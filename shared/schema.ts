@@ -93,6 +93,16 @@ export const aiAgents = pgTable("ai_agents", {
   rating: integer("rating").default(0),
   installCount: integer("install_count").notNull().default(0),
   isPublic: boolean("is_public").notNull().default(true),
+  // Directory paths for agent code
+  backendPath: text("backend_path"),
+  frontendPath: text("frontend_path"),
+  // Subscription and pricing
+  pricingModel: text("pricing_model").notNull().default("free"),
+  priceMonthly: integer("price_monthly").default(0),
+  priceYearly: integer("price_yearly").default(0),
+  // Metadata
+  version: text("version").notNull().default("1.0.0"),
+  tags: jsonb("tags").notNull().default([]),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
