@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -70,16 +70,53 @@ export const workflows = pgTable("workflows", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
-  type: text("type").notNull(),
+  category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  nodes: jsonb("nodes").notNull().default([]),
-  status: text("status").notNull().default("draft"),
+  // Visual workflow builder data
+  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`), // Array of workflow nodes
+  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`), // Array of connections between nodes
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas viewport state
+  // Workflow state
+  status: text("status").notNull().default("draft"), // 'draft', 'published', 'archived'
   version: integer("version").notNull().default(1),
   isActive: boolean("is_active").notNull().default(true),
+  // Trigger configuration
+  trigger: jsonb("trigger").default(sql`'{}'::jsonb`), // Trigger type and configuration
+  // Metadata
+  lastPublishedAt: timestamp("last_published_at"),
+  lastExecutedAt: timestamp("last_executed_at"),
+  executionCount: integer("execution_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Workflow Executions - track workflow runs
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  workflowVersion: integer("workflow_version").notNull(), // Critical: track which version executed
+  triggeredBy: varchar("triggered_by").references(() => users.id),
+  status: text("status").notNull().default("running"), // 'running', 'completed', 'failed', 'cancelled'
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  // Execution data
+  input: jsonb("input").default(sql`'{}'::jsonb`),
+  output: jsonb("output").default(sql`'{}'::jsonb`),
+  error: text("error"),
+  // Node execution tracking
+  nodeExecutions: jsonb("node_executions").notNull().default(sql`'[]'::jsonb`), // Track which nodes executed
+  currentNodeId: varchar("current_node_id"),
+  // Metadata
+  duration: integer("duration"), // milliseconds
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance on multi-tenant queries
+  orgWorkflowIdx: index("workflow_executions_org_workflow_idx").on(table.organizationId, table.workflowId),
+  workflowStatusIdx: index("workflow_executions_workflow_status_idx").on(table.workflowId, table.status),
+}));
 
 // AI Agents in marketplace
 export const aiAgents = pgTable("ai_agents", {
@@ -268,6 +305,84 @@ export const taggables = pgTable("taggables", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Workflow TypeScript Types for Nodes and Edges
+export type WorkflowNodeType = 
+  | "trigger"
+  | "condition"
+  | "action"
+  | "delay"
+  | "notification"
+  | "approval"
+  | "loop"
+  | "end";
+
+export type WorkflowTriggerType =
+  | "manual"
+  | "schedule"
+  | "document_upload"
+  | "client_created"
+  | "form_submitted"
+  | "email_received"
+  | "webhook";
+
+export type WorkflowActionType =
+  | "send_email"
+  | "send_notification"
+  | "create_task"
+  | "update_document"
+  | "run_ai_agent"
+  | "http_request"
+  | "create_organizer"
+  | "assign_to_user";
+
+export interface WorkflowNodeData {
+  label: string;
+  type: WorkflowNodeType;
+  config: Record<string, any>;
+  // For trigger nodes
+  triggerType?: WorkflowTriggerType;
+  triggerConfig?: Record<string, any>;
+  // For action nodes
+  actionType?: WorkflowActionType;
+  actionConfig?: Record<string, any>;
+  // For condition nodes
+  conditionExpression?: string;
+  conditionConfig?: Record<string, any>;
+}
+
+export interface WorkflowNode {
+  id: string;
+  type: WorkflowNodeType;
+  position: { x: number; y: number };
+  data: WorkflowNodeData;
+}
+
+export interface WorkflowEdge {
+  id: string;
+  source: string; // node id
+  target: string; // node id
+  sourceHandle?: string;
+  targetHandle?: string;
+  label?: string;
+  // For conditional edges
+  condition?: string;
+}
+
+export interface WorkflowTrigger {
+  type: WorkflowTriggerType;
+  config: Record<string, any>;
+  // For schedule triggers
+  schedule?: {
+    cron?: string;
+    timezone?: string;
+  };
+  // For event triggers
+  event?: {
+    resource: string;
+    action: string;
+  };
+}
+
 // Zod Schemas and Types
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -294,8 +409,20 @@ export const insertPermissionSchema = createInsertSchema(permissions).omit({
 
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   id: true,
+  organizationId: true,
+  createdBy: true,
+  lastPublishedAt: true,
+  lastExecutedAt: true,
+  executionCount: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutions).omit({
+  id: true,
+  organizationId: true,
+  startedAt: true,
+  createdAt: true,
 });
 
 export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
@@ -386,6 +513,8 @@ export type InsertTag = z.infer<typeof insertTagSchema>;
 export type Tag = typeof tags.$inferSelect;
 export type InsertTaggable = z.infer<typeof insertTaggableSchema>;
 export type Taggable = typeof taggables.$inferSelect;
+export type InsertWorkflowExecution = z.infer<typeof insertWorkflowExecutionSchema>;
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
