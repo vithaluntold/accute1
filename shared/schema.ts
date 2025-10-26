@@ -248,6 +248,26 @@ export const contacts = pgTable("contacts", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Tags for organizing resources
+export const tags = pgTable("tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6b7280"), // Default gray
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Polymorphic taggables junction table
+export const taggables = pgTable("taggables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tagId: varchar("tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
+  taggableType: text("taggable_type").notNull(), // 'document', 'client', 'workflow', 'contact', etc.
+  taggableId: varchar("taggable_id").notNull(), // ID of the tagged resource
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Zod Schemas and Types
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -322,6 +342,19 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   updatedAt: true,
 });
 
+export const insertTagSchema = createInsertSchema(tags).omit({
+  id: true,
+  organizationId: true,
+  createdBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaggableSchema = createInsertSchema(taggables).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -349,6 +382,10 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+export type InsertTag = z.infer<typeof insertTagSchema>;
+export type Tag = typeof tags.$inferSelect;
+export type InsertTaggable = z.infer<typeof insertTaggableSchema>;
+export type Taggable = typeof taggables.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;

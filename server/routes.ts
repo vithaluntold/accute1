@@ -1175,6 +1175,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Tag Routes ====================
+
+  app.get("/api/tags", requireAuth, requirePermission("tags.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const tags = await storage.getTagsByOrganization(req.user!.organizationId!);
+      res.json(tags);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tags" });
+    }
+  });
+
+  app.post("/api/tags", requireAuth, requirePermission("tags.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = schema.insertTagSchema.parse(req.body);
+      const tag = await storage.createTag({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "tag", tag.id, { name: tag.name }, req);
+      res.json(tag);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create tag" });
+    }
+  });
+
+  app.patch("/api/tags/:id", requireAuth, requirePermission("tags.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTag(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      const validated = schema.insertTagSchema.partial().parse(req.body);
+      const { organizationId, createdBy, ...safeData } = validated as any;
+      
+      const tag = await storage.updateTag(req.params.id, safeData);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "tag", req.params.id, {}, req);
+      res.json(tag);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update tag" });
+    }
+  });
+
+  app.delete("/api/tags/:id", requireAuth, requirePermission("tags.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTag(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      await storage.deleteTag(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "tag", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete tag" });
+    }
+  });
+
+  // Taggables routes
+  app.post("/api/taggables", requireAuth, requirePermission("tags.apply"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = schema.insertTaggableSchema.parse(req.body);
+      
+      const tag = await storage.getTag(validated.tagId);
+      if (!tag || tag.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      const taggable = await storage.addTag(validated);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "apply_tag", validated.taggableType, validated.taggableId, { tagId: validated.tagId }, req);
+      res.json(taggable);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add tag" });
+    }
+  });
+
+  app.delete("/api/taggables", requireAuth, requirePermission("tags.apply"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { tagId, taggableType, taggableId } = req.body;
+      
+      const tag = await storage.getTag(tagId);
+      if (!tag || tag.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Tag not found" });
+      }
+      
+      await storage.removeTag(tagId, taggableType, taggableId);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "remove_tag", taggableType, taggableId, { tagId }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove tag" });
+    }
+  });
+
+  app.get("/api/resources/:type/:id/tags", requireAuth, requirePermission("tags.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const tags = await storage.getTagsForResource(req.params.type, req.params.id);
+      res.json(tags);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch resource tags" });
+    }
+  });
+
   // ==================== Notification Routes ====================
   
   app.get("/api/notifications", requireAuth, async (req: AuthRequest, res: Response) => {

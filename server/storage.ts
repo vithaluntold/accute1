@@ -150,6 +150,19 @@ export interface IStorage {
   deleteContact(id: string): Promise<void>;
   getContactsByClient(clientId: string): Promise<Contact[]>;
   getContactsByOrganization(organizationId: string): Promise<Contact[]>;
+  
+  // Tags
+  getTag(id: string): Promise<Tag | undefined>;
+  createTag(tag: InsertTag & { organizationId: string; createdBy: string }): Promise<Tag>;
+  updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag>;
+  deleteTag(id: string): Promise<void>;
+  getTagsByOrganization(organizationId: string): Promise<Tag[]>;
+  
+  // Taggables
+  addTag(taggable: InsertTaggable): Promise<Taggable>;
+  removeTag(tagId: string, taggableType: string, taggableId: string): Promise<void>;
+  getTagsForResource(taggableType: string, taggableId: string): Promise<Tag[]>;
+  getResourcesByTag(tagId: string, taggableType: string): Promise<string[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -680,6 +693,71 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.contacts)
       .where(eq(schema.contacts.organizationId, organizationId))
       .orderBy(schema.contacts.lastName, schema.contacts.firstName);
+  }
+
+  // Tags
+  async getTag(id: string): Promise<Tag | undefined> {
+    const result = await db.select().from(schema.tags).where(eq(schema.tags.id, id));
+    return result[0];
+  }
+
+  async createTag(tag: InsertTag & { organizationId: string; createdBy: string }): Promise<Tag> {
+    const result = await db.insert(schema.tags).values(tag).returning();
+    return result[0];
+  }
+
+  async updateTag(id: string, tag: Partial<InsertTag>): Promise<Tag> {
+    const result = await db.update(schema.tags)
+      .set({ ...tag, updatedAt: new Date() })
+      .where(eq(schema.tags.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTag(id: string): Promise<void> {
+    await db.delete(schema.tags).where(eq(schema.tags.id, id));
+  }
+
+  async getTagsByOrganization(organizationId: string): Promise<Tag[]> {
+    return await db.select().from(schema.tags)
+      .where(eq(schema.tags.organizationId, organizationId))
+      .orderBy(schema.tags.name);
+  }
+
+  // Taggables
+  async addTag(taggable: InsertTaggable): Promise<Taggable> {
+    const result = await db.insert(schema.taggables).values(taggable).returning();
+    return result[0];
+  }
+
+  async removeTag(tagId: string, taggableType: string, taggableId: string): Promise<void> {
+    await db.delete(schema.taggables)
+      .where(and(
+        eq(schema.taggables.tagId, tagId),
+        eq(schema.taggables.taggableType, taggableType),
+        eq(schema.taggables.taggableId, taggableId)
+      ));
+  }
+
+  async getTagsForResource(taggableType: string, taggableId: string): Promise<Tag[]> {
+    const result = await db.select({ tag: schema.tags })
+      .from(schema.taggables)
+      .innerJoin(schema.tags, eq(schema.taggables.tagId, schema.tags.id))
+      .where(and(
+        eq(schema.taggables.taggableType, taggableType),
+        eq(schema.taggables.taggableId, taggableId)
+      ));
+    return result.map(r => r.tag);
+  }
+
+  async getResourcesByTag(tagId: string, taggableType: string): Promise<string[]> {
+    const result = await db.select({ taggableId: schema.taggables.taggableId })
+      .from(schema.taggables)
+      .where(and(
+        eq(schema.taggables.tagId, tagId),
+        eq(schema.taggables.taggableType, taggableType)
+      ));
+    return result.map(r => r.taggableId);
   }
 }
 

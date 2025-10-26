@@ -46,7 +46,18 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Contacts Management Complete)
+### 2025-10-26 (Latest - Tagging System Complete)
+- ✅ Implemented polymorphic tagging system for organizing resources:
+  - Database schema with tags table (name, color, organizationId)
+  - Polymorphic taggables junction table (tagId, taggableType, taggableId)
+  - Supports tagging documents, clients, workflows, contacts, and any future resources
+  - Storage layer with comprehensive tag operations (CRUD, apply/remove, queries)
+  - API routes with multi-tenant security and schema validation
+  - Cascade delete when tags are removed
+- ✅ Added tag permissions: tags.view, tags.create, tags.edit, tags.delete, tags.apply
+- ✅ Server-populated fields pattern for organizationId and createdBy
+
+### 2025-10-26 (Earlier - Contacts Management Complete)
 - ✅ Implemented Contacts management system with client assignment:
   - Database schema with contacts table (firstName, lastName, email, phone, title, department, isPrimary)
   - Client relationship with cascade delete
