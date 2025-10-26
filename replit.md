@@ -46,7 +46,27 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Forms Management UI Complete)
+### 2025-10-26 (Latest - Form Builder UI Complete)
+- ✅ Built production-ready Form Builder page (/forms/:id/builder):
+  - Add fields with 22 field types (text, textarea, number, email, phone, url, date, time, datetime, select, multi_select, radio, checkbox, file_upload, signature, address, currency, percentage, rating, slider, calculated, heading, divider, html)
+  - Configure field properties: label, placeholder, description, help text, required, width
+  - Edit existing fields
+  - Delete fields with automatic order re-ranking
+  - Save only fields array (doesn't overwrite sections/pages/conditionalRules)
+  - Back navigation to forms list
+  - Empty state when no fields
+- ✅ Fixed critical bugs identified by architect:
+  - Save mutation now sends ONLY fields array (prevents overwriting backend structures)
+  - Field deletion re-ranks remaining fields sequentially (0, 1, 2 not 0, 2, 4)
+  - All interactive controls have data-testid attributes
+- ✅ Verified with automated E2E tests:
+  - Add 3 fields → Delete middle field → Remaining fields have sequential order
+  - Save successfully sends only fields array
+  - Fields persist after save/reload
+- ✅ Architect approved as production-ready
+- 📋 Next: Build dynamic form renderer component (renders forms at runtime)
+
+### 2025-10-26 (Earlier - Forms Management UI Complete)
 - ✅ Built production-ready Forms Management page (/forms):
   - Full CRUD operations: Create, Edit, Publish, Delete forms
   - Card-based grid layout with search/filter functionality
