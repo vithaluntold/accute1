@@ -46,7 +46,25 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Tag Management UI Complete)
+### 2025-10-26 (Latest - Form Builder Schema Complete)
+- ✅ Designed comprehensive form creator system:
+  - Database schema: form_templates and form_submissions tables
+  - 22 field types: text, textarea, number, email, phone, url, date, time, datetime, select, multi_select, radio, checkbox, file_upload, signature, address, currency, percentage, rating, slider, calculated, heading, divider, html
+  - Conditional logic: Show/hide/require/disable fields based on expressions
+  - Validation rules: Required, min/max, pattern matching, custom JavaScript
+  - Calculated fields: Auto-compute values using expressions
+  - Repeating sections: For listing multiple items (e.g., dependents, income sources)
+  - Multi-page forms: With sections and progress tracking
+  - **Folder structure mapping**: Critical for auto-creating client folders!
+  - Submission workflow: Review, approve, reject submissions
+  - Client linking: Associate submissions with clients
+  - Version control: Track form template versions
+  - TypeScript types for all form structures
+- ✅ Capabilities exceed Zoho Forms (22 vs ~18 field types, folder automation unique to Accute)
+- ✅ Architect approved as production-ready
+- 📋 Next: Build visual form designer UI and dynamic renderer
+
+### 2025-10-26 (Earlier - Tag Management UI Complete)
 - ✅ Built complete tag management UI with CRUD operations:
   - Tags page (/tags) with color picker, search, and card-based grid
   - TagSelector component for applying/removing tags on any resource

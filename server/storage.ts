@@ -30,6 +30,16 @@ import type {
   InsertInvitation,
   Client,
   InsertClient,
+  Contact,
+  InsertContact,
+  Tag,
+  InsertTag,
+  Taggable,
+  InsertTaggable,
+  FormTemplate,
+  InsertFormTemplate,
+  FormSubmission,
+  InsertFormSubmission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -163,6 +173,23 @@ export interface IStorage {
   removeTag(tagId: string, taggableType: string, taggableId: string): Promise<void>;
   getTagsForResource(taggableType: string, taggableId: string): Promise<Tag[]>;
   getResourcesByTag(tagId: string, taggableType: string): Promise<string[]>;
+
+  // Form Templates
+  getFormTemplate(id: string): Promise<FormTemplate | undefined>;
+  createFormTemplate(template: InsertFormTemplate & { organizationId: string; createdBy: string }): Promise<FormTemplate>;
+  updateFormTemplate(id: string, template: Partial<InsertFormTemplate>): Promise<FormTemplate | undefined>;
+  deleteFormTemplate(id: string): Promise<void>;
+  getFormTemplatesByOrganization(organizationId: string): Promise<FormTemplate[]>;
+  publishFormTemplate(id: string): Promise<FormTemplate | undefined>;
+
+  // Form Submissions
+  getFormSubmission(id: string): Promise<FormSubmission | undefined>;
+  createFormSubmission(submission: InsertFormSubmission & { organizationId: string }): Promise<FormSubmission>;
+  updateFormSubmission(id: string, submission: Partial<InsertFormSubmission>): Promise<FormSubmission | undefined>;
+  getFormSubmissionsByTemplate(formTemplateId: string): Promise<FormSubmission[]>;
+  getFormSubmissionsByClient(clientId: string): Promise<FormSubmission[]>;
+  getFormSubmissionsByOrganization(organizationId: string): Promise<FormSubmission[]>;
+  reviewFormSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<FormSubmission | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -758,6 +785,104 @@ export class DbStorage implements IStorage {
         eq(schema.taggables.taggableType, taggableType)
       ));
     return result.map(r => r.taggableId);
+  }
+
+  // Form Templates
+  async getFormTemplate(id: string): Promise<FormTemplate | undefined> {
+    const result = await db.select().from(schema.formTemplates).where(eq(schema.formTemplates.id, id));
+    return result[0];
+  }
+
+  async createFormTemplate(template: InsertFormTemplate & { organizationId: string; createdBy: string }): Promise<FormTemplate> {
+    const result = await db.insert(schema.formTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateFormTemplate(id: string, template: Partial<InsertFormTemplate>): Promise<FormTemplate | undefined> {
+    const result = await db.update(schema.formTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(schema.formTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFormTemplate(id: string): Promise<void> {
+    await db.delete(schema.formTemplates).where(eq(schema.formTemplates.id, id));
+  }
+
+  async getFormTemplatesByOrganization(organizationId: string): Promise<FormTemplate[]> {
+    return await db.select().from(schema.formTemplates)
+      .where(eq(schema.formTemplates.organizationId, organizationId))
+      .orderBy(desc(schema.formTemplates.updatedAt));
+  }
+
+  async publishFormTemplate(id: string): Promise<FormTemplate | undefined> {
+    const result = await db.update(schema.formTemplates)
+      .set({ 
+        status: 'published', 
+        lastPublishedAt: new Date(),
+        updatedAt: new Date() 
+      })
+      .where(eq(schema.formTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Form Submissions
+  async getFormSubmission(id: string): Promise<FormSubmission | undefined> {
+    const result = await db.select().from(schema.formSubmissions).where(eq(schema.formSubmissions.id, id));
+    return result[0];
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission & { organizationId: string }): Promise<FormSubmission> {
+    const result = await db.insert(schema.formSubmissions).values(submission).returning();
+    // Increment submission count on template
+    await db.update(schema.formTemplates)
+      .set({ 
+        submissionCount: sql`${schema.formTemplates.submissionCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.formTemplates.id, submission.formTemplateId));
+    return result[0];
+  }
+
+  async updateFormSubmission(id: string, submission: Partial<InsertFormSubmission>): Promise<FormSubmission | undefined> {
+    const result = await db.update(schema.formSubmissions)
+      .set(submission)
+      .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getFormSubmissionsByTemplate(formTemplateId: string): Promise<FormSubmission[]> {
+    return await db.select().from(schema.formSubmissions)
+      .where(eq(schema.formSubmissions.formTemplateId, formTemplateId))
+      .orderBy(desc(schema.formSubmissions.submittedAt));
+  }
+
+  async getFormSubmissionsByClient(clientId: string): Promise<FormSubmission[]> {
+    return await db.select().from(schema.formSubmissions)
+      .where(eq(schema.formSubmissions.clientId, clientId))
+      .orderBy(desc(schema.formSubmissions.submittedAt));
+  }
+
+  async getFormSubmissionsByOrganization(organizationId: string): Promise<FormSubmission[]> {
+    return await db.select().from(schema.formSubmissions)
+      .where(eq(schema.formSubmissions.organizationId, organizationId))
+      .orderBy(desc(schema.formSubmissions.submittedAt));
+  }
+
+  async reviewFormSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<FormSubmission | undefined> {
+    const result = await db.update(schema.formSubmissions)
+      .set({ 
+        status,
+        reviewedBy,
+        reviewedAt: new Date(),
+        reviewNotes
+      })
+      .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return result[0];
   }
 }
 

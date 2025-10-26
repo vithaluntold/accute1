@@ -32,6 +32,8 @@ import {
   insertContactSchema,
   insertTagSchema,
   insertTaggableSchema,
+  insertFormTemplateSchema,
+  insertFormSubmissionSchema,
 } from "@shared/schema";
 
 const upload = multer({
@@ -1321,6 +1323,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(logs);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  // ==================== Form Template Routes ====================
+  
+  app.get("/api/forms", requireAuth, requirePermission("forms.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const forms = await storage.getFormTemplatesByOrganization(req.user!.organizationId!);
+      res.json(forms);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  app.get("/api/forms/:id", requireAuth, requirePermission("forms.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const form = await storage.getFormTemplate(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(form);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch form" });
+    }
+  });
+
+  app.post("/api/forms", requireAuth, requirePermission("forms.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const parsed = insertFormTemplateSchema.parse(req.body);
+      const form = await storage.createFormTemplate({
+        ...parsed,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id,
+      });
+      
+      await logActivity(
+        req.user!.id,
+        "form_created",
+        "form",
+        form.id,
+        req.user!.organizationId!,
+        { formName: form.name }
+      );
+      
+      res.status(201).json(form);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create form" });
+    }
+  });
+
+  app.put("/api/forms/:id", requireAuth, requirePermission("forms.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFormTemplate(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const parsed = insertFormTemplateSchema.partial().parse(req.body);
+      const updated = await storage.updateFormTemplate(req.params.id, parsed);
+      
+      await logActivity(
+        req.user!.id,
+        "form_updated",
+        "form",
+        req.params.id,
+        req.user!.organizationId!,
+        { formName: updated?.name }
+      );
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update form" });
+    }
+  });
+
+  app.post("/api/forms/:id/publish", requireAuth, requirePermission("forms.publish"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFormTemplate(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const published = await storage.publishFormTemplate(req.params.id);
+      
+      await logActivity(
+        req.user!.id,
+        "form_published",
+        "form",
+        req.params.id,
+        req.user!.organizationId!,
+        { formName: published?.name }
+      );
+      
+      res.json(published);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to publish form" });
+    }
+  });
+
+  app.delete("/api/forms/:id", requireAuth, requirePermission("forms.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFormTemplate(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteFormTemplate(req.params.id);
+      
+      await logActivity(
+        req.user!.id,
+        "form_deleted",
+        "form",
+        req.params.id,
+        req.user!.organizationId!,
+        { formName: existing.name }
+      );
+      
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete form" });
+    }
+  });
+
+  // ==================== Form Submission Routes ====================
+  
+  app.get("/api/form-submissions", requireAuth, requirePermission("form_submissions.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { formTemplateId, clientId } = req.query;
+      let submissions;
+      
+      if (formTemplateId) {
+        const form = await storage.getFormTemplate(formTemplateId as string);
+        if (!form || form.organizationId !== req.user!.organizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        submissions = await storage.getFormSubmissionsByTemplate(formTemplateId as string);
+      } else if (clientId) {
+        const client = await storage.getClient(clientId as string);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        submissions = await storage.getFormSubmissionsByClient(clientId as string);
+      } else {
+        submissions = await storage.getFormSubmissionsByOrganization(req.user!.organizationId!);
+      }
+      
+      res.json(submissions);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  app.post("/api/form-submissions", requireAuth, requirePermission("form_submissions.submit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const parsed = insertFormSubmissionSchema.parse(req.body);
+      
+      // Verify form exists and get version
+      const form = await storage.getFormTemplate(parsed.formTemplateId);
+      if (!form) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+      
+      // Allow submission if user is in same org or form allows external submissions
+      if (form.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const submission = await storage.createFormSubmission({
+        ...parsed,
+        formVersion: form.version,
+        organizationId: form.organizationId,
+      });
+      
+      await logActivity(
+        req.user!.id,
+        "form_submitted",
+        "form_submission",
+        submission.id,
+        form.organizationId,
+        { formName: form.name, submissionId: submission.id }
+      );
+      
+      res.status(201).json(submission);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to submit form" });
+    }
+  });
+
+  app.put("/api/form-submissions/:id/review", requireAuth, requirePermission("form_submissions.review"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { status, reviewNotes } = req.body;
+      
+      if (!status || !["approved", "rejected", "under_review"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const reviewed = await storage.reviewFormSubmission(
+        req.params.id,
+        req.user!.id,
+        status,
+        reviewNotes
+      );
+      
+      await logActivity(
+        req.user!.id,
+        "form_submission_reviewed",
+        "form_submission",
+        req.params.id,
+        req.user!.organizationId!,
+        { status, reviewNotes }
+      );
+      
+      res.json(reviewed);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to review submission" });
     }
   });
 
