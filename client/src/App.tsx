@@ -31,6 +31,7 @@ import Team from "@/pages/team";
 import Documents from "@/pages/documents";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
+import Tags from "@/pages/tags";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -215,6 +216,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Contacts />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tags">
+        <ProtectedRoute>
+          <AppLayout>
+            <Tags />
           </AppLayout>
         </ProtectedRoute>
       </Route>

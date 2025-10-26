@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calendar } from "lucide-react";
 import { formatDistance } from "date-fns";
+import { TagSelector } from "@/components/tag-selector";
 
 export default function Documents() {
   const { toast } = useToast();
@@ -283,6 +284,7 @@ export default function Documents() {
                     {doc.status}
                   </Badge>
                 </div>
+                <TagSelector resourceType="document" resourceId={doc.id} />
                 <div className="flex gap-2">
                   <Button
                     variant="outline"

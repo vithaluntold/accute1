@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, Plus, Building2, Mail, Phone, MapPin, Pencil, Trash2, Users } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { TagSelector } from "@/components/tag-selector";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema } from "@shared/schema";
 import type { Client, InsertClient } from "@shared/schema";
@@ -435,6 +436,9 @@ export default function Clients() {
                       <span>{client.city}, {client.state}</span>
                     </div>
                   )}
+                </div>
+                <div className="mt-3">
+                  <TagSelector resourceType="client" resourceId={client.id} />
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Button

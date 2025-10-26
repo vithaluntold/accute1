@@ -1,4 +1,4 @@
-import { Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut } from "lucide-react";
+import { Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, UserCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -38,6 +38,24 @@ const menuItems = [
     url: "/documents",
     icon: FileText,
     permission: "documents.view",
+  },
+  {
+    title: "Clients",
+    url: "/clients",
+    icon: Building2,
+    permission: "clients.view",
+  },
+  {
+    title: "Contacts",
+    url: "/contacts",
+    icon: UserCircle,
+    permission: "contacts.view",
+  },
+  {
+    title: "Tags",
+    url: "/tags",
+    icon: Tag,
+    permission: "tags.view",
   },
   {
     title: "Analytics",

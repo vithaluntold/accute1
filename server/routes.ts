@@ -29,6 +29,9 @@ import {
   insertDocumentSchema,
   insertNotificationSchema,
   insertClientSchema,
+  insertContactSchema,
+  insertTagSchema,
+  insertTaggableSchema,
 } from "@shared/schema";
 
 const upload = multer({
@@ -1188,16 +1191,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tags", requireAuth, requirePermission("tags.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const validated = schema.insertTagSchema.parse(req.body);
+      console.log("POST /api/tags - Request body:", req.body);
+      console.log("User organizationId:", req.user?.organizationId);
+      console.log("User userId:", req.userId);
+      
+      const validated = insertTagSchema.parse(req.body);
+      console.log("Validated data:", validated);
+      
       const tag = await storage.createTag({
         ...validated,
         organizationId: req.user!.organizationId!,
         createdBy: req.userId!,
       });
+      console.log("Tag created successfully:", tag.id);
+      
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "tag", tag.id, { name: tag.name }, req);
       res.json(tag);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to create tag" });
+      console.error("Failed to create tag:", error);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Failed to create tag", details: error.message });
     }
   });
 
@@ -1208,7 +1221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tag not found" });
       }
       
-      const validated = schema.insertTagSchema.partial().parse(req.body);
+      const validated = insertTagSchema.partial().parse(req.body);
       const { organizationId, createdBy, ...safeData } = validated as any;
       
       const tag = await storage.updateTag(req.params.id, safeData);
@@ -1237,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Taggables routes
   app.post("/api/taggables", requireAuth, requirePermission("tags.apply"), async (req: AuthRequest, res: Response) => {
     try {
-      const validated = schema.insertTaggableSchema.parse(req.body);
+      const validated = insertTaggableSchema.parse(req.body);
       
       const tag = await storage.getTag(validated.tagId);
       if (!tag || tag.organizationId !== req.user!.organizationId) {

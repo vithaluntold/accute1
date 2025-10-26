@@ -46,7 +46,22 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Tagging System Complete)
+### 2025-10-26 (Latest - Tag Management UI Complete)
+- ✅ Built complete tag management UI with CRUD operations:
+  - Tags page (/tags) with color picker, search, and card-based grid
+  - TagSelector component for applying/removing tags on any resource
+  - Integrated into Documents, Clients, and Contacts pages
+- ✅ Fixed critical bugs:
+  - Dialog open handler - properly accepts boolean parameter
+  - Schema imports - added insertTagSchema, insertContactSchema, insertTaggableSchema
+  - LSP errors resolved
+- ✅ Created tag permissions in database (manually):
+  - Super Admin: all 5 permissions (view, create, edit, delete, apply)
+  - Admin: 4 permissions (view, create, edit, apply)
+  - Employee: 2 permissions (view, apply)
+- ✅ Verified with automated E2E tests - Create, Edit, Delete all working
+
+### 2025-10-26 (Earlier - Tagging System Backend Complete)
 - ✅ Implemented polymorphic tagging system for organizing resources:
   - Database schema with tags table (name, color, organizationId)
   - Polymorphic taggables junction table (tagId, taggableType, taggableId)

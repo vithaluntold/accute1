@@ -14,6 +14,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertContactSchema, type InsertContact, type Contact, type Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Search, Mail, Phone, Building2, Trash2, Edit, User, Star } from "lucide-react";
+import { TagSelector } from "@/components/tag-selector";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -434,6 +435,9 @@ export default function Contacts() {
                       {contact.department}
                     </Badge>
                   )}
+                  <div className="mt-3">
+                    <TagSelector resourceType="contact" resourceId={contact.id} />
+                  </div>
                 </CardContent>
               </Card>
             ))}
