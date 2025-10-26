@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { formatDistance } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,14 @@ export default function Settings() {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [expiresInDays, setExpiresInDays] = useState(30);
+  
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const isSuperAdmin = currentUser?.role?.name === "Super Admin";
 
   const form = useForm<ProviderFormData>({
     resolver: zodResolver(providerSchema),
@@ -417,6 +426,93 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Super Admin Key Management
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Generate invitation keys for new super administrators
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="border rounded-md p-4 bg-muted/30 space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label>Expires In (days)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={expiresInDays}
+                    onChange={(e) => setExpiresInDays(parseInt(e.target.value))}
+                    className="mt-2"
+                    data-testid="input-key-expiry"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    apiRequest("POST", "/api/super-admin/keys", { expiresInDays })
+                      .then(res => res.json())
+                      .then(data => {
+                        setGeneratedKey(data.key);
+                        queryClient.invalidateQueries({ queryKey: ["/api/super-admin/keys"] });
+                        toast({
+                          title: "Super admin key generated!",
+                          description: "Save this key securely - it will not be shown again",
+                        });
+                      })
+                      .catch(error => {
+                        toast({
+                          title: "Failed to generate key",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                      });
+                  }}
+                  className="mt-7"
+                  data-testid="button-generate-key"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Generate Key
+                </Button>
+              </div>
+
+              {generatedKey && (
+                <div className="p-4 bg-primary/10 border border-primary rounded-md">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-medium">New Super Admin Key:</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedKey);
+                        toast({ title: "Key copied to clipboard" });
+                      }}
+                      data-testid="button-copy-key"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <code className="text-xs break-all bg-background p-2 rounded block" data-testid="text-generated-key">
+                    {generatedKey}
+                  </code>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Save this key securely. It will not be shown again.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <SuperAdminKeysList />
+          </CardContent>
+        </Card>
+      )}
+
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -447,6 +543,81 @@ export default function Settings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function SuperAdminKeysList() {
+  const { data: keys = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/super-admin/keys"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (keys.length === 0) {
+    return (
+      <div className="text-center p-8 border rounded-md bg-muted/20">
+        <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+        <p className="text-sm text-muted-foreground">
+          No super admin keys generated yet
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium">Generated Keys</h3>
+      {keys.map((key: any) => (
+        <div
+          key={key.id}
+          className="flex items-center justify-between p-4 border rounded-md"
+          data-testid={`key-card-${key.id}`}
+        >
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              {key.usedAt ? (
+                <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Used
+                </Badge>
+              ) : key.revokedAt ? (
+                <Badge variant="outline" className="gap-1 text-red-600 border-red-600">
+                  <X className="h-3 w-3" />
+                  Revoked
+                </Badge>
+              ) : new Date(key.expiresAt) < new Date() ? (
+                <Badge variant="outline" className="gap-1 text-orange-600 border-orange-600">
+                  <AlertCircle className="h-3 w-3" />
+                  Expired
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1">
+                  <Clock className="h-3 w-3" />
+                  Active
+                </Badge>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Created {formatDistance(new Date(key.createdAt), new Date(), { addSuffix: true })}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Expires {formatDistance(new Date(key.expiresAt), new Date(), { addSuffix: true })}
+            </span>
+            {key.usedAt && (
+              <span className="text-xs text-muted-foreground">
+                Used {formatDistance(new Date(key.usedAt), new Date(), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

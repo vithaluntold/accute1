@@ -218,6 +218,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Super Admin Routes ====================
 
+  // Get super admin keys (requires super admin)
+  app.get("/api/super-admin/keys", requireAuth, requirePermission("super_admin.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const keys = await storage.getSuperAdminKeysByUser(req.userId!);
+      res.json(keys);
+    } catch (error: any) {
+      console.error("Get super admin keys error:", error);
+      res.status(500).json({ error: "Failed to fetch super admin keys" });
+    }
+  });
+
   // Generate super admin key (requires existing super admin)
   app.post("/api/super-admin/keys", requireAuth, requirePermission("super_admin.manage"), async (req: AuthRequest, res: Response) => {
     try {

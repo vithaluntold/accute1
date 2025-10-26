@@ -46,8 +46,8 @@ const menuItems = [
     permission: "analytics.view",
   },
   {
-    title: "Users",
-    url: "/users",
+    title: "Team",
+    url: "/team",
     icon: Users,
     permission: "users.view",
   },

@@ -27,6 +27,7 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Workflows from "@/pages/workflows";
 import AIAgents from "@/pages/ai-agents";
+import Team from "@/pages/team";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -183,6 +184,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <AIAgents />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/team">
+        <ProtectedRoute>
+          <AppLayout>
+            <Team />
           </AppLayout>
         </ProtectedRoute>
       </Route>
