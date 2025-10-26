@@ -305,6 +305,181 @@ export const taggables = pgTable("taggables", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Form Templates - Advanced form builder for organizers and questionnaires
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("custom"), // 'tax', 'audit', 'onboarding', 'custom'
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  // Form structure
+  fields: jsonb("fields").notNull().default(sql`'[]'::jsonb`), // Array of form fields
+  sections: jsonb("sections").notNull().default(sql`'[]'::jsonb`), // Group fields into sections
+  pages: jsonb("pages").notNull().default(sql`'[]'::jsonb`), // Multi-page forms
+  // Conditional logic
+  conditionalRules: jsonb("conditional_rules").notNull().default(sql`'[]'::jsonb`), // Show/hide logic
+  validationRules: jsonb("validation_rules").notNull().default(sql`'[]'::jsonb`), // Custom validation
+  calculatedFields: jsonb("calculated_fields").notNull().default(sql`'[]'::jsonb`), // Auto-calculated fields
+  // Folder mapping for document organization
+  folderStructure: jsonb("folder_structure").default(sql`'{}'::jsonb`), // Maps form sections to folder paths
+  // Settings
+  settings: jsonb("settings").default(sql`'{}'::jsonb`), // Notifications, confirmations, etc.
+  // State
+  status: text("status").notNull().default("draft"), // 'draft', 'published', 'archived'
+  version: integer("version").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(true),
+  // Metadata
+  lastPublishedAt: timestamp("last_published_at"),
+  submissionCount: integer("submission_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Form Submissions - Store form responses
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formTemplateId: varchar("form_template_id").notNull().references(() => formTemplates.id, { onDelete: "cascade" }),
+  formVersion: integer("form_version").notNull(), // Track which version was submitted
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  submittedBy: varchar("submitted_by").references(() => users.id),
+  clientId: varchar("client_id").references(() => clients.id), // Link to client if applicable
+  // Submission data
+  data: jsonb("data").notNull().default(sql`'{}'::jsonb`), // Form field responses
+  attachments: jsonb("attachments").notNull().default(sql`'[]'::jsonb`), // Uploaded files metadata
+  // Status tracking
+  status: text("status").notNull().default("submitted"), // 'submitted', 'under_review', 'approved', 'rejected'
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  // Metadata
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  orgFormIdx: index("form_submissions_org_form_idx").on(table.organizationId, table.formTemplateId),
+  clientIdx: index("form_submissions_client_idx").on(table.clientId),
+  statusIdx: index("form_submissions_status_idx").on(table.status),
+}));
+
+// Form Builder TypeScript Types
+export type FormFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "email"
+  | "phone"
+  | "url"
+  | "date"
+  | "time"
+  | "datetime"
+  | "select"
+  | "multi_select"
+  | "radio"
+  | "checkbox"
+  | "file_upload"
+  | "signature"
+  | "address"
+  | "currency"
+  | "percentage"
+  | "rating"
+  | "slider"
+  | "calculated"
+  | "heading"
+  | "divider"
+  | "html";
+
+export interface FormFieldValidation {
+  required?: boolean;
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  customValidation?: string; // JavaScript expression
+  errorMessage?: string;
+}
+
+export interface FormFieldOption {
+  label: string;
+  value: string;
+  icon?: string;
+}
+
+export interface FormField {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  placeholder?: string;
+  description?: string;
+  helpText?: string;
+  defaultValue?: any;
+  // Validation
+  validation?: FormFieldValidation;
+  // Options for select/radio/checkbox
+  options?: FormFieldOption[];
+  // File upload settings
+  fileTypes?: string[]; // ['pdf', 'jpg', 'png']
+  maxFileSize?: number; // in MB
+  maxFiles?: number;
+  // Conditional logic
+  conditionalRules?: FormConditionalRule[];
+  // Layout
+  width?: "full" | "half" | "third" | "quarter";
+  order?: number;
+  sectionId?: string;
+  pageId?: string;
+  // Calculated field
+  calculation?: string; // JavaScript expression
+  // Folder mapping
+  folderPath?: string; // e.g., "Tax Returns/2024/W2"
+}
+
+export interface FormConditionalRule {
+  id: string;
+  condition: string; // JavaScript expression, e.g., "field_income > 100000"
+  action: "show" | "hide" | "require" | "disable";
+  targetFieldIds: string[];
+}
+
+export interface FormSection {
+  id: string;
+  title: string;
+  description?: string;
+  order?: number;
+  isRepeatable?: boolean; // For repeating sections
+  minRepeat?: number;
+  maxRepeat?: number;
+  folderPath?: string; // Auto-create folder for this section
+}
+
+export interface FormPage {
+  id: string;
+  title: string;
+  description?: string;
+  order?: number;
+  sectionIds: string[];
+}
+
+export interface FormSettings {
+  // Submission
+  allowMultipleSubmissions?: boolean;
+  requireAuth?: boolean;
+  // Notifications
+  sendConfirmationEmail?: boolean;
+  confirmationEmailTemplate?: string;
+  notifyOnSubmission?: boolean;
+  notificationRecipients?: string[];
+  // Workflow integration
+  triggerWorkflowOnSubmit?: boolean;
+  workflowId?: string;
+  // Folder automation
+  autoCreateFolders?: boolean;
+  baseFolderPath?: string;
+}
+
 // Workflow TypeScript Types for Nodes and Edges
 export type WorkflowNodeType = 
   | "trigger"
@@ -482,6 +657,23 @@ export const insertTaggableSchema = createInsertSchema(taggables).omit({
   createdAt: true,
 });
 
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+  id: true,
+  organizationId: true,
+  createdBy: true,
+  lastPublishedAt: true,
+  submissionCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  organizationId: true,
+  submittedAt: true,
+  createdAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -515,6 +707,10 @@ export type InsertTaggable = z.infer<typeof insertTaggableSchema>;
 export type Taggable = typeof taggables.$inferSelect;
 export type InsertWorkflowExecution = z.infer<typeof insertWorkflowExecutionSchema>;
 export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
