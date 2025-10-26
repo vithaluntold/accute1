@@ -29,6 +29,7 @@ import Workflows from "@/pages/workflows";
 import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
 import Documents from "@/pages/documents";
+import Clients from "@/pages/clients";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -199,6 +200,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Documents />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/clients">
+        <ProtectedRoute>
+          <AppLayout>
+            <Clients />
           </AppLayout>
         </ProtectedRoute>
       </Route>

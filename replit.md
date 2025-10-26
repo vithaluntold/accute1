@@ -132,8 +132,13 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 
 ### Documents
 - `GET /api/documents` - List documents (requires `documents.view`)
-- `POST /api/documents` - Upload document (requires `documents.upload`)
-- `DELETE /api/documents/:id` - Delete document (requires `documents.delete`)
+- `POST /api/documents` - Upload document with multipart/form-data using multer (requires `documents.upload`)
+  - Files stored in `uploads/` directory with unique filenames
+  - 50MB file size limit
+- `GET /api/documents/:id/download` - Authenticated download endpoint (requires `documents.view`)
+  - Organization validation and client-only access to own documents
+  - Streams file securely after permission checks
+- `DELETE /api/documents/:id` - Delete document and physical file (requires `documents.delete`)
 
 ### Notifications
 - `GET /api/notifications` - Get user notifications
@@ -179,7 +184,45 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 
 ## Recent Changes
 
-### 2025-10-26 (Latest Session)
+### 2025-10-26 (Latest - Clients Management Complete)
+- ✅ Implemented Clients management system:
+  - Database schema with comprehensive client fields (company, contact, address, tax ID)
+  - Storage layer with CRUD operations
+  - API routes with multi-tenant security (organization validation)
+  - Request body validation using Zod schemas
+  - Privilege escalation prevention (strip protected fields)
+  - Frontend UI with create, edit, delete, search functionality
+  - Client cards displaying key information with status badges
+- ✅ Added client permissions to init system:
+  - clients.view, clients.create, clients.edit, clients.delete
+- ✅ Fixed critical security vulnerability:
+  - Added organization validation to update/delete operations
+  - Prevent cross-tenant data access
+  - Schema validation on all mutations
+
+### 2025-10-26 (Earlier - Documents Page Complete)
+- ✅ Implemented Documents page (/documents) with full CRUD functionality:
+  - File upload with multer middleware (multipart/form-data)
+  - Document grid view with file type icons and metadata
+  - Search/filter functionality
+  - Authenticated download endpoint (not publicly accessible)
+  - Delete functionality with physical file cleanup
+- ✅ Fixed critical security vulnerability - documents no longer publicly accessible:
+  - Removed static `/uploads` route
+  - Created authenticated download endpoint with permission checks
+  - Organization and client-level access control
+  - Fixed path handling bug (strip leading slash before path.join)
+- ✅ Enhanced authentication system:
+  - Added cookie-parser middleware
+  - Login endpoint now sets httpOnly session cookie
+  - Auth middleware checks both Authorization header and session cookie
+  - Supports multipart/form-data requests with authentication
+- ✅ Created test admin user for development:
+  - Email: admin@example.com
+  - Password: admin123 (bcrypt hashed)
+  - Role: Super Admin with full permissions
+
+### 2025-10-26 (Earlier Session)
 - ✅ Implemented multi-tier authentication system:
   - Super Admin registration via secret keys (SHA-256 hashed, single-use, expirable)
   - Admin self-registration with organization creation

@@ -206,6 +206,30 @@ export const invitations = pgTable("invitations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Clients for accounting firms
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull(),
+  contactName: text("contact_name"),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country").notNull().default("US"),
+  taxId: text("tax_id"),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  status: text("status").notNull().default("active"), // 'active', 'inactive', 'prospect'
+  industry: text("industry"),
+  notes: text("notes"),
+  metadata: jsonb("metadata").default({}),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Zod Schemas and Types
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -268,6 +292,12 @@ export const insertInvitationSchema = createInsertSchema(invitations).omit({
   createdAt: true,
 });
 
+export const insertClientSchema = createInsertSchema(clients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -291,6 +321,8 @@ export type InsertSuperAdminKey = z.infer<typeof insertSuperAdminKeySchema>;
 export type SuperAdminKey = typeof superAdminKeys.$inferSelect;
 export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
 export type Invitation = typeof invitations.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+export type Client = typeof clients.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;

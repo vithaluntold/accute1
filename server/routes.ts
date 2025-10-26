@@ -28,6 +28,7 @@ import {
   insertAiAgentSchema,
   insertDocumentSchema,
   insertNotificationSchema,
+  insertClientSchema,
 } from "@shared/schema";
 
 const upload = multer({
@@ -180,6 +181,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log activity
       await logActivity(user.id, user.organizationId || undefined, "login", "user", user.id, {}, req);
+
+      // Set session cookie
+      res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
 
       res.json({
         user: {
@@ -1019,6 +1028,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
+  // ==================== Client Routes ====================
+  
+  app.get("/api/clients", requireAuth, requirePermission("clients.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      res.json(clients);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  app.post("/api/clients", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = insertClientSchema.parse(req.body);
+      const client = await storage.createClient({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "client", client.id, { name: client.companyName }, req);
+      res.json(client);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
+  app.patch("/api/clients/:id", requireAuth, requirePermission("clients.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getClient(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const validated = insertClientSchema.partial().parse(req.body);
+      const { organizationId, createdBy, ...safeData } = validated as any;
+      
+      const client = await storage.updateClient(req.params.id, safeData);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "client", req.params.id, {}, req);
+      res.json(client);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
+  app.delete("/api/clients/:id", requireAuth, requirePermission("clients.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getClient(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      await storage.deleteClient(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "client", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete client" });
     }
   });
 

@@ -68,8 +68,19 @@ export function decrypt(text: string): string {
 // Authentication middleware
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    // Check both Authorization header and cookie
     const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    
+    // If no Bearer token, check for cookie
+    if (!token && req.headers.cookie) {
+      const cookies = req.headers.cookie.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
+      token = cookies['session_token'] || null;
+    }
 
     if (!token) {
       return res.status(401).json({ error: "Authentication required" });

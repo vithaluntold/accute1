@@ -28,6 +28,8 @@ import type {
   InsertSuperAdminKey,
   Invitation,
   InsertInvitation,
+  Client,
+  InsertClient,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -132,6 +134,14 @@ export interface IStorage {
   updateInvitationStatus(id: string, status: string, acceptedBy?: string): Promise<void>;
   getInvitationsByOrganization(organizationId: string): Promise<Invitation[]>;
   revokeInvitation(id: string): Promise<void>;
+
+  // Clients
+  getClient(id: string): Promise<Client | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: string): Promise<void>;
+  getClientsByOrganization(organizationId: string): Promise<Client[]>;
+  getClientsByAssignedUser(userId: string): Promise<Client[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -588,6 +598,45 @@ export class DbStorage implements IStorage {
     await db.update(schema.invitations)
       .set({ status: "revoked", revokedAt: new Date() })
       .where(eq(schema.invitations.id, id));
+  }
+
+  // Clients
+  async getClient(id: string): Promise<Client | undefined> {
+    const results = await db.select().from(schema.clients)
+      .where(eq(schema.clients.id, id));
+    return results[0];
+  }
+
+  async createClient(client: InsertClient): Promise<Client> {
+    const results = await db.insert(schema.clients)
+      .values(client)
+      .returning();
+    return results[0];
+  }
+
+  async updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined> {
+    const results = await db.update(schema.clients)
+      .set({ ...client, updatedAt: new Date() })
+      .where(eq(schema.clients.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    await db.delete(schema.clients)
+      .where(eq(schema.clients.id, id));
+  }
+
+  async getClientsByOrganization(organizationId: string): Promise<Client[]> {
+    return await db.select().from(schema.clients)
+      .where(eq(schema.clients.organizationId, organizationId))
+      .orderBy(schema.clients.companyName);
+  }
+
+  async getClientsByAssignedUser(userId: string): Promise<Client[]> {
+    return await db.select().from(schema.clients)
+      .where(eq(schema.clients.assignedTo, userId))
+      .orderBy(schema.clients.companyName);
   }
 }
 
