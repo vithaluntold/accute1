@@ -45,12 +45,14 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 
 ### Feature Tables
 - **workflows**: Workflow automation templates (JSON node-based)
-- **ai_agents**: AI agent marketplace entries
+- **ai_agents**: AI agent marketplace entries with directory paths and pricing models
 - **ai_agent_installations**: Installed agents per organization
 - **ai_provider_configs**: Multi-provider AI configurations (encrypted API keys)
 - **documents**: Secure document storage with encryption
 - **notifications**: Real-time user notifications
 - **activity_logs**: Comprehensive audit trail
+- **super_admin_keys**: Single-use keys for super admin onboarding (SHA-256 hashed)
+- **invitations**: Email/SMS invite tokens for employee/client registration
 
 ## System Roles & Permissions
 
@@ -73,6 +75,7 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 - View analytics
 
 ### Client
+- View and install AI agents from marketplace
 - View workflows
 - Upload and view own documents
 - Limited portal access
@@ -108,9 +111,20 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 ### AI Agents
 - `GET /api/ai-agents` - List public AI agents
 - `GET /api/ai-agents/:id` - Get agent details
-- `POST /api/ai-agents` - Create agent (requires `ai_agents.create`)
+- `POST /api/ai-agents` - Create agent with directory paths and pricing (requires `ai_agents.create`)
 - `POST /api/ai-agents/:id/install` - Install agent (requires `ai_agents.install`)
 - `GET /api/ai-agents/installed` - List installed agents
+
+### Super Admin & Invitations
+- `GET /api/super-admin/keys` - List generated super admin keys (requires `super_admin.manage`)
+- `POST /api/super-admin/keys` - Generate new super admin key (requires `super_admin.manage`)
+- `POST /api/super-admin/register` - Register with super admin key (public)
+- `POST /api/auth/register-admin` - Self-register as admin with new organization (public)
+- `POST /api/auth/register-invite` - Register via invitation token (public)
+- `POST /api/invitations` - Create invitation (requires `users.invite`)
+- `GET /api/invitations/validate/:token` - Validate invitation token (public)
+- `GET /api/invitations` - List organization invitations (requires `users.invite`)
+- `POST /api/invitations/:id/revoke` - Revoke invitation (requires `users.invite`)
 
 ### AI Providers
 - `POST /api/ai-providers` - Configure AI provider (requires `ai_agents.configure`)
@@ -165,7 +179,29 @@ Accute is an enterprise-grade accounting workflow automation platform that combi
 
 ## Recent Changes
 
-### 2025-10-26 (Latest)
+### 2025-10-26 (Latest Session)
+- ✅ Implemented multi-tier authentication system:
+  - Super Admin registration via secret keys (SHA-256 hashed, single-use, expirable)
+  - Admin self-registration with organization creation
+  - Employee/Client invite-only registration (email/SMS)
+- ✅ Extended AI agents schema with modular code architecture:
+  - Directory paths (backendPath, frontendPath) for linking agent code
+  - Subscription models (free, monthly, yearly, usage-based)
+  - Pricing fields (priceMonthly, priceYearly)
+  - Version tracking and tags for better organization
+- ✅ Enhanced AI Agent Marketplace UI:
+  - Super Admin can create agents with directory paths and pricing
+  - Clients can browse, search, filter, and install agents
+  - Pricing badges and subscription model display
+  - Responsive grid layout with enhanced agent cards
+- ✅ Added missing permissions:
+  - `users.invite` for Admin and Super Admin roles
+  - `ai_agents.view` and `ai_agents.install` for Client and Employee roles
+- ✅ Created Team Management page (/team) for invitations
+- ✅ Added Super Admin key management in Settings page
+- ✅ Fixed invitation validation query bug in registration flow
+
+### 2025-10-26 (Earlier)
 - ✅ Created comprehensive landing page with hero, features, use cases, TaxDome comparison, and security sections
 - ✅ Enhanced application header with workspace switcher, role indicator, notifications dropdown, profile menu, and global search
 - ✅ Documented feature gaps vs TaxDome in FEATURE_ROADMAP.md (12 missing features identified)
