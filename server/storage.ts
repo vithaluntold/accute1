@@ -142,6 +142,14 @@ export interface IStorage {
   deleteClient(id: string): Promise<void>;
   getClientsByOrganization(organizationId: string): Promise<Client[]>;
   getClientsByAssignedUser(userId: string): Promise<Client[]>;
+  
+  // Contacts
+  getContact(id: string): Promise<Contact | undefined>;
+  createContact(contact: InsertContact): Promise<Contact>;
+  updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact>;
+  deleteContact(id: string): Promise<void>;
+  getContactsByClient(clientId: string): Promise<Contact[]>;
+  getContactsByOrganization(organizationId: string): Promise<Contact[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -637,6 +645,41 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.clients)
       .where(eq(schema.clients.assignedTo, userId))
       .orderBy(schema.clients.companyName);
+  }
+
+  // Contacts
+  async getContact(id: string): Promise<Contact | undefined> {
+    const result = await db.select().from(schema.contacts).where(eq(schema.contacts.id, id));
+    return result[0];
+  }
+
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const result = await db.insert(schema.contacts).values(contact).returning();
+    return result[0];
+  }
+
+  async updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact> {
+    const result = await db.update(schema.contacts)
+      .set({ ...contact, updatedAt: new Date() })
+      .where(eq(schema.contacts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    await db.delete(schema.contacts).where(eq(schema.contacts.id, id));
+  }
+
+  async getContactsByClient(clientId: string): Promise<Contact[]> {
+    return await db.select().from(schema.contacts)
+      .where(eq(schema.contacts.clientId, clientId))
+      .orderBy(schema.contacts.lastName, schema.contacts.firstName);
+  }
+
+  async getContactsByOrganization(organizationId: string): Promise<Contact[]> {
+    return await db.select().from(schema.contacts)
+      .where(eq(schema.contacts.organizationId, organizationId))
+      .orderBy(schema.contacts.lastName, schema.contacts.firstName);
   }
 }
 

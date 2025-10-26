@@ -1090,6 +1090,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Contact Routes ====================
+
+  app.get("/api/contacts", requireAuth, requirePermission("contacts.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { clientId } = req.query;
+      let contacts;
+      
+      if (clientId) {
+        const client = await storage.getClient(clientId as string);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "Client not found" });
+        }
+        contacts = await storage.getContactsByClient(clientId as string);
+      } else {
+        contacts = await storage.getContactsByOrganization(req.user!.organizationId!);
+      }
+      
+      res.json(contacts);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch contacts" });
+    }
+  });
+
+  app.post("/api/contacts", requireAuth, requirePermission("contacts.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = schema.insertContactSchema.parse(req.body);
+      
+      const client = await storage.getClient(validated.clientId);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const contact = await storage.createContact({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "contact", contact.id, { name: `${contact.firstName} ${contact.lastName}` }, req);
+      res.json(contact);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create contact" });
+    }
+  });
+
+  app.patch("/api/contacts/:id", requireAuth, requirePermission("contacts.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getContact(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      
+      const validated = schema.insertContactSchema.partial().parse(req.body);
+      const { organizationId, createdBy, ...safeData } = validated as any;
+      
+      if (safeData.clientId) {
+        const client = await storage.getClient(safeData.clientId);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "Client not found" });
+        }
+      }
+      
+      const contact = await storage.updateContact(req.params.id, safeData);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "contact", req.params.id, {}, req);
+      res.json(contact);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update contact" });
+    }
+  });
+
+  app.delete("/api/contacts/:id", requireAuth, requirePermission("contacts.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getContact(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+      
+      await storage.deleteContact(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "contact", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete contact" });
+    }
+  });
+
   // ==================== Notification Routes ====================
   
   app.get("/api/notifications", requireAuth, async (req: AuthRequest, res: Response) => {

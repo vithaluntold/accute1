@@ -81,6 +81,12 @@ export async function initializeSystem() {
       { name: "clients.edit", resource: "clients", action: "edit", description: "Edit clients" },
       { name: "clients.delete", resource: "clients", action: "delete", description: "Delete clients" },
       
+      // Contact management
+      { name: "contacts.view", resource: "contacts", action: "view", description: "View contacts" },
+      { name: "contacts.create", resource: "contacts", action: "create", description: "Create contacts" },
+      { name: "contacts.edit", resource: "contacts", action: "edit", description: "Edit contacts" },
+      { name: "contacts.delete", resource: "contacts", action: "delete", description: "Delete contacts" },
+      
       // Organization management
       { name: "organizations.view", resource: "organizations", action: "view", description: "View organizations" },
       { name: "organizations.edit", resource: "organizations", action: "edit", description: "Edit organizations" },

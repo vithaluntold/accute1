@@ -30,6 +30,7 @@ import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
 import Documents from "@/pages/documents";
 import Clients from "@/pages/clients";
+import Contacts from "@/pages/contacts";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -207,6 +208,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Clients />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/contacts">
+        <ProtectedRoute>
+          <AppLayout>
+            <Contacts />
           </AppLayout>
         </ProtectedRoute>
       </Route>
