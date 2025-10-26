@@ -221,11 +221,13 @@ After seeding, you can create test users via `/api/auth/register`:
 - ✅ Authentication UI (login, register) (COMPLETED)
 - ✅ Main application layout with sidebar and enhanced header (COMPLETED)
 - ✅ AI Provider Settings UI (COMPLETED)
+- ✅ Workflows page with list view, search, and filtering (COMPLETED)
+- ✅ AI Agent Marketplace page with browse and install functionality (COMPLETED)
 - [ ] Dashboard views for all 4 roles (Super Admin, Admin, Employee, Client)
-- [ ] Workflow builder with drag-drop canvas UI
-- [ ] AI agent marketplace UI (schema complete, UI pending)
+- [ ] Workflow builder with drag-drop canvas UI (next priority)
 - [ ] Client portal with document upload UI
 - [ ] Admin panel for user/role management UI
+- [ ] Documents page UI
 
 ### Critical Missing Features (See FEATURE_ROADMAP.md)
 **Phase 1 Priority (Q1 2025):**

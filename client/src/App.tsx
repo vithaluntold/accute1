@@ -25,6 +25,8 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
+import Workflows from "@/pages/workflows";
+import AIAgents from "@/pages/ai-agents";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -167,6 +169,20 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Settings />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workflows">
+        <ProtectedRoute>
+          <AppLayout>
+            <Workflows />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/ai-agents">
+        <ProtectedRoute>
+          <AppLayout>
+            <AIAgents />
           </AppLayout>
         </ProtectedRoute>
       </Route>
