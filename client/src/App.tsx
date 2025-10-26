@@ -30,6 +30,7 @@ import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
 import Documents from "@/pages/documents";
+import Forms from "@/pages/forms";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
@@ -217,6 +218,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Documents />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/forms">
+        <ProtectedRoute>
+          <AppLayout>
+            <Forms />
           </AppLayout>
         </ProtectedRoute>
       </Route>

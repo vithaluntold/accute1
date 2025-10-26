@@ -1,4 +1,4 @@
-import { Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, UserCircle } from "lucide-react";
+import { Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, UserCircle, ClipboardList } from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -38,6 +38,12 @@ const menuItems = [
     url: "/documents",
     icon: FileText,
     permission: "documents.view",
+  },
+  {
+    title: "Forms",
+    url: "/forms",
+    icon: ClipboardList,
+    permission: "forms.view",
   },
   {
     title: "Clients",
