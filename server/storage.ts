@@ -87,8 +87,10 @@ export interface IStorage {
 
   // AI Provider Configs
   getAiProviderConfig(organizationId: string, provider: string): Promise<AiProviderConfig | undefined>;
+  getAiProviderConfigById(id: string): Promise<AiProviderConfig | undefined>;
   createAiProviderConfig(config: Omit<AiProviderConfig, "id" | "createdAt" | "updatedAt">): Promise<AiProviderConfig>;
   updateAiProviderConfig(id: string, config: Partial<AiProviderConfig>): Promise<AiProviderConfig | undefined>;
+  deleteAiProviderConfig(id: string): Promise<void>;
   getActiveProviders(organizationId: string): Promise<AiProviderConfig[]>;
 
   // Documents
@@ -378,6 +380,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getAiProviderConfigById(id: string): Promise<AiProviderConfig | undefined> {
+    const result = await db.select().from(schema.aiProviderConfigs).where(eq(schema.aiProviderConfigs.id, id));
+    return result[0];
+  }
+
   async createAiProviderConfig(config: Omit<AiProviderConfig, "id" | "createdAt" | "updatedAt">): Promise<AiProviderConfig> {
     const result = await db.insert(schema.aiProviderConfigs).values(config).returning();
     return result[0];
@@ -389,6 +396,10 @@ export class DbStorage implements IStorage {
       .where(eq(schema.aiProviderConfigs.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteAiProviderConfig(id: string): Promise<void> {
+    await db.delete(schema.aiProviderConfigs).where(eq(schema.aiProviderConfigs.id, id));
   }
 
   async getActiveProviders(organizationId: string): Promise<AiProviderConfig[]> {

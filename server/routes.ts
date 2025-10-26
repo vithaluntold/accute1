@@ -464,6 +464,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ai-providers", requireAuth, requirePermission("ai_agents.configure"), async (req: AuthRequest, res: Response) => {
     try {
       const { provider, apiKey, endpoint, priority } = req.body;
+      
+      // Validate Azure OpenAI requires endpoint
+      if (provider === "azure_openai" && !endpoint) {
+        return res.status(400).json({ error: "Azure OpenAI requires an endpoint URL" });
+      }
+      
       const encryptedApiKey = encrypt(apiKey);
 
       const config = await storage.createAiProviderConfig({
@@ -490,6 +496,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(providers.map(p => ({ ...p, encryptedApiKey: undefined })));
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch AI providers" });
+    }
+  });
+
+  app.delete("/api/ai-providers/:id", requireAuth, requirePermission("ai_agents.configure"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Verify the provider belongs to the user's organization
+      const provider = await storage.getAiProviderConfigById(req.params.id);
+      if (!provider || provider.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "AI provider not found" });
+      }
+      
+      await storage.deleteAiProviderConfig(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "ai_provider", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete AI provider" });
     }
   });
 

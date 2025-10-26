@@ -10,6 +10,7 @@ import { isAuthenticated } from "@/lib/auth";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Dashboard from "@/pages/dashboard";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Dashboard />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute>
+          <AppLayout>
+            <Settings />
           </AppLayout>
         </ProtectedRoute>
       </Route>
