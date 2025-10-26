@@ -24,6 +24,10 @@ import type {
   RolePermission,
   AiAgentInstallation,
   AiProviderConfig,
+  SuperAdminKey,
+  InsertSuperAdminKey,
+  Invitation,
+  InsertInvitation,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -113,6 +117,21 @@ export interface IStorage {
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getActivityLogsByOrganization(organizationId: string, limit?: number): Promise<ActivityLog[]>;
   getActivityLogsByUser(userId: string, limit?: number): Promise<ActivityLog[]>;
+
+  // Super Admin Keys
+  createSuperAdminKey(key: InsertSuperAdminKey): Promise<SuperAdminKey>;
+  getSuperAdminKeyByHash(keyHash: string): Promise<SuperAdminKey | undefined>;
+  markSuperAdminKeyAsUsed(id: string, usedBy: string): Promise<void>;
+  revokeSuperAdminKey(id: string): Promise<void>;
+  getSuperAdminKeysByUser(userId: string): Promise<SuperAdminKey[]>;
+
+  // Invitations
+  createInvitation(invitation: InsertInvitation): Promise<Invitation>;
+  getInvitationByToken(tokenHash: string): Promise<Invitation | undefined>;
+  getInvitationById(id: string): Promise<Invitation | undefined>;
+  updateInvitationStatus(id: string, status: string, acceptedBy?: string): Promise<void>;
+  getInvitationsByOrganization(organizationId: string): Promise<Invitation[]>;
+  revokeInvitation(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -498,6 +517,77 @@ export class DbStorage implements IStorage {
       .where(eq(schema.activityLogs.userId, userId))
       .orderBy(desc(schema.activityLogs.createdAt))
       .limit(limit);
+  }
+
+  // Super Admin Keys
+  async createSuperAdminKey(key: InsertSuperAdminKey): Promise<SuperAdminKey> {
+    const result = await db.insert(schema.superAdminKeys).values(key).returning();
+    return result[0];
+  }
+
+  async getSuperAdminKeyByHash(keyHash: string): Promise<SuperAdminKey | undefined> {
+    const result = await db.select().from(schema.superAdminKeys)
+      .where(eq(schema.superAdminKeys.keyHash, keyHash));
+    return result[0];
+  }
+
+  async markSuperAdminKeyAsUsed(id: string, usedBy: string): Promise<void> {
+    await db.update(schema.superAdminKeys)
+      .set({ usedBy, usedAt: new Date() })
+      .where(eq(schema.superAdminKeys.id, id));
+  }
+
+  async revokeSuperAdminKey(id: string): Promise<void> {
+    await db.update(schema.superAdminKeys)
+      .set({ revokedAt: new Date() })
+      .where(eq(schema.superAdminKeys.id, id));
+  }
+
+  async getSuperAdminKeysByUser(userId: string): Promise<SuperAdminKey[]> {
+    return await db.select().from(schema.superAdminKeys)
+      .where(eq(schema.superAdminKeys.generatedBy, userId))
+      .orderBy(desc(schema.superAdminKeys.createdAt));
+  }
+
+  // Invitations
+  async createInvitation(invitation: InsertInvitation): Promise<Invitation> {
+    const result = await db.insert(schema.invitations).values(invitation).returning();
+    return result[0];
+  }
+
+  async getInvitationByToken(tokenHash: string): Promise<Invitation | undefined> {
+    const result = await db.select().from(schema.invitations)
+      .where(eq(schema.invitations.tokenHash, tokenHash));
+    return result[0];
+  }
+
+  async getInvitationById(id: string): Promise<Invitation | undefined> {
+    const result = await db.select().from(schema.invitations)
+      .where(eq(schema.invitations.id, id));
+    return result[0];
+  }
+
+  async updateInvitationStatus(id: string, status: string, acceptedBy?: string): Promise<void> {
+    const updateData: any = { status };
+    if (status === "accepted" && acceptedBy) {
+      updateData.acceptedBy = acceptedBy;
+      updateData.acceptedAt = new Date();
+    }
+    await db.update(schema.invitations)
+      .set(updateData)
+      .where(eq(schema.invitations.id, id));
+  }
+
+  async getInvitationsByOrganization(organizationId: string): Promise<Invitation[]> {
+    return await db.select().from(schema.invitations)
+      .where(eq(schema.invitations.organizationId, organizationId))
+      .orderBy(desc(schema.invitations.createdAt));
+  }
+
+  async revokeInvitation(id: string): Promise<void> {
+    await db.update(schema.invitations)
+      .set({ status: "revoked", revokedAt: new Date() })
+      .where(eq(schema.invitations.id, id));
   }
 }
 

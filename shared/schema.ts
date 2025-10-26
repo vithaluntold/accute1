@@ -164,6 +164,38 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Super Admin Keys for controlled super admin onboarding
+export const superAdminKeys = pgTable("super_admin_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyHash: text("key_hash").notNull().unique(),
+  generatedBy: varchar("generated_by").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedBy: varchar("used_by").references(() => users.id),
+  usedAt: timestamp("used_at"),
+  revokedAt: timestamp("revoked_at"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Invitations for employee and client onboarding
+export const invitations = pgTable("invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenHash: text("token_hash").notNull().unique(),
+  type: text("type").notNull(), // 'email' or 'sms'
+  email: text("email"),
+  phone: text("phone"),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  roleId: varchar("role_id").notNull().references(() => roles.id),
+  invitedBy: varchar("invited_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"), // 'pending', 'accepted', 'expired', 'revoked'
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedBy: varchar("accepted_by").references(() => users.id),
+  acceptedAt: timestamp("accepted_at"),
+  revokedAt: timestamp("revoked_at"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Zod Schemas and Types
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -216,6 +248,16 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
   createdAt: true,
 });
 
+export const insertSuperAdminKeySchema = createInsertSchema(superAdminKeys).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInvitationSchema = createInsertSchema(invitations).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -235,6 +277,10 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertSuperAdminKey = z.infer<typeof insertSuperAdminKeySchema>;
+export type SuperAdminKey = typeof superAdminKeys.$inferSelect;
+export type InsertInvitation = z.infer<typeof insertInvitationSchema>;
+export type Invitation = typeof invitations.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
