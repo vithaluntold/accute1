@@ -158,3 +158,66 @@ export async function logActivity(
     console.error("Failed to log activity:", error);
   }
 }
+
+// Generate secure 256-bit random token (32 bytes hex = 64 characters)
+export function generateSecureToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Hash token with SHA-256 for deterministic lookup (tokens are already random and secure)
+export function hashTokenSHA256(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+// Validate super admin key
+export async function validateSuperAdminKey(key: string): Promise<{ valid: boolean; keyRecord?: any; error?: string }> {
+  try {
+    const keyHash = hashTokenSHA256(key);
+    const keyRecord = await storage.getSuperAdminKeyByHash(keyHash);
+
+    if (!keyRecord) {
+      return { valid: false, error: "Invalid super admin key" };
+    }
+
+    if (keyRecord.revokedAt) {
+      return { valid: false, error: "Super admin key has been revoked" };
+    }
+
+    if (keyRecord.usedAt) {
+      return { valid: false, error: "Super admin key has already been used" };
+    }
+
+    if (keyRecord.expiresAt < new Date()) {
+      return { valid: false, error: "Super admin key has expired" };
+    }
+
+    return { valid: true, keyRecord };
+  } catch (error) {
+    return { valid: false, error: "Invalid super admin key format" };
+  }
+}
+
+// Validate invitation token
+export async function validateInvitationToken(token: string): Promise<{ valid: boolean; invitation?: any; error?: string }> {
+  try {
+    const tokenHash = hashTokenSHA256(token);
+    const invitation = await storage.getInvitationByToken(tokenHash);
+
+    if (!invitation) {
+      return { valid: false, error: "Invalid invitation token" };
+    }
+
+    if (invitation.status !== 'pending') {
+      return { valid: false, error: `Invitation has been ${invitation.status}` };
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      await storage.updateInvitationStatus(invitation.id, 'expired');
+      return { valid: false, error: "Invitation has expired" };
+    }
+
+    return { valid: true, invitation };
+  } catch (error) {
+    return { valid: false, error: "Invalid invitation token format" };
+  }
+}
