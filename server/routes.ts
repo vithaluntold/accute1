@@ -10,6 +10,10 @@ import {
   rateLimit,
   logActivity,
   encrypt,
+  generateSecureToken,
+  hashTokenSHA256,
+  validateSuperAdminKey,
+  validateInvitationToken,
   type AuthRequest,
 } from "./auth";
 import {
@@ -209,6 +213,381 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // ==================== Super Admin Routes ====================
+
+  // Generate super admin key (requires existing super admin)
+  app.post("/api/super-admin/keys", requireAuth, requirePermission("super_admin.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { expiresInDays = 30 } = req.body;
+      
+      const key = generateSecureToken();
+      const keyHash = hashTokenSHA256(key);
+      const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+      await storage.createSuperAdminKey({
+        keyHash,
+        generatedBy: req.userId!,
+        expiresAt,
+        usedBy: null,
+        usedAt: null,
+        revokedAt: null,
+        metadata: {},
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "generate", "super_admin_key", undefined, { expiresInDays }, req);
+
+      res.json({
+        key,
+        expiresAt,
+        message: "Super admin key generated. Save this key securely - it will not be shown again."
+      });
+    } catch (error: any) {
+      console.error("Super admin key generation error:", error);
+      res.status(500).json({ error: "Failed to generate super admin key" });
+    }
+  });
+
+  // Register as super admin with key
+  app.post("/api/super-admin/register", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { email, username, password, firstName, lastName, superAdminKey } = req.body;
+
+      if (!email || !username || !password || !superAdminKey) {
+        return res.status(400).json({ error: "All fields including super admin key are required" });
+      }
+
+      const validation = await validateSuperAdminKey(superAdminKey);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+
+      const superAdminRole = await storage.getRoleByName("Super Admin");
+      if (!superAdminRole) {
+        return res.status(500).json({ error: "Super Admin role not found. Contact system administrator." });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      const userData = insertUserSchema.parse({
+        email,
+        username,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        roleId: superAdminRole.id,
+        organizationId: null,
+        isActive: true,
+      });
+
+      const user = await storage.createUser(userData);
+      await storage.markSuperAdminKeyAsUsed(validation.keyRecord.id, user.id);
+
+      const token = generateToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createSession(user.id, token, expiresAt);
+
+      await logActivity(user.id, undefined, "register_super_admin", "user", user.id, {}, req);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roleId: user.roleId,
+          organizationId: user.organizationId,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error("Super admin registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // ==================== Admin Self-Registration ====================
+
+  app.post("/api/auth/register-admin", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { email, username, password, firstName, lastName, organizationName } = req.body;
+
+      if (!email || !username || !password || !organizationName) {
+        return res.status(400).json({ error: "All fields including organization name are required" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+
+      const slug = organizationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const existingOrg = await storage.getOrganizationBySlug(slug);
+      if (existingOrg) {
+        return res.status(400).json({ error: "Organization name already taken. Please choose a different name." });
+      }
+
+      const orgData = insertOrganizationSchema.parse({
+        name: organizationName,
+        slug,
+      });
+      const organization = await storage.createOrganization(orgData);
+
+      const adminRole = await storage.getRoleByName("Admin");
+      if (!adminRole) {
+        return res.status(500).json({ error: "Admin role not found. Contact system administrator." });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      const userData = insertUserSchema.parse({
+        email,
+        username,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        roleId: adminRole.id,
+        organizationId: organization.id,
+        isActive: true,
+      });
+
+      const user = await storage.createUser(userData);
+
+      const token = generateToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createSession(user.id, token, expiresAt);
+
+      await logActivity(user.id, organization.id, "register_admin", "user", user.id, { organizationId: organization.id }, req);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roleId: user.roleId,
+          organizationId: user.organizationId,
+        },
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error("Admin registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // ==================== Invitation Routes ====================
+
+  app.post("/api/invitations", requireAuth, requirePermission("users.invite"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { email, phone, type, roleId, expiresInDays = 7 } = req.body;
+
+      if (!type || (type === 'email' && !email) || (type === 'sms' && !phone)) {
+        return res.status(400).json({ error: "Type and corresponding contact method required" });
+      }
+
+      if (!roleId) {
+        return res.status(400).json({ error: "Role is required" });
+      }
+
+      const role = await storage.getRole(roleId);
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+
+      if (role.name === "Super Admin") {
+        return res.status(403).json({ error: "Cannot invite users with Super Admin role" });
+      }
+
+      const token = generateSecureToken();
+      const tokenHash = hashTokenSHA256(token);
+      const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+      const invitation = await storage.createInvitation({
+        tokenHash,
+        type,
+        email: email || null,
+        phone: phone || null,
+        organizationId: req.user!.organizationId!,
+        roleId,
+        invitedBy: req.userId!,
+        status: 'pending',
+        expiresAt,
+        acceptedBy: null,
+        acceptedAt: null,
+        revokedAt: null,
+        metadata: {},
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "invitation", invitation.id, { type, roleId }, req);
+
+      const inviteUrl = `${req.protocol}://${req.get('host')}/register?token=${token}`;
+
+      res.json({
+        invitation: {
+          id: invitation.id,
+          type: invitation.type,
+          email: invitation.email,
+          phone: invitation.phone,
+          status: invitation.status,
+          expiresAt: invitation.expiresAt,
+        },
+        inviteUrl,
+        token,
+        message: type === 'sms' ? "Send this URL via SMS to complete invitation" : "Send this URL via email to complete invitation"
+      });
+    } catch (error: any) {
+      console.error("Invitation creation error:", error);
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  app.get("/api/invitations/validate/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      
+      const validation = await validateInvitationToken(token);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error, valid: false });
+      }
+
+      const role = await storage.getRole(validation.invitation.roleId);
+      const organization = await storage.getOrganization(validation.invitation.organizationId);
+
+      res.json({
+        valid: true,
+        invitation: {
+          type: validation.invitation.type,
+          email: validation.invitation.email,
+          organizationName: organization?.name,
+          roleName: role?.name,
+          expiresAt: validation.invitation.expiresAt,
+        }
+      });
+    } catch (error: any) {
+      console.error("Invitation validation error:", error);
+      res.status(500).json({ error: "Failed to validate invitation", valid: false });
+    }
+  });
+
+  app.post("/api/auth/register-invite", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { email, username, password, firstName, lastName, invitationToken } = req.body;
+
+      if (!email || !username || !password || !invitationToken) {
+        return res.status(400).json({ error: "All fields including invitation token are required" });
+      }
+
+      const validation = await validateInvitationToken(invitationToken);
+      if (!validation.valid) {
+        return res.status(400).json({ error: validation.error });
+      }
+
+      if (validation.invitation.email && validation.invitation.email !== email) {
+        return res.status(400).json({ error: "Email must match invitation" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      const userData = insertUserSchema.parse({
+        email,
+        username,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        roleId: validation.invitation.roleId,
+        organizationId: validation.invitation.organizationId,
+        isActive: true,
+      });
+
+      const user = await storage.createUser(userData);
+      await storage.updateInvitationStatus(validation.invitation.id, 'accepted', user.id);
+
+      const token = generateToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createSession(user.id, token, expiresAt);
+
+      await logActivity(user.id, user.organizationId || undefined, "register_invite", "user", user.id, { invitationId: validation.invitation.id }, req);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roleId: user.roleId,
+          organizationId: user.organizationId,
+        },
+        token,
+      });
+    } catch (error: any) {
+      console.error("Invite registration error:", error);
+      res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  app.get("/api/invitations", requireAuth, requirePermission("users.invite"), async (req: AuthRequest, res: Response) => {
+    try {
+      const invitations = await storage.getInvitationsByOrganization(req.user!.organizationId!);
+      res.json(invitations);
+    } catch (error: any) {
+      console.error("Fetch invitations error:", error);
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  app.post("/api/invitations/:id/revoke", requireAuth, requirePermission("users.invite"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const invitation = await storage.getInvitationById(id);
+      
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      if (invitation.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      await storage.revokeInvitation(id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "revoke", "invitation", id, {}, req);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Revoke invitation error:", error);
+      res.status(500).json({ error: "Failed to revoke invitation" });
     }
   });
 
