@@ -31,6 +31,7 @@ import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
 import Documents from "@/pages/documents";
 import Forms from "@/pages/forms";
+import FormBuilder from "@/pages/form-builder";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
@@ -225,6 +226,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Forms />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/forms/:id/builder">
+        <ProtectedRoute>
+          <AppLayout>
+            <FormBuilder />
           </AppLayout>
         </ProtectedRoute>
       </Route>

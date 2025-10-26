@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText } from "lucide-react";
+import { useLocation } from "wouter";
+import { Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function FormsPage() {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormTemplate | null>(null);
@@ -182,9 +184,18 @@ export default function FormsPage() {
               </CardContent>
               <CardFooter className="flex gap-2">
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   className="flex-1"
+                  onClick={() => setLocation(`/forms/${form.id}/builder`)}
+                  data-testid={`button-build-form-${form.id}`}
+                >
+                  <Wrench className="w-3 h-3 mr-1" />
+                  Build
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setEditingForm(form)}
                   data-testid={`button-edit-form-${form.id}`}
                 >
@@ -193,7 +204,7 @@ export default function FormsPage() {
                 </Button>
                 {form.status === "draft" && (
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
                     onClick={() => publishMutation.mutate(form.id)}
                     disabled={publishMutation.isPending}
