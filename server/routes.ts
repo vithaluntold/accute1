@@ -1,5 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import {
   hashPassword,
@@ -26,6 +29,25 @@ import {
   insertDocumentSchema,
   insertNotificationSchema,
 } from "@shared/schema";
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
@@ -926,22 +948,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/documents", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/documents", requireAuth, requirePermission("documents.upload"), upload.single('file'), async (req: AuthRequest, res: Response) => {
     try {
-      const document = await storage.createDocument({
-        ...req.body,
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const documentData = {
+        name: req.body.name || req.file.originalname,
+        type: req.file.mimetype,
+        size: req.file.size,
+        url: `/uploads/${req.file.filename}`,
         organizationId: req.user!.organizationId!,
         uploadedBy: req.userId!,
-      });
+        status: "processed",
+        workflowId: req.body.workflowId || null,
+        encryptedContent: null,
+      };
+
+      const document = await storage.createDocument(documentData);
       await logActivity(req.userId, req.user!.organizationId || undefined, "upload", "document", document.id, { name: document.name }, req);
       res.json(document);
     } catch (error: any) {
+      console.error("Document upload error:", error);
       res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  app.get("/api/documents/:id/download", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const document = await storage.getDocument(req.params.id);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      const role = await storage.getRole(req.user!.roleId);
+      if (role?.name === "Client" && document.uploadedBy !== req.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const filePath = path.join(process.cwd(), document.url.replace(/^\//, ''));
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      res.download(filePath, document.name);
+    } catch (error: any) {
+      console.error("Document download error:", error);
+      res.status(500).json({ error: "Failed to download document" });
     }
   });
 
   app.delete("/api/documents/:id", requireAuth, requirePermission("documents.delete"), async (req: AuthRequest, res: Response) => {
     try {
+      const document = await storage.getDocument(req.params.id);
+      if (document) {
+        const filePath = path.join(process.cwd(), document.url.replace(/^\//, ''));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      
       await storage.deleteDocument(req.params.id);
       await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "document", req.params.id, {}, req);
       res.json({ success: true });

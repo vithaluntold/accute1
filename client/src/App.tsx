@@ -28,12 +28,13 @@ import Settings from "@/pages/settings";
 import Workflows from "@/pages/workflows";
 import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
+import Documents from "@/pages/documents";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
     enabled: !!user,
   });
@@ -191,6 +192,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Team />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/documents">
+        <ProtectedRoute>
+          <AppLayout>
+            <Documents />
           </AppLayout>
         </ProtectedRoute>
       </Route>
