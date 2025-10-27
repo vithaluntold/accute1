@@ -118,7 +118,8 @@ export const workflowExecutions = pgTable("workflow_executions", {
   workflowStatusIdx: index("workflow_executions_workflow_status_idx").on(table.workflowId, table.status),
 }));
 
-// Pipelines - Hierarchical project/workflow management with stages, steps, and tasks
+// Pipelines - Unified hierarchical project/workflow management with automation
+// Combines stages/steps/tasks hierarchy WITH workflow automation capabilities
 export const pipelines = pgTable("pipelines", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -128,11 +129,24 @@ export const pipelines = pgTable("pipelines", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
   currentStageId: varchar("current_stage_id"), // Track which stage pipeline is currently on
+  
+  // Automation triggers - What starts this pipeline?
+  triggers: jsonb("triggers").notNull().default(sql`'[]'::jsonb`), // Array of trigger configs: {type: 'email'|'form'|'webhook'|'schedule', config: {...}}
+  isAutomated: boolean("is_automated").notNull().default(false), // Does this pipeline have automation?
+  
+  // Visual workflow representation (optional - for complex automations)
+  nodes: jsonb("nodes").default(sql`'[]'::jsonb`), // Visual workflow nodes
+  edges: jsonb("edges").default(sql`'[]'::jsonb`), // Connections between nodes
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas state
+  
+  // Metadata
+  lastExecutedAt: timestamp("last_executed_at"),
+  executionCount: integer("execution_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Pipeline Stages - Top level grouping (e.g., "Planning", "Execution", "Review")
+// Pipeline Stages - Top level grouping with auto-progression rules
 export const pipelineStages = pgTable("pipeline_stages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   pipelineId: varchar("pipeline_id").notNull().references(() => pipelines.id, { onDelete: "cascade" }),
@@ -140,12 +154,18 @@ export const pipelineStages = pgTable("pipeline_stages", {
   description: text("description"),
   order: integer("order").notNull(), // Display order
   status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
+  
+  // Automation: Auto-progression to next stage
+  autoProgress: boolean("auto_progress").notNull().default(false), // Auto-advance when conditions met
+  progressConditions: jsonb("progress_conditions").default(sql`'{}'::jsonb`), // Conditions for auto-progression
+  onCompleteActions: jsonb("on_complete_actions").default(sql`'[]'::jsonb`), // Actions to execute when stage completes
+  
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Pipeline Steps - Within each stage (e.g., "Gather Requirements", "Design", "Build")
+// Pipeline Steps - Within each stage with automation support
 export const pipelineSteps = pgTable("pipeline_steps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   stageId: varchar("stage_id").notNull().references(() => pipelineStages.id, { onDelete: "cascade" }),
@@ -154,12 +174,18 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   order: integer("order").notNull(), // Display order
   status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
   requireAllTasksComplete: boolean("require_all_tasks_complete").notNull().default(true), // Must complete all tasks before proceeding
+  
+  // Automation: Auto-progression and actions
+  autoProgress: boolean("auto_progress").notNull().default(false), // Auto-advance when conditions met
+  progressConditions: jsonb("progress_conditions").default(sql`'{}'::jsonb`), // Conditions for auto-progression
+  onCompleteActions: jsonb("on_complete_actions").default(sql`'[]'::jsonb`), // Actions to execute when step completes
+  
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Pipeline Tasks - Individual work items (manual or automated)
+// Pipeline Tasks - Individual work items with full automation support
 export const pipelineTasks = pgTable("pipeline_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   stepId: varchar("step_id").notNull().references(() => pipelineSteps.id, { onDelete: "cascade" }),
@@ -174,6 +200,14 @@ export const pipelineTasks = pgTable("pipeline_tasks", {
   dueDate: timestamp("due_date"),
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
+  
+  // Automation configuration
+  automationTrigger: jsonb("automation_trigger").default(sql`'{}'::jsonb`), // Trigger config for automated tasks
+  automationConditions: jsonb("automation_conditions").default(sql`'[]'::jsonb`), // Conditions to check before executing
+  automationActions: jsonb("automation_actions").default(sql`'[]'::jsonb`), // Actions to execute (API calls, notifications, etc.)
+  automationInput: jsonb("automation_input").default(sql`'{}'::jsonb`), // Input data for AI agent or automation
+  automationOutput: jsonb("automation_output").default(sql`'{}'::jsonb`), // Output/results from automation
+  
   // Reminder configuration
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   reminderDuration: integer("reminder_duration"), // Minutes before due date to send reminder (e.g., 60 = 1 hour before, 1440 = 1 day before)
@@ -181,6 +215,7 @@ export const pipelineTasks = pgTable("pipeline_tasks", {
   notifyManager: boolean("notify_manager").notNull().default(false), // Notify the manager/admin
   notifyClient: boolean("notify_client").notNull().default(false), // Notify the client (if client is assigned)
   lastReminderSent: timestamp("last_reminder_sent"), // Track when last reminder was sent
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
