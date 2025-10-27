@@ -3,8 +3,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { LlmConfiguration } from '@shared/schema';
 
-// Encryption key from environment (should be 32 bytes for AES-256)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-please-change-in-production-32bytes';
+// Encryption key from environment (REQUIRED - must be 32 bytes for AES-256)
+if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+  throw new Error(
+    'CRITICAL SECURITY ERROR: ENCRYPTION_KEY environment variable must be set and at least 32 characters long. ' +
+    'Generate a secure key with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"'
+  );
+}
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;

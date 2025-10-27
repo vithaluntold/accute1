@@ -5,6 +5,13 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 import path from "path";
 
+// Critical security check: Ensure encryption key is set
+if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+  console.error('❌ CRITICAL SECURITY ERROR: ENCRYPTION_KEY environment variable must be set and at least 32 characters long.');
+  console.error('   Generate a secure key with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"');
+  process.exit(1);
+}
+
 const app = express();
 
 app.use(cookieParser());
