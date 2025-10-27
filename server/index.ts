@@ -5,11 +5,11 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 import path from "path";
 
-// Critical security check: Ensure encryption key is set
+// Security check: Warn if encryption key is not set
 if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-  console.error('❌ CRITICAL SECURITY ERROR: ENCRYPTION_KEY environment variable must be set and at least 32 characters long.');
-  console.error('   Generate a secure key with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"');
-  process.exit(1);
+  console.warn('⚠️  WARNING: ENCRYPTION_KEY not configured. LLM features will be disabled.');
+  console.warn('   To enable AI agents, set ENCRYPTION_KEY (32+ characters).');
+  console.warn('   Generate one with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"');
 }
 
 const app = express();

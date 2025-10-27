@@ -3,27 +3,32 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import type { LlmConfiguration } from '@shared/schema';
 
-// Encryption key from environment (REQUIRED - must be 32 bytes for AES-256)
-if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-  throw new Error(
-    'CRITICAL SECURITY ERROR: ENCRYPTION_KEY environment variable must be set and at least 32 characters long. ' +
-    'Generate a secure key with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"'
-  );
-}
-
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 /**
+ * Check if encryption is properly configured
+ */
+function checkEncryptionKey(): void {
+  if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
+    throw new Error(
+      'ENCRYPTION_KEY not configured. Please set a 32+ character encryption key to use LLM features. ' +
+      'Generate one with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"'
+    );
+  }
+}
+
+/**
  * Encrypt sensitive data using AES-256-GCM
  */
 export function encrypt(text: string): string {
+  checkEncryptionKey();
+  
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(
     ALGORITHM,
-    Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
+    Buffer.from(process.env.ENCRYPTION_KEY!.slice(0, 32)),
     iv
   );
   
@@ -39,13 +44,15 @@ export function encrypt(text: string): string {
  * Decrypt sensitive data using AES-256-GCM
  */
 export function decrypt(encryptedData: string): string {
+  checkEncryptionKey();
+  
   const ivHex = encryptedData.slice(0, IV_LENGTH * 2);
   const authTagHex = encryptedData.slice(IV_LENGTH * 2, (IV_LENGTH + AUTH_TAG_LENGTH) * 2);
   const encrypted = encryptedData.slice((IV_LENGTH + AUTH_TAG_LENGTH) * 2);
   
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
-    Buffer.from(ENCRYPTION_KEY.slice(0, 32)),
+    Buffer.from(process.env.ENCRYPTION_KEY!.slice(0, 32)),
     Buffer.from(ivHex, 'hex')
   );
   
