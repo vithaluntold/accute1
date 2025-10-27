@@ -1378,6 +1378,7 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({ i
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDocumentAnnotationSchema = createInsertSchema(documentAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLlmConfigurationSchema = createInsertSchema(llmConfigurations).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1411,3 +1412,5 @@ export type InsertDocumentAnnotation = z.infer<typeof insertDocumentAnnotationSc
 export type DocumentAnnotation = typeof documentAnnotations.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+export type InsertLlmConfiguration = z.infer<typeof insertLlmConfigurationSchema>;
+export type LlmConfiguration = typeof llmConfigurations.$inferSelect;
