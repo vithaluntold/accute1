@@ -54,8 +54,51 @@
 
 ---
 
-## Color Placeholder Notes
-*[Final palette pending - ensure WCAG AA contrast ratios, status colors for success/warning/error/info]*
+## Color System
+
+### Primary Gradient (Brand Identity)
+**Porsche to Pink:** Creates an energetic, modern feel for AI-powered automation
+- **Porsche:** #e5a660 (warm gold) - Reliability, trust
+- **Pink:** #d76082 (vibrant rose) - Innovation, energy
+- **Gradient:** `linear-gradient(135deg, #e5a660 0%, #d76082 100%)`
+
+### Semantic Colors
+- **Primary:** Porsche-Pink gradient for CTAs, highlights, active states
+- **Success:** #10b981 (Emerald) - Completed workflows, success states
+- **Warning:** #f59e0b (Amber) - Pending actions, cautions
+- **Error:** #ef4444 (Red) - Failed executions, errors
+- **Info:** #3b82f6 (Blue) - Information, guidance
+
+### Surface Colors (Light Mode)
+- **Background:** #ffffff (Pure white)
+- **Surface:** #f8fafc (Slate 50) - Cards, elevated surfaces
+- **Surface Hover:** #f1f5f9 (Slate 100) - Hover states
+- **Border:** #e2e8f0 (Slate 200) - Subtle divisions
+- **Border Strong:** #cbd5e1 (Slate 300) - Emphasized borders
+
+### Surface Colors (Dark Mode)
+- **Background:** #0f172a (Slate 900)
+- **Surface:** #1e293b (Slate 800) - Cards, elevated surfaces
+- **Surface Hover:** #334155 (Slate 700) - Hover states
+- **Border:** #475569 (Slate 600) - Subtle divisions
+- **Border Strong:** #64748b (Slate 500) - Emphasized borders
+
+### Text Colors (Light Mode)
+- **Primary:** #0f172a (Slate 900) - Headers, primary text
+- **Secondary:** #475569 (Slate 600) - Descriptions, labels
+- **Tertiary:** #94a3b8 (Slate 400) - Metadata, helpers
+- **On Primary:** #ffffff - Text on gradient backgrounds
+
+### Text Colors (Dark Mode)
+- **Primary:** #f8fafc (Slate 50) - Headers, primary text
+- **Secondary:** #cbd5e1 (Slate 300) - Descriptions, labels
+- **Tertiary:** #64748b (Slate 500) - Metadata, helpers
+- **On Primary:** #ffffff - Text on gradient backgrounds
+
+### Accent Colors
+- **Accent Blue:** #60a5fa (Sky 400) - Links, interactive elements
+- **Accent Purple:** #a78bfa (Violet 400) - AI features, premium
+- **Accent Teal:** #2dd4bf (Teal 400) - Automation, workflows
 
 ---
 
