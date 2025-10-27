@@ -1,10 +1,17 @@
 import type { FormConditionalRule } from "@shared/schema";
+import { Parser } from "expr-eval";
+
+// Create a safe expression parser (no access to global scope)
+const parser = new Parser();
 
 /**
  * Safely evaluates a conditional expression with form data
+ * Uses expr-eval library which provides secure expression evaluation
+ * without access to global scope or arbitrary code execution
+ * 
  * Expressions can reference fields by their ID (e.g., "field_abc123 > 1000")
  * 
- * @param expression - JavaScript expression to evaluate
+ * @param expression - Mathematical/logical expression to evaluate
  * @param formData - Current form values keyed by field ID
  * @returns boolean result of the expression
  */
@@ -13,17 +20,10 @@ export function evaluateCondition(
   formData: Record<string, any>
 ): boolean {
   try {
-    // Create a restricted context with only form field values
-    // This prevents access to global objects like window, document, etc.
-    const contextKeys = Object.keys(formData);
-    const contextValues = Object.values(formData);
-    
-    // Build a function that evaluates the expression in a restricted scope
-    // The function parameters are the field IDs, and we pass the field values as arguments
-    const evaluator = new Function(...contextKeys, `"use strict"; return (${expression});`);
-    
-    // Execute the function with form data values
-    const result = evaluator(...contextValues);
+    // Parse and evaluate the expression with form data as context
+    // expr-eval only allows safe mathematical and logical operations
+    // No access to global objects, Function constructor, or eval
+    const result = parser.evaluate(expression, formData);
     
     // Ensure result is boolean
     return Boolean(result);
@@ -96,8 +96,9 @@ export function validateConditionalExpression(expression: string): {
   error?: string;
 } {
   try {
-    // Try to create the function without executing it
-    new Function(`"use strict"; return (${expression});`);
+    // Try to parse the expression without executing it
+    // This validates syntax using the safe expr-eval parser
+    parser.parse(expression);
     return { valid: true };
   } catch (error) {
     return {
