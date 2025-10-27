@@ -413,6 +413,60 @@ export const revisionRequests = pgTable("revision_requests", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Document Requests - Track document collection from clients
+export const documentRequests = pgTable("document_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull(), // e.g., "2024 Tax Documents"
+  description: text("description"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id), // Staff member responsible
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed', 'overdue'
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"), // Internal notes
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  clientIdx: index("document_requests_client_idx").on(table.clientId),
+  statusIdx: index("document_requests_status_idx").on(table.status),
+  orgIdx: index("document_requests_org_idx").on(table.organizationId),
+}));
+
+// Required Documents - Individual document types within a request
+export const requiredDocuments = pgTable("required_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => documentRequests.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g., "W-2 Form", "1099-MISC"
+  description: text("description"), // Instructions for the document
+  category: text("category"), // e.g., "Tax Documents", "Bank Statements"
+  isRequired: boolean("is_required").notNull().default(true),
+  expectedQuantity: integer("expected_quantity").default(1), // How many of this document expected
+  status: text("status").notNull().default("pending"), // 'pending', 'submitted', 'approved', 'rejected'
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  requestIdx: index("required_documents_request_idx").on(table.requestId),
+}));
+
+// Document Submissions - Links uploaded documents to required documents
+export const documentSubmissions = pgTable("document_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requiredDocumentId: varchar("required_document_id").notNull().references(() => requiredDocuments.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  submittedBy: varchar("submitted_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending_review"), // 'pending_review', 'approved', 'rejected'
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  requiredDocIdx: index("document_submissions_required_idx").on(table.requiredDocumentId),
+  docIdx: index("document_submissions_doc_idx").on(table.documentId),
+}));
+
 // Form Builder TypeScript Types
 export type FormFieldType =
   | "text"
@@ -793,6 +847,27 @@ export const insertRevisionRequestSchema = createInsertSchema(revisionRequests).
   createdAt: true,
 });
 
+export const insertDocumentRequestSchema = createInsertSchema(documentRequests).omit({
+  id: true,
+  organizationId: true,
+  createdBy: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRequiredDocumentSchema = createInsertSchema(requiredDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDocumentSubmissionSchema = createInsertSchema(documentSubmissions).omit({
+  id: true,
+  reviewedBy: true,
+  reviewedAt: true,
+  createdAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -836,6 +911,12 @@ export type InsertSubmissionNote = z.infer<typeof insertSubmissionNoteSchema>;
 export type SubmissionNote = typeof submissionNotes.$inferSelect;
 export type InsertRevisionRequest = z.infer<typeof insertRevisionRequestSchema>;
 export type RevisionRequest = typeof revisionRequests.$inferSelect;
+export type InsertDocumentRequest = z.infer<typeof insertDocumentRequestSchema>;
+export type DocumentRequest = typeof documentRequests.$inferSelect;
+export type InsertRequiredDocument = z.infer<typeof insertRequiredDocumentSchema>;
+export type RequiredDocument = typeof requiredDocuments.$inferSelect;
+export type InsertDocumentSubmission = z.infer<typeof insertDocumentSubmissionSchema>;
+export type DocumentSubmission = typeof documentSubmissions.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
