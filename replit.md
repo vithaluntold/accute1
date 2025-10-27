@@ -27,7 +27,7 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 - **User & Client Management**: Tools for managing users, roles, and client profiles, including invitation-based registration.
 - **Audit Trails**: Comprehensive activity logging for compliance.
 - **Super Admin Onboarding**: Secure, single-use key-based registration for initial setup.
-- **Form Builder & Renderer**: Dynamic form creation with 22 field types, conditional logic (show/hide/require/disable fields based on expressions), dynamic Zod schema generation, and secure backend submission.
+- **Form Builder & Renderer**: Dynamic form creation with 22 field types including text, email, number, date, select, checkbox, radio, file upload, signature, rating, matrix, slider, and more. Features comprehensive conditional logic system that evaluates expressions safely using `expr-eval` library (no global scope access, no arbitrary code execution). Conditional rules support show/hide/require/disable actions on target fields based on real-time form value evaluation. Rules are configured via intuitive UI with live expression validation, stored in database, and evaluated reactively in form preview/submission. Includes dynamic Zod schema generation that adapts to conditional requirements and secure backend submission with multi-tenant isolation.
 - **Polymorphic Tagging System**: Organize resources like documents, clients, and contacts with tags, including CRUD operations and permissions.
 - **Contacts Management**: System for managing contacts associated with clients, including primary contact designation and permissions.
 - **Clients Management**: Comprehensive CRUD operations for client profiles with multi-tenant security and permissions.
