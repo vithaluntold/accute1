@@ -982,9 +982,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           // Try to list models as a simple health check
+          console.log('[Azure Health Check] Attempting to list models...');
           await client.models.list();
           testResult = { success: true, message: "Azure OpenAI connection successful" };
         } catch (error: any) {
+          console.error('[Azure Health Check] Error:', error);
           testResult = { 
             success: false, 
             message: error.message || "Failed to connect to Azure OpenAI" 
