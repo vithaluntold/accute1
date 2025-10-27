@@ -61,9 +61,9 @@ export default function WorkflowBuilder() {
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (isEditMode) {
-        return apiRequest(`/api/workflows/${id}`, 'PATCH', data);
+        return apiRequest('PATCH', `/api/workflows/${id}`, data);
       } else {
-        return apiRequest('/api/workflows', 'POST', data);
+        return apiRequest('POST', '/api/workflows', data);
       }
     },
     onSuccess: () => {
