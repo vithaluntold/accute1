@@ -56,6 +56,8 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "multi_select", label: "Multi-Select" },
   { value: "radio", label: "Radio Buttons" },
   { value: "checkbox", label: "Checkbox" },
+  { value: "image_choice", label: "Image Choice" },
+  { value: "matrix_choice", label: "Matrix / Grid" },
   { value: "file_upload", label: "File Upload" },
   { value: "signature", label: "Signature" },
   { value: "rating", label: "Rating" },
@@ -71,7 +73,7 @@ const fieldSchema = z.object({
     "text", "textarea", "number", "decimal", "email", "phone", "url",
     "name", "address", "currency", "percentage",
     "date", "time", "datetime", "select", "multi_select", "radio",
-    "checkbox", "file_upload", "signature",
+    "checkbox", "image_choice", "matrix_choice", "file_upload", "signature",
     "rating", "slider", "calculated", "heading", "divider", "html"
   ]),
   label: z.string().min(1, "Label is required"),

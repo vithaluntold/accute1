@@ -388,6 +388,8 @@ export type FormFieldType =
   | "percentage"
   | "rating"
   | "slider"
+  | "image_choice"  // Image-based single/multi selection
+  | "matrix_choice" // Grid of questions with rating scale
   | "calculated"
   | "heading"
   | "divider"
@@ -408,6 +410,7 @@ export interface FormFieldOption {
   label: string;
   value: string;
   icon?: string;
+  imageUrl?: string; // For image_choice field type
 }
 
 export interface CompositeFieldConfig {
@@ -423,6 +426,13 @@ export interface CompositeFieldConfig {
   allowNegative?: boolean;
   // Decimal configuration
   decimalPlaces?: number;
+  // Image choice configuration
+  allowMultiple?: boolean; // Allow multiple image selections
+  imageSize?: "small" | "medium" | "large"; // Display size of images
+  // Matrix choice configuration
+  matrixRows?: FormFieldOption[]; // Questions/items to rate
+  matrixColumns?: FormFieldOption[]; // Rating scale options
+  matrixType?: "radio" | "checkbox"; // Single or multiple selections per row
 }
 
 export interface FormField {

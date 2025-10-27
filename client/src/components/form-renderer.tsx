@@ -17,7 +17,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon, Star, Upload } from "lucide-react";
+import { CalendarIcon, Star, Upload, Check } from "lucide-react";
 
 interface FormRendererProps {
   formTemplate: FormTemplate;
@@ -249,6 +249,59 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             fieldSchema = fieldSchema.refine((val) => val && (val.length > 0 || val instanceof FileList && val.length > 0), {
               message: "Please upload a file",
             });
+          }
+          break;
+
+        case "image_choice":
+          // Check if multiple selection is allowed
+          const allowMultiple = (field.config as any)?.allowMultiple || false;
+          if (allowMultiple) {
+            fieldSchema = z.array(z.string());
+            if (isRequired) {
+              fieldSchema = (fieldSchema as z.ZodArray<any>).min(1, "Please select at least one option");
+            }
+          } else {
+            fieldSchema = z.string();
+            if (isRequired) {
+              fieldSchema = (fieldSchema as z.ZodString).min(1, "Please select an option");
+            } else {
+              fieldSchema = fieldSchema.optional();
+            }
+          }
+          break;
+
+        case "matrix_choice":
+          // Matrix stored as object with rowId keys and column values
+          const matrixRows = (field.config as any)?.matrixRows || [];
+          const matrixType = (field.config as any)?.matrixType || "radio";
+          
+          if (matrixType === "checkbox") {
+            // For checkbox matrix, each row can have multiple selections (array)
+            const rowSchemas: Record<string, z.ZodTypeAny> = {};
+            matrixRows.forEach((row: any) => {
+              const rowId = row.value || row.id;
+              rowSchemas[rowId] = z.array(z.string());
+              if (isRequired) {
+                rowSchemas[rowId] = (rowSchemas[rowId] as z.ZodArray<any>).min(1, `Please select at least one option for ${row.label}`);
+              }
+            });
+            fieldSchema = z.object(rowSchemas);
+          } else {
+            // For radio matrix, each row has single selection (string)
+            const rowSchemas: Record<string, z.ZodTypeAny> = {};
+            matrixRows.forEach((row: any) => {
+              const rowId = row.value || row.id;
+              if (isRequired) {
+                rowSchemas[rowId] = z.string().min(1, `Please select an option for ${row.label}`);
+              } else {
+                rowSchemas[rowId] = z.string().optional();
+              }
+            });
+            fieldSchema = z.object(rowSchemas);
+          }
+          
+          if (!isRequired) {
+            fieldSchema = fieldSchema.optional();
           }
           break;
 
@@ -792,6 +845,174 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                 data-testid={`address-country-${id}`}
               />
             </div>
+          </div>
+        );
+
+      case "image_choice":
+        const allowMultiple = (field.config as any)?.allowMultiple || false;
+        const imageSize = (field.config as any)?.imageSize || "medium";
+        const imageSizeMap = {
+          small: "100px",
+          medium: "150px",
+          large: "200px",
+        };
+        const imageHeight = imageSizeMap[imageSize as keyof typeof imageSizeMap] || imageSizeMap.medium;
+        
+        const currentValue = allowMultiple 
+          ? (controllerField.value || [])
+          : (controllerField.value || "");
+
+        const isSelected = (optionValue: string) => {
+          if (allowMultiple) {
+            return (currentValue as string[]).includes(optionValue);
+          }
+          return currentValue === optionValue;
+        };
+
+        const handleImageChoice = (optionValue: string) => {
+          if (disabled) return;
+          
+          if (allowMultiple) {
+            const current = currentValue as string[];
+            const updated = current.includes(optionValue)
+              ? current.filter((v: string) => v !== optionValue)
+              : [...current, optionValue];
+            controllerField.onChange(updated);
+          } else {
+            controllerField.onChange(optionValue);
+          }
+        };
+
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {options.map((option) => {
+              const selected = isSelected(option.value);
+              return (
+                <Card
+                  key={option.value}
+                  className={cn(
+                    "cursor-pointer hover-elevate transition-all relative overflow-hidden",
+                    selected && "ring-2 ring-primary",
+                    disabled && "opacity-50 cursor-not-allowed"
+                  )}
+                  onClick={() => handleImageChoice(option.value)}
+                  data-testid={`image-option-${id}-${option.value}`}
+                >
+                  <CardContent className="p-0">
+                    <div className="relative" style={{ height: imageHeight }}>
+                      {option.imageUrl ? (
+                        <img
+                          src={option.imageUrl}
+                          alt={option.label}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <span className="text-sm text-muted-foreground">{option.label}</span>
+                        </div>
+                      )}
+                      {selected && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <div className="bg-primary rounded-full p-2">
+                            <Check className="h-6 w-6 text-primary-foreground" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 text-center">
+                      <span className="text-sm font-medium">{option.label}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        );
+
+      case "matrix_choice":
+        const matrixRows = (field.config as any)?.matrixRows || [];
+        const matrixColumns = (field.config as any)?.matrixColumns || [];
+        const matrixType = (field.config as any)?.matrixType || "radio";
+        const matrixValue = controllerField.value || {};
+
+        const handleMatrixChange = (rowValue: string, colValue: string, checked?: boolean) => {
+          if (disabled) return;
+          
+          const current = { ...matrixValue };
+          
+          if (matrixType === "checkbox") {
+            // Handle checkbox matrix - each row can have multiple selections
+            const currentRowValues = current[rowValue] || [];
+            if (checked) {
+              current[rowValue] = [...currentRowValues, colValue];
+            } else {
+              current[rowValue] = currentRowValues.filter((v: string) => v !== colValue);
+            }
+          } else {
+            // Handle radio matrix - each row has single selection
+            current[rowValue] = colValue;
+          }
+          
+          controllerField.onChange(current);
+        };
+
+        const isMatrixSelected = (rowValue: string, colValue: string) => {
+          if (matrixType === "checkbox") {
+            const rowValues = matrixValue[rowValue] || [];
+            return rowValues.includes(colValue);
+          }
+          return matrixValue[rowValue] === colValue;
+        };
+
+        return (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border p-3 bg-muted text-left font-medium"></th>
+                  {matrixColumns.map((col: any) => (
+                    <th key={col.value} className="border p-3 bg-muted text-center font-medium">
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {matrixRows.map((row: any) => (
+                  <tr key={row.value}>
+                    <td className="border p-3 font-medium">{row.label}</td>
+                    {matrixColumns.map((col: any) => (
+                      <td
+                        key={col.value}
+                        className="border p-3 text-center"
+                        data-testid={`matrix-cell-${id}-${row.value}-${col.value}`}
+                      >
+                        {matrixType === "checkbox" ? (
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={isMatrixSelected(row.value, col.value)}
+                              onCheckedChange={(checked) => 
+                                handleMatrixChange(row.value, col.value, checked as boolean)
+                              }
+                              disabled={disabled}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <RadioGroupItem
+                              value={col.value}
+                              checked={isMatrixSelected(row.value, col.value)}
+                              onClick={() => handleMatrixChange(row.value, col.value)}
+                              disabled={disabled}
+                            />
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         );
 
