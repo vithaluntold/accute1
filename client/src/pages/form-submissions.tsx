@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, Search, Eye, Filter } from "lucide-react";
+import { ArrowLeft, Search, Eye, Filter, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { exportToCSV, exportToJSON, exportToExcel, exportToPDF } from "@/lib/export-utils";
 
 interface FormSubmission {
   id: string;
@@ -57,6 +60,8 @@ export default function FormSubmissionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
 
   const { data: formTemplate, isLoading: isLoadingForm } = useQuery<FormTemplate>({
     queryKey: ["/api/forms", params.formId],
@@ -92,6 +97,54 @@ export default function FormSubmissionsPage() {
 
   const getStatusLabel = (status: string) => {
     return status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const handleExport = async (format: "csv" | "json" | "excel" | "pdf") => {
+    if (filteredSubmissions.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no submissions to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const formName = formTemplate?.name || "form";
+
+      switch (format) {
+        case "csv":
+          exportToCSV(filteredSubmissions, formName);
+          break;
+        case "json":
+          exportToJSON(filteredSubmissions, formName);
+          break;
+        case "excel":
+          exportToExcel(filteredSubmissions, formName);
+          break;
+        case "pdf":
+          exportToPDF(filteredSubmissions, formName);
+          break;
+      }
+
+      toast({
+        title: "Export successful",
+        description: `Exported ${filteredSubmissions.length} submission${
+          filteredSubmissions.length === 1 ? "" : "s"
+        } as ${format.toUpperCase()}`,
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "An error occurred during export",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (isLoadingForm) {
@@ -167,6 +220,44 @@ export default function FormSubmissionsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={filteredSubmissions.length === 0 || isExporting}
+                  data-testid="button-export"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {isExporting ? "Exporting..." : "Export"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => handleExport("csv")}
+                  data-testid="export-option-csv"
+                >
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleExport("excel")}
+                  data-testid="export-option-excel"
+                >
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleExport("pdf")}
+                  data-testid="export-option-pdf"
+                >
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleExport("json")}
+                  data-testid="export-option-json"
+                >
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {isLoadingSubmissions ? (
