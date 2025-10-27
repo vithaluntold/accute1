@@ -32,12 +32,6 @@ const menuItems = [
     permission: "workflows.view",
   },
   {
-    title: "Pipelines",
-    url: "/pipelines",
-    icon: Network,
-    permission: "pipelines.view",
-  },
-  {
     title: "AI Agents",
     url: "/ai-agents",
     icon: Bot,

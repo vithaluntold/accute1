@@ -3317,146 +3317,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // PIPELINES - Hierarchical Project Management
+  // WORKFLOW HIERARCHY - Stages, Steps, Tasks
   // ========================================
 
-  // Pipelines
-  app.get("/api/pipelines", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  // Workflow Stages
+  app.get("/api/workflows/:workflowId/stages", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const pipelines = await storage.getPipelinesByOrganization(req.user!.organizationId!);
-      res.json(pipelines);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch pipelines" });
-    }
-  });
-
-  app.post("/api/pipelines", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
-    try {
-      const pipeline = await storage.createPipeline({
-        ...req.body,
-        organizationId: req.user!.organizationId!,
-        createdBy: req.user!.id
-      });
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline", pipeline.id, pipeline, req);
-      res.status(201).json(pipeline);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to create pipeline" });
-    }
-  });
-
-  app.get("/api/pipelines/:id", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
-    try {
-      const pipeline = await storage.getPipeline(req.params.id);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
-        return res.status(404).json({ error: "Pipeline not found" });
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
       }
-      res.json(pipeline);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch pipeline" });
-    }
-  });
-
-  app.put("/api/pipelines/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
-    try {
-      const existing = await storage.getPipeline(req.params.id);
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
-        return res.status(404).json({ error: "Pipeline not found" });
-      }
-      const updated = await storage.updatePipeline(req.params.id, req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline", req.params.id, req.body, req);
-      res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to update pipeline" });
-    }
-  });
-
-  app.delete("/api/pipelines/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
-    try {
-      const existing = await storage.getPipeline(req.params.id);
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
-        return res.status(404).json({ error: "Pipeline not found" });
-      }
-      await storage.deletePipeline(req.params.id);
-      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline", req.params.id, {}, req);
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to delete pipeline" });
-    }
-  });
-
-  // Pipeline Stages
-  app.get("/api/pipelines/:pipelineId/stages", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
-    try {
-      const pipeline = await storage.getPipeline(req.params.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
-        return res.status(404).json({ error: "Pipeline not found" });
-      }
-      const stages = await storage.getStagesByPipeline(req.params.pipelineId);
+      const stages = await storage.getStagesByWorkflow(req.params.workflowId);
       res.json(stages);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch stages" });
     }
   });
 
-  app.post("/api/stages", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/stages", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const pipeline = await storage.getPipeline(req.body.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
-        return res.status(404).json({ error: "Pipeline not found" });
+      const workflow = await storage.getWorkflow(req.body.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
       }
-      const stage = await storage.createPipelineStage(req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_stage", stage.id, stage, req);
+      const stage = await storage.createWorkflowStage(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_stage", stage.id, stage, req);
       res.status(201).json(stage);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create stage" });
     }
   });
 
-  app.put("/api/stages/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.put("/api/stages/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const stage = await storage.getPipelineStage(req.params.id);
+      const stage = await storage.getWorkflowStage(req.params.id);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updatePipelineStage(req.params.id, req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_stage", req.params.id, req.body, req);
+      const updated = await storage.updateWorkflowStage(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_stage", req.params.id, req.body, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update stage" });
     }
   });
 
-  app.delete("/api/stages/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/stages/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
-      const stage = await storage.getPipelineStage(req.params.id);
+      const stage = await storage.getWorkflowStage(req.params.id);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      await storage.deletePipelineStage(req.params.id);
-      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_stage", req.params.id, {}, req);
+      await storage.deleteWorkflowStage(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "workflow_stage", req.params.id, {}, req);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete stage" });
     }
   });
 
-  // Pipeline Steps
-  app.get("/api/stages/:stageId/steps", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  // Workflow Steps
+  app.get("/api/stages/:stageId/steps", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const stage = await storage.getPipelineStage(req.params.stageId);
+      const stage = await storage.getWorkflowStage(req.params.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
       const steps = await storage.getStepsByStage(req.params.stageId);
@@ -3466,62 +3402,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/steps", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/steps", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const stage = await storage.getPipelineStage(req.body.stageId);
+      const stage = await storage.getWorkflowStage(req.body.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const step = await storage.createPipelineStep(req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_step", step.id, step, req);
+      const step = await storage.createWorkflowStep(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_step", step.id, step, req);
       res.status(201).json(step);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create step" });
     }
   });
 
-  app.put("/api/steps/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.put("/api/steps/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const step = await storage.getPipelineStep(req.params.id);
+      const step = await storage.getWorkflowStep(req.params.id);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updatePipelineStep(req.params.id, req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_step", req.params.id, req.body, req);
+      const updated = await storage.updateWorkflowStep(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_step", req.params.id, req.body, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update step" });
     }
   });
 
-  app.delete("/api/steps/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/steps/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
-      const step = await storage.getPipelineStep(req.params.id);
+      const step = await storage.getWorkflowStep(req.params.id);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      await storage.deletePipelineStep(req.params.id);
-      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_step", req.params.id, {}, req);
+      await storage.deleteWorkflowStep(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "workflow_step", req.params.id, {}, req);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete step" });
@@ -3529,17 +3465,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Pipeline Tasks
-  app.get("/api/steps/:stepId/tasks", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  app.get("/api/steps/:stepId/tasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const step = await storage.getPipelineStep(req.params.stepId);
+      const step = await storage.getWorkflowStep(req.params.stepId);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
+      const pipeline = await storage.getWorkflow(stage.workflowId);
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
@@ -3550,62 +3486,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tasks", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/tasks", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const step = await storage.getPipelineStep(req.body.stepId);
+      const step = await storage.getWorkflowStep(req.body.stepId);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
+      const pipeline = await storage.getWorkflow(stage.workflowId);
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const task = await storage.createPipelineTask(req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_task", task.id, task, req);
+      const task = await storage.createWorkflowTask(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_task", task.id, task, req);
       res.status(201).json(task);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to create task" });
     }
   });
 
-  app.put("/api/tasks/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.put("/api/tasks/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
-      const step = await storage.getPipelineStep(task.stepId);
+      const step = await storage.getWorkflowStep(task.stepId);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
-      const pipeline = await storage.getPipeline(stage.pipelineId);
+      const pipeline = await storage.getWorkflow(stage.workflowId);
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updatePipelineTask(req.params.id, req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_task", req.params.id, req.body, req);
+      const updated = await storage.updateWorkflowTask(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task", req.params.id, req.body, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update task" });
     }
   });
 
-  app.post("/api/tasks/:id/assign", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/tasks/:id/assign", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
       const updated = await storage.assignTask(req.params.id, req.body.userId);
-      await logActivity(req.user!.id, req.user!.organizationId!, "assign", "pipeline_task", req.params.id, { userId: req.body.userId }, req);
+      await logActivity(req.user!.id, req.user!.organizationId!, "assign", "workflow_task", req.params.id, { userId: req.body.userId }, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to assign task" });
@@ -3614,21 +3550,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tasks/:id/complete", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
       const updated = await storage.completeTask(req.params.id, req.user!.id);
-      await logActivity(req.user!.id, req.user!.organizationId!, "complete", "pipeline_task", req.params.id, {}, req);
+      await logActivity(req.user!.id, req.user!.organizationId!, "complete", "workflow_task", req.params.id, {}, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to complete task" });
     }
   });
 
-  app.post("/api/tasks/:id/execute-ai", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/tasks/:id/execute-ai", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -3637,19 +3573,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update task status to in_progress
-      await storage.updatePipelineTask(req.params.id, { status: 'in_progress' });
+      await storage.updateWorkflowTask(req.params.id, { status: 'in_progress' });
       
       // In a real implementation, this would trigger AI agent execution
       // For now, we'll simulate AI execution and auto-complete the task
       // This is a placeholder for actual AI agent integration
       
-      await logActivity(req.user!.id, req.user!.organizationId!, "execute_ai", "pipeline_task", req.params.id, {}, req);
+      await logActivity(req.user!.id, req.user!.organizationId!, "execute_ai", "workflow_task", req.params.id, {}, req);
       
       // Auto-complete after simulation (in production, this would be done by the AI agent upon completion)
       setTimeout(async () => {
         try {
           await storage.completeTask(req.params.id, req.user!.id);
-          await logActivity(req.user!.id, req.user!.organizationId!, "ai_complete", "pipeline_task", req.params.id, {}, req);
+          await logActivity(req.user!.id, req.user!.organizationId!, "ai_complete", "workflow_task", req.params.id, {}, req);
         } catch (error) {
           console.error("Failed to auto-complete AI task:", error);
         }
@@ -3662,17 +3598,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check and send task reminders
-  app.post("/api/tasks/process-reminders", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/tasks/process-reminders", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
       // SECURITY: Strictly scope to authenticated user's organization only
       const organizationId = req.user!.organizationId!;
-      const organizationPipelines = await storage.getPipelinesByOrganization(organizationId);
+      const organizationPipelines = await storage.getWorkflowsByOrganization(organizationId);
       const tasksNeedingReminders: any[] = [];
       const now = new Date();
       
       // Get all tasks from all pipelines within this organization (flatten the hierarchy)
       for (const pipeline of organizationPipelines) {
-        const stages = await storage.getStagesByPipeline(pipeline.id);
+        const stages = await storage.getStagesByWorkflow(pipeline.id);
         for (const stage of stages) {
           const steps = await storage.getStepsByStage(stage.id);
           for (const step of steps) {
@@ -3739,8 +3675,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             metadata: {
               relatedEntityType: 'pipeline_task',
               relatedEntityId: task.id,
-              pipelineId: pipeline.id,
-              pipelineName: pipeline.name,
+              workflowId: workflow.id,
+              workflowName: workflow.name,
               dueDate: task.dueDate
             },
             isRead: false,
@@ -3749,7 +3685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Update lastReminderSent
-        await storage.updatePipelineTask(task.id, { lastReminderSent: now });
+        await storage.updateWorkflowTask(task.id, { lastReminderSent: now });
       }
       
       res.json({ 
@@ -3763,37 +3699,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== Pipeline Automation Execution Routes ====================
+  // ==================== Workflow Automation Execution Routes ====================
 
   // Execute task automation
-  app.post("/api/tasks/:id/execute-automation", requireAuth, requirePermission("pipelines.edit"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/tasks/:id/execute-automation", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
       const { AutomationEngine } = await import('./automation-engine');
       const automationEngine = new AutomationEngine(storage);
       
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
 
       // Resolve hierarchy for complete context
-      const step = await storage.getPipelineStep(task.stepId);
+      const step = await storage.getWorkflowStep(task.stepId);
       if (!step) {
         return res.status(404).json({ error: "Step not found" });
       }
 
-      const stage = await storage.getPipelineStage(step.stageId);
+      const stage = await storage.getWorkflowStage(step.stageId);
       if (!stage) {
         return res.status(404).json({ error: "Stage not found" });
       }
 
-      const pipeline = await storage.getPipeline(stage.pipelineId);
-      if (!pipeline) {
-        return res.status(404).json({ error: "Pipeline not found" });
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
       }
 
-      // Security: Verify user owns this pipeline
-      if (pipeline.organizationId !== req.user!.organizationId) {
+      // Security: Verify user owns this workflow
+      if (workflow.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Unauthorized" });
       }
 
@@ -3804,20 +3740,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           taskId: task.id,
           stepId: task.stepId,
           stageId: stage.id,
-          pipelineId: pipeline.id,
-          organizationId: pipeline.organizationId,
+          workflowId: workflow.id,
+          organizationId: workflow.organizationId,
           userId: req.user!.id,
           data: task.automationInput as any,
         }
       );
 
       // Update automation output
-      await storage.updatePipelineTask(task.id, {
+      await storage.updateWorkflowTask(task.id, {
         automationOutput: results as any,
         status: results.every((r: any) => r.success) ? 'completed' : 'in_progress',
       } as any);
 
-      await logActivity(req.user!.id, req.user!.organizationId!, "execute_automation", "pipeline_task", task.id, {}, req);
+      await logActivity(req.user!.id, req.user!.organizationId!, "execute_automation", "workflow_task", task.id, {}, req);
       res.json({ success: true, results });
     } catch (error: any) {
       console.error("Automation execution error:", error);
@@ -3840,39 +3776,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manually trigger pipeline automation
-  app.post("/api/pipelines/:id/trigger-automation", requireAuth, requirePermission("pipelines.edit"), async (req: AuthRequest, res: Response) => {
+  // Manually trigger workflow automation
+  app.post("/api/workflows/:id/trigger-automation", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const pipeline = await storage.getPipeline(req.params.id);
-      if (!pipeline) {
-        return res.status(404).json({ error: "Pipeline not found" });
+      const workflow = await storage.getWorkflow(req.params.id);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
       }
 
-      if (!pipeline.isAutomated) {
-        return res.status(400).json({ error: "Pipeline does not have automation enabled" });
+      if (!workflow.isAutomated) {
+        return res.status(400).json({ error: "Workflow does not have automation enabled" });
       }
 
       // Update execution metadata
-      await storage.updatePipeline(pipeline.id, {
+      await storage.updateWorkflow(workflow.id, {
         lastExecutedAt: new Date(),
-        executionCount: (pipeline.executionCount || 0) + 1,
+        executionCount: (workflow.executionCount || 0) + 1,
       });
 
-      await logActivity(req.user!.id, req.user!.organizationId!, "trigger_automation", "pipeline", pipeline.id, {}, req);
-      res.json({ success: true, message: "Pipeline automation triggered" });
+      await logActivity(req.user!.id, req.user!.organizationId!, "trigger_automation", "workflow", workflow.id, {}, req);
+      res.json({ success: true, message: "Workflow automation triggered" });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to trigger automation" });
     }
   });
 
-  app.delete("/api/tasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/tasks/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.id);
+      const task = await storage.getWorkflowTask(req.params.id);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
-      await storage.deletePipelineTask(req.params.id);
-      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_task", req.params.id, {}, req);
+      await storage.deleteWorkflowTask(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "workflow_task", req.params.id, {}, req);
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete task" });
@@ -3880,9 +3816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task Subtasks
-  app.get("/api/tasks/:taskId/subtasks", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  app.get("/api/tasks/:taskId/subtasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.taskId);
+      const task = await storage.getWorkflowTask(req.params.taskId);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -3893,9 +3829,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/subtasks", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/subtasks", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.body.taskId);
+      const task = await storage.getWorkflowTask(req.body.taskId);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -3907,7 +3843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/subtasks/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+  app.put("/api/subtasks/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
       const subtask = await storage.getTaskSubtask(req.params.id);
       if (!subtask) {
@@ -3935,7 +3871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/subtasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/subtasks/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const subtask = await storage.getTaskSubtask(req.params.id);
       if (!subtask) {
@@ -3950,9 +3886,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task Checklists
-  app.get("/api/tasks/:taskId/checklists", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+  app.get("/api/tasks/:taskId/checklists", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.params.taskId);
+      const task = await storage.getWorkflowTask(req.params.taskId);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -3963,9 +3899,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/checklists", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/checklists", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const task = await storage.getPipelineTask(req.body.taskId);
+      const task = await storage.getWorkflowTask(req.body.taskId);
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
@@ -3991,7 +3927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/checklists/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/checklists/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const checklist = await storage.getTaskChecklist(req.params.id);
       if (!checklist) {

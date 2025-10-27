@@ -21,15 +21,18 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data for multiple organizations.
 - **Role-Based Access Control**: Granular permissions for Super Admin, Admin, Employee, and Client roles.
-- **Unified Pipeline System with Full Automation** (Workflows + Pipelines merged):
-  - **Hierarchical Structure**: Stages → Steps → Tasks → Subtasks/Checklists for organizing complex projects
+- **Unified Workflows System** (October 2025 - Merged Pipelines into Workflows):
+  - **TaxDome-Style Unified Interface**: Single "Workflows" feature combining visual automation (node-based canvas) AND hierarchical project management
+  - **Dual Capabilities in ONE Feature**:
+    - **Visual Automation**: Node-based workflow builder with triggers, conditions, and automated actions
+    - **Hierarchical Project Management**: Stages → Steps → Tasks for structured project execution
   - **Automation at Every Level**: 
-    - **Pipeline Level**: Triggers (email, form submission, webhook, schedule) to start pipelines automatically
+    - **Workflow Level**: Triggers (email, form submission, webhook, schedule) to start workflows automatically
     - **Stage/Step Level**: Auto-progression rules with conditions and completion actions
     - **Task Level**: Automated tasks with triggers, conditions, actions (API calls, notifications, AI agent execution)
-  - **Visual Workflow Builder**: Optional node-based editor for complex automation sequences
-  - **Hybrid Tasks**: Mix manual (human-assigned) and automated (trigger-based) tasks in the same pipeline
+  - **Hybrid Execution**: Mix manual (human-assigned) and automated (trigger-based) tasks in the same workflow
   - **Use Cases**: Client engagements, tax preparation, audits, automated workflows, or any project requiring both structure and automation
+  - **Schema**: workflows, workflowStages, workflowSteps, workflowTasks tables (replaced old pipeline tables)
 - **AI Agent Marketplace & Execution System**: Browse, install, and manage AI agents with defined directories and pricing. **Fully-functional AI Agents**: Four production-ready agents (Kanban View, Cadence, Parity, Forma) that work with user-configured LLM credentials (OpenAI, Anthropic, Azure OpenAI). Agents use AES-256 encrypted API key storage and support multiple LLM providers per organization.
 - **LLM Configuration Management**: Secure credential storage for multiple AI providers (OpenAI, Anthropic Claude, Azure OpenAI) with AES-256 encryption. Organizations can configure multiple LLM providers and set a default configuration. API keys are encrypted before storage and never exposed in API responses.
 - **Secure Document Management**: Encrypted storage, authenticated downloads, and organization/client-level access control.
@@ -40,13 +43,13 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 - **Polymorphic Tagging System**: Organize resources like documents, clients, and contacts with tags, including CRUD operations and permissions.
 - **Contacts Management**: System for managing contacts associated with clients, including primary contact designation and permissions.
 - **Clients Management**: Comprehensive CRUD operations for client profiles with multi-tenant security and permissions.
-- **Hierarchical Pipeline Builder**: Sophisticated project management system with **Stages → Steps → Tasks → Subtasks/Checklists** hierarchy. Features include: user assignment to tasks and subtasks, manual and automated (AI-powered) tasks, progression logic requiring completion of all tasks/checklists before advancing, priority levels, status tracking, and comprehensive CRUD operations at every level. Pipelines support multi-tenant isolation with granular RBAC permissions for create, view, update, and delete operations. **Task Reminder System**: Configure reminders for tasks with due dates. Features include: customizable reminder duration (15 minutes to 1 week before due date), granular notification settings to notify assigned user, manager/admin, and/or client (if client is assigned), automated reminder processing endpoint (`POST /api/tasks/process-reminders`), and notification creation for selected recipients. Reminders are sent once per day maximum and track last sent timestamp to prevent spam.
+- **Unified Workflows Builder** (Replaces separate Pipeline feature): Sophisticated system combining **visual automation AND hierarchical project management** with **Stages → Steps → Tasks** hierarchy. Features include: user assignment to tasks, manual and automated (AI-powered) tasks, progression logic requiring completion of all tasks before advancing, priority levels, status tracking, and comprehensive CRUD operations at every level. Workflows support multi-tenant isolation with granular RBAC permissions (workflows.view, workflows.create, workflows.update, workflows.delete). **Task Reminder System**: Configure reminders for tasks with due dates. Features include: customizable reminder duration (15 minutes to 1 week before due date), granular notification settings to notify assigned user, manager/admin, and/or client (if client is assigned), automated reminder processing endpoint (`POST /api/tasks/process-reminders`), and notification creation for selected recipients. Reminders are sent once per day maximum and track last sent timestamp to prevent spam.
 
 ### System Design Choices
-The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows, AI agents, documents, forms, tags, contacts, and pipelines (with related tables: pipelineStages, pipelineSteps, pipelineTasks, taskSubtasks, taskChecklists). Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
+The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows (combining visual automation and hierarchical project management with workflowStages, workflowSteps, workflowTasks), AI agents, documents, forms, tags, and contacts. Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
 
 ### Automation Engine Implementation
-The unified pipeline automation system is powered by `AutomationEngine` (`server/automation-engine.ts`) with the following capabilities:
+The unified workflow automation system is powered by `AutomationEngine` (`server/automation-engine.ts`) with the following capabilities:
 
 **Action Types Supported:**
 1. `create_task`: Creates new tasks in specified steps with multi-tenant validation
@@ -56,21 +59,22 @@ The unified pipeline automation system is powered by `AutomationEngine` (`server
 5. `wait_delay`: Introduces delays between automated actions
 
 **Context Propagation & Security:**
-- All automation execution paths resolve complete hierarchy (task → step → stage → pipeline)
-- Full context populated: `organizationId`, `pipelineId`, `stageId`, `stepId`, `taskId`, `userId`
+- All automation execution paths resolve complete hierarchy (task → step → stage → workflow)
+- Full context populated: `organizationId`, `workflowId`, `stageId`, `stepId`, `taskId`, `userId`
 - Multi-tenant isolation enforced at every level via organizationId validation
 - Ownership chain verification prevents cross-organization access
 - Security-critical fix (Oct 2025): Added hierarchy resolution in execution routes and cascade methods
+- Migration (Oct 2025): Merged Pipelines into Workflows - all pipeline references updated to workflow terminology
 
 **Execution Endpoints:**
 - `POST /api/tasks/:id/execute-automation`: Execute task-level automation
-- `POST /api/pipelines/:id/trigger-automation`: Manually trigger pipeline automation
+- `POST /api/workflows/:id/trigger-automation`: Manually trigger workflow automation
 - `POST /api/automation/test-conditions`: Test condition expressions before deployment
 
 **Auto-Progression Cascade:**
 - Task completion triggers `processTaskCompletion()` → checks if step should auto-progress
 - Step completion triggers `processStepCompletion()` → checks if stage should auto-progress
-- Both cascades resolve full pipeline hierarchy to populate secure context before executing completion actions
+- Both cascades resolve full workflow hierarchy to populate secure context before executing completion actions
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.

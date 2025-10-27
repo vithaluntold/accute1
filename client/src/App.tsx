@@ -52,7 +52,6 @@ import Projects from "@/pages/projects";
 import TeamChat from "@/pages/team-chat";
 import Calendar from "@/pages/calendar";
 import EmailTemplates from "@/pages/email-templates";
-import Pipelines from "@/pages/pipelines";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -395,13 +394,6 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <EmailTemplates />
-          </AppLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/pipelines">
-        <ProtectedRoute>
-          <AppLayout>
-            <Pipelines />
           </AppLayout>
         </ProtectedRoute>
       </Route>
