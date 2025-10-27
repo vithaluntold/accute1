@@ -65,7 +65,8 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Workflows for accounting automation
+// Workflows - Unified hierarchical project/workflow management with automation
+// Combines stages/steps/tasks hierarchy WITH visual automation capabilities (best of both worlds!)
 export const workflows = pgTable("workflows", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -73,17 +74,21 @@ export const workflows = pgTable("workflows", {
   category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
-  // Visual workflow builder data
-  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`), // Array of workflow nodes
-  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`), // Array of connections between nodes
-  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas viewport state
-  // Workflow state
-  status: text("status").notNull().default("draft"), // 'draft', 'published', 'archived'
+  status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
+  currentStageId: varchar("current_stage_id"), // Track which stage workflow is currently on
+  
+  // Automation triggers - What starts this workflow?
+  triggers: jsonb("triggers").notNull().default(sql`'[]'::jsonb`), // Array of trigger configs: {type: 'email'|'form'|'webhook'|'schedule', config: {...}}
+  isAutomated: boolean("is_automated").notNull().default(false), // Does this workflow have automation?
+  
+  // Visual workflow representation (for automation canvas)
+  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`), // Visual workflow nodes
+  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`), // Connections between nodes
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas state
+  
+  // Metadata
   version: integer("version").notNull().default(1),
   isActive: boolean("is_active").notNull().default(true),
-  // Trigger configuration
-  trigger: jsonb("trigger").default(sql`'{}'::jsonb`), // Trigger type and configuration
-  // Metadata
   lastPublishedAt: timestamp("last_published_at"),
   lastExecutedAt: timestamp("last_executed_at"),
   executionCount: integer("execution_count").notNull().default(0),
@@ -118,38 +123,10 @@ export const workflowExecutions = pgTable("workflow_executions", {
   workflowStatusIdx: index("workflow_executions_workflow_status_idx").on(table.workflowId, table.status),
 }));
 
-// Pipelines - Unified hierarchical project/workflow management with automation
-// Combines stages/steps/tasks hierarchy WITH workflow automation capabilities
-export const pipelines = pgTable("pipelines", {
+// Workflow Stages - Top level grouping with auto-progression rules
+export const workflowStages = pgTable("workflow_stages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  description: text("description"),
-  category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
-  createdBy: varchar("created_by").notNull().references(() => users.id),
-  status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
-  currentStageId: varchar("current_stage_id"), // Track which stage pipeline is currently on
-  
-  // Automation triggers - What starts this pipeline?
-  triggers: jsonb("triggers").notNull().default(sql`'[]'::jsonb`), // Array of trigger configs: {type: 'email'|'form'|'webhook'|'schedule', config: {...}}
-  isAutomated: boolean("is_automated").notNull().default(false), // Does this pipeline have automation?
-  
-  // Visual workflow representation (optional - for complex automations)
-  nodes: jsonb("nodes").default(sql`'[]'::jsonb`), // Visual workflow nodes
-  edges: jsonb("edges").default(sql`'[]'::jsonb`), // Connections between nodes
-  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas state
-  
-  // Metadata
-  lastExecutedAt: timestamp("last_executed_at"),
-  executionCount: integer("execution_count").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-// Pipeline Stages - Top level grouping with auto-progression rules
-export const pipelineStages = pgTable("pipeline_stages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  pipelineId: varchar("pipeline_id").notNull().references(() => pipelines.id, { onDelete: "cascade" }),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   order: integer("order").notNull(), // Display order
@@ -165,10 +142,10 @@ export const pipelineStages = pgTable("pipeline_stages", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Pipeline Steps - Within each stage with automation support
-export const pipelineSteps = pgTable("pipeline_steps", {
+// Workflow Steps - Within each stage with automation support
+export const workflowSteps = pgTable("workflow_steps", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  stageId: varchar("stage_id").notNull().references(() => pipelineStages.id, { onDelete: "cascade" }),
+  stageId: varchar("stage_id").notNull().references(() => workflowStages.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   order: integer("order").notNull(), // Display order
@@ -185,10 +162,10 @@ export const pipelineSteps = pgTable("pipeline_steps", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Pipeline Tasks - Individual work items with full automation support
-export const pipelineTasks = pgTable("pipeline_tasks", {
+// Workflow Tasks - Individual work items with full automation support
+export const workflowTasks = pgTable("workflow_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  stepId: varchar("step_id").notNull().references(() => pipelineSteps.id, { onDelete: "cascade" }),
+  stepId: varchar("step_id").notNull().references(() => workflowSteps.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").notNull().default("manual"), // 'manual', 'automated'
@@ -223,7 +200,7 @@ export const pipelineTasks = pgTable("pipeline_tasks", {
 // Task Subtasks - Break down tasks into smaller pieces
 export const taskSubtasks = pgTable("task_subtasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  taskId: varchar("task_id").notNull().references(() => pipelineTasks.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull().references(() => workflowTasks.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   order: integer("order").notNull(), // Display order
   status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
@@ -237,7 +214,7 @@ export const taskSubtasks = pgTable("task_subtasks", {
 // Task Checklists - Simple checkboxes for task completion
 export const taskChecklists = pgTable("task_checklists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  taskId: varchar("task_id").notNull().references(() => pipelineTasks.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull().references(() => workflowTasks.id, { onDelete: "cascade" }),
   item: text("item").notNull(),
   order: integer("order").notNull(), // Display order
   isChecked: boolean("is_checked").notNull().default(false),
@@ -901,31 +878,22 @@ export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutio
   createdAt: true,
 });
 
-// Pipeline Zod Schemas
-export const insertPipelineSchema = createInsertSchema(pipelines).omit({
-  id: true,
-  organizationId: true,
-  createdBy: true,
-  currentStageId: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertPipelineStageSchema = createInsertSchema(pipelineStages).omit({
+// Workflow Hierarchy Zod Schemas (Stages, Steps, Tasks)
+export const insertWorkflowStageSchema = createInsertSchema(workflowStages).omit({
   id: true,
   completedAt: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const insertPipelineStepSchema = createInsertSchema(pipelineSteps).omit({
+export const insertWorkflowStepSchema = createInsertSchema(workflowSteps).omit({
   id: true,
   completedAt: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const insertPipelineTaskSchema = createInsertSchema(pipelineTasks).omit({
+export const insertWorkflowTaskSchema = createInsertSchema(workflowTasks).omit({
   id: true,
   completedAt: true,
   completedBy: true,
@@ -1076,15 +1044,13 @@ export type Permission = typeof permissions.$inferSelect;
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type Workflow = typeof workflows.$inferSelect;
 
-// Pipeline Types
-export type InsertPipeline = z.infer<typeof insertPipelineSchema>;
-export type Pipeline = typeof pipelines.$inferSelect;
-export type InsertPipelineStage = z.infer<typeof insertPipelineStageSchema>;
-export type PipelineStage = typeof pipelineStages.$inferSelect;
-export type InsertPipelineStep = z.infer<typeof insertPipelineStepSchema>;
-export type PipelineStep = typeof pipelineSteps.$inferSelect;
-export type InsertPipelineTask = z.infer<typeof insertPipelineTaskSchema>;
-export type PipelineTask = typeof pipelineTasks.$inferSelect;
+// Workflow Hierarchy Types (Stages, Steps, Tasks)
+export type InsertWorkflowStage = z.infer<typeof insertWorkflowStageSchema>;
+export type WorkflowStage = typeof workflowStages.$inferSelect;
+export type InsertWorkflowStep = z.infer<typeof insertWorkflowStepSchema>;
+export type WorkflowStep = typeof workflowSteps.$inferSelect;
+export type InsertWorkflowTask = z.infer<typeof insertWorkflowTaskSchema>;
+export type WorkflowTask = typeof workflowTasks.$inferSelect;
 export type InsertTaskSubtask = z.infer<typeof insertTaskSubtaskSchema>;
 export type TaskSubtask = typeof taskSubtasks.$inferSelect;
 export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;

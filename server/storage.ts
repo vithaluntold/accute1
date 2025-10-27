@@ -347,35 +347,28 @@ export interface IStorage {
   deleteDocumentAnnotation(id: string): Promise<void>;
   resolveAnnotation(id: string, resolvedBy: string): Promise<schema.DocumentAnnotation | undefined>;
 
-  // Pipelines - Hierarchical project management
-  createPipeline(pipeline: schema.InsertPipeline & { organizationId: string; createdBy: string }): Promise<schema.Pipeline>;
-  getPipeline(id: string): Promise<schema.Pipeline | undefined>;
-  getPipelinesByOrganization(organizationId: string): Promise<schema.Pipeline[]>;
-  updatePipeline(id: string, pipeline: Partial<schema.InsertPipeline>): Promise<schema.Pipeline | undefined>;
-  deletePipeline(id: string): Promise<void>;
+  // Workflow Stages - Hierarchical structure within workflows
+  createWorkflowStage(stage: schema.InsertWorkflowStage): Promise<schema.WorkflowStage>;
+  getWorkflowStage(id: string): Promise<schema.WorkflowStage | undefined>;
+  getStagesByWorkflow(workflowId: string): Promise<schema.WorkflowStage[]>;
+  updateWorkflowStage(id: string, stage: Partial<schema.InsertWorkflowStage>): Promise<schema.WorkflowStage | undefined>;
+  deleteWorkflowStage(id: string): Promise<void>;
 
-  // Pipeline Stages
-  createPipelineStage(stage: schema.InsertPipelineStage): Promise<schema.PipelineStage>;
-  getPipelineStage(id: string): Promise<schema.PipelineStage | undefined>;
-  getStagesByPipeline(pipelineId: string): Promise<schema.PipelineStage[]>;
-  updatePipelineStage(id: string, stage: Partial<schema.InsertPipelineStage>): Promise<schema.PipelineStage | undefined>;
-  deletePipelineStage(id: string): Promise<void>;
+  // Workflow Steps - Within each stage
+  createWorkflowStep(step: schema.InsertWorkflowStep): Promise<schema.WorkflowStep>;
+  getWorkflowStep(id: string): Promise<schema.WorkflowStep | undefined>;
+  getStepsByStage(stageId: string): Promise<schema.WorkflowStep[]>;
+  updateWorkflowStep(id: string, step: Partial<schema.InsertWorkflowStep>): Promise<schema.WorkflowStep | undefined>;
+  deleteWorkflowStep(id: string): Promise<void>;
 
-  // Pipeline Steps
-  createPipelineStep(step: schema.InsertPipelineStep): Promise<schema.PipelineStep>;
-  getPipelineStep(id: string): Promise<schema.PipelineStep | undefined>;
-  getStepsByStage(stageId: string): Promise<schema.PipelineStep[]>;
-  updatePipelineStep(id: string, step: Partial<schema.InsertPipelineStep>): Promise<schema.PipelineStep | undefined>;
-  deletePipelineStep(id: string): Promise<void>;
-
-  // Pipeline Tasks
-  createPipelineTask(task: schema.InsertPipelineTask): Promise<schema.PipelineTask>;
-  getPipelineTask(id: string): Promise<schema.PipelineTask | undefined>;
-  getTasksByStep(stepId: string): Promise<schema.PipelineTask[]>;
-  updatePipelineTask(id: string, task: Partial<schema.InsertPipelineTask>): Promise<schema.PipelineTask | undefined>;
-  deletePipelineTask(id: string): Promise<void>;
-  assignTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined>;
-  completeTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined>;
+  // Workflow Tasks - Individual work items
+  createWorkflowTask(task: schema.InsertWorkflowTask): Promise<schema.WorkflowTask>;
+  getWorkflowTask(id: string): Promise<schema.WorkflowTask | undefined>;
+  getTasksByStep(stepId: string): Promise<schema.WorkflowTask[]>;
+  updateWorkflowTask(id: string, task: Partial<schema.InsertWorkflowTask>): Promise<schema.WorkflowTask | undefined>;
+  deleteWorkflowTask(id: string): Promise<void>;
+  assignTask(taskId: string, userId: string): Promise<schema.WorkflowTask | undefined>;
+  completeTask(taskId: string, userId: string): Promise<schema.WorkflowTask | undefined>;
 
   // Task Subtasks
   createTaskSubtask(subtask: schema.InsertTaskSubtask): Promise<schema.TaskSubtask>;
@@ -1896,142 +1889,113 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  // Pipelines
-  async createPipeline(pipeline: schema.InsertPipeline & { organizationId: string; createdBy: string }): Promise<schema.Pipeline> {
-    const result = await db.insert(schema.pipelines).values(pipeline).returning();
+  // Workflow Stages
+  async createWorkflowStage(stage: schema.InsertWorkflowStage): Promise<schema.WorkflowStage> {
+    const result = await db.insert(schema.workflowStages).values(stage).returning();
     return result[0];
   }
 
-  async getPipeline(id: string): Promise<schema.Pipeline | undefined> {
-    const result = await db.select().from(schema.pipelines).where(eq(schema.pipelines.id, id));
+  async getWorkflowStage(id: string): Promise<schema.WorkflowStage | undefined> {
+    const result = await db.select().from(schema.workflowStages).where(eq(schema.workflowStages.id, id));
     return result[0];
   }
 
-  async getPipelinesByOrganization(organizationId: string): Promise<schema.Pipeline[]> {
-    return await db.select().from(schema.pipelines)
-      .where(eq(schema.pipelines.organizationId, organizationId))
-      .orderBy(schema.pipelines.createdAt);
+  async getStagesByWorkflow(workflowId: string): Promise<schema.WorkflowStage[]> {
+    return await db.select().from(schema.workflowStages)
+      .where(eq(schema.workflowStages.workflowId, workflowId))
+      .orderBy(schema.workflowStages.order);
   }
 
-  async updatePipeline(id: string, pipeline: Partial<schema.InsertPipeline>): Promise<schema.Pipeline | undefined> {
-    const result = await db.update(schema.pipelines)
-      .set({ ...pipeline, updatedAt: new Date() })
-      .where(eq(schema.pipelines.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async deletePipeline(id: string): Promise<void> {
-    await db.delete(schema.pipelines).where(eq(schema.pipelines.id, id));
-  }
-
-  // Pipeline Stages
-  async createPipelineStage(stage: schema.InsertPipelineStage): Promise<schema.PipelineStage> {
-    const result = await db.insert(schema.pipelineStages).values(stage).returning();
-    return result[0];
-  }
-
-  async getPipelineStage(id: string): Promise<schema.PipelineStage | undefined> {
-    const result = await db.select().from(schema.pipelineStages).where(eq(schema.pipelineStages.id, id));
-    return result[0];
-  }
-
-  async getStagesByPipeline(pipelineId: string): Promise<schema.PipelineStage[]> {
-    return await db.select().from(schema.pipelineStages)
-      .where(eq(schema.pipelineStages.pipelineId, pipelineId))
-      .orderBy(schema.pipelineStages.order);
-  }
-
-  async updatePipelineStage(id: string, stage: Partial<schema.InsertPipelineStage>): Promise<schema.PipelineStage | undefined> {
-    const result = await db.update(schema.pipelineStages)
+  async updateWorkflowStage(id: string, stage: Partial<schema.InsertWorkflowStage>): Promise<schema.WorkflowStage | undefined> {
+    const result = await db.update(schema.workflowStages)
       .set({ ...stage, updatedAt: new Date() })
-      .where(eq(schema.pipelineStages.id, id))
+      .where(eq(schema.workflowStages.id, id))
       .returning();
     return result[0];
   }
 
-  async deletePipelineStage(id: string): Promise<void> {
-    await db.delete(schema.pipelineStages).where(eq(schema.pipelineStages.id, id));
+  async deleteWorkflowStage(id: string): Promise<void> {
+    await db.delete(schema.workflowStages).where(eq(schema.workflowStages.id, id));
   }
 
-  // Pipeline Steps
-  async createPipelineStep(step: schema.InsertPipelineStep): Promise<schema.PipelineStep> {
-    const result = await db.insert(schema.pipelineSteps).values(step).returning();
+  // Workflow Steps
+  async createWorkflowStep(step: schema.InsertWorkflowStep): Promise<schema.WorkflowStep> {
+    const result = await db.insert(schema.workflowSteps).values(step).returning();
     return result[0];
   }
 
-  async getPipelineStep(id: string): Promise<schema.PipelineStep | undefined> {
-    const result = await db.select().from(schema.pipelineSteps).where(eq(schema.pipelineSteps.id, id));
+  async getWorkflowStep(id: string): Promise<schema.WorkflowStep | undefined> {
+    const result = await db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, id));
     return result[0];
   }
 
-  async getStepsByStage(stageId: string): Promise<schema.PipelineStep[]> {
-    return await db.select().from(schema.pipelineSteps)
-      .where(eq(schema.pipelineSteps.stageId, stageId))
-      .orderBy(schema.pipelineSteps.order);
+  async getStepsByStage(stageId: string): Promise<schema.WorkflowStep[]> {
+    return await db.select().from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.stageId, stageId))
+      .orderBy(schema.workflowSteps.order);
   }
 
-  async updatePipelineStep(id: string, step: Partial<schema.InsertPipelineStep>): Promise<schema.PipelineStep | undefined> {
-    const result = await db.update(schema.pipelineSteps)
+  async updateWorkflowStep(id: string, step: Partial<schema.InsertWorkflowStep>): Promise<schema.WorkflowStep | undefined> {
+    const result = await db.update(schema.workflowSteps)
       .set({ ...step, updatedAt: new Date() })
-      .where(eq(schema.pipelineSteps.id, id))
+      .where(eq(schema.workflowSteps.id, id))
       .returning();
     return result[0];
   }
 
-  async deletePipelineStep(id: string): Promise<void> {
-    await db.delete(schema.pipelineSteps).where(eq(schema.pipelineSteps.id, id));
+  async deleteWorkflowStep(id: string): Promise<void> {
+    await db.delete(schema.workflowSteps).where(eq(schema.workflowSteps.id, id));
   }
 
-  // Pipeline Tasks
-  async createPipelineTask(task: schema.InsertPipelineTask): Promise<schema.PipelineTask> {
-    const result = await db.insert(schema.pipelineTasks).values(task).returning();
+  // Workflow Tasks
+  async createWorkflowTask(task: schema.InsertWorkflowTask): Promise<schema.WorkflowTask> {
+    const result = await db.insert(schema.workflowTasks).values(task).returning();
     return result[0];
   }
 
-  async getPipelineTask(id: string): Promise<schema.PipelineTask | undefined> {
-    const result = await db.select().from(schema.pipelineTasks).where(eq(schema.pipelineTasks.id, id));
+  async getWorkflowTask(id: string): Promise<schema.WorkflowTask | undefined> {
+    const result = await db.select().from(schema.workflowTasks).where(eq(schema.workflowTasks.id, id));
     return result[0];
   }
 
-  async getTasksByStep(stepId: string): Promise<schema.PipelineTask[]> {
-    return await db.select().from(schema.pipelineTasks)
-      .where(eq(schema.pipelineTasks.stepId, stepId))
-      .orderBy(schema.pipelineTasks.order);
+  async getTasksByStep(stepId: string): Promise<schema.WorkflowTask[]> {
+    return await db.select().from(schema.workflowTasks)
+      .where(eq(schema.workflowTasks.stepId, stepId))
+      .orderBy(schema.workflowTasks.order);
   }
 
-  async updatePipelineTask(id: string, task: Partial<schema.InsertPipelineTask>): Promise<schema.PipelineTask | undefined> {
-    const result = await db.update(schema.pipelineTasks)
+  async updateWorkflowTask(id: string, task: Partial<schema.InsertWorkflowTask>): Promise<schema.WorkflowTask | undefined> {
+    const result = await db.update(schema.workflowTasks)
       .set({ ...task, updatedAt: new Date() })
-      .where(eq(schema.pipelineTasks.id, id))
+      .where(eq(schema.workflowTasks.id, id))
       .returning();
     return result[0];
   }
 
-  async deletePipelineTask(id: string): Promise<void> {
-    await db.delete(schema.pipelineTasks).where(eq(schema.pipelineTasks.id, id));
+  async deleteWorkflowTask(id: string): Promise<void> {
+    await db.delete(schema.workflowTasks).where(eq(schema.workflowTasks.id, id));
   }
 
-  async assignTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined> {
-    const result = await db.update(schema.pipelineTasks)
+  async assignTask(taskId: string, userId: string): Promise<schema.WorkflowTask | undefined> {
+    const result = await db.update(schema.workflowTasks)
       .set({ assignedTo: userId, updatedAt: new Date() })
-      .where(eq(schema.pipelineTasks.id, taskId))
+      .where(eq(schema.workflowTasks.id, taskId))
       .returning();
     return result[0];
   }
 
-  async completeTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined> {
-    const task = await this.getPipelineTask(taskId);
+  async completeTask(taskId: string, userId: string): Promise<schema.WorkflowTask | undefined> {
+    const task = await this.getWorkflowTask(taskId);
     if (!task) return undefined;
     
-    const result = await db.update(schema.pipelineTasks)
+    const result = await db.update(schema.workflowTasks)
       .set({ 
         status: 'completed', 
         completedAt: new Date(), 
         completedBy: userId,
         updatedAt: new Date()
       })
-      .where(eq(schema.pipelineTasks.id, taskId))
+      .where(eq(schema.workflowTasks.id, taskId))
       .returning();
     
     // Trigger progression check
@@ -2146,7 +2110,7 @@ export class DbStorage implements IStorage {
   // Progression Logic - Check if task can be auto-completed
   async checkAndUpdateTaskCompletion(taskId: string): Promise<void> {
     console.log(`[PROGRESSION] Checking task completion for task ${taskId}`);
-    const task = await this.getPipelineTask(taskId);
+    const task = await this.getWorkflowTask(taskId);
     if (!task) {
       console.log(`[PROGRESSION] Task not found: ${taskId}`);
       return;
@@ -2168,13 +2132,13 @@ export class DbStorage implements IStorage {
     if (allSubtasksComplete && allChecklistsComplete) {
       console.log(`[PROGRESSION] Auto-completing task ${taskId}`);
       // Auto-complete the task
-      await db.update(schema.pipelineTasks)
+      await db.update(schema.workflowTasks)
         .set({ 
           status: 'completed',
           completedAt: new Date(),
           updatedAt: new Date()
         })
-        .where(eq(schema.pipelineTasks.id, taskId));
+        .where(eq(schema.workflowTasks.id, taskId));
       
       console.log(`[PROGRESSION] Task ${taskId} completed, checking step ${task.stepId}`);
       // Check step completion
@@ -2187,7 +2151,7 @@ export class DbStorage implements IStorage {
   // Check if step can be auto-completed
   async checkAndUpdateStepCompletion(stepId: string): Promise<void> {
     console.log(`[PROGRESSION] Checking step completion for step ${stepId}`);
-    const step = await this.getPipelineStep(stepId);
+    const step = await this.getWorkflowStep(stepId);
     if (!step) {
       console.log(`[PROGRESSION] Step not found: ${stepId}`);
       return;
@@ -2216,13 +2180,13 @@ export class DbStorage implements IStorage {
     if (allTasksComplete) {
       console.log(`[PROGRESSION] Auto-completing step ${stepId}`);
       // Auto-complete the step
-      await db.update(schema.pipelineSteps)
+      await db.update(schema.workflowSteps)
         .set({ 
           status: 'completed',
           completedAt: new Date(),
           updatedAt: new Date()
         })
-        .where(eq(schema.pipelineSteps.id, stepId));
+        .where(eq(schema.workflowSteps.id, stepId));
       
       console.log(`[PROGRESSION] Step ${stepId} completed, checking stage`);
       // Check stage completion
@@ -2234,7 +2198,7 @@ export class DbStorage implements IStorage {
 
   // Check if stage can be auto-completed
   async checkAndUpdateStageCompletion(stageId: string): Promise<void> {
-    const stage = await this.getPipelineStage(stageId);
+    const stage = await this.getWorkflowStage(stageId);
     if (!stage || stage.status === 'completed') return;
 
     const steps = await this.getStepsByStage(stageId);
@@ -2244,37 +2208,37 @@ export class DbStorage implements IStorage {
 
     if (allStepsComplete) {
       // Auto-complete the stage
-      await db.update(schema.pipelineStages)
+      await db.update(schema.workflowStages)
         .set({ 
           status: 'completed',
           completedAt: new Date(),
           updatedAt: new Date()
         })
-        .where(eq(schema.pipelineStages.id, stageId));
+        .where(eq(schema.workflowStages.id, stageId));
       
-      // Check pipeline completion
-      await this.checkAndUpdatePipelineCompletion(stage.pipelineId);
+      // Check workflow completion
+      await this.checkAndUpdateWorkflowCompletion(stage.workflowId);
     }
   }
 
-  // Check if pipeline can be auto-completed
-  async checkAndUpdatePipelineCompletion(pipelineId: string): Promise<void> {
-    const pipeline = await this.getPipeline(pipelineId);
-    if (!pipeline || pipeline.status === 'completed') return;
+  // Check if workflow can be auto-completed
+  async checkAndUpdateWorkflowCompletion(workflowId: string): Promise<void> {
+    const workflow = await this.getWorkflow(workflowId);
+    if (!workflow || workflow.status === 'completed') return;
 
-    const stages = await this.getStagesByPipeline(pipelineId);
+    const stages = await this.getStagesByWorkflow(workflowId);
     
     // Check if all stages are complete
     const allStagesComplete = stages.length > 0 && stages.every(s => s.status === 'completed');
 
     if (allStagesComplete) {
-      // Auto-complete the pipeline
-      await db.update(schema.pipelines)
+      // Auto-complete the workflow
+      await db.update(schema.workflows)
         .set({ 
           status: 'completed',
           updatedAt: new Date()
         })
-        .where(eq(schema.pipelines.id, pipelineId));
+        .where(eq(schema.workflows.id, workflowId));
     }
   }
 
