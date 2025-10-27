@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, ChevronDown, ChevronRight, CheckCircle2, Circle, Users, Bot } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, CheckCircle2, Circle, Users, Bot, UserPlus, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Pipeline, PipelineStage, PipelineStep, PipelineTask, TaskSubtask, TaskChecklist } from "@shared/schema";
+import type { Pipeline, PipelineStage, PipelineStep, PipelineTask, TaskSubtask, TaskChecklist, User } from "@shared/schema";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Pipelines() {
   const { toast } = useToast();
@@ -26,6 +27,10 @@ export default function Pipelines() {
 
   const { data: pipelines, isLoading } = useQuery<Pipeline[]>({
     queryKey: ["/api/pipelines"],
+  });
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const createPipeline = useMutation({
@@ -164,6 +169,7 @@ export default function Pipelines() {
               onToggleStage={(id) => toggleExpand(id, 'stage')}
               onToggleStep={(id) => toggleExpand(id, 'step')}
               onToggleTask={(id) => toggleExpand(id, 'task')}
+              users={users}
             />
           ))}
         </div>
@@ -182,6 +188,7 @@ function PipelineItem({
   onToggleStage,
   onToggleStep,
   onToggleTask,
+  users,
 }: { 
   pipeline: Pipeline; 
   expanded: boolean; 
@@ -192,6 +199,7 @@ function PipelineItem({
   onToggleStage: (id: string) => void;
   onToggleStep: (id: string) => void;
   onToggleTask: (id: string) => void;
+  users?: User[];
 }) {
   const { toast } = useToast();
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
@@ -305,6 +313,7 @@ function PipelineItem({
                   expandedTasks={expandedTasks}
                   onToggleStep={onToggleStep}
                   onToggleTask={onToggleTask}
+                  users={users}
                 />
               ))}
             </div>
@@ -323,6 +332,7 @@ function StageItem({
   expandedTasks,
   onToggleStep,
   onToggleTask,
+  users,
 }: { 
   stage: PipelineStage; 
   expanded: boolean; 
@@ -331,6 +341,7 @@ function StageItem({
   expandedTasks: Set<string>;
   onToggleStep: (id: string) => void;
   onToggleTask: (id: string) => void;
+  users?: User[];
 }) {
   const { toast } = useToast();
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
@@ -450,6 +461,7 @@ function StageItem({
                   onToggle={() => onToggleStep(step.id)}
                   expandedTasks={expandedTasks}
                   onToggleTask={onToggleTask}
+                  users={users}
                 />
               ))}
             </div>
@@ -466,12 +478,14 @@ function StepItem({
   onToggle,
   expandedTasks,
   onToggleTask,
+  users,
 }: { 
   step: PipelineStep; 
   expanded: boolean; 
   onToggle: () => void;
   expandedTasks: Set<string>;
   onToggleTask: (id: string) => void;
+  users?: User[];
 }) {
   const { toast } = useToast();
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -623,6 +637,7 @@ function StepItem({
                   task={task}
                   expanded={expandedTasks.has(task.id)}
                   onToggle={() => onToggleTask(task.id)}
+                  users={users}
                 />
               ))}
             </div>
@@ -633,8 +648,14 @@ function StepItem({
   );
 }
 
-function TaskItem({ task, expanded, onToggle }: { task: PipelineTask; expanded: boolean; onToggle: () => void }) {
+function TaskItem({ task, expanded, onToggle, users }: { task: PipelineTask; expanded: boolean; onToggle: () => void; users?: User[] }) {
   const { toast } = useToast();
+  const [subtaskDialogOpen, setSubtaskDialogOpen] = useState(false);
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [newSubtask, setNewSubtask] = useState({ name: "", description: "", priority: "medium", order: 0 });
+  const [newChecklistItem, setNewChecklistItem] = useState({ item: "", order: 0 });
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   
   const { data: subtasks } = useQuery<TaskSubtask[]>({
     queryKey: ["/api/tasks", task.id, "subtasks"],
@@ -646,10 +667,73 @@ function TaskItem({ task, expanded, onToggle }: { task: PipelineTask; expanded: 
     enabled: expanded,
   });
 
+  const assignedUser = users?.find(u => u.id === task.assignedTo);
+
+  const createSubtask = useMutation({
+    mutationFn: (data: typeof newSubtask) =>
+      apiRequest("POST", "/api/subtasks", { ...data, taskId: task.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id, "subtasks"] });
+      setSubtaskDialogOpen(false);
+      setNewSubtask({ name: "", description: "", priority: "medium", order: (subtasks?.length || 0) + 1 });
+      toast({ title: "Subtask created successfully!" });
+    },
+  });
+
+  const createChecklistItem = useMutation({
+    mutationFn: (data: typeof newChecklistItem) =>
+      apiRequest("POST", "/api/checklists", { ...data, taskId: task.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id, "checklists"] });
+      setChecklistDialogOpen(false);
+      setNewChecklistItem({ item: "", order: (checklists?.length || 0) + 1 });
+      toast({ title: "Checklist item created successfully!" });
+    },
+  });
+
+  const assignTask = useMutation({
+    mutationFn: (userId: string) =>
+      apiRequest("POST", `/api/tasks/${task.id}/assign`, { userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
+      setAssignDialogOpen(false);
+      toast({ title: "Task assigned successfully!" });
+    },
+  });
+
+  const completeTask = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/tasks/${task.id}/complete`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
+      toast({ title: "Task completed!" });
+    },
+  });
+
+  const executeAI = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/tasks/${task.id}/execute-ai`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
+      toast({ title: "AI agent started executing task..." });
+      // Poll for task completion
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
+      }, 3000);
+    },
+  });
+
+  const completeSubtask = useMutation({
+    mutationFn: (subtaskId: string) => apiRequest("POST", `/api/subtasks/${subtaskId}/complete`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
+    },
+  });
+
   const toggleChecklist = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/checklists/${id}/toggle`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id, "checklists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
     },
   });
 
@@ -714,18 +798,184 @@ function TaskItem({ task, expanded, onToggle }: { task: PipelineTask; expanded: 
 
       {expanded && (
         <CardContent className="space-y-3 pt-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {assignedUser && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-5 w-5">
+                  <AvatarFallback className="text-xs">
+                    {assignedUser.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-xs text-muted-foreground">{assignedUser.fullName || assignedUser.email}</span>
+              </div>
+            )}
+            <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" data-testid={`button-assign-task-${task.id}`}>
+                  <UserPlus className="mr-1 h-3 w-3" />
+                  {assignedUser ? 'Reassign' : 'Assign'}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign Task</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Select User</Label>
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger data-testid="select-user-assign">
+                        <SelectValue placeholder="Choose a user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users?.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.fullName || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                  <Button 
+                    onClick={() => assignTask.mutate(selectedUserId)} 
+                    disabled={!selectedUserId || assignTask.isPending}
+                    data-testid="button-submit-assign"
+                  >
+                    {assignTask.isPending ? "Assigning..." : "Assign"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            {task.type === 'automated' && task.status !== 'completed' && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => executeAI.mutate()}
+                disabled={executeAI.isPending || task.status === 'in_progress'}
+                data-testid={`button-execute-ai-${task.id}`}
+              >
+                <Bot className="mr-1 h-3 w-3" />
+                {task.status === 'in_progress' ? 'Running...' : 'Run AI Agent'}
+              </Button>
+            )}
+            {task.type === 'manual' && task.status !== 'completed' && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => completeTask.mutate()}
+                disabled={completeTask.isPending}
+                data-testid={`button-complete-task-${task.id}`}
+              >
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                Complete
+              </Button>
+            )}
+            <Dialog open={subtaskDialogOpen} onOpenChange={setSubtaskDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" data-testid={`button-add-subtask-${task.id}`}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Subtask
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Subtask</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="subtask-name">Name</Label>
+                    <Input
+                      id="subtask-name"
+                      data-testid="input-subtask-name"
+                      value={newSubtask.name}
+                      onChange={(e) => setNewSubtask({ ...newSubtask, name: e.target.value })}
+                      placeholder="Subtask name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="subtask-description">Description</Label>
+                    <Textarea
+                      id="subtask-description"
+                      data-testid="input-subtask-description"
+                      value={newSubtask.description || ""}
+                      onChange={(e) => setNewSubtask({ ...newSubtask, description: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSubtaskDialogOpen(false)}>Cancel</Button>
+                  <Button 
+                    onClick={() => createSubtask.mutate(newSubtask)}
+                    disabled={!newSubtask.name || createSubtask.isPending}
+                    data-testid="button-submit-subtask"
+                  >
+                    {createSubtask.isPending ? "Creating..." : "Create"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" data-testid={`button-add-checklist-${task.id}`}>
+                  <ListChecks className="mr-1 h-3 w-3" />
+                  Add Checklist Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Checklist Item</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="checklist-item">Item</Label>
+                    <Input
+                      id="checklist-item"
+                      data-testid="input-checklist-item"
+                      value={newChecklistItem.item}
+                      onChange={(e) => setNewChecklistItem({ ...newChecklistItem, item: e.target.value })}
+                      placeholder="Checklist item"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setChecklistDialogOpen(false)}>Cancel</Button>
+                  <Button 
+                    onClick={() => createChecklistItem.mutate(newChecklistItem)}
+                    disabled={!newChecklistItem.item || createChecklistItem.isPending}
+                    data-testid="button-submit-checklist"
+                  >
+                    {createChecklistItem.isPending ? "Creating..." : "Create"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Separator />
+
           {subtasks && subtasks.length > 0 && (
             <div>
               <h6 className="text-xs font-semibold mb-2">Subtasks</h6>
               <div className="space-y-1">
                 {subtasks.map((subtask) => (
-                  <div key={subtask.id} className="flex items-center gap-2 text-xs" data-testid={`subtask-${subtask.id}`}>
-                    {getStatusIcon(subtask.status)}
-                    <span>{subtask.name}</span>
-                    {subtask.assignedTo && (
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <Users className="h-2 w-2" />
-                      </Badge>
+                  <div key={subtask.id} className="flex items-center justify-between gap-2 text-xs" data-testid={`subtask-${subtask.id}`}>
+                    <div className="flex items-center gap-2 flex-1">
+                      {getStatusIcon(subtask.status)}
+                      <span>{subtask.name}</span>
+                    </div>
+                    {subtask.status !== 'completed' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => completeSubtask.mutate(subtask.id)}
+                        disabled={completeSubtask.isPending}
+                        data-testid={`button-complete-subtask-${subtask.id}`}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                      </Button>
                     )}
                   </div>
                 ))}

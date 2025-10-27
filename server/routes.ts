@@ -3483,6 +3483,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/tasks/:id/execute-ai", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      if (task.type !== 'automated') {
+        return res.status(400).json({ error: "Task is not automated" });
+      }
+      
+      // Update task status to in_progress
+      await storage.updatePipelineTask(req.params.id, { status: 'in_progress' });
+      
+      // In a real implementation, this would trigger AI agent execution
+      // For now, we'll simulate AI execution and auto-complete the task
+      // This is a placeholder for actual AI agent integration
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "execute_ai", "pipeline_task", req.params.id, {}, req);
+      
+      // Auto-complete after simulation (in production, this would be done by the AI agent upon completion)
+      setTimeout(async () => {
+        try {
+          await storage.completeTask(req.params.id, req.user!.id);
+          await logActivity(req.user!.id, req.user!.organizationId!, "ai_complete", "pipeline_task", req.params.id, {}, req);
+        } catch (error) {
+          console.error("Failed to auto-complete AI task:", error);
+        }
+      }, 2000);
+      
+      res.json({ message: "AI agent execution started", taskId: req.params.id });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to execute AI agent" });
+    }
+  });
+
   app.delete("/api/tasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const task = await storage.getPipelineTask(req.params.id);

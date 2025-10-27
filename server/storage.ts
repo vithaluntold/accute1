@@ -2013,6 +2013,9 @@ export class DbStorage implements IStorage {
   }
 
   async completeTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined> {
+    const task = await this.getPipelineTask(taskId);
+    if (!task) return undefined;
+    
     const result = await db.update(schema.pipelineTasks)
       .set({ 
         status: 'completed', 
@@ -2022,6 +2025,12 @@ export class DbStorage implements IStorage {
       })
       .where(eq(schema.pipelineTasks.id, taskId))
       .returning();
+    
+    // Trigger progression check
+    if (result[0]) {
+      await this.checkAndUpdateStepCompletion(task.stepId);
+    }
+    
     return result[0];
   }
 
@@ -2055,6 +2064,9 @@ export class DbStorage implements IStorage {
   }
 
   async completeSubtask(subtaskId: string, userId: string): Promise<schema.TaskSubtask | undefined> {
+    const subtask = await this.getTaskSubtask(subtaskId);
+    if (!subtask) return undefined;
+    
     const result = await db.update(schema.taskSubtasks)
       .set({ 
         status: 'completed', 
@@ -2064,6 +2076,12 @@ export class DbStorage implements IStorage {
       })
       .where(eq(schema.taskSubtasks.id, subtaskId))
       .returning();
+    
+    // Trigger progression check
+    if (result[0]) {
+      await this.checkAndUpdateTaskCompletion(subtask.taskId);
+    }
+    
     return result[0];
   }
 
@@ -2108,7 +2126,111 @@ export class DbStorage implements IStorage {
       })
       .where(eq(schema.taskChecklists.id, id))
       .returning();
+    
+    // Check if all checklists for this task are complete
+    if (result[0]) {
+      await this.checkAndUpdateTaskCompletion(current.taskId);
+    }
+    
     return result[0];
+  }
+
+  // Progression Logic - Check if task can be auto-completed
+  async checkAndUpdateTaskCompletion(taskId: string): Promise<void> {
+    const task = await this.getPipelineTask(taskId);
+    if (!task || task.status === 'completed') return;
+
+    const subtasks = await this.getSubtasksByTask(taskId);
+    const checklists = await this.getChecklistsByTask(taskId);
+
+    // Check if all subtasks and checklists are complete
+    const allSubtasksComplete = subtasks.length === 0 || subtasks.every(s => s.status === 'completed');
+    const allChecklistsComplete = checklists.length === 0 || checklists.every(c => c.isChecked);
+
+    if (allSubtasksComplete && allChecklistsComplete) {
+      // Auto-complete the task
+      await db.update(schema.pipelineTasks)
+        .set({ 
+          status: 'completed',
+          completedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(schema.pipelineTasks.id, taskId));
+      
+      // Check step completion
+      await this.checkAndUpdateStepCompletion(task.stepId);
+    }
+  }
+
+  // Check if step can be auto-completed
+  async checkAndUpdateStepCompletion(stepId: string): Promise<void> {
+    const step = await this.getPipelineStep(stepId);
+    if (!step || step.status === 'completed' || !step.requireAllTasksComplete) return;
+
+    const tasks = await this.getTasksByStep(stepId);
+    
+    // Check if all tasks are complete
+    const allTasksComplete = tasks.length > 0 && tasks.every(t => t.status === 'completed');
+
+    if (allTasksComplete) {
+      // Auto-complete the step
+      await db.update(schema.pipelineSteps)
+        .set({ 
+          status: 'completed',
+          completedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(schema.pipelineSteps.id, stepId));
+      
+      // Check stage completion
+      await this.checkAndUpdateStageCompletion(step.stageId);
+    }
+  }
+
+  // Check if stage can be auto-completed
+  async checkAndUpdateStageCompletion(stageId: string): Promise<void> {
+    const stage = await this.getPipelineStage(stageId);
+    if (!stage || stage.status === 'completed') return;
+
+    const steps = await this.getStepsByStage(stageId);
+    
+    // Check if all steps are complete
+    const allStepsComplete = steps.length > 0 && steps.every(s => s.status === 'completed');
+
+    if (allStepsComplete) {
+      // Auto-complete the stage
+      await db.update(schema.pipelineStages)
+        .set({ 
+          status: 'completed',
+          completedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(schema.pipelineStages.id, stageId));
+      
+      // Check pipeline completion
+      await this.checkAndUpdatePipelineCompletion(stage.pipelineId);
+    }
+  }
+
+  // Check if pipeline can be auto-completed
+  async checkAndUpdatePipelineCompletion(pipelineId: string): Promise<void> {
+    const pipeline = await this.getPipeline(pipelineId);
+    if (!pipeline || pipeline.status === 'completed') return;
+
+    const stages = await this.getStagesByPipeline(pipelineId);
+    
+    // Check if all stages are complete
+    const allStagesComplete = stages.length > 0 && stages.every(s => s.status === 'completed');
+
+    if (allStagesComplete) {
+      // Auto-complete the pipeline
+      await db.update(schema.pipelines)
+        .set({ 
+          status: 'completed',
+          updatedAt: new Date()
+        })
+        .where(eq(schema.pipelines.id, pipelineId));
+    }
   }
 }
 
