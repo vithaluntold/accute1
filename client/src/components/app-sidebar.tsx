@@ -1,4 +1,8 @@
-import { Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, UserCircle, ClipboardList, ClipboardCheck, FolderOpen } from "lucide-react";
+import { 
+  Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
+  UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail 
+} from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Sidebar,
@@ -80,6 +84,60 @@ const menuItems = [
     url: "/analytics",
     icon: BarChart3,
     permission: "analytics.view",
+  },
+  {
+    title: "Messages",
+    url: "/messages",
+    icon: MessageSquare,
+    permission: "messaging.send",
+  },
+  {
+    title: "Time Tracking",
+    url: "/time-tracking",
+    icon: Clock,
+    permission: "time.create",
+  },
+  {
+    title: "Invoices",
+    url: "/invoices",
+    icon: Receipt,
+    permission: "invoices.view",
+  },
+  {
+    title: "Payments",
+    url: "/payments",
+    icon: CreditCard,
+    permission: "payments.view",
+  },
+  {
+    title: "E-Signatures",
+    url: "/signatures",
+    icon: FileSignature,
+    permission: "signatures.view",
+  },
+  {
+    title: "Projects",
+    url: "/projects",
+    icon: Kanban,
+    permission: "projects.view",
+  },
+  {
+    title: "Team Chat",
+    url: "/team-chat",
+    icon: MessagesSquare,
+    permission: null,
+  },
+  {
+    title: "Calendar",
+    url: "/calendar",
+    icon: Calendar,
+    permission: "appointments.view",
+  },
+  {
+    title: "Email Templates",
+    url: "/email-templates",
+    icon: Mail,
+    permission: "templates.view",
   },
   {
     title: "Team",

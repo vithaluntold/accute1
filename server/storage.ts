@@ -238,6 +238,114 @@ export interface IStorage {
   getDocumentSubmission(id: string): Promise<DocSubmission | undefined>;
   getDocumentSubmissionsByRequiredDoc(requiredDocumentId: string): Promise<DocSubmission[]>;
   reviewDocumentSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<DocSubmission | undefined>;
+
+  // TaxDome Features - Secure Messaging
+  createConversation(conversation: schema.InsertConversation): Promise<schema.Conversation>;
+  getConversation(id: string): Promise<schema.Conversation | undefined>;
+  getConversationsByOrganization(organizationId: string): Promise<schema.Conversation[]>;
+  getConversationsByClient(clientId: string): Promise<schema.Conversation[]>;
+  updateConversation(id: string, conversation: Partial<schema.InsertConversation>): Promise<schema.Conversation | undefined>;
+  createMessage(message: schema.InsertMessage): Promise<schema.Message>;
+  getMessage(id: string): Promise<schema.Message | undefined>;
+  getMessagesByConversation(conversationId: string): Promise<schema.Message[]>;
+  markMessageAsRead(id: string): Promise<void>;
+
+  // TaxDome Features - Time Tracking & Billing
+  createTimeEntry(entry: schema.InsertTimeEntry): Promise<schema.TimeEntry>;
+  getTimeEntry(id: string): Promise<schema.TimeEntry | undefined>;
+  getTimeEntriesByOrganization(organizationId: string): Promise<schema.TimeEntry[]>;
+  getTimeEntriesByUser(userId: string): Promise<schema.TimeEntry[]>;
+  getTimeEntriesByClient(clientId: string): Promise<schema.TimeEntry[]>;
+  updateTimeEntry(id: string, entry: Partial<schema.InsertTimeEntry>): Promise<schema.TimeEntry | undefined>;
+  deleteTimeEntry(id: string): Promise<void>;
+  
+  createInvoice(invoice: schema.InsertInvoice): Promise<schema.Invoice>;
+  getInvoice(id: string): Promise<schema.Invoice | undefined>;
+  getInvoicesByOrganization(organizationId: string): Promise<schema.Invoice[]>;
+  getInvoicesByClient(clientId: string): Promise<schema.Invoice[]>;
+  updateInvoice(id: string, invoice: Partial<schema.InsertInvoice>): Promise<schema.Invoice | undefined>;
+  deleteInvoice(id: string): Promise<void>;
+  
+  createInvoiceItem(item: schema.InsertInvoiceItem): Promise<schema.InvoiceItem>;
+  getInvoiceItemsByInvoice(invoiceId: string): Promise<schema.InvoiceItem[]>;
+  deleteInvoiceItem(id: string): Promise<void>;
+  
+  createPayment(payment: schema.InsertPayment): Promise<schema.Payment>;
+  getPayment(id: string): Promise<schema.Payment | undefined>;
+  getPaymentsByInvoice(invoiceId: string): Promise<schema.Payment[]>;
+  getPaymentsByClient(clientId: string): Promise<schema.Payment[]>;
+  updatePayment(id: string, payment: Partial<schema.InsertPayment>): Promise<schema.Payment | undefined>;
+  
+  createExpense(expense: schema.InsertExpense): Promise<schema.Expense>;
+  getExpense(id: string): Promise<schema.Expense | undefined>;
+  getExpensesByOrganization(organizationId: string): Promise<schema.Expense[]>;
+  getExpensesByUser(userId: string): Promise<schema.Expense[]>;
+  updateExpense(id: string, expense: Partial<schema.InsertExpense>): Promise<schema.Expense | undefined>;
+  deleteExpense(id: string): Promise<void>;
+
+  // TaxDome Features - E-Signatures
+  createSignatureRequest(request: schema.InsertSignatureRequest): Promise<schema.SignatureRequest>;
+  getSignatureRequest(id: string): Promise<schema.SignatureRequest | undefined>;
+  getSignatureRequestsByOrganization(organizationId: string): Promise<schema.SignatureRequest[]>;
+  getSignatureRequestsByClient(clientId: string): Promise<schema.SignatureRequest[]>;
+  updateSignatureRequest(id: string, request: Partial<schema.InsertSignatureRequest>): Promise<schema.SignatureRequest | undefined>;
+  signDocument(id: string, signedBy: string, signatureData: string, ipAddress: string, userAgent: string): Promise<schema.SignatureRequest | undefined>;
+
+  // TaxDome Features - Projects & Kanban
+  createProject(project: schema.InsertProject): Promise<schema.Project>;
+  getProject(id: string): Promise<schema.Project | undefined>;
+  getProjectsByOrganization(organizationId: string): Promise<schema.Project[]>;
+  getProjectsByClient(clientId: string): Promise<schema.Project[]>;
+  updateProject(id: string, project: Partial<schema.InsertProject>): Promise<schema.Project | undefined>;
+  deleteProject(id: string): Promise<void>;
+  
+  createProjectTask(task: schema.InsertProjectTask): Promise<schema.ProjectTask>;
+  getProjectTask(id: string): Promise<schema.ProjectTask | undefined>;
+  getProjectTasksByProject(projectId: string): Promise<schema.ProjectTask[]>;
+  updateProjectTask(id: string, task: Partial<schema.InsertProjectTask>): Promise<schema.ProjectTask | undefined>;
+  deleteProjectTask(id: string): Promise<void>;
+
+  // TaxDome Features - Team Chat
+  createChatChannel(channel: schema.InsertChatChannel): Promise<schema.ChatChannel>;
+  getChatChannel(id: string): Promise<schema.ChatChannel | undefined>;
+  getChatChannelsByOrganization(organizationId: string): Promise<schema.ChatChannel[]>;
+  updateChatChannel(id: string, channel: Partial<schema.InsertChatChannel>): Promise<schema.ChatChannel | undefined>;
+  deleteChatChannel(id: string): Promise<void>;
+  
+  addChatMember(member: schema.InsertChatMember): Promise<schema.ChatMember>;
+  getChatMembersByChannel(channelId: string): Promise<schema.ChatMember[]>;
+  removeChatMember(channelId: string, userId: string): Promise<void>;
+  updateLastRead(channelId: string, userId: string): Promise<void>;
+  
+  createChatMessage(message: schema.InsertChatMessage): Promise<schema.ChatMessage>;
+  getChatMessage(id: string): Promise<schema.ChatMessage | undefined>;
+  getChatMessagesByChannel(channelId: string): Promise<schema.ChatMessage[]>;
+  updateChatMessage(id: string, content: string): Promise<schema.ChatMessage | undefined>;
+  deleteChatMessage(id: string): Promise<void>;
+
+  // TaxDome Features - Calendar & Appointments
+  createAppointment(appointment: schema.InsertAppointment): Promise<schema.Appointment>;
+  getAppointment(id: string): Promise<schema.Appointment | undefined>;
+  getAppointmentsByOrganization(organizationId: string): Promise<schema.Appointment[]>;
+  getAppointmentsByClient(clientId: string): Promise<schema.Appointment[]>;
+  getAppointmentsByUser(userId: string): Promise<schema.Appointment[]>;
+  updateAppointment(id: string, appointment: Partial<schema.InsertAppointment>): Promise<schema.Appointment | undefined>;
+  deleteAppointment(id: string): Promise<void>;
+
+  // TaxDome Features - Email Templates
+  createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate>;
+  getEmailTemplate(id: string): Promise<schema.EmailTemplate | undefined>;
+  getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]>;
+  updateEmailTemplate(id: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string): Promise<void>;
+
+  // TaxDome Features - PDF Annotations
+  createDocumentAnnotation(annotation: schema.InsertDocumentAnnotation): Promise<schema.DocumentAnnotation>;
+  getDocumentAnnotation(id: string): Promise<schema.DocumentAnnotation | undefined>;
+  getDocumentAnnotationsByDocument(documentId: string): Promise<schema.DocumentAnnotation[]>;
+  updateDocumentAnnotation(id: string, annotation: Partial<schema.InsertDocumentAnnotation>): Promise<schema.DocumentAnnotation | undefined>;
+  deleteDocumentAnnotation(id: string): Promise<void>;
+  resolveAnnotation(id: string, resolvedBy: string): Promise<schema.DocumentAnnotation | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -1211,6 +1319,525 @@ export class DbStorage implements IStorage {
         reviewedAt: new Date() 
       })
       .where(eq(schema.documentSubmissions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // ==============================================
+  // TAXDOME FEATURES - Practice Management
+  // ==============================================
+
+  // Secure Messaging
+  async createConversation(conversation: schema.InsertConversation): Promise<schema.Conversation> {
+    const result = await db.insert(schema.conversations).values(conversation).returning();
+    return result[0];
+  }
+
+  async getConversation(id: string): Promise<schema.Conversation | undefined> {
+    const result = await db.select().from(schema.conversations).where(eq(schema.conversations.id, id));
+    return result[0];
+  }
+
+  async getConversationsByOrganization(organizationId: string): Promise<schema.Conversation[]> {
+    return await db.select().from(schema.conversations)
+      .where(eq(schema.conversations.organizationId, organizationId))
+      .orderBy(desc(schema.conversations.lastMessageAt));
+  }
+
+  async getConversationsByClient(clientId: string): Promise<schema.Conversation[]> {
+    return await db.select().from(schema.conversations)
+      .where(eq(schema.conversations.clientId, clientId))
+      .orderBy(desc(schema.conversations.lastMessageAt));
+  }
+
+  async updateConversation(id: string, conversation: Partial<schema.InsertConversation>): Promise<schema.Conversation | undefined> {
+    const result = await db.update(schema.conversations)
+      .set({ ...conversation, updatedAt: new Date() })
+      .where(eq(schema.conversations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createMessage(message: schema.InsertMessage): Promise<schema.Message> {
+    const result = await db.insert(schema.messages).values(message).returning();
+    await db.update(schema.conversations)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(schema.conversations.id, message.conversationId));
+    return result[0];
+  }
+
+  async getMessage(id: string): Promise<schema.Message | undefined> {
+    const result = await db.select().from(schema.messages).where(eq(schema.messages.id, id));
+    return result[0];
+  }
+
+  async getMessagesByConversation(conversationId: string): Promise<schema.Message[]> {
+    return await db.select().from(schema.messages)
+      .where(eq(schema.messages.conversationId, conversationId))
+      .orderBy(schema.messages.createdAt);
+  }
+
+  async markMessageAsRead(id: string): Promise<void> {
+    await db.update(schema.messages)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(schema.messages.id, id));
+  }
+
+  // Time Tracking & Billing
+  async createTimeEntry(entry: schema.InsertTimeEntry): Promise<schema.TimeEntry> {
+    const result = await db.insert(schema.timeEntries).values(entry).returning();
+    return result[0];
+  }
+
+  async getTimeEntry(id: string): Promise<schema.TimeEntry | undefined> {
+    const result = await db.select().from(schema.timeEntries).where(eq(schema.timeEntries.id, id));
+    return result[0];
+  }
+
+  async getTimeEntriesByOrganization(organizationId: string): Promise<schema.TimeEntry[]> {
+    return await db.select().from(schema.timeEntries)
+      .where(eq(schema.timeEntries.organizationId, organizationId))
+      .orderBy(desc(schema.timeEntries.date));
+  }
+
+  async getTimeEntriesByUser(userId: string): Promise<schema.TimeEntry[]> {
+    return await db.select().from(schema.timeEntries)
+      .where(eq(schema.timeEntries.userId, userId))
+      .orderBy(desc(schema.timeEntries.date));
+  }
+
+  async getTimeEntriesByClient(clientId: string): Promise<schema.TimeEntry[]> {
+    return await db.select().from(schema.timeEntries)
+      .where(eq(schema.timeEntries.clientId, clientId))
+      .orderBy(desc(schema.timeEntries.date));
+  }
+
+  async updateTimeEntry(id: string, entry: Partial<schema.InsertTimeEntry>): Promise<schema.TimeEntry | undefined> {
+    const result = await db.update(schema.timeEntries)
+      .set({ ...entry, updatedAt: new Date() })
+      .where(eq(schema.timeEntries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTimeEntry(id: string): Promise<void> {
+    await db.delete(schema.timeEntries).where(eq(schema.timeEntries.id, id));
+  }
+
+  async createInvoice(invoice: schema.InsertInvoice): Promise<schema.Invoice> {
+    const result = await db.insert(schema.invoices).values(invoice).returning();
+    return result[0];
+  }
+
+  async getInvoice(id: string): Promise<schema.Invoice | undefined> {
+    const result = await db.select().from(schema.invoices).where(eq(schema.invoices.id, id));
+    return result[0];
+  }
+
+  async getInvoicesByOrganization(organizationId: string): Promise<schema.Invoice[]> {
+    return await db.select().from(schema.invoices)
+      .where(eq(schema.invoices.organizationId, organizationId))
+      .orderBy(desc(schema.invoices.createdAt));
+  }
+
+  async getInvoicesByClient(clientId: string): Promise<schema.Invoice[]> {
+    return await db.select().from(schema.invoices)
+      .where(eq(schema.invoices.clientId, clientId))
+      .orderBy(desc(schema.invoices.createdAt));
+  }
+
+  async updateInvoice(id: string, invoice: Partial<schema.InsertInvoice>): Promise<schema.Invoice | undefined> {
+    const result = await db.update(schema.invoices)
+      .set({ ...invoice, updatedAt: new Date() })
+      .where(eq(schema.invoices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    await db.delete(schema.invoices).where(eq(schema.invoices.id, id));
+  }
+
+  async createInvoiceItem(item: schema.InsertInvoiceItem): Promise<schema.InvoiceItem> {
+    const result = await db.insert(schema.invoiceItems).values(item).returning();
+    return result[0];
+  }
+
+  async getInvoiceItemsByInvoice(invoiceId: string): Promise<schema.InvoiceItem[]> {
+    return await db.select().from(schema.invoiceItems)
+      .where(eq(schema.invoiceItems.invoiceId, invoiceId));
+  }
+
+  async deleteInvoiceItem(id: string): Promise<void> {
+    await db.delete(schema.invoiceItems).where(eq(schema.invoiceItems.id, id));
+  }
+
+  async createPayment(payment: schema.InsertPayment): Promise<schema.Payment> {
+    const result = await db.insert(schema.payments).values(payment).returning();
+    return result[0];
+  }
+
+  async getPayment(id: string): Promise<schema.Payment | undefined> {
+    const result = await db.select().from(schema.payments).where(eq(schema.payments.id, id));
+    return result[0];
+  }
+
+  async getPaymentsByInvoice(invoiceId: string): Promise<schema.Payment[]> {
+    return await db.select().from(schema.payments)
+      .where(eq(schema.payments.invoiceId, invoiceId))
+      .orderBy(desc(schema.payments.createdAt));
+  }
+
+  async getPaymentsByClient(clientId: string): Promise<schema.Payment[]> {
+    return await db.select().from(schema.payments)
+      .where(eq(schema.payments.clientId, clientId))
+      .orderBy(desc(schema.payments.createdAt));
+  }
+
+  async updatePayment(id: string, payment: Partial<schema.InsertPayment>): Promise<schema.Payment | undefined> {
+    const result = await db.update(schema.payments)
+      .set({ ...payment, updatedAt: new Date() })
+      .where(eq(schema.payments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createExpense(expense: schema.InsertExpense): Promise<schema.Expense> {
+    const result = await db.insert(schema.expenses).values(expense).returning();
+    return result[0];
+  }
+
+  async getExpense(id: string): Promise<schema.Expense | undefined> {
+    const result = await db.select().from(schema.expenses).where(eq(schema.expenses.id, id));
+    return result[0];
+  }
+
+  async getExpensesByOrganization(organizationId: string): Promise<schema.Expense[]> {
+    return await db.select().from(schema.expenses)
+      .where(eq(schema.expenses.organizationId, organizationId))
+      .orderBy(desc(schema.expenses.date));
+  }
+
+  async getExpensesByUser(userId: string): Promise<schema.Expense[]> {
+    return await db.select().from(schema.expenses)
+      .where(eq(schema.expenses.userId, userId))
+      .orderBy(desc(schema.expenses.date));
+  }
+
+  async updateExpense(id: string, expense: Partial<schema.InsertExpense>): Promise<schema.Expense | undefined> {
+    const result = await db.update(schema.expenses)
+      .set({ ...expense, updatedAt: new Date() })
+      .where(eq(schema.expenses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
+  }
+
+  // E-Signatures
+  async createSignatureRequest(request: schema.InsertSignatureRequest): Promise<schema.SignatureRequest> {
+    const result = await db.insert(schema.signatureRequests).values(request).returning();
+    return result[0];
+  }
+
+  async getSignatureRequest(id: string): Promise<schema.SignatureRequest | undefined> {
+    const result = await db.select().from(schema.signatureRequests).where(eq(schema.signatureRequests.id, id));
+    return result[0];
+  }
+
+  async getSignatureRequestsByOrganization(organizationId: string): Promise<schema.SignatureRequest[]> {
+    return await db.select().from(schema.signatureRequests)
+      .where(eq(schema.signatureRequests.organizationId, organizationId))
+      .orderBy(desc(schema.signatureRequests.createdAt));
+  }
+
+  async getSignatureRequestsByClient(clientId: string): Promise<schema.SignatureRequest[]> {
+    return await db.select().from(schema.signatureRequests)
+      .where(eq(schema.signatureRequests.clientId, clientId))
+      .orderBy(desc(schema.signatureRequests.createdAt));
+  }
+
+  async updateSignatureRequest(id: string, request: Partial<schema.InsertSignatureRequest>): Promise<schema.SignatureRequest | undefined> {
+    const result = await db.update(schema.signatureRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(schema.signatureRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async signDocument(id: string, signedBy: string, signatureData: string, ipAddress: string, userAgent: string): Promise<schema.SignatureRequest | undefined> {
+    const result = await db.update(schema.signatureRequests)
+      .set({
+        status: 'signed',
+        signedBy,
+        signatureData,
+        ipAddress,
+        userAgent,
+        signedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(schema.signatureRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Projects & Kanban
+  async createProject(project: schema.InsertProject): Promise<schema.Project> {
+    const result = await db.insert(schema.projects).values(project).returning();
+    return result[0];
+  }
+
+  async getProject(id: string): Promise<schema.Project | undefined> {
+    const result = await db.select().from(schema.projects).where(eq(schema.projects.id, id));
+    return result[0];
+  }
+
+  async getProjectsByOrganization(organizationId: string): Promise<schema.Project[]> {
+    return await db.select().from(schema.projects)
+      .where(eq(schema.projects.organizationId, organizationId))
+      .orderBy(desc(schema.projects.createdAt));
+  }
+
+  async getProjectsByClient(clientId: string): Promise<schema.Project[]> {
+    return await db.select().from(schema.projects)
+      .where(eq(schema.projects.clientId, clientId))
+      .orderBy(desc(schema.projects.createdAt));
+  }
+
+  async updateProject(id: string, project: Partial<schema.InsertProject>): Promise<schema.Project | undefined> {
+    const result = await db.update(schema.projects)
+      .set({ ...project, updatedAt: new Date() })
+      .where(eq(schema.projects.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await db.delete(schema.projects).where(eq(schema.projects.id, id));
+  }
+
+  async createProjectTask(task: schema.InsertProjectTask): Promise<schema.ProjectTask> {
+    const result = await db.insert(schema.projectTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getProjectTask(id: string): Promise<schema.ProjectTask | undefined> {
+    const result = await db.select().from(schema.projectTasks).where(eq(schema.projectTasks.id, id));
+    return result[0];
+  }
+
+  async getProjectTasksByProject(projectId: string): Promise<schema.ProjectTask[]> {
+    return await db.select().from(schema.projectTasks)
+      .where(eq(schema.projectTasks.projectId, projectId))
+      .orderBy(schema.projectTasks.position);
+  }
+
+  async updateProjectTask(id: string, task: Partial<schema.InsertProjectTask>): Promise<schema.ProjectTask | undefined> {
+    const result = await db.update(schema.projectTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(schema.projectTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProjectTask(id: string): Promise<void> {
+    await db.delete(schema.projectTasks).where(eq(schema.projectTasks.id, id));
+  }
+
+  // Team Chat
+  async createChatChannel(channel: schema.InsertChatChannel): Promise<schema.ChatChannel> {
+    const result = await db.insert(schema.chatChannels).values(channel).returning();
+    return result[0];
+  }
+
+  async getChatChannel(id: string): Promise<schema.ChatChannel | undefined> {
+    const result = await db.select().from(schema.chatChannels).where(eq(schema.chatChannels.id, id));
+    return result[0];
+  }
+
+  async getChatChannelsByOrganization(organizationId: string): Promise<schema.ChatChannel[]> {
+    return await db.select().from(schema.chatChannels)
+      .where(eq(schema.chatChannels.organizationId, organizationId))
+      .orderBy(schema.chatChannels.name);
+  }
+
+  async updateChatChannel(id: string, channel: Partial<schema.InsertChatChannel>): Promise<schema.ChatChannel | undefined> {
+    const result = await db.update(schema.chatChannels)
+      .set({ ...channel, updatedAt: new Date() })
+      .where(eq(schema.chatChannels.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChatChannel(id: string): Promise<void> {
+    await db.delete(schema.chatChannels).where(eq(schema.chatChannels.id, id));
+  }
+
+  async addChatMember(member: schema.InsertChatMember): Promise<schema.ChatMember> {
+    const result = await db.insert(schema.chatMembers).values(member).returning();
+    return result[0];
+  }
+
+  async getChatMembersByChannel(channelId: string): Promise<schema.ChatMember[]> {
+    return await db.select().from(schema.chatMembers)
+      .where(eq(schema.chatMembers.channelId, channelId));
+  }
+
+  async removeChatMember(channelId: string, userId: string): Promise<void> {
+    await db.delete(schema.chatMembers)
+      .where(and(
+        eq(schema.chatMembers.channelId, channelId),
+        eq(schema.chatMembers.userId, userId)
+      ));
+  }
+
+  async updateLastRead(channelId: string, userId: string): Promise<void> {
+    await db.update(schema.chatMembers)
+      .set({ lastReadAt: new Date() })
+      .where(and(
+        eq(schema.chatMembers.channelId, channelId),
+        eq(schema.chatMembers.userId, userId)
+      ));
+  }
+
+  async createChatMessage(message: schema.InsertChatMessage): Promise<schema.ChatMessage> {
+    const result = await db.insert(schema.chatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getChatMessage(id: string): Promise<schema.ChatMessage | undefined> {
+    const result = await db.select().from(schema.chatMessages).where(eq(schema.chatMessages.id, id));
+    return result[0];
+  }
+
+  async getChatMessagesByChannel(channelId: string): Promise<schema.ChatMessage[]> {
+    return await db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.channelId, channelId))
+      .orderBy(schema.chatMessages.createdAt);
+  }
+
+  async updateChatMessage(id: string, content: string): Promise<schema.ChatMessage | undefined> {
+    const result = await db.update(schema.chatMessages)
+      .set({ content, isEdited: true, editedAt: new Date() })
+      .where(eq(schema.chatMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteChatMessage(id: string): Promise<void> {
+    await db.delete(schema.chatMessages).where(eq(schema.chatMessages.id, id));
+  }
+
+  // Calendar & Appointments
+  async createAppointment(appointment: schema.InsertAppointment): Promise<schema.Appointment> {
+    const result = await db.insert(schema.appointments).values(appointment).returning();
+    return result[0];
+  }
+
+  async getAppointment(id: string): Promise<schema.Appointment | undefined> {
+    const result = await db.select().from(schema.appointments).where(eq(schema.appointments.id, id));
+    return result[0];
+  }
+
+  async getAppointmentsByOrganization(organizationId: string): Promise<schema.Appointment[]> {
+    return await db.select().from(schema.appointments)
+      .where(eq(schema.appointments.organizationId, organizationId))
+      .orderBy(schema.appointments.startTime);
+  }
+
+  async getAppointmentsByClient(clientId: string): Promise<schema.Appointment[]> {
+    return await db.select().from(schema.appointments)
+      .where(eq(schema.appointments.clientId, clientId))
+      .orderBy(schema.appointments.startTime);
+  }
+
+  async getAppointmentsByUser(userId: string): Promise<schema.Appointment[]> {
+    return await db.select().from(schema.appointments)
+      .where(eq(schema.appointments.assignedTo, userId))
+      .orderBy(schema.appointments.startTime);
+  }
+
+  async updateAppointment(id: string, appointment: Partial<schema.InsertAppointment>): Promise<schema.Appointment | undefined> {
+    const result = await db.update(schema.appointments)
+      .set({ ...appointment, updatedAt: new Date() })
+      .where(eq(schema.appointments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAppointment(id: string): Promise<void> {
+    await db.delete(schema.appointments).where(eq(schema.appointments.id, id));
+  }
+
+  // Email Templates
+  async createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate> {
+    const result = await db.insert(schema.emailTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async getEmailTemplate(id: string): Promise<schema.EmailTemplate | undefined> {
+    const result = await db.select().from(schema.emailTemplates).where(eq(schema.emailTemplates.id, id));
+    return result[0];
+  }
+
+  async getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]> {
+    return await db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.organizationId, organizationId))
+      .orderBy(schema.emailTemplates.name);
+  }
+
+  async updateEmailTemplate(id: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined> {
+    const result = await db.update(schema.emailTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(schema.emailTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteEmailTemplate(id: string): Promise<void> {
+    await db.delete(schema.emailTemplates).where(eq(schema.emailTemplates.id, id));
+  }
+
+  // PDF Annotations
+  async createDocumentAnnotation(annotation: schema.InsertDocumentAnnotation): Promise<schema.DocumentAnnotation> {
+    const result = await db.insert(schema.documentAnnotations).values(annotation).returning();
+    return result[0];
+  }
+
+  async getDocumentAnnotation(id: string): Promise<schema.DocumentAnnotation | undefined> {
+    const result = await db.select().from(schema.documentAnnotations).where(eq(schema.documentAnnotations.id, id));
+    return result[0];
+  }
+
+  async getDocumentAnnotationsByDocument(documentId: string): Promise<schema.DocumentAnnotation[]> {
+    return await db.select().from(schema.documentAnnotations)
+      .where(eq(schema.documentAnnotations.documentId, documentId))
+      .orderBy(schema.documentAnnotations.pageNumber, schema.documentAnnotations.createdAt);
+  }
+
+  async updateDocumentAnnotation(id: string, annotation: Partial<schema.InsertDocumentAnnotation>): Promise<schema.DocumentAnnotation | undefined> {
+    const result = await db.update(schema.documentAnnotations)
+      .set({ ...annotation, updatedAt: new Date() })
+      .where(eq(schema.documentAnnotations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDocumentAnnotation(id: string): Promise<void> {
+    await db.delete(schema.documentAnnotations).where(eq(schema.documentAnnotations.id, id));
+  }
+
+  async resolveAnnotation(id: string, resolvedBy: string): Promise<schema.DocumentAnnotation | undefined> {
+    const result = await db.update(schema.documentAnnotations)
+      .set({ 
+        resolved: true, 
+        resolvedBy, 
+        resolvedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(schema.documentAnnotations.id, id))
       .returning();
     return result[0];
   }

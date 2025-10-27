@@ -43,6 +43,15 @@ import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
 import DocumentRequests from "@/pages/document-requests";
 import MyDocumentRequests from "@/pages/my-document-requests";
+import Messages from "@/pages/messages";
+import TimeTracking from "@/pages/time-tracking";
+import Invoices from "@/pages/invoices";
+import Payments from "@/pages/payments";
+import Signatures from "@/pages/signatures";
+import Projects from "@/pages/projects";
+import TeamChat from "@/pages/team-chat";
+import Calendar from "@/pages/calendar";
+import EmailTemplates from "@/pages/email-templates";
 import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -322,6 +331,69 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <MyDocumentRequests />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/messages">
+        <ProtectedRoute>
+          <AppLayout>
+            <Messages />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/time-tracking">
+        <ProtectedRoute>
+          <AppLayout>
+            <TimeTracking />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/invoices">
+        <ProtectedRoute>
+          <AppLayout>
+            <Invoices />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/payments">
+        <ProtectedRoute>
+          <AppLayout>
+            <Payments />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/signatures">
+        <ProtectedRoute>
+          <AppLayout>
+            <Signatures />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/projects">
+        <ProtectedRoute>
+          <AppLayout>
+            <Projects />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/team-chat">
+        <ProtectedRoute>
+          <AppLayout>
+            <TeamChat />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute>
+          <AppLayout>
+            <Calendar />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/email-templates">
+        <ProtectedRoute>
+          <AppLayout>
+            <EmailTemplates />
           </AppLayout>
         </ProtectedRoute>
       </Route>

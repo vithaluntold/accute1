@@ -2575,6 +2575,604 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // TAXDOME FEATURES - Practice Management
+  // ============================================
+
+  // Secure Messaging - Conversations
+  app.get("/api/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const conversations = await storage.getConversationsByOrganization(req.user!.organizationId!);
+      res.json(conversations);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  app.post("/api/conversations", requireAuth, requirePermission("messaging.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const conversation = await storage.createConversation({
+        ...req.body,
+        organizationId: req.user!.organizationId!
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "conversation", conversation.id, conversation, req);
+      res.status(201).json(conversation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  app.get("/api/conversations/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation || conversation.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch conversation" });
+    }
+  });
+
+  app.get("/api/conversations/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation || conversation.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      const messages = await storage.getMessagesByConversation(req.params.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/conversations/:id/messages", requireAuth, requirePermission("messaging.send"), async (req: AuthRequest, res: Response) => {
+    try {
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation || conversation.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      const message = await storage.createMessage({
+        conversationId: req.params.id,
+        senderId: req.user!.id,
+        senderType: req.body.senderType || "staff",
+        content: req.body.content,
+        attachments: req.body.attachments || []
+      });
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Time Tracking
+  app.get("/api/time-entries", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const entries = await storage.getTimeEntriesByOrganization(req.user!.organizationId!);
+      res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch time entries" });
+    }
+  });
+
+  app.post("/api/time-entries", requireAuth, requirePermission("time.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const entry = await storage.createTimeEntry({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        userId: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "time_entry", entry.id, entry, req);
+      res.status(201).json(entry);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create time entry" });
+    }
+  });
+
+  app.put("/api/time-entries/:id", requireAuth, requirePermission("time.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTimeEntry(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Time entry not found" });
+      }
+      const updated = await storage.updateTimeEntry(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "time_entry", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update time entry" });
+    }
+  });
+
+  app.delete("/api/time-entries/:id", requireAuth, requirePermission("time.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTimeEntry(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Time entry not found" });
+      }
+      await storage.deleteTimeEntry(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "time_entry", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete time entry" });
+    }
+  });
+
+  // Invoices
+  app.get("/api/invoices", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const invoices = await storage.getInvoicesByOrganization(req.user!.organizationId!);
+      res.json(invoices);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/invoices", requireAuth, requirePermission("invoices.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const invoice = await storage.createInvoice({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "invoice", invoice.id, invoice, req);
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice || invoice.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const items = await storage.getInvoiceItemsByInvoice(invoice.id);
+      res.json({ ...invoice, items });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  app.put("/api/invoices/:id", requireAuth, requirePermission("invoices.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getInvoice(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const updated = await storage.updateInvoice(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "invoice", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:id/items", requireAuth, requirePermission("invoices.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice || invoice.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const item = await storage.createInvoiceItem({
+        ...req.body,
+        invoiceId: req.params.id
+      });
+      res.status(201).json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add invoice item" });
+    }
+  });
+
+  // Payments
+  app.get("/api/payments", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { clientId } = req.query;
+      let payments;
+      if (clientId) {
+        payments = await storage.getPaymentsByClient(clientId as string);
+      } else {
+        const invoices = await storage.getInvoicesByOrganization(req.user!.organizationId!);
+        const allPayments = await Promise.all(
+          invoices.map(inv => storage.getPaymentsByInvoice(inv.id))
+        );
+        payments = allPayments.flat();
+      }
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch payments" });
+    }
+  });
+
+  app.post("/api/payments", requireAuth, requirePermission("payments.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const payment = await storage.createPayment({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "payment", payment.id, payment, req);
+      res.status(201).json(payment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  // E-Signatures
+  app.get("/api/signature-requests", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const requests = await storage.getSignatureRequestsByOrganization(req.user!.organizationId!);
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch signature requests" });
+    }
+  });
+
+  app.post("/api/signature-requests", requireAuth, requirePermission("signatures.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const request = await storage.createSignatureRequest({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        requestedBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "signature_request", request.id, request, req);
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create signature request" });
+    }
+  });
+
+  app.post("/api/signature-requests/:id/sign", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const request = await storage.getSignatureRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Signature request not found" });
+      }
+      const signed = await storage.signDocument(
+        req.params.id,
+        req.user!.id,
+        req.body.signatureData,
+        req.ip || "",
+        req.get("user-agent") || ""
+      );
+      await logActivity(req.user!.id, req.user!.organizationId!, "sign", "signature_request", req.params.id, {}, req);
+      res.json(signed);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to sign document" });
+    }
+  });
+
+  // Projects (Kanban)
+  app.get("/api/projects", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const projects = await storage.getProjectsByOrganization(req.user!.organizationId!);
+      res.json(projects);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch projects" });
+    }
+  });
+
+  app.post("/api/projects", requireAuth, requirePermission("projects.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.createProject({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "project", project.id, project, req);
+      res.status(201).json(project);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create project" });
+    }
+  });
+
+  app.get("/api/projects/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const tasks = await storage.getProjectTasksByProject(project.id);
+      res.json({ ...project, tasks });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch project" });
+    }
+  });
+
+  app.put("/api/projects/:id", requireAuth, requirePermission("projects.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getProject(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const updated = await storage.updateProject(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "project", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update project" });
+    }
+  });
+
+  app.post("/api/projects/:id/tasks", requireAuth, requirePermission("tasks.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const task = await storage.createProjectTask({
+        ...req.body,
+        projectId: req.params.id,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "task", task.id, task, req);
+      res.status(201).json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/tasks/:id", requireAuth, requirePermission("tasks.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getProjectTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const project = await storage.getProject(task.projectId);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateProjectTask(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "task", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  // Team Chat
+  app.get("/api/chat/channels", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const channels = await storage.getChatChannelsByOrganization(req.user!.organizationId!);
+      res.json(channels);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch chat channels" });
+    }
+  });
+
+  app.post("/api/chat/channels", requireAuth, requirePermission("chat.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const channel = await storage.createChatChannel({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await storage.addChatMember({
+        channelId: channel.id,
+        userId: req.user!.id,
+        role: "admin"
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "chat_channel", channel.id, channel, req);
+      res.status(201).json(channel);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create chat channel" });
+    }
+  });
+
+  app.get("/api/chat/channels/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const channel = await storage.getChatChannel(req.params.id);
+      if (!channel || channel.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      const messages = await storage.getChatMessagesByChannel(req.params.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/chat/channels/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const channel = await storage.getChatChannel(req.params.id);
+      if (!channel || channel.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      const message = await storage.createChatMessage({
+        channelId: req.params.id,
+        senderId: req.user!.id,
+        content: req.body.content,
+        mentions: req.body.mentions || [],
+        attachments: req.body.attachments || []
+      });
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Appointments
+  app.get("/api/appointments", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const appointments = await storage.getAppointmentsByOrganization(req.user!.organizationId!);
+      res.json(appointments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  app.post("/api/appointments", requireAuth, requirePermission("appointments.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const appointment = await storage.createAppointment({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "appointment", appointment.id, appointment, req);
+      res.status(201).json(appointment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create appointment" });
+    }
+  });
+
+  app.put("/api/appointments/:id", requireAuth, requirePermission("appointments.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getAppointment(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      const updated = await storage.updateAppointment(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "appointment", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update appointment" });
+    }
+  });
+
+  // Email Templates
+  app.get("/api/email-templates", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const templates = await storage.getEmailTemplatesByOrganization(req.user!.organizationId!);
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email templates" });
+    }
+  });
+
+  app.post("/api/email-templates", requireAuth, requirePermission("templates.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const template = await storage.createEmailTemplate({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "email_template", template.id, template, req);
+      res.status(201).json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create email template" });
+    }
+  });
+
+  app.put("/api/email-templates/:id", requireAuth, requirePermission("templates.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailTemplate(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      const updated = await storage.updateEmailTemplate(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "email_template", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update email template" });
+    }
+  });
+
+  // PDF Annotations
+  app.get("/api/documents/:id/annotations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const document = await storage.getDocument(req.params.id);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      const annotations = await storage.getDocumentAnnotationsByDocument(req.params.id);
+      res.json(annotations);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch annotations" });
+    }
+  });
+
+  app.post("/api/documents/:id/annotations", requireAuth, requirePermission("documents.annotate"), async (req: AuthRequest, res: Response) => {
+    try {
+      const document = await storage.getDocument(req.params.id);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      const annotation = await storage.createDocumentAnnotation({
+        ...req.body,
+        documentId: req.params.id,
+        userId: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "annotation", annotation.id, annotation, req);
+      res.status(201).json(annotation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create annotation" });
+    }
+  });
+
+  app.put("/api/annotations/:id", requireAuth, requirePermission("documents.annotate"), async (req: AuthRequest, res: Response) => {
+    try {
+      const annotation = await storage.getDocumentAnnotation(req.params.id);
+      if (!annotation) {
+        return res.status(404).json({ error: "Annotation not found" });
+      }
+      const document = await storage.getDocument(annotation.documentId);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateDocumentAnnotation(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "annotation", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update annotation" });
+    }
+  });
+
+  app.post("/api/annotations/:id/resolve", requireAuth, requirePermission("documents.annotate"), async (req: AuthRequest, res: Response) => {
+    try {
+      const annotation = await storage.getDocumentAnnotation(req.params.id);
+      if (!annotation) {
+        return res.status(404).json({ error: "Annotation not found" });
+      }
+      const document = await storage.getDocument(annotation.documentId);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const resolved = await storage.resolveAnnotation(req.params.id, req.user!.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "resolve", "annotation", req.params.id, {}, req);
+      res.json(resolved);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to resolve annotation" });
+    }
+  });
+
+  // Expenses
+  app.get("/api/expenses", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const expenses = await storage.getExpensesByOrganization(req.user!.organizationId!);
+      res.json(expenses);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.post("/api/expenses", requireAuth, requirePermission("expenses.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const expense = await storage.createExpense({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        userId: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "expense", expense.id, expense, req);
+      res.status(201).json(expense);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.put("/api/expenses/:id", requireAuth, requirePermission("expenses.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getExpense(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      const updated = await storage.updateExpense(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "expense", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update expense" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
