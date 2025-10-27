@@ -218,6 +218,20 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
       if (hasChanged) {
         setConditionalStates(newStates);
       }
+    } else {
+      // Reset all conditional states when no rules exist
+      const hasStates = 
+        conditionalStates.hidden.size > 0 ||
+        conditionalStates.required.size > 0 ||
+        conditionalStates.disabled.size > 0;
+      
+      if (hasStates) {
+        setConditionalStates({
+          hidden: new Set(),
+          required: new Set(),
+          disabled: new Set(),
+        });
+      }
     }
   }, [formValues, conditionalRules]);
 
