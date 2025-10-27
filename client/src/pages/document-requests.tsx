@@ -86,7 +86,7 @@ const requiredDocFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional(),
   isRequired: z.boolean().default(true),
-  expectedQuantity: z.number().min(1).default(1),
+  expectedQuantity: z.coerce.number().min(1).default(1),
 });
 
 type RequiredDocFormValues = z.infer<typeof requiredDocFormSchema>;

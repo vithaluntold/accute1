@@ -2011,6 +2011,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Client Portal Routes ====================
+
+  // Get client associated with current user's email
+  app.get("/api/me/client", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      res.json({ clientId: client.id, client });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch client information" });
+    }
+  });
+
   // ==================== Document Collection Tracking Routes ====================
 
   // Get all document requests for organization
