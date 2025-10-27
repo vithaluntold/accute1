@@ -34,6 +34,7 @@ import Forms from "@/pages/forms";
 import FormBuilder from "@/pages/form-builder";
 import FormPreview from "@/pages/form-preview";
 import FormSubmissions from "@/pages/form-submissions";
+import FormAnalytics from "@/pages/form-analytics";
 import SubmissionDetail from "@/pages/submission-detail";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
@@ -250,6 +251,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <FormSubmissions />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/forms/:formId/analytics">
+        <ProtectedRoute>
+          <AppLayout>
+            <FormAnalytics />
           </AppLayout>
         </ProtectedRoute>
       </Route>

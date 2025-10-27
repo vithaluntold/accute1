@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { 
   Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText, Wrench, Sparkles,
   MessageSquare, Star, Calendar, Briefcase, HeadphonesIcon, ShoppingCart, Mail, DollarSign, UserPlus,
-  List
+  List, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -259,6 +259,15 @@ export default function FormsPage() {
                 >
                   <List className="w-3 h-3 mr-1" />
                   Submissions
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation(`/forms/${form.id}/analytics`)}
+                  data-testid={`button-analytics-${form.id}`}
+                >
+                  <BarChart3 className="w-3 h-3 mr-1" />
+                  Analytics
                 </Button>
                 <Button
                   variant="outline"
