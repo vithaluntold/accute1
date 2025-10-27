@@ -87,7 +87,12 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     }
 
     const session = await storage.getSession(token);
-    if (!session || session.expiresAt < new Date()) {
+    if (!session) {
+      console.error('Session not found for token:', token.substring(0, 20) + '...');
+      return res.status(401).json({ error: "Session expired" });
+    }
+    if (session.expiresAt < new Date()) {
+      console.error('Session expired:', session.expiresAt, 'Current time:', new Date());
       return res.status(401).json({ error: "Session expired" });
     }
 

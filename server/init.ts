@@ -129,6 +129,9 @@ export async function initializeSystem() {
       // Analytics
       { name: "analytics.view", resource: "analytics", action: "view", description: "View analytics" },
       
+      // Settings
+      { name: "settings.manage", resource: "settings", action: "manage", description: "Manage organization settings" },
+      
       // Email Templates
       { name: "templates.view", resource: "templates", action: "view", description: "View email templates" },
       { name: "templates.create", resource: "templates", action: "create", description: "Create email templates" },

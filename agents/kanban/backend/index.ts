@@ -105,7 +105,7 @@ Create an intuitive Kanban board with appropriate columns and cards. Use meaning
    * Create a basic fallback Kanban board if AI fails
    */
   private createFallbackBoard(input: KanbanInput): KanbanBoard {
-    if (input.type === 'pipeline' && input.data.stages) {
+    if (input.type === 'pipeline' && input.data?.stages) {
       // Create columns from stages
       const columns: KanbanColumn[] = input.data.stages.map((stage: any, idx: number) => ({
         id: `col-${stage.id || idx}`,
@@ -123,14 +123,14 @@ Create an intuitive Kanban board with appropriate columns and cards. Use meaning
       }));
       
       return {
-        title: input.data.name || 'Pipeline Board',
+        title: input.data?.name || 'Pipeline Board',
         columns
       };
     }
     
     // Default fallback
     return {
-      title: input.data.name || 'Kanban Board',
+      title: input.data?.name || 'Kanban Board',
       columns: [
         { id: 'col-1', title: 'To Do', cards: [] },
         { id: 'col-2', title: 'In Progress', cards: [] },

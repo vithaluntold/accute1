@@ -799,7 +799,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow", workflow.id, { name: workflow.name }, req);
       res.json(workflow);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to create workflow" });
+      console.error("Failed to create workflow:", error);
+      res.status(500).json({ error: "Failed to create workflow", details: error.message });
     }
   });
 
