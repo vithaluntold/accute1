@@ -390,6 +390,9 @@ export type FormFieldType =
   | "slider"
   | "image_choice"  // Image-based single/multi selection
   | "matrix_choice" // Grid of questions with rating scale
+  | "audio"         // Audio upload with recording capability
+  | "video"         // Video upload with recording capability
+  | "camera"        // Camera image capture
   | "calculated"
   | "heading"
   | "divider"
