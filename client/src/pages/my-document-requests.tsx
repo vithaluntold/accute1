@@ -72,26 +72,44 @@ export default function MyDocumentRequestsPage() {
 
   // Fetch document requests for the user's client
   const { data: requests = [], isLoading: requestsLoading } = useQuery<DocumentRequest[]>({
-    queryKey: ["/api/clients", userClient?.clientId, "document-requests"],
+    queryKey: ["/api/my/document-requests"],
     enabled: !!userClient?.clientId,
+  });
+
+  // Fetch required documents for all requests (for progress calculation)
+  const { data: allRequiredDocs = {} } = useQuery<Record<string, RequiredDocument[]>>({
+    queryKey: ["/api/my/all-required-documents"],
+    enabled: requests.length > 0,
+    queryFn: async () => {
+      const docs: Record<string, RequiredDocument[]> = {};
+      for (const request of requests) {
+        const response = await fetch(`/api/my/document-requests/${request.id}/required-documents`, {
+          credentials: "include",
+        });
+        if (response.ok) {
+          docs[request.id] = await response.json();
+        }
+      }
+      return docs;
+    },
   });
 
   // Fetch required documents for selected request
   const { data: requiredDocs = [] } = useQuery<RequiredDocument[]>({
-    queryKey: ["/api/document-requests", selectedRequest?.id, "required-documents"],
+    queryKey: ["/api/my/document-requests", selectedRequest?.id, "required-documents"],
     enabled: !!selectedRequest,
   });
 
   // Fetch submissions for each required document
   const { data: allSubmissions = {} } = useQuery<Record<string, DocumentSubmission[]>>({
     queryKey: ["/api/my-document-submissions", selectedRequest?.id],
-    enabled: !!selectedRequest,
+    enabled: !!selectedRequest && requiredDocs.length > 0,
     queryFn: async () => {
       if (!requiredDocs.length) return {};
       const submissions: Record<string, DocumentSubmission[]> = {};
       
       for (const doc of requiredDocs) {
-        const response = await fetch(`/api/required-documents/${doc.id}/submissions`, {
+        const response = await fetch(`/api/my/required-documents/${doc.id}/submissions`, {
           credentials: "include",
         });
         if (response.ok) {
@@ -142,7 +160,7 @@ export default function MyDocumentRequestsPage() {
     mutationFn: async (documentId: string) => {
       if (!selectedRequiredDoc) return;
       
-      const response = await apiRequest("POST", `/api/required-documents/${selectedRequiredDoc.id}/submissions`, {
+      const response = await apiRequest("POST", `/api/my/required-documents/${selectedRequiredDoc.id}/submit`, {
         documentId,
       });
       return response;
@@ -151,7 +169,8 @@ export default function MyDocumentRequestsPage() {
       setUploading(false);
       setUploadDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/my-document-submissions", selectedRequest?.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/document-requests", selectedRequest?.id, "required-documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my/document-requests", selectedRequest?.id, "required-documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my/all-required-documents"] });
       toast({
         title: "Success",
         description: "Document uploaded successfully",
@@ -178,7 +197,7 @@ export default function MyDocumentRequestsPage() {
 
   // Calculate progress for a request
   const calculateProgress = (requestId: string) => {
-    const docs = requiredDocs.filter((d) => d.requestId === requestId);
+    const docs = allRequiredDocs[requestId] || [];
     if (docs.length === 0) return 0;
 
     const completed = docs.filter((d) => 

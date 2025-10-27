@@ -2035,6 +2035,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get document requests for client (client-facing)
+  app.get("/api/my/document-requests", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      const requests = await storage.getDocumentRequestsByClient(client.id);
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch document requests" });
+    }
+  });
+
+  // Get required documents for a request (client-facing)
+  app.get("/api/my/document-requests/:id/required-documents", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Verify request belongs to this client
+      const request = await storage.getDocumentRequest(req.params.id);
+      if (!request || request.clientId !== client.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const requiredDocs = await storage.getRequiredDocumentsByRequest(req.params.id);
+      res.json(requiredDocs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch required documents" });
+    }
+  });
+
+  // Get submissions for a required document (client-facing)
+  app.get("/api/my/required-documents/:id/submissions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Verify required document belongs to client's request
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.clientId !== client.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const submissions = await storage.getDocumentSubmissionsByRequiredDoc(req.params.id);
+      res.json(submissions);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  // Submit document for required document (client-facing)
+  app.post("/api/my/required-documents/:id/submit", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Verify required document belongs to client's request
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.clientId !== client.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { documentId } = req.body;
+
+      if (!documentId) {
+        return res.status(400).json({ error: "Document ID is required" });
+      }
+
+      // Verify document exists and belongs to organization
+      const document = await storage.getDocument(documentId);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const submission = await storage.createDocumentSubmission({
+        requiredDocumentId: req.params.id,
+        documentId,
+        submittedBy: req.user!.id,
+        status: "pending_review",
+        reviewNotes: null,
+      });
+
+      // Update required document status
+      await storage.updateRequiredDocument(req.params.id, { status: "submitted" });
+
+      res.status(201).json(submission);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to submit document" });
+    }
+  });
+
   // ==================== Document Collection Tracking Routes ====================
 
   // Get all document requests for organization
