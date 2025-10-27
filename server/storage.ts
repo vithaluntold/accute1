@@ -2137,17 +2137,28 @@ export class DbStorage implements IStorage {
 
   // Progression Logic - Check if task can be auto-completed
   async checkAndUpdateTaskCompletion(taskId: string): Promise<void> {
+    console.log(`[PROGRESSION] Checking task completion for task ${taskId}`);
     const task = await this.getPipelineTask(taskId);
-    if (!task || task.status === 'completed') return;
+    if (!task) {
+      console.log(`[PROGRESSION] Task not found: ${taskId}`);
+      return;
+    }
+    if (task.status === 'completed') {
+      console.log(`[PROGRESSION] Task already completed: ${taskId}`);
+      return;
+    }
 
     const subtasks = await this.getSubtasksByTask(taskId);
     const checklists = await this.getChecklistsByTask(taskId);
+    console.log(`[PROGRESSION] Task ${taskId} has ${subtasks.length} subtasks and ${checklists.length} checklists`);
 
     // Check if all subtasks and checklists are complete
     const allSubtasksComplete = subtasks.length === 0 || subtasks.every(s => s.status === 'completed');
     const allChecklistsComplete = checklists.length === 0 || checklists.every(c => c.isChecked);
+    console.log(`[PROGRESSION] All subtasks complete: ${allSubtasksComplete}, All checklists complete: ${allChecklistsComplete}`);
 
     if (allSubtasksComplete && allChecklistsComplete) {
+      console.log(`[PROGRESSION] Auto-completing task ${taskId}`);
       // Auto-complete the task
       await db.update(schema.pipelineTasks)
         .set({ 
@@ -2157,22 +2168,45 @@ export class DbStorage implements IStorage {
         })
         .where(eq(schema.pipelineTasks.id, taskId));
       
+      console.log(`[PROGRESSION] Task ${taskId} completed, checking step ${task.stepId}`);
       // Check step completion
       await this.checkAndUpdateStepCompletion(task.stepId);
+    } else {
+      console.log(`[PROGRESSION] Not all children complete for task ${taskId}, not auto-completing`);
     }
   }
 
   // Check if step can be auto-completed
   async checkAndUpdateStepCompletion(stepId: string): Promise<void> {
+    console.log(`[PROGRESSION] Checking step completion for step ${stepId}`);
     const step = await this.getPipelineStep(stepId);
-    if (!step || step.status === 'completed' || !step.requireAllTasksComplete) return;
+    if (!step) {
+      console.log(`[PROGRESSION] Step not found: ${stepId}`);
+      return;
+    }
+    if (step.status === 'completed') {
+      console.log(`[PROGRESSION] Step already completed: ${stepId}`);
+      return;
+    }
+    
+    // Only check for completion if requireAllTasksComplete is explicitly set to false
+    // Default behavior (null/undefined/true) is to require all tasks complete
+    console.log(`[PROGRESSION] Step requireAllTasksComplete: ${step.requireAllTasksComplete}`);
+    if (step.requireAllTasksComplete === false) {
+      console.log(`[PROGRESSION] Step ${stepId} has requireAllTasksComplete=false, skipping auto-completion`);
+      return;
+    }
 
     const tasks = await this.getTasksByStep(stepId);
+    console.log(`[PROGRESSION] Step ${stepId} has ${tasks.length} tasks`);
+    console.log(`[PROGRESSION] Task statuses:`, tasks.map(t => ({ id: t.id, name: t.name, status: t.status })));
     
     // Check if all tasks are complete
     const allTasksComplete = tasks.length > 0 && tasks.every(t => t.status === 'completed');
+    console.log(`[PROGRESSION] All tasks complete: ${allTasksComplete}`);
 
     if (allTasksComplete) {
+      console.log(`[PROGRESSION] Auto-completing step ${stepId}`);
       // Auto-complete the step
       await db.update(schema.pipelineSteps)
         .set({ 
@@ -2182,8 +2216,11 @@ export class DbStorage implements IStorage {
         })
         .where(eq(schema.pipelineSteps.id, stepId));
       
+      console.log(`[PROGRESSION] Step ${stepId} completed, checking stage`);
       // Check stage completion
       await this.checkAndUpdateStageCompletion(step.stageId);
+    } else {
+      console.log(`[PROGRESSION] Not all tasks complete for step ${stepId}, not auto-completing`);
     }
   }
 
