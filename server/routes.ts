@@ -3593,8 +3593,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             type: 'task_reminder',
             title: `Task Reminder: ${task.name}`,
             message: `Task "${task.name}" in pipeline "${pipeline.name}" is due soon (${new Date(task.dueDate!).toLocaleString()})`,
-            relatedEntityType: 'pipeline_task',
-            relatedEntityId: task.id,
+            metadata: {
+              relatedEntityType: 'pipeline_task',
+              relatedEntityId: task.id,
+              pipelineId: pipeline.id,
+              pipelineName: pipeline.name,
+              dueDate: task.dueDate
+            },
             isRead: false,
           });
           notificationsSent.push(notification);
