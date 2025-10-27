@@ -45,6 +45,33 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 ### System Design Choices
 The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows, AI agents, documents, forms, tags, contacts, and pipelines (with related tables: pipelineStages, pipelineSteps, pipelineTasks, taskSubtasks, taskChecklists). Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
 
+### Automation Engine Implementation
+The unified pipeline automation system is powered by `AutomationEngine` (`server/automation-engine.ts`) with the following capabilities:
+
+**Action Types Supported:**
+1. `create_task`: Creates new tasks in specified steps with multi-tenant validation
+2. `send_notification`: Sends notifications to users within the organization
+3. `run_ai_agent`: Executes AI agents using organization's LLM configuration
+4. `update_field`: Updates fields on tasks, steps, stages, or pipelines
+5. `wait_delay`: Introduces delays between automated actions
+
+**Context Propagation & Security:**
+- All automation execution paths resolve complete hierarchy (task → step → stage → pipeline)
+- Full context populated: `organizationId`, `pipelineId`, `stageId`, `stepId`, `taskId`, `userId`
+- Multi-tenant isolation enforced at every level via organizationId validation
+- Ownership chain verification prevents cross-organization access
+- Security-critical fix (Oct 2025): Added hierarchy resolution in execution routes and cascade methods
+
+**Execution Endpoints:**
+- `POST /api/tasks/:id/execute-automation`: Execute task-level automation
+- `POST /api/pipelines/:id/trigger-automation`: Manually trigger pipeline automation
+- `POST /api/automation/test-conditions`: Test condition expressions before deployment
+
+**Auto-Progression Cascade:**
+- Task completion triggers `processTaskCompletion()` → checks if step should auto-progress
+- Step completion triggers `processStepCompletion()` → checks if stage should auto-progress
+- Both cascades resolve full pipeline hierarchy to populate secure context before executing completion actions
+
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
 - **OpenAI API**: AI model integration.
