@@ -346,6 +346,52 @@ export interface IStorage {
   updateDocumentAnnotation(id: string, annotation: Partial<schema.InsertDocumentAnnotation>): Promise<schema.DocumentAnnotation | undefined>;
   deleteDocumentAnnotation(id: string): Promise<void>;
   resolveAnnotation(id: string, resolvedBy: string): Promise<schema.DocumentAnnotation | undefined>;
+
+  // Pipelines - Hierarchical project management
+  createPipeline(pipeline: schema.InsertPipeline & { organizationId: string; createdBy: string }): Promise<schema.Pipeline>;
+  getPipeline(id: string): Promise<schema.Pipeline | undefined>;
+  getPipelinesByOrganization(organizationId: string): Promise<schema.Pipeline[]>;
+  updatePipeline(id: string, pipeline: Partial<schema.InsertPipeline>): Promise<schema.Pipeline | undefined>;
+  deletePipeline(id: string): Promise<void>;
+
+  // Pipeline Stages
+  createPipelineStage(stage: schema.InsertPipelineStage): Promise<schema.PipelineStage>;
+  getPipelineStage(id: string): Promise<schema.PipelineStage | undefined>;
+  getStagesByPipeline(pipelineId: string): Promise<schema.PipelineStage[]>;
+  updatePipelineStage(id: string, stage: Partial<schema.InsertPipelineStage>): Promise<schema.PipelineStage | undefined>;
+  deletePipelineStage(id: string): Promise<void>;
+
+  // Pipeline Steps
+  createPipelineStep(step: schema.InsertPipelineStep): Promise<schema.PipelineStep>;
+  getPipelineStep(id: string): Promise<schema.PipelineStep | undefined>;
+  getStepsByStage(stageId: string): Promise<schema.PipelineStep[]>;
+  updatePipelineStep(id: string, step: Partial<schema.InsertPipelineStep>): Promise<schema.PipelineStep | undefined>;
+  deletePipelineStep(id: string): Promise<void>;
+
+  // Pipeline Tasks
+  createPipelineTask(task: schema.InsertPipelineTask): Promise<schema.PipelineTask>;
+  getPipelineTask(id: string): Promise<schema.PipelineTask | undefined>;
+  getTasksByStep(stepId: string): Promise<schema.PipelineTask[]>;
+  updatePipelineTask(id: string, task: Partial<schema.InsertPipelineTask>): Promise<schema.PipelineTask | undefined>;
+  deletePipelineTask(id: string): Promise<void>;
+  assignTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined>;
+  completeTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined>;
+
+  // Task Subtasks
+  createTaskSubtask(subtask: schema.InsertTaskSubtask): Promise<schema.TaskSubtask>;
+  getTaskSubtask(id: string): Promise<schema.TaskSubtask | undefined>;
+  getSubtasksByTask(taskId: string): Promise<schema.TaskSubtask[]>;
+  updateTaskSubtask(id: string, subtask: Partial<schema.InsertTaskSubtask>): Promise<schema.TaskSubtask | undefined>;
+  deleteTaskSubtask(id: string): Promise<void>;
+  completeSubtask(subtaskId: string, userId: string): Promise<schema.TaskSubtask | undefined>;
+
+  // Task Checklists
+  createTaskChecklist(checklist: schema.InsertTaskChecklist): Promise<schema.TaskChecklist>;
+  getTaskChecklist(id: string): Promise<schema.TaskChecklist | undefined>;
+  getChecklistsByTask(taskId: string): Promise<schema.TaskChecklist[]>;
+  updateTaskChecklist(id: string, checklist: Partial<schema.InsertTaskChecklist>): Promise<schema.TaskChecklist | undefined>;
+  deleteTaskChecklist(id: string): Promise<void>;
+  toggleChecklistItem(id: string, userId: string): Promise<schema.TaskChecklist | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -1838,6 +1884,229 @@ export class DbStorage implements IStorage {
         updatedAt: new Date()
       })
       .where(eq(schema.documentAnnotations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Pipelines
+  async createPipeline(pipeline: schema.InsertPipeline & { organizationId: string; createdBy: string }): Promise<schema.Pipeline> {
+    const result = await db.insert(schema.pipelines).values(pipeline).returning();
+    return result[0];
+  }
+
+  async getPipeline(id: string): Promise<schema.Pipeline | undefined> {
+    const result = await db.select().from(schema.pipelines).where(eq(schema.pipelines.id, id));
+    return result[0];
+  }
+
+  async getPipelinesByOrganization(organizationId: string): Promise<schema.Pipeline[]> {
+    return await db.select().from(schema.pipelines)
+      .where(eq(schema.pipelines.organizationId, organizationId))
+      .orderBy(schema.pipelines.createdAt);
+  }
+
+  async updatePipeline(id: string, pipeline: Partial<schema.InsertPipeline>): Promise<schema.Pipeline | undefined> {
+    const result = await db.update(schema.pipelines)
+      .set({ ...pipeline, updatedAt: new Date() })
+      .where(eq(schema.pipelines.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePipeline(id: string): Promise<void> {
+    await db.delete(schema.pipelines).where(eq(schema.pipelines.id, id));
+  }
+
+  // Pipeline Stages
+  async createPipelineStage(stage: schema.InsertPipelineStage): Promise<schema.PipelineStage> {
+    const result = await db.insert(schema.pipelineStages).values(stage).returning();
+    return result[0];
+  }
+
+  async getPipelineStage(id: string): Promise<schema.PipelineStage | undefined> {
+    const result = await db.select().from(schema.pipelineStages).where(eq(schema.pipelineStages.id, id));
+    return result[0];
+  }
+
+  async getStagesByPipeline(pipelineId: string): Promise<schema.PipelineStage[]> {
+    return await db.select().from(schema.pipelineStages)
+      .where(eq(schema.pipelineStages.pipelineId, pipelineId))
+      .orderBy(schema.pipelineStages.order);
+  }
+
+  async updatePipelineStage(id: string, stage: Partial<schema.InsertPipelineStage>): Promise<schema.PipelineStage | undefined> {
+    const result = await db.update(schema.pipelineStages)
+      .set({ ...stage, updatedAt: new Date() })
+      .where(eq(schema.pipelineStages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePipelineStage(id: string): Promise<void> {
+    await db.delete(schema.pipelineStages).where(eq(schema.pipelineStages.id, id));
+  }
+
+  // Pipeline Steps
+  async createPipelineStep(step: schema.InsertPipelineStep): Promise<schema.PipelineStep> {
+    const result = await db.insert(schema.pipelineSteps).values(step).returning();
+    return result[0];
+  }
+
+  async getPipelineStep(id: string): Promise<schema.PipelineStep | undefined> {
+    const result = await db.select().from(schema.pipelineSteps).where(eq(schema.pipelineSteps.id, id));
+    return result[0];
+  }
+
+  async getStepsByStage(stageId: string): Promise<schema.PipelineStep[]> {
+    return await db.select().from(schema.pipelineSteps)
+      .where(eq(schema.pipelineSteps.stageId, stageId))
+      .orderBy(schema.pipelineSteps.order);
+  }
+
+  async updatePipelineStep(id: string, step: Partial<schema.InsertPipelineStep>): Promise<schema.PipelineStep | undefined> {
+    const result = await db.update(schema.pipelineSteps)
+      .set({ ...step, updatedAt: new Date() })
+      .where(eq(schema.pipelineSteps.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePipelineStep(id: string): Promise<void> {
+    await db.delete(schema.pipelineSteps).where(eq(schema.pipelineSteps.id, id));
+  }
+
+  // Pipeline Tasks
+  async createPipelineTask(task: schema.InsertPipelineTask): Promise<schema.PipelineTask> {
+    const result = await db.insert(schema.pipelineTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getPipelineTask(id: string): Promise<schema.PipelineTask | undefined> {
+    const result = await db.select().from(schema.pipelineTasks).where(eq(schema.pipelineTasks.id, id));
+    return result[0];
+  }
+
+  async getTasksByStep(stepId: string): Promise<schema.PipelineTask[]> {
+    return await db.select().from(schema.pipelineTasks)
+      .where(eq(schema.pipelineTasks.stepId, stepId))
+      .orderBy(schema.pipelineTasks.order);
+  }
+
+  async updatePipelineTask(id: string, task: Partial<schema.InsertPipelineTask>): Promise<schema.PipelineTask | undefined> {
+    const result = await db.update(schema.pipelineTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(schema.pipelineTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deletePipelineTask(id: string): Promise<void> {
+    await db.delete(schema.pipelineTasks).where(eq(schema.pipelineTasks.id, id));
+  }
+
+  async assignTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined> {
+    const result = await db.update(schema.pipelineTasks)
+      .set({ assignedTo: userId, updatedAt: new Date() })
+      .where(eq(schema.pipelineTasks.id, taskId))
+      .returning();
+    return result[0];
+  }
+
+  async completeTask(taskId: string, userId: string): Promise<schema.PipelineTask | undefined> {
+    const result = await db.update(schema.pipelineTasks)
+      .set({ 
+        status: 'completed', 
+        completedAt: new Date(), 
+        completedBy: userId,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.pipelineTasks.id, taskId))
+      .returning();
+    return result[0];
+  }
+
+  // Task Subtasks
+  async createTaskSubtask(subtask: schema.InsertTaskSubtask): Promise<schema.TaskSubtask> {
+    const result = await db.insert(schema.taskSubtasks).values(subtask).returning();
+    return result[0];
+  }
+
+  async getTaskSubtask(id: string): Promise<schema.TaskSubtask | undefined> {
+    const result = await db.select().from(schema.taskSubtasks).where(eq(schema.taskSubtasks.id, id));
+    return result[0];
+  }
+
+  async getSubtasksByTask(taskId: string): Promise<schema.TaskSubtask[]> {
+    return await db.select().from(schema.taskSubtasks)
+      .where(eq(schema.taskSubtasks.taskId, taskId))
+      .orderBy(schema.taskSubtasks.order);
+  }
+
+  async updateTaskSubtask(id: string, subtask: Partial<schema.InsertTaskSubtask>): Promise<schema.TaskSubtask | undefined> {
+    const result = await db.update(schema.taskSubtasks)
+      .set({ ...subtask, updatedAt: new Date() })
+      .where(eq(schema.taskSubtasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaskSubtask(id: string): Promise<void> {
+    await db.delete(schema.taskSubtasks).where(eq(schema.taskSubtasks.id, id));
+  }
+
+  async completeSubtask(subtaskId: string, userId: string): Promise<schema.TaskSubtask | undefined> {
+    const result = await db.update(schema.taskSubtasks)
+      .set({ 
+        status: 'completed', 
+        completedAt: new Date(), 
+        completedBy: userId,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.taskSubtasks.id, subtaskId))
+      .returning();
+    return result[0];
+  }
+
+  // Task Checklists
+  async createTaskChecklist(checklist: schema.InsertTaskChecklist): Promise<schema.TaskChecklist> {
+    const result = await db.insert(schema.taskChecklists).values(checklist).returning();
+    return result[0];
+  }
+
+  async getTaskChecklist(id: string): Promise<schema.TaskChecklist | undefined> {
+    const result = await db.select().from(schema.taskChecklists).where(eq(schema.taskChecklists.id, id));
+    return result[0];
+  }
+
+  async getChecklistsByTask(taskId: string): Promise<schema.TaskChecklist[]> {
+    return await db.select().from(schema.taskChecklists)
+      .where(eq(schema.taskChecklists.taskId, taskId))
+      .orderBy(schema.taskChecklists.order);
+  }
+
+  async updateTaskChecklist(id: string, checklist: Partial<schema.InsertTaskChecklist>): Promise<schema.TaskChecklist | undefined> {
+    const result = await db.update(schema.taskChecklists)
+      .set(checklist)
+      .where(eq(schema.taskChecklists.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaskChecklist(id: string): Promise<void> {
+    await db.delete(schema.taskChecklists).where(eq(schema.taskChecklists.id, id));
+  }
+
+  async toggleChecklistItem(id: string, userId: string): Promise<schema.TaskChecklist | undefined> {
+    const current = await this.getTaskChecklist(id);
+    if (!current) return undefined;
+    
+    const result = await db.update(schema.taskChecklists)
+      .set({ 
+        isChecked: !current.isChecked,
+        checkedAt: !current.isChecked ? new Date() : null,
+        checkedBy: !current.isChecked ? userId : null
+      })
+      .where(eq(schema.taskChecklists.id, id))
       .returning();
     return result[0];
   }

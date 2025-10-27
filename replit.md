@@ -31,9 +31,10 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 - **Polymorphic Tagging System**: Organize resources like documents, clients, and contacts with tags, including CRUD operations and permissions.
 - **Contacts Management**: System for managing contacts associated with clients, including primary contact designation and permissions.
 - **Clients Management**: Comprehensive CRUD operations for client profiles with multi-tenant security and permissions.
+- **Hierarchical Pipeline Builder**: Sophisticated project management system with **Stages → Steps → Tasks → Subtasks/Checklists** hierarchy. Features include: user assignment to tasks and subtasks, manual and automated (AI-powered) tasks, progression logic requiring completion of all tasks/checklists before advancing, priority levels, status tracking, and comprehensive CRUD operations at every level. Pipelines support multi-tenant isolation with granular RBAC permissions for create, view, update, and delete operations.
 
 ### System Design Choices
-The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows, AI agents, documents, forms, tags, and contacts. Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
+The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows, AI agents, documents, forms, tags, contacts, and pipelines (with related tables: pipelineStages, pipelineSteps, pipelineTasks, taskSubtasks, taskChecklists). Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.

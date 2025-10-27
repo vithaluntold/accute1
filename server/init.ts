@@ -70,6 +70,12 @@ export async function initializeSystem() {
       { name: "workflows.delete", resource: "workflows", action: "delete", description: "Delete workflows" },
       { name: "workflows.execute", resource: "workflows", action: "execute", description: "Execute workflows" },
       
+      // Pipeline management
+      { name: "pipelines.view", resource: "pipelines", action: "view", description: "View pipelines" },
+      { name: "pipelines.create", resource: "pipelines", action: "create", description: "Create pipelines" },
+      { name: "pipelines.update", resource: "pipelines", action: "update", description: "Update pipelines" },
+      { name: "pipelines.delete", resource: "pipelines", action: "delete", description: "Delete pipelines" },
+      
       // AI Agent management
       { name: "ai_agents.view", resource: "ai_agents", action: "view", description: "View AI agents" },
       { name: "ai_agents.install", resource: "ai_agents", action: "install", description: "Install AI agents" },

@@ -3173,6 +3173,456 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // PIPELINES - Hierarchical Project Management
+  // ========================================
+
+  // Pipelines
+  app.get("/api/pipelines", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipelines = await storage.getPipelinesByOrganization(req.user!.organizationId!);
+      res.json(pipelines);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch pipelines" });
+    }
+  });
+
+  app.post("/api/pipelines", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipeline = await storage.createPipeline({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline", pipeline.id, pipeline, req);
+      res.status(201).json(pipeline);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create pipeline" });
+    }
+  });
+
+  app.get("/api/pipelines/:id", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipeline = await storage.getPipeline(req.params.id);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+      res.json(pipeline);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch pipeline" });
+    }
+  });
+
+  app.put("/api/pipelines/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getPipeline(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+      const updated = await storage.updatePipeline(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update pipeline" });
+    }
+  });
+
+  app.delete("/api/pipelines/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getPipeline(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+      await storage.deletePipeline(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete pipeline" });
+    }
+  });
+
+  // Pipeline Stages
+  app.get("/api/pipelines/:pipelineId/stages", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipeline = await storage.getPipeline(req.params.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+      const stages = await storage.getStagesByPipeline(req.params.pipelineId);
+      res.json(stages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch stages" });
+    }
+  });
+
+  app.post("/api/stages", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipeline = await storage.getPipeline(req.body.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+      const stage = await storage.createPipelineStage(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_stage", stage.id, stage, req);
+      res.status(201).json(stage);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create stage" });
+    }
+  });
+
+  app.put("/api/stages/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getPipelineStage(req.params.id);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updatePipelineStage(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_stage", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update stage" });
+    }
+  });
+
+  app.delete("/api/stages/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getPipelineStage(req.params.id);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deletePipelineStage(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_stage", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete stage" });
+    }
+  });
+
+  // Pipeline Steps
+  app.get("/api/stages/:stageId/steps", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getPipelineStage(req.params.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const steps = await storage.getStepsByStage(req.params.stageId);
+      res.json(steps);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch steps" });
+    }
+  });
+
+  app.post("/api/steps", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getPipelineStage(req.body.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const step = await storage.createPipelineStep(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_step", step.id, step, req);
+      res.status(201).json(step);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create step" });
+    }
+  });
+
+  app.put("/api/steps/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getPipelineStep(req.params.id);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updatePipelineStep(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_step", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update step" });
+    }
+  });
+
+  app.delete("/api/steps/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getPipelineStep(req.params.id);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deletePipelineStep(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_step", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete step" });
+    }
+  });
+
+  // Pipeline Tasks
+  app.get("/api/steps/:stepId/tasks", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getPipelineStep(req.params.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const tasks = await storage.getTasksByStep(req.params.stepId);
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  app.post("/api/tasks", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getPipelineStep(req.body.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const task = await storage.createPipelineTask(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "pipeline_task", task.id, task, req);
+      res.status(201).json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/tasks/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const step = await storage.getPipelineStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updatePipelineTask(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "pipeline_task", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.post("/api/tasks/:id/assign", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const updated = await storage.assignTask(req.params.id, req.body.userId);
+      await logActivity(req.user!.id, req.user!.organizationId!, "assign", "pipeline_task", req.params.id, { userId: req.body.userId }, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to assign task" });
+    }
+  });
+
+  app.post("/api/tasks/:id/complete", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const updated = await storage.completeTask(req.params.id, req.user!.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "complete", "pipeline_task", req.params.id, {}, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to complete task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      await storage.deletePipelineTask(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "pipeline_task", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Task Subtasks
+  app.get("/api/tasks/:taskId/subtasks", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const subtasks = await storage.getSubtasksByTask(req.params.taskId);
+      res.json(subtasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch subtasks" });
+    }
+  });
+
+  app.post("/api/subtasks", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.body.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const subtask = await storage.createTaskSubtask(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "task_subtask", subtask.id, subtask, req);
+      res.status(201).json(subtask);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create subtask" });
+    }
+  });
+
+  app.put("/api/subtasks/:id", requireAuth, requirePermission("pipelines.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const subtask = await storage.getTaskSubtask(req.params.id);
+      if (!subtask) {
+        return res.status(404).json({ error: "Subtask not found" });
+      }
+      const updated = await storage.updateTaskSubtask(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "task_subtask", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update subtask" });
+    }
+  });
+
+  app.post("/api/subtasks/:id/complete", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const subtask = await storage.getTaskSubtask(req.params.id);
+      if (!subtask) {
+        return res.status(404).json({ error: "Subtask not found" });
+      }
+      const updated = await storage.completeSubtask(req.params.id, req.user!.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "complete", "task_subtask", req.params.id, {}, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to complete subtask" });
+    }
+  });
+
+  app.delete("/api/subtasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const subtask = await storage.getTaskSubtask(req.params.id);
+      if (!subtask) {
+        return res.status(404).json({ error: "Subtask not found" });
+      }
+      await storage.deleteTaskSubtask(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "task_subtask", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete subtask" });
+    }
+  });
+
+  // Task Checklists
+  app.get("/api/tasks/:taskId/checklists", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const checklists = await storage.getChecklistsByTask(req.params.taskId);
+      res.json(checklists);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch checklists" });
+    }
+  });
+
+  app.post("/api/checklists", requireAuth, requirePermission("pipelines.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getPipelineTask(req.body.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const checklist = await storage.createTaskChecklist(req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "task_checklist", checklist.id, checklist, req);
+      res.status(201).json(checklist);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create checklist item" });
+    }
+  });
+
+  app.post("/api/checklists/:id/toggle", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const checklist = await storage.getTaskChecklist(req.params.id);
+      if (!checklist) {
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+      const updated = await storage.toggleChecklistItem(req.params.id, req.user!.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "toggle", "task_checklist", req.params.id, {}, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to toggle checklist item" });
+    }
+  });
+
+  app.delete("/api/checklists/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const checklist = await storage.getTaskChecklist(req.params.id);
+      if (!checklist) {
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+      await storage.deleteTaskChecklist(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "task_checklist", req.params.id, {}, req);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete checklist item" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -118,6 +118,92 @@ export const workflowExecutions = pgTable("workflow_executions", {
   workflowStatusIdx: index("workflow_executions_workflow_status_idx").on(table.workflowId, table.status),
 }));
 
+// Pipelines - Hierarchical project/workflow management with stages, steps, and tasks
+export const pipelines = pgTable("pipelines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
+  currentStageId: varchar("current_stage_id"), // Track which stage pipeline is currently on
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Pipeline Stages - Top level grouping (e.g., "Planning", "Execution", "Review")
+export const pipelineStages = pgTable("pipeline_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pipelineId: varchar("pipeline_id").notNull().references(() => pipelines.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  order: integer("order").notNull(), // Display order
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Pipeline Steps - Within each stage (e.g., "Gather Requirements", "Design", "Build")
+export const pipelineSteps = pgTable("pipeline_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stageId: varchar("stage_id").notNull().references(() => pipelineStages.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  order: integer("order").notNull(), // Display order
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
+  requireAllTasksComplete: boolean("require_all_tasks_complete").notNull().default(true), // Must complete all tasks before proceeding
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Pipeline Tasks - Individual work items (manual or automated)
+export const pipelineTasks = pgTable("pipeline_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stepId: varchar("step_id").notNull().references(() => pipelineSteps.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("manual"), // 'manual', 'automated'
+  order: integer("order").notNull(), // Display order
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
+  assignedTo: varchar("assigned_to").references(() => users.id), // User assigned to this task
+  aiAgentId: varchar("ai_agent_id").references(() => aiAgents.id), // AI agent for automated tasks
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Task Subtasks - Break down tasks into smaller pieces
+export const taskSubtasks = pgTable("task_subtasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => pipelineTasks.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  order: integer("order").notNull(), // Display order
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed'
+  assignedTo: varchar("assigned_to").references(() => users.id), // User assigned to this subtask
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Task Checklists - Simple checkboxes for task completion
+export const taskChecklists = pgTable("task_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => pipelineTasks.id, { onDelete: "cascade" }),
+  item: text("item").notNull(),
+  order: integer("order").notNull(), // Display order
+  isChecked: boolean("is_checked").notNull().default(false),
+  checkedAt: timestamp("checked_at"),
+  checkedBy: varchar("checked_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // AI Agents in marketplace
 export const aiAgents = pgTable("ai_agents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -752,6 +838,53 @@ export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutio
   createdAt: true,
 });
 
+// Pipeline Zod Schemas
+export const insertPipelineSchema = createInsertSchema(pipelines).omit({
+  id: true,
+  organizationId: true,
+  createdBy: true,
+  currentStageId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPipelineStageSchema = createInsertSchema(pipelineStages).omit({
+  id: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPipelineStepSchema = createInsertSchema(pipelineSteps).omit({
+  id: true,
+  completedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPipelineTaskSchema = createInsertSchema(pipelineTasks).omit({
+  id: true,
+  completedAt: true,
+  completedBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskSubtaskSchema = createInsertSchema(taskSubtasks).omit({
+  id: true,
+  completedAt: true,
+  completedBy: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskChecklistSchema = createInsertSchema(taskChecklists).omit({
+  id: true,
+  checkedAt: true,
+  checkedBy: true,
+  createdAt: true,
+});
+
 export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
   id: true,
   createdAt: true,
@@ -879,6 +1012,21 @@ export type InsertPermission = z.infer<typeof insertPermissionSchema>;
 export type Permission = typeof permissions.$inferSelect;
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type Workflow = typeof workflows.$inferSelect;
+
+// Pipeline Types
+export type InsertPipeline = z.infer<typeof insertPipelineSchema>;
+export type Pipeline = typeof pipelines.$inferSelect;
+export type InsertPipelineStage = z.infer<typeof insertPipelineStageSchema>;
+export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type InsertPipelineStep = z.infer<typeof insertPipelineStepSchema>;
+export type PipelineStep = typeof pipelineSteps.$inferSelect;
+export type InsertPipelineTask = z.infer<typeof insertPipelineTaskSchema>;
+export type PipelineTask = typeof pipelineTasks.$inferSelect;
+export type InsertTaskSubtask = z.infer<typeof insertTaskSubtaskSchema>;
+export type TaskSubtask = typeof taskSubtasks.$inferSelect;
+export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;
+export type TaskChecklist = typeof taskChecklists.$inferSelect;
+
 export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 export type AiAgent = typeof aiAgents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;

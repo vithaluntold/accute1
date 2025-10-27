@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail 
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network 
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -30,6 +30,12 @@ const menuItems = [
     url: "/workflows",
     icon: Workflow,
     permission: "workflows.view",
+  },
+  {
+    title: "Pipelines",
+    url: "/pipelines",
+    icon: Network,
+    permission: "pipelines.view",
   },
   {
     title: "AI Agents",
