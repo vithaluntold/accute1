@@ -643,11 +643,25 @@ export default function Settings() {
                         <FormLabel>Model</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder={selectedLlmProvider === "openai" ? "gpt-4" : selectedLlmProvider === "anthropic" ? "claude-3-opus-20240229" : "gpt-4"} 
+                            placeholder={
+                              selectedLlmProvider === "openai" 
+                                ? "gpt-4" 
+                                : selectedLlmProvider === "anthropic" 
+                                ? "claude-3-opus-20240229" 
+                                : selectedLlmProvider === "azure"
+                                ? "your-deployment-name"
+                                : "gpt-4"
+                            } 
                             data-testid="input-llm-model" 
                             {...field} 
                           />
                         </FormControl>
+                        <FormDescription>
+                          {selectedLlmProvider === "azure" 
+                            ? "Enter your Azure deployment name (not the full URL)"
+                            : "Model identifier for API calls"
+                          }
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -680,6 +694,9 @@ export default function Settings() {
                           <FormControl>
                             <Input type="url" placeholder="https://your-resource.openai.azure.com" data-testid="input-llm-azure-endpoint" {...field} />
                           </FormControl>
+                          <FormDescription>
+                            Base URL only - do not include /openai/deployments or other paths
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
