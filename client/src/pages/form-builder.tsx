@@ -41,9 +41,14 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "text", label: "Text" },
   { value: "textarea", label: "Text Area" },
   { value: "number", label: "Number" },
+  { value: "decimal", label: "Decimal Number" },
   { value: "email", label: "Email" },
   { value: "phone", label: "Phone" },
   { value: "url", label: "URL" },
+  { value: "name", label: "Full Name" },
+  { value: "address", label: "Address" },
+  { value: "currency", label: "Currency" },
+  { value: "percentage", label: "Percentage" },
   { value: "date", label: "Date" },
   { value: "time", label: "Time" },
   { value: "datetime", label: "Date & Time" },
@@ -53,9 +58,6 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "checkbox", label: "Checkbox" },
   { value: "file_upload", label: "File Upload" },
   { value: "signature", label: "Signature" },
-  { value: "address", label: "Address" },
-  { value: "currency", label: "Currency" },
-  { value: "percentage", label: "Percentage" },
   { value: "rating", label: "Rating" },
   { value: "slider", label: "Slider" },
   { value: "calculated", label: "Calculated Field" },
@@ -66,10 +68,11 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
 
 const fieldSchema = z.object({
   type: z.enum([
-    "text", "textarea", "number", "email", "phone", "url",
+    "text", "textarea", "number", "decimal", "email", "phone", "url",
+    "name", "address", "currency", "percentage",
     "date", "time", "datetime", "select", "multi_select", "radio",
-    "checkbox", "file_upload", "signature", "address", "currency",
-    "percentage", "rating", "slider", "calculated", "heading", "divider", "html"
+    "checkbox", "file_upload", "signature",
+    "rating", "slider", "calculated", "heading", "divider", "html"
   ]),
   label: z.string().min(1, "Label is required"),
   placeholder: z.string().optional(),

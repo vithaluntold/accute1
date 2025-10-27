@@ -381,8 +381,10 @@ export type FormFieldType =
   | "checkbox"
   | "file_upload"
   | "signature"
-  | "address"
-  | "currency"
+  | "name"          // Composite: title, first, middle, last
+  | "address"       // Composite: street, city, state, zip
+  | "currency"      // Number with currency symbol/type
+  | "decimal"       // Number with decimal precision
   | "percentage"
   | "rating"
   | "slider"
@@ -408,6 +410,21 @@ export interface FormFieldOption {
   icon?: string;
 }
 
+export interface CompositeFieldConfig {
+  // Name field sub-fields
+  showTitle?: boolean;
+  showMiddleName?: boolean;
+  // Address field configuration
+  showLine2?: boolean;
+  showCountry?: boolean;
+  defaultCountry?: string;
+  // Currency configuration
+  currencyType?: string; // 'USD', 'EUR', 'GBP', etc.
+  allowNegative?: boolean;
+  // Decimal configuration
+  decimalPlaces?: number;
+}
+
 export interface FormField {
   id: string;
   type: FormFieldType;
@@ -424,6 +441,8 @@ export interface FormField {
   fileTypes?: string[]; // ['pdf', 'jpg', 'png']
   maxFileSize?: number; // in MB
   maxFiles?: number;
+  // Composite field configuration (Name, Address, Currency, Decimal)
+  config?: CompositeFieldConfig;
   // Conditional logic
   conditionalRules?: FormConditionalRule[];
   // Layout

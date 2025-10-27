@@ -55,7 +55,6 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
       switch (field.type) {
         case "number":
-        case "currency":
         case "percentage":
         case "rating":
         case "slider":
@@ -78,6 +77,95 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             fieldSchema = fieldSchema.refine(
               (val) => val === undefined || val <= field.validation!.max!,
               { message: `Value must be at most ${field.validation.max}` }
+            );
+          }
+          if (!isRequired) {
+            fieldSchema = fieldSchema.optional();
+          }
+          break;
+
+        case "currency":
+          // Currency stored as object with amount and currencyType
+          fieldSchema = z.object({
+            amount: z.union([z.string(), z.number()]).pipe(z.coerce.number()),
+            currencyType: z.string(),
+          });
+          if (isRequired) {
+            fieldSchema = (fieldSchema as any).refine(
+              (val: any) => val && val.amount !== undefined && val.amount !== null && val.amount !== "" && !isNaN(val.amount),
+              { message: "Amount is required" }
+            );
+          }
+          if (field.validation?.min !== undefined) {
+            fieldSchema = (fieldSchema as any).refine(
+              (val: any) => val === undefined || val.amount === undefined || val.amount >= field.validation!.min!,
+              { message: `Amount must be at least ${field.validation.min}` }
+            );
+          }
+          if (field.validation?.max !== undefined) {
+            fieldSchema = (fieldSchema as any).refine(
+              (val: any) => val === undefined || val.amount === undefined || val.amount <= field.validation!.max!,
+              { message: `Amount must be at most ${field.validation.max}` }
+            );
+          }
+          if (!isRequired) {
+            fieldSchema = fieldSchema.optional();
+          }
+          break;
+
+        case "decimal":
+          // Decimal number with specific precision
+          fieldSchema = z.union([z.string(), z.number()]).pipe(z.coerce.number());
+          if (isRequired) {
+            fieldSchema = fieldSchema.refine(
+              (val) => val !== undefined && val !== null && val !== "" && !isNaN(val),
+              { message: "This field is required" }
+            );
+          }
+          // Validate decimal places if specified
+          const decimalPlaces = (field.config as any)?.decimalPlaces;
+          if (decimalPlaces !== undefined) {
+            fieldSchema = fieldSchema.refine(
+              (val) => {
+                if (val === undefined || val === null || val === "") return true;
+                const strVal = val.toString();
+                const decimalIndex = strVal.indexOf('.');
+                if (decimalIndex === -1) return true; // No decimals is fine
+                const actualDecimals = strVal.length - decimalIndex - 1;
+                return actualDecimals <= decimalPlaces;
+              },
+              { message: `Maximum ${decimalPlaces} decimal places allowed` }
+            );
+          }
+          if (field.validation?.min !== undefined) {
+            fieldSchema = fieldSchema.refine(
+              (val) => val === undefined || val >= field.validation!.min!,
+              { message: `Value must be at least ${field.validation.min}` }
+            );
+          }
+          if (field.validation?.max !== undefined) {
+            fieldSchema = fieldSchema.refine(
+              (val) => val === undefined || val <= field.validation!.max!,
+              { message: `Value must be at most ${field.validation.max}` }
+            );
+          }
+          if (!isRequired) {
+            fieldSchema = fieldSchema.optional();
+          }
+          break;
+
+        case "name":
+          // Full name with title, first, middle (optional), last
+          fieldSchema = z.object({
+            title: z.string(),
+            firstName: z.string(),
+            middleName: z.string().optional(),
+            lastName: z.string(),
+          });
+          if (isRequired) {
+            fieldSchema = (fieldSchema as any).refine(
+              (val: any) => val && val.firstName && val.firstName.trim().length > 0 && val.lastName && val.lastName.trim().length > 0,
+              { message: "First name and last name are required" }
             );
           }
           if (!isRequired) {
@@ -332,7 +420,6 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
         );
 
       case "number":
-      case "currency":
       case "percentage":
         return (
           <Input
@@ -347,6 +434,121 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               controllerField.onChange(val === "" ? undefined : parseFloat(val));
             }}
           />
+        );
+
+      case "decimal":
+        const decimalPlaces = (field.config as any)?.decimalPlaces || 2;
+        const step = Math.pow(10, -decimalPlaces).toFixed(decimalPlaces);
+        return (
+          <Input
+            {...controllerField}
+            id={id}
+            type="number"
+            step={step}
+            placeholder={placeholder}
+            disabled={disabled}
+            data-testid={`input-decimal-${id}`}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "") {
+                controllerField.onChange(undefined);
+              } else {
+                const numVal = parseFloat(val);
+                // Round to specified decimal places
+                const rounded = Math.round(numVal * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
+                controllerField.onChange(rounded);
+              }
+            }}
+          />
+        );
+
+      case "currency":
+        const currencyValue = controllerField.value || { amount: "", currencyType: "USD" };
+        const currencies = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY", "INR"];
+        return (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Select
+                value={currencyValue.currencyType || "USD"}
+                onValueChange={(value) => controllerField.onChange({ ...currencyValue, currencyType: value })}
+                disabled={disabled}
+              >
+                <SelectTrigger className="w-32" data-testid={`currency-type-${id}`}>
+                  <SelectValue placeholder="Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={currencyValue.amount ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  controllerField.onChange({
+                    ...currencyValue,
+                    amount: val === "" ? undefined : parseFloat(val)
+                  });
+                }}
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                disabled={disabled}
+                className="flex-1"
+                data-testid={`currency-amount-${id}`}
+              />
+            </div>
+          </div>
+        );
+
+      case "name":
+        const nameValue = controllerField.value || { title: "", firstName: "", middleName: "", lastName: "" };
+        const titles = ["Mr", "Mrs", "Ms", "Dr", "Prof"];
+        return (
+          <div className="space-y-2">
+            <Select
+              value={nameValue.title || ""}
+              onValueChange={(value) => controllerField.onChange({ ...nameValue, title: value })}
+              disabled={disabled}
+            >
+              <SelectTrigger data-testid={`name-title-${id}`}>
+                <SelectValue placeholder="Title" />
+              </SelectTrigger>
+              <SelectContent>
+                {titles.map((title) => (
+                  <SelectItem key={title} value={title}>
+                    {title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                value={nameValue.firstName || ""}
+                onChange={(e) => controllerField.onChange({ ...nameValue, firstName: e.target.value })}
+                placeholder="First Name"
+                disabled={disabled}
+                data-testid={`name-first-${id}`}
+              />
+              <Input
+                value={nameValue.lastName || ""}
+                onChange={(e) => controllerField.onChange({ ...nameValue, lastName: e.target.value })}
+                placeholder="Last Name"
+                disabled={disabled}
+                data-testid={`name-last-${id}`}
+              />
+            </div>
+            <Input
+              value={nameValue.middleName || ""}
+              onChange={(e) => controllerField.onChange({ ...nameValue, middleName: e.target.value })}
+              placeholder="Middle Name (Optional)"
+              disabled={disabled}
+              data-testid={`name-middle-${id}`}
+            />
+          </div>
         );
 
       case "date":
