@@ -34,19 +34,14 @@ export default function EmailTemplatesPage() {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: (data: any) => {
-      console.log("Creating email template with data:", data);
-      return apiRequest("POST", "/api/email-templates", data);
-    },
-    onSuccess: (data) => {
-      console.log("Template created successfully:", data);
+    mutationFn: (data: any) => apiRequest("POST", "/api/email-templates", data),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-templates"] });
       setDialogOpen(false);
       setSelectedCategory("");
       toast({ title: "Email template created successfully" });
     },
-    onError: (error) => {
-      console.error("Error creating template:", error);
+    onError: () => {
       toast({ title: "Failed to create template", variant: "destructive" });
     },
   });
@@ -68,32 +63,22 @@ export default function EmailTemplatesPage() {
             </DialogHeader>
             <form
               onSubmit={(e) => {
-                console.log("Form submit triggered");
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
                 
-                console.log("Selected category:", selectedCategory);
-                console.log("Form data - name:", formData.get("name"));
-                console.log("Form data - subject:", formData.get("subject"));
-                console.log("Form data - body:", formData.get("body"));
-                
                 if (!selectedCategory) {
-                  console.log("Validation failed: no category selected");
                   toast({ title: "Please select a category", variant: "destructive" });
                   return;
                 }
                 
-                const templateData = {
+                createTemplateMutation.mutate({
                   name: formData.get("name"),
                   category: selectedCategory,
                   subject: formData.get("subject"),
                   body: formData.get("body"),
                   variables: [],
                   isActive: true,
-                };
-                
-                console.log("Calling mutation with data:", templateData);
-                createTemplateMutation.mutate(templateData);
+                });
               }}
               className="space-y-4"
             >
