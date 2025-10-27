@@ -206,6 +206,59 @@ export async function initializeSystem() {
       }
     }
 
+    // Seed AI Copilots in marketplace
+    const aiCopilots = [
+      {
+        name: "Cadence",
+        description: "AI-powered workflow automation copilot that helps you build complex accounting workflows through natural conversation. Cadence understands tax processes, audit procedures, and bookkeeping tasks to create intelligent workflow pipelines.",
+        provider: "accute",
+        category: "workflow",
+        capabilities: ["workflow_generation", "process_automation", "tax_workflows", "audit_workflows", "bookkeeping_automation"],
+        configuration: { modelProvider: "openai", model: "gpt-4" },
+        pricingModel: "free",
+        version: "1.0.0",
+        tags: ["workflow", "automation", "ai-assistant", "accounting"],
+        isPublic: true,
+      },
+      {
+        name: "Parity",
+        description: "Legal document generation copilot specialized in creating engagement letters, agreements, contracts, and compliance documents. Parity ensures your documents meet professional standards and include all necessary legal clauses.",
+        provider: "accute",
+        category: "legal",
+        capabilities: ["document_generation", "engagement_letters", "contracts", "compliance_docs", "legal_templates"],
+        configuration: { modelProvider: "openai", model: "gpt-4" },
+        pricingModel: "free",
+        version: "1.0.0",
+        tags: ["legal", "documents", "contracts", "ai-assistant"],
+        isPublic: true,
+      },
+      {
+        name: "Forma",
+        description: "Intelligent form builder copilot that creates custom forms, organizers, and questionnaires for client data collection. Forma understands tax forms, client intake processes, and can build complex conditional forms with validation.",
+        provider: "accute",
+        category: "forms",
+        capabilities: ["form_generation", "questionnaires", "organizers", "conditional_logic", "validation_rules"],
+        configuration: { modelProvider: "openai", model: "gpt-4" },
+        pricingModel: "free",
+        version: "1.0.0",
+        tags: ["forms", "data-collection", "ai-assistant", "tax-organizers"],
+        isPublic: true,
+      },
+    ];
+
+    for (const copilot of aiCopilots) {
+      try {
+        // Check if copilot already exists
+        const existing = await db.select().from(schema.aiAgents).where(eq(schema.aiAgents.name, copilot.name));
+        if (existing.length === 0) {
+          await db.insert(schema.aiAgents).values(copilot);
+          console.log(`✓ Seeded AI copilot: ${copilot.name}`);
+        }
+      } catch (error) {
+        console.log(`⚠️  Copilot ${copilot.name} may already exist`);
+      }
+    }
+
     console.log("✅ System initialized successfully");
   } catch (error) {
     console.error("❌ System initialization failed:", error);
