@@ -53,7 +53,8 @@ export function decrypt(encryptedData: string): string {
   const decipher = crypto.createDecipheriv(
     ALGORITHM,
     Buffer.from(process.env.ENCRYPTION_KEY!.slice(0, 32)),
-    Buffer.from(ivHex, 'hex')
+    Buffer.from(ivHex, 'hex'),
+    { authTagLength: AUTH_TAG_LENGTH }
   );
   
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
