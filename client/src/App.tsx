@@ -33,6 +33,8 @@ import Documents from "@/pages/documents";
 import Forms from "@/pages/forms";
 import FormBuilder from "@/pages/form-builder";
 import FormPreview from "@/pages/form-preview";
+import FormSubmissions from "@/pages/form-submissions";
+import SubmissionDetail from "@/pages/submission-detail";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
@@ -241,6 +243,20 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <FormPreview />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/forms/:formId/submissions">
+        <ProtectedRoute>
+          <AppLayout>
+            <FormSubmissions />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/submissions/:id">
+        <ProtectedRoute>
+          <AppLayout>
+            <SubmissionDetail />
           </AppLayout>
         </ProtectedRoute>
       </Route>
