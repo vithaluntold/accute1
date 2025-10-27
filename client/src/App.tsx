@@ -23,6 +23,7 @@ import { Search, Bell, User, Building2, ChevronDown } from "lucide-react";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import PublicFormPage from "@/pages/public-form";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Workflows from "@/pages/workflows";
@@ -170,6 +171,10 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      
+      {/* Public route - NO authentication required */}
+      <Route path="/public/:shareToken" component={PublicFormPage} />
+
       <Route path="/dashboard">
         <ProtectedRoute>
           <AppLayout>

@@ -40,6 +40,8 @@ import type {
   InsertFormTemplate,
   FormSubmission,
   InsertFormSubmission,
+  FormShareLink,
+  InsertFormShareLink,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -190,6 +192,16 @@ export interface IStorage {
   getFormSubmissionsByClient(clientId: string): Promise<FormSubmission[]>;
   getFormSubmissionsByOrganization(organizationId: string): Promise<FormSubmission[]>;
   reviewFormSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<FormSubmission | undefined>;
+
+  // Form Share Links
+  createFormShareLink(data: InsertFormShareLink & { organizationId: string; createdBy: string }): Promise<FormShareLink>;
+  getFormShareLink(id: string): Promise<FormShareLink | undefined>;
+  getFormShareLinkByToken(token: string): Promise<FormShareLink | undefined>;
+  getFormShareLinksByForm(formTemplateId: string): Promise<FormShareLink[]>;
+  updateFormShareLink(id: string, data: Partial<InsertFormShareLink>): Promise<FormShareLink | undefined>;
+  deleteFormShareLink(id: string): Promise<void>;
+  incrementShareLinkView(shareToken: string): Promise<void>;
+  incrementShareLinkSubmission(shareToken: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -883,6 +895,60 @@ export class DbStorage implements IStorage {
       .where(eq(schema.formSubmissions.id, id))
       .returning();
     return result[0];
+  }
+
+  // Form Share Links
+  async createFormShareLink(data: InsertFormShareLink & { organizationId: string; createdBy: string }): Promise<FormShareLink> {
+    const result = await db.insert(schema.formShareLinks).values(data).returning();
+    return result[0];
+  }
+
+  async getFormShareLink(id: string): Promise<FormShareLink | undefined> {
+    const result = await db.select().from(schema.formShareLinks).where(eq(schema.formShareLinks.id, id));
+    return result[0];
+  }
+
+  async getFormShareLinkByToken(token: string): Promise<FormShareLink | undefined> {
+    const result = await db.select().from(schema.formShareLinks).where(eq(schema.formShareLinks.shareToken, token));
+    return result[0];
+  }
+
+  async getFormShareLinksByForm(formTemplateId: string): Promise<FormShareLink[]> {
+    return await db.select().from(schema.formShareLinks)
+      .where(eq(schema.formShareLinks.formTemplateId, formTemplateId))
+      .orderBy(desc(schema.formShareLinks.createdAt));
+  }
+
+  async updateFormShareLink(id: string, data: Partial<InsertFormShareLink>): Promise<FormShareLink | undefined> {
+    const result = await db.update(schema.formShareLinks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.formShareLinks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFormShareLink(id: string): Promise<void> {
+    await db.delete(schema.formShareLinks).where(eq(schema.formShareLinks.id, id));
+  }
+
+  async incrementShareLinkView(shareToken: string): Promise<void> {
+    await db.update(schema.formShareLinks)
+      .set({ 
+        viewCount: sql`${schema.formShareLinks.viewCount} + 1`,
+        lastAccessedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(schema.formShareLinks.shareToken, shareToken));
+  }
+
+  async incrementShareLinkSubmission(shareToken: string): Promise<void> {
+    await db.update(schema.formShareLinks)
+      .set({ 
+        submissionCount: sql`${schema.formShareLinks.submissionCount} + 1`,
+        lastAccessedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(schema.formShareLinks.shareToken, shareToken));
   }
 }
 

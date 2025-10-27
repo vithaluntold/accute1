@@ -34,7 +34,10 @@ import {
   insertTaggableSchema,
   insertFormTemplateSchema,
   insertFormSubmissionSchema,
+  insertFormShareLinkSchema,
 } from "@shared/schema";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -1606,6 +1609,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(reviewed);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to review submission" });
+    }
+  });
+
+  // ==================== Form Share Link Routes ====================
+
+  // Create share link for a form
+  app.post("/api/forms/:formId/share-links", requireAuth, requirePermission("forms.share"), async (req: AuthRequest, res: Response) => {
+    try {
+      const form = await storage.getFormTemplate(req.params.formId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { clientId, password, expiresAt, maxSubmissions, dueDate, notes } = req.body;
+
+      // Generate unique share token
+      const shareToken = crypto.randomBytes(16).toString('hex');
+
+      // Hash password if provided
+      let hashedPassword = null;
+      if (password) {
+        hashedPassword = await hashPassword(password);
+      }
+
+      const shareLink = await storage.createFormShareLink({
+        formTemplateId: req.params.formId,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id,
+        shareToken,
+        clientId: clientId || null,
+        password: hashedPassword,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        maxSubmissions: maxSubmissions || null,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        notes: notes || null,
+        status: 'active',
+      });
+
+      await logActivity(
+        req.user!.id,
+        "share_link_created",
+        "form_share_link",
+        shareLink.id,
+        req.user!.organizationId!,
+        { formName: form.name, shareToken }
+      );
+
+      res.status(201).json(shareLink);
+    } catch (error: any) {
+      console.error("Failed to create share link:", error);
+      res.status(500).json({ error: "Failed to create share link" });
+    }
+  });
+
+  // Get all share links for a form
+  app.get("/api/forms/:formId/share-links", requireAuth, requirePermission("forms.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const form = await storage.getFormTemplate(req.params.formId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      if (form.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const shareLinks = await storage.getFormShareLinksByForm(req.params.formId);
+      res.json(shareLinks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch share links" });
+    }
+  });
+
+  // Delete share link
+  app.delete("/api/share-links/:id", requireAuth, requirePermission("forms.share"), async (req: AuthRequest, res: Response) => {
+    try {
+      const shareLink = await storage.getFormShareLink(req.params.id);
+      if (!shareLink) {
+        return res.status(404).json({ error: "Share link not found" });
+      }
+      if (shareLink.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteFormShareLink(req.params.id);
+
+      await logActivity(
+        req.user!.id,
+        "share_link_deleted",
+        "form_share_link",
+        req.params.id,
+        req.user!.organizationId!,
+        { shareToken: shareLink.shareToken }
+      );
+
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete share link" });
+    }
+  });
+
+  // ==================== Public Form Routes (NO AUTH) ====================
+
+  // Get form by share token (public access)
+  app.get("/api/public/forms/:shareToken", async (req: Request, res: Response) => {
+    try {
+      const shareLink = await storage.getFormShareLinkByToken(req.params.shareToken);
+      
+      if (!shareLink) {
+        return res.status(404).json({ error: "Form not found or link is invalid" });
+      }
+
+      // Check if link is active
+      if (shareLink.status !== 'active') {
+        return res.status(403).json({ error: "This link has been disabled" });
+      }
+
+      // Check expiration
+      if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
+        await storage.updateFormShareLink(shareLink.id, { status: 'expired' });
+        return res.status(403).json({ error: "This link has expired" });
+      }
+
+      // Check max submissions
+      if (shareLink.maxSubmissions && shareLink.submissionCount >= shareLink.maxSubmissions) {
+        return res.status(403).json({ error: "Maximum submissions reached for this link" });
+      }
+
+      // Get the form template
+      const form = await storage.getFormTemplate(shareLink.formTemplateId);
+      if (!form) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+
+      // Increment view count
+      await storage.incrementShareLinkView(req.params.shareToken);
+
+      // Return form and share link info (without sensitive data)
+      res.json({
+        form: {
+          id: form.id,
+          name: form.name,
+          description: form.description,
+          fields: form.fields,
+          sections: form.sections,
+          pages: form.pages,
+          conditionalRules: form.conditionalRules,
+          settings: form.settings,
+        },
+        shareLink: {
+          id: shareLink.id,
+          requiresPassword: !!shareLink.password,
+          dueDate: shareLink.dueDate,
+          expiresAt: shareLink.expiresAt,
+          maxSubmissions: shareLink.maxSubmissions,
+          submissionCount: shareLink.submissionCount,
+        },
+      });
+    } catch (error: any) {
+      console.error("Failed to fetch public form:", error);
+      res.status(500).json({ error: "Failed to load form" });
+    }
+  });
+
+  // Submit form via share link (public access)
+  app.post("/api/public/forms/:shareToken/submit", async (req: Request, res: Response) => {
+    try {
+      const { data: formData, password } = req.body;
+
+      const shareLink = await storage.getFormShareLinkByToken(req.params.shareToken);
+      
+      if (!shareLink) {
+        return res.status(404).json({ error: "Form not found or link is invalid" });
+      }
+
+      // Check if link is active
+      if (shareLink.status !== 'active') {
+        return res.status(403).json({ error: "This link has been disabled" });
+      }
+
+      // Check expiration
+      if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
+        await storage.updateFormShareLink(shareLink.id, { status: 'expired' });
+        return res.status(403).json({ error: "This link has expired" });
+      }
+
+      // Check max submissions
+      if (shareLink.maxSubmissions && shareLink.submissionCount >= shareLink.maxSubmissions) {
+        return res.status(403).json({ error: "Maximum submissions reached for this link" });
+      }
+
+      // Verify password if required
+      if (shareLink.password) {
+        if (!password) {
+          return res.status(401).json({ error: "Password required" });
+        }
+        const passwordValid = await bcrypt.compare(password, shareLink.password);
+        if (!passwordValid) {
+          return res.status(401).json({ error: "Invalid password" });
+        }
+      }
+
+      // Get the form template
+      const form = await storage.getFormTemplate(shareLink.formTemplateId);
+      if (!form) {
+        return res.status(404).json({ error: "Form template not found" });
+      }
+
+      // Create submission
+      const submission = await storage.createFormSubmission({
+        formTemplateId: shareLink.formTemplateId,
+        formVersion: form.version,
+        organizationId: shareLink.organizationId,
+        submittedBy: null, // Public submission, no user
+        clientId: shareLink.clientId,
+        data: formData,
+        attachments: [],
+        status: "submitted",
+        ipAddress: req.ip || null,
+        userAgent: req.get("user-agent") || null,
+      });
+
+      // Increment submission count on share link
+      await storage.incrementShareLinkSubmission(req.params.shareToken);
+
+      res.status(201).json({ 
+        success: true, 
+        submissionId: submission.id,
+        message: "Form submitted successfully" 
+      });
+    } catch (error: any) {
+      console.error("Failed to submit public form:", error);
+      res.status(500).json({ error: "Failed to submit form" });
     }
   });
 

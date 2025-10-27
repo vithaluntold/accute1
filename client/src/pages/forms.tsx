@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
   Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText, Wrench, Sparkles,
   MessageSquare, Star, Calendar, Briefcase, HeadphonesIcon, ShoppingCart, Mail, DollarSign, UserPlus,
-  List, BarChart3
+  List, BarChart3, Share2, Copy, Download, Link2, Settings, Lock, Users, CalendarDays, Hash, StickyNote
 } from "lucide-react";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,13 +16,18 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertFormTemplateSchema, type FormTemplate } from "@shared/schema";
+import { insertFormTemplateSchema, type FormTemplate, type FormShareLink, type Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
 import { formTemplates, templateCategories, type FormTemplate as TemplateType } from "@/data/form-templates";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 // Only user-editable fields
 const formSchema = z.object({
@@ -53,10 +59,31 @@ export default function FormsPage() {
   const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormTemplate | null>(null);
   const [deleteConfirmForm, setDeleteConfirmForm] = useState<FormTemplate | null>(null);
+  const [shareDialogForm, setShareDialogForm] = useState<FormTemplate | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [shareLinkSettings, setShareLinkSettings] = useState({
+    clientId: "",
+    password: "",
+    enablePassword: false,
+    expiresAt: undefined as Date | undefined,
+    maxSubmissions: "",
+    dueDate: undefined as Date | undefined,
+    notes: "",
+  });
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
   const { data: forms = [], isLoading } = useQuery<FormTemplate[]>({
     queryKey: ["/api/forms"],
+  });
+
+  const { data: clients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  const { data: shareLinks = [], refetch: refetchShareLinks } = useQuery<FormShareLink[]>({
+    queryKey: ["/api/forms", shareDialogForm?.id, "share-links"],
+    enabled: !!shareDialogForm,
   });
 
   const createMutation = useMutation({
@@ -125,6 +152,80 @@ export default function FormsPage() {
       toast({ title: "Failed to publish form", description: error.message, variant: "destructive" });
     },
   });
+
+  const createShareLinkMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", `/api/forms/${shareDialogForm?.id}/share-links`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", shareDialogForm?.id, "share-links"] });
+      refetchShareLinks();
+      toast({ title: "Share link created successfully" });
+      setShareLinkSettings({
+        clientId: "",
+        password: "",
+        enablePassword: false,
+        expiresAt: undefined,
+        maxSubmissions: "",
+        dueDate: undefined,
+        notes: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create share link", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteShareLinkMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/share-links/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", shareDialogForm?.id, "share-links"] });
+      refetchShareLinks();
+      toast({ title: "Share link deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete share link", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Generate QR code when share links change
+  useEffect(() => {
+    if (shareLinks.length > 0 && qrCanvasRef.current) {
+      const firstLink = shareLinks[0];
+      const url = `${window.location.origin}/public/${firstLink.shareToken}`;
+      QRCode.toCanvas(qrCanvasRef.current, url, { width: 200 }, (error) => {
+        if (error) console.error("QR Code generation error:", error);
+      });
+      setQrCodeUrl(url);
+    }
+  }, [shareLinks]);
+
+  const handleCreateShareLink = () => {
+    const data: any = {
+      clientId: shareLinkSettings.clientId || null,
+      password: shareLinkSettings.enablePassword ? shareLinkSettings.password : null,
+      expiresAt: shareLinkSettings.expiresAt?.toISOString(),
+      maxSubmissions: shareLinkSettings.maxSubmissions ? parseInt(shareLinkSettings.maxSubmissions) : null,
+      dueDate: shareLinkSettings.dueDate?.toISOString(),
+      notes: shareLinkSettings.notes || null,
+    };
+    createShareLinkMutation.mutate(data);
+  };
+
+  const handleCopyLink = (shareToken: string) => {
+    const url = `${window.location.origin}/public/${shareToken}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: "Link copied to clipboard" });
+  };
+
+  const handleDownloadQR = () => {
+    if (qrCanvasRef.current) {
+      const url = qrCanvasRef.current.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `form-qr-${shareDialogForm?.name}.png`;
+      link.href = url;
+      link.click();
+      toast({ title: "QR code downloaded" });
+    }
+  };
 
   const filteredForms = forms.filter((form) =>
     form.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -272,6 +373,15 @@ export default function FormsPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => setShareDialogForm(form)}
+                  data-testid={`button-share-form-${form.id}`}
+                >
+                  <Share2 className="w-3 h-3 mr-1" />
+                  Share
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setEditingForm(form)}
                   data-testid={`button-edit-form-${form.id}`}
                 >
@@ -389,6 +499,301 @@ export default function FormsPage() {
         }}
         isPending={createFromTemplateMutation.isPending}
       />
+
+      {/* Share Dialog */}
+      <Dialog 
+        open={shareDialogForm !== null} 
+        onOpenChange={(open) => !open && setShareDialogForm(null)}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="dialog-share-form">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-5 w-5" />
+              Share Form: {shareDialogForm?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Create secure share links for clients to access and submit this form
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs defaultValue="link" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="link" data-testid="tab-link">
+                <Link2 className="w-4 h-4 mr-2" />
+                Link
+              </TabsTrigger>
+              <TabsTrigger value="settings" data-testid="tab-settings">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="link" className="space-y-4 mt-4">
+              {shareLinks.length > 0 ? (
+                <>
+                  <div className="space-y-4">
+                    <div className="p-4 border rounded-lg space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Shareable Link</Label>
+                        <Badge variant="outline" data-testid="badge-link-status">
+                          {shareLinks[0].status}
+                        </Badge>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Input
+                          value={qrCodeUrl}
+                          readOnly
+                          className="font-mono text-sm"
+                          data-testid="input-share-url"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleCopyLink(shareLinks[0].shareToken)}
+                          data-testid="button-copy-link"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center justify-center p-4">
+                        <div className="border rounded-lg p-4">
+                          <canvas ref={qrCanvasRef} data-testid="canvas-qr-code" />
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleDownloadQR}
+                        className="w-full"
+                        data-testid="button-download-qr"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download QR Code
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Existing Share Links</Label>
+                      <div className="space-y-2">
+                        {shareLinks.map((link) => (
+                          <Card key={link.id} className="p-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs bg-muted px-2 py-1 rounded truncate">
+                                    {link.shareToken}
+                                  </code>
+                                  {link.password && <Lock className="h-3 w-3 text-muted-foreground" />}
+                                </div>
+                                <div className="text-xs text-muted-foreground space-y-0.5">
+                                  <div>Views: {link.viewCount} | Submissions: {link.submissionCount}</div>
+                                  {link.expiresAt && (
+                                    <div>Expires: {new Date(link.expiresAt).toLocaleDateString()}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteShareLinkMutation.mutate(link.id)}
+                                disabled={deleteShareLinkMutation.isPending}
+                                data-testid={`button-delete-link-${link.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Share2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No share links created yet.</p>
+                  <p className="text-sm">Go to Settings tab to create your first share link.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="client-select" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Client (Optional)
+                  </Label>
+                  <Select
+                    value={shareLinkSettings.clientId}
+                    onValueChange={(value) =>
+                      setShareLinkSettings({ ...shareLinkSettings, clientId: value })
+                    }
+                  >
+                    <SelectTrigger id="client-select" data-testid="select-client">
+                      <SelectValue placeholder="Select a client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific client</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.companyName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="due-date" className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Due Date (Optional)
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !shareLinkSettings.dueDate && "text-muted-foreground"
+                        )}
+                        data-testid="button-due-date"
+                      >
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {shareLinkSettings.dueDate ? (
+                          format(shareLinkSettings.dueDate, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={shareLinkSettings.dueDate}
+                        onSelect={(date) =>
+                          setShareLinkSettings({ ...shareLinkSettings, dueDate: date })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password-toggle" className="flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Password Protection
+                    </Label>
+                    <Switch
+                      id="password-toggle"
+                      checked={shareLinkSettings.enablePassword}
+                      onCheckedChange={(checked) =>
+                        setShareLinkSettings({ ...shareLinkSettings, enablePassword: checked })
+                      }
+                      data-testid="switch-password-protection"
+                    />
+                  </div>
+                  {shareLinkSettings.enablePassword && (
+                    <Input
+                      type="password"
+                      placeholder="Enter password"
+                      value={shareLinkSettings.password}
+                      onChange={(e) =>
+                        setShareLinkSettings({ ...shareLinkSettings, password: e.target.value })
+                      }
+                      data-testid="input-password"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="expires-at" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Expiration Date (Optional)
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !shareLinkSettings.expiresAt && "text-muted-foreground"
+                        )}
+                        data-testid="button-expiration-date"
+                      >
+                        <Clock className="mr-2 h-4 w-4" />
+                        {shareLinkSettings.expiresAt ? (
+                          format(shareLinkSettings.expiresAt, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={shareLinkSettings.expiresAt}
+                        onSelect={(date) =>
+                          setShareLinkSettings({ ...shareLinkSettings, expiresAt: date })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="max-submissions" className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    Max Submissions (Optional)
+                  </Label>
+                  <Input
+                    id="max-submissions"
+                    type="number"
+                    min="1"
+                    placeholder="Unlimited"
+                    value={shareLinkSettings.maxSubmissions}
+                    onChange={(e) =>
+                      setShareLinkSettings({ ...shareLinkSettings, maxSubmissions: e.target.value })
+                    }
+                    data-testid="input-max-submissions"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="flex items-center gap-2">
+                    <StickyNote className="h-4 w-4" />
+                    Notes (Internal)
+                  </Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Internal notes about this share link..."
+                    value={shareLinkSettings.notes}
+                    onChange={(e) =>
+                      setShareLinkSettings({ ...shareLinkSettings, notes: e.target.value })
+                    }
+                    data-testid="textarea-notes"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleCreateShareLink}
+                  disabled={createShareLinkMutation.isPending}
+                  className="w-full"
+                  data-testid="button-create-share-link"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Create Share Link
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

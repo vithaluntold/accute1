@@ -364,6 +364,35 @@ export const formSubmissions = pgTable("form_submissions", {
   statusIdx: index("form_submissions_status_idx").on(table.status),
 }));
 
+// Form Share Links - For client portal secure sharing
+export const formShareLinks = pgTable("form_share_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formTemplateId: varchar("form_template_id").notNull().references(() => formTemplates.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  // Share link configuration
+  shareToken: varchar("share_token").notNull().unique(), // Unique token for the URL
+  clientId: varchar("client_id").references(() => clients.id), // Optional: associate with specific client
+  // Security settings
+  password: text("password"), // Optional: bcrypt hashed password
+  expiresAt: timestamp("expires_at"), // Optional: expiration date
+  maxSubmissions: integer("max_submissions"), // Optional: limit number of submissions
+  // Tracking
+  status: text("status").notNull().default("active"), // 'active', 'expired', 'disabled'
+  viewCount: integer("view_count").notNull().default(0),
+  submissionCount: integer("submission_count").notNull().default(0),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  // Metadata
+  dueDate: timestamp("due_date"), // When client should complete the form
+  notes: text("notes"), // Internal notes about this share
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  tokenIdx: index("form_share_links_token_idx").on(table.shareToken),
+  formIdx: index("form_share_links_form_idx").on(table.formTemplateId),
+  clientIdx: index("form_share_links_client_idx").on(table.clientId),
+}));
+
 // Form Builder TypeScript Types
 export type FormFieldType =
   | "text"
@@ -723,6 +752,17 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
   createdAt: true,
 });
 
+export const insertFormShareLinkSchema = createInsertSchema(formShareLinks).omit({
+  id: true,
+  organizationId: true,
+  createdBy: true,
+  viewCount: true,
+  submissionCount: true,
+  lastAccessedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -760,6 +800,8 @@ export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
 export type FormTemplate = typeof formTemplates.$inferSelect;
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
+export type InsertFormShareLink = z.infer<typeof insertFormShareLinkSchema>;
+export type FormShareLink = typeof formShareLinks.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
