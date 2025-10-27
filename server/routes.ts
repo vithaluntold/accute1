@@ -974,6 +974,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Execute AI Agent
+  app.post("/api/ai-agents/execute", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { agentName, input, llmConfigId } = req.body;
+      
+      // Get LLM configuration - use specified or default
+      let llmConfig;
+      if (llmConfigId) {
+        llmConfig = await storage.getLlmConfiguration(llmConfigId);
+        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "LLM configuration not found" });
+        }
+      } else {
+        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+        if (!llmConfig) {
+          return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
+        }
+      }
+      
+      // Load and execute the appropriate agent
+      let result;
+      switch (agentName) {
+        case 'kanban': {
+          const { KanbanAgent } = await import('../agents/kanban/backend/index');
+          const agent = new KanbanAgent(llmConfig);
+          result = await agent.execute(input);
+          break;
+        }
+        case 'cadence': {
+          const { CadenceAgent } = await import('../agents/cadence/backend/index');
+          const agent = new CadenceAgent(llmConfig);
+          result = await agent.execute(input);
+          break;
+        }
+        case 'parity': {
+          const { ParityAgent } = await import('../agents/parity/backend/index');
+          const agent = new ParityAgent(llmConfig);
+          result = await agent.execute(input);
+          break;
+        }
+        case 'forma': {
+          const { FormaAgent } = await import('../agents/forma/backend/index');
+          const agent = new FormaAgent(llmConfig);
+          result = await agent.execute(input);
+          break;
+        }
+        default:
+          return res.status(400).json({ error: `Unknown agent: ${agentName}` });
+      }
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "execute", "ai_agent", agentName, { input }, req);
+      res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('Agent execution error:', error);
+      res.status(500).json({ error: "Failed to execute AI agent", details: error.message });
+    }
+  });
+
   // ==================== AI Provider Config Routes ====================
   
   app.post("/api/ai-providers", requireAuth, requirePermission("ai_agents.configure"), async (req: AuthRequest, res: Response) => {
