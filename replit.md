@@ -46,7 +46,38 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Form Builder UI Complete)
+### 2025-10-26 (Latest - Dynamic Form Renderer Complete)
+- ✅ Built production-ready Form Renderer component (client/src/components/form-renderer.tsx):
+  - Renders all 22 field types dynamically at runtime
+  - Field types: text, textarea, number, email, phone, url, date, time, datetime, select, multi_select, radio, checkbox, file_upload, signature, address, currency, percentage, rating, slider, calculated, heading, divider, html
+  - Dynamic Zod schema generation based on field validation rules
+  - Required field enforcement (asterisks, non-empty checks, literal true for checkboxes)
+  - Field-specific validation (email format, phone regex, URL validation, min/max, pattern matching)
+  - Address field as structured object {street, city, state, zip, country} with proper validation
+  - Responsive grid layout (12-column with width support: full, half, third, quarter)
+  - Error messages below each field
+  - Help text and description support
+- ✅ Built Form Preview page (/forms/:id/preview):
+  - Standalone preview for end users
+  - Fully functional with validation
+  - Success/error toasts
+  - Back navigation
+- ✅ Fixed critical validation bugs:
+  - Text fields now enforce `.min(1)` when required
+  - Checkboxes use `z.literal(true)` for required (must be checked)
+  - Multi-select enforces `.min(1)` (at least one selection)
+  - Address fields bound to form controller with validation
+  - File uploads validated when required
+  - Date/time fields use refinement for required check
+- ✅ Verified with automated E2E tests:
+  - All 22 field types render correctly
+  - Required validation blocks empty submissions
+  - Field-specific validation (email, address, etc.)
+  - Address field captures structured data
+  - Success toast on valid submission
+- 📋 Next: Add conditional logic engine (show/hide fields based on rules)
+
+### 2025-10-26 (Earlier - Form Builder UI Complete)
 - ✅ Built production-ready Form Builder page (/forms/:id/builder):
   - Add fields with 22 field types (text, textarea, number, email, phone, url, date, time, datetime, select, multi_select, radio, checkbox, file_upload, signature, address, currency, percentage, rating, slider, calculated, heading, divider, html)
   - Configure field properties: label, placeholder, description, help text, required, width

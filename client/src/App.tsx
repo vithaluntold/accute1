@@ -32,6 +32,7 @@ import Team from "@/pages/team";
 import Documents from "@/pages/documents";
 import Forms from "@/pages/forms";
 import FormBuilder from "@/pages/form-builder";
+import FormPreview from "@/pages/form-preview";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
@@ -233,6 +234,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <FormBuilder />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/forms/:id/preview">
+        <ProtectedRoute>
+          <AppLayout>
+            <FormPreview />
           </AppLayout>
         </ProtectedRoute>
       </Route>

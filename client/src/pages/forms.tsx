@@ -182,16 +182,24 @@ export default function FormsPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex gap-2">
+              <CardFooter className="flex flex-wrap gap-2">
                 <Button
                   variant="default"
                   size="sm"
-                  className="flex-1"
                   onClick={() => setLocation(`/forms/${form.id}/builder`)}
                   data-testid={`button-build-form-${form.id}`}
                 >
                   <Wrench className="w-3 h-3 mr-1" />
                   Build
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLocation(`/forms/${form.id}/preview`)}
+                  data-testid={`button-preview-form-${form.id}`}
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  Preview
                 </Button>
                 <Button
                   variant="outline"

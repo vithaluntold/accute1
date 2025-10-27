@@ -1458,6 +1458,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Submit form data (simplified endpoint for form preview)
+  app.post("/api/forms/:id/submit", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const form = await storage.getFormTemplate(req.params.id);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      
+      // Allow submission if user is in same org
+      if (form.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Extract submission data from request body
+      const { data, clientId } = req.body;
+      
+      if (!data) {
+        return res.status(400).json({ error: "Form data is required" });
+      }
+      
+      const submission = await storage.createFormSubmission({
+        formTemplateId: req.params.id,
+        formVersion: form.version,
+        organizationId: form.organizationId,
+        submittedBy: req.user!.id,
+        clientId: clientId || null,
+        data: data,
+        attachments: [],
+        status: "submitted",
+        ipAddress: req.ip || null,
+        userAgent: req.get("user-agent") || null,
+      });
+      
+      await logActivity(
+        req.user!.id,
+        "form_submitted",
+        "form_submission",
+        submission.id,
+        form.organizationId,
+        { formName: form.name, submissionId: submission.id }
+      );
+      
+      res.status(201).json(submission);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to submit form" });
+    }
+  });
+
   // ==================== Form Submission Routes ====================
   
   app.get("/api/form-submissions", requireAuth, requirePermission("form_submissions.view"), async (req: AuthRequest, res: Response) => {
