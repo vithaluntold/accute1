@@ -18,7 +18,7 @@ import { TagSelector } from "@/components/tag-selector";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClientFilter, setSelectedClientFilter] = useState<string>("");
+  const [selectedClientFilter, setSelectedClientFilter] = useState<string>("all");
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

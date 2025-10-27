@@ -33,7 +33,7 @@ export default function Workflows() {
             Automate your accounting processes with AI-powered workflows
           </p>
         </div>
-        <Button onClick={() => setLocation("/workflows/new")} data-testid="button-create-workflow">
+        <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-workflow">
           <Plus className="h-4 w-4 mr-2" />
           Create Workflow
         </Button>
@@ -72,7 +72,7 @@ export default function Workflows() {
               Create your first workflow to automate client onboarding, tax preparation,
               bookkeeping, and more
             </p>
-            <Button onClick={() => setLocation("/workflows/new")} data-testid="button-create-first-workflow">
+            <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-first-workflow">
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Workflow
             </Button>
