@@ -3763,6 +3763,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Pipeline Automation Execution Routes ====================
+
+  // Execute task automation
+  app.post("/api/tasks/:id/execute-automation", requireAuth, requirePermission("pipelines.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { AutomationEngine } = await import('./automation-engine');
+      const automationEngine = new AutomationEngine(storage);
+      
+      const task = await storage.getPipelineTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Execute task automation
+      const results = await automationEngine.executeActions(
+        (task.automationActions as any) || [],
+        {
+          taskId: task.id,
+          stepId: task.stepId,
+          stageId: '', // Will be resolved
+          pipelineId: '', // Will be resolved
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id,
+          data: task.automationInput as any,
+        }
+      );
+
+      // Update automation output
+      await storage.updatePipelineTask(task.id, {
+        automationOutput: results as any,
+        status: results.every((r: any) => r.success) ? 'completed' : 'in_progress',
+      } as any);
+
+      await logActivity(req.user!.id, req.user!.organizationId!, "execute_automation", "pipeline_task", task.id, {}, req);
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("Automation execution error:", error);
+      res.status(500).json({ error: "Failed to execute automation", details: error.message });
+    }
+  });
+
+  // Test automation conditions
+  app.post("/api/automation/test-conditions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { AutomationEngine } = await import('./automation-engine');
+      const automationEngine = new AutomationEngine(storage);
+      
+      const { conditions, testData } = req.body;
+      const result = automationEngine.evaluateConditions(conditions, testData);
+      
+      res.json({ conditionsMet: result });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to test conditions", details: error.message });
+    }
+  });
+
+  // Manually trigger pipeline automation
+  app.post("/api/pipelines/:id/trigger-automation", requireAuth, requirePermission("pipelines.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const pipeline = await storage.getPipeline(req.params.id);
+      if (!pipeline) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+
+      if (!pipeline.isAutomated) {
+        return res.status(400).json({ error: "Pipeline does not have automation enabled" });
+      }
+
+      // Update execution metadata
+      await storage.updatePipeline(pipeline.id, {
+        lastExecutedAt: new Date(),
+        executionCount: (pipeline.executionCount || 0) + 1,
+      });
+
+      await logActivity(req.user!.id, req.user!.organizationId!, "trigger_automation", "pipeline", pipeline.id, {}, req);
+      res.json({ success: true, message: "Pipeline automation triggered" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to trigger automation" });
+    }
+  });
+
   app.delete("/api/tasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const task = await storage.getPipelineTask(req.params.id);

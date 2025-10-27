@@ -21,9 +21,15 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data for multiple organizations.
 - **Role-Based Access Control**: Granular permissions for Super Admin, Admin, Employee, and Client roles.
-- **Workflow Automation vs Pipelines**:
-  - **Workflows**: Node-based visual automation builder (similar to Zapier/n8n) for discrete task automation. Uses JSON nodes and edges to define automation sequences with trigger configuration. Ideal for automating repetitive processes like data entry, notifications, or API integrations.
-  - **Pipelines**: Hierarchical project management system with Stages → Steps → Tasks → Subtasks/Checklists. Designed for managing complex, multi-stage projects with team collaboration, user assignments, and progress tracking. Ideal for client engagements, tax preparation, audits, or any multi-phase accounting work.
+- **Unified Pipeline System with Full Automation** (Workflows + Pipelines merged):
+  - **Hierarchical Structure**: Stages → Steps → Tasks → Subtasks/Checklists for organizing complex projects
+  - **Automation at Every Level**: 
+    - **Pipeline Level**: Triggers (email, form submission, webhook, schedule) to start pipelines automatically
+    - **Stage/Step Level**: Auto-progression rules with conditions and completion actions
+    - **Task Level**: Automated tasks with triggers, conditions, actions (API calls, notifications, AI agent execution)
+  - **Visual Workflow Builder**: Optional node-based editor for complex automation sequences
+  - **Hybrid Tasks**: Mix manual (human-assigned) and automated (trigger-based) tasks in the same pipeline
+  - **Use Cases**: Client engagements, tax preparation, audits, automated workflows, or any project requiring both structure and automation
 - **AI Agent Marketplace & Execution System**: Browse, install, and manage AI agents with defined directories and pricing. **Fully-functional AI Agents**: Four production-ready agents (Kanban View, Cadence, Parity, Forma) that work with user-configured LLM credentials (OpenAI, Anthropic, Azure OpenAI). Agents use AES-256 encrypted API key storage and support multiple LLM providers per organization.
 - **LLM Configuration Management**: Secure credential storage for multiple AI providers (OpenAI, Anthropic Claude, Azure OpenAI) with AES-256 encryption. Organizations can configure multiple LLM providers and set a default configuration. API keys are encrypted before storage and never exposed in API responses.
 - **Secure Document Management**: Encrypted storage, authenticated downloads, and organization/client-level access control.
