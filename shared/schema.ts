@@ -174,6 +174,13 @@ export const pipelineTasks = pgTable("pipeline_tasks", {
   dueDate: timestamp("due_date"),
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
+  // Reminder configuration
+  reminderEnabled: boolean("reminder_enabled").notNull().default(false),
+  reminderDuration: integer("reminder_duration"), // Minutes before due date to send reminder (e.g., 60 = 1 hour before, 1440 = 1 day before)
+  notifyAssignee: boolean("notify_assignee").notNull().default(true), // Notify the assigned user
+  notifyManager: boolean("notify_manager").notNull().default(false), // Notify the manager/admin
+  notifyClient: boolean("notify_client").notNull().default(false), // Notify the client (if client is assigned)
+  lastReminderSent: timestamp("last_reminder_sent"), // Track when last reminder was sent
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
