@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, Play } from 'lucide-react';
+import { ArrowLeft, Save, Play, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { WorkflowCanvas } from '@/components/workflow-canvas';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import type { Workflow, WorkflowNode, WorkflowEdge } from '@shared/schema';
+import type { Workflow, WorkflowNode, WorkflowEdge, InstalledAgentView } from '@shared/schema';
 import type { Node, Edge } from '@xyflow/react';
 
 export default function WorkflowBuilder() {
@@ -38,6 +39,13 @@ export default function WorkflowBuilder() {
     queryKey: ['/api/workflows', id],
     enabled: isEditMode,
   });
+
+  // Check if Cadence copilot is installed
+  const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
+    queryKey: ['/api/ai-agents/installed'],
+  });
+
+  const hasCadence = installedAgents.some((agent) => agent.agent?.name === 'Cadence');
 
   useEffect(() => {
     if (workflow) {
@@ -174,9 +182,17 @@ export default function WorkflowBuilder() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">
-                {isEditMode ? 'Edit Workflow' : 'Create Workflow'}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">
+                  {isEditMode ? 'Edit Workflow' : 'Create Workflow'}
+                </h1>
+                {hasCadence && (
+                  <Badge variant="secondary" className="gap-1" data-testid="badge-cadence-copilot">
+                    <Sparkles className="h-3 w-3" />
+                    Cadence AI
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 Design your automation workflow visually
               </p>

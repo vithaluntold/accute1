@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertFormTemplateSchema, type FormTemplate, type FormShareLink, type Client } from "@shared/schema";
+import { insertFormTemplateSchema, type FormTemplate, type FormShareLink, type Client, type InstalledAgentView } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
 import { formTemplates, templateCategories, type FormTemplate as TemplateType } from "@/data/form-templates";
@@ -77,6 +77,13 @@ export default function FormsPage() {
   const { data: forms = [], isLoading } = useQuery<FormTemplate[]>({
     queryKey: ["/api/forms"],
   });
+
+  // Check if Forma copilot is installed
+  const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
+    queryKey: ['/api/ai-agents/installed'],
+  });
+
+  const hasForma = installedAgents.some((agent) => agent.agent?.name === 'Forma');
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
@@ -237,7 +244,15 @@ export default function FormsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display">Forms</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-display">Forms</h1>
+            {hasForma && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-forma-copilot">
+                <Sparkles className="w-4 h-4" />
+                Forma AI
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
             Create and manage form templates for clients and workflows
           </p>

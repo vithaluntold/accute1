@@ -107,7 +107,7 @@ export interface IStorage {
   getAllPublicAiAgents(): Promise<AiAgent[]>;
   getAiAgentsByCategory(category: string): Promise<AiAgent[]>;
   installAiAgent(agentId: string, organizationId: string, userId: string, configuration: any): Promise<AiAgentInstallation>;
-  getInstalledAgents(organizationId: string): Promise<AiAgentInstallation[]>;
+  getInstalledAgents(organizationId: string): Promise<schema.InstalledAgentView[]>;
 
   // AI Provider Configs
   getAiProviderConfig(organizationId: string, provider: string): Promise<AiProviderConfig | undefined>;
@@ -490,8 +490,19 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getInstalledAgents(organizationId: string): Promise<AiAgentInstallation[]> {
-    return await db.select().from(schema.aiAgentInstallations)
+  async getInstalledAgents(organizationId: string): Promise<schema.InstalledAgentView[]> {
+    return await db.select({
+      id: schema.aiAgentInstallations.id,
+      agentId: schema.aiAgentInstallations.agentId,
+      organizationId: schema.aiAgentInstallations.organizationId,
+      installedBy: schema.aiAgentInstallations.installedBy,
+      configuration: schema.aiAgentInstallations.configuration,
+      isActive: schema.aiAgentInstallations.isActive,
+      createdAt: schema.aiAgentInstallations.createdAt,
+      agent: schema.aiAgents,
+    })
+      .from(schema.aiAgentInstallations)
+      .leftJoin(schema.aiAgents, eq(schema.aiAgentInstallations.agentId, schema.aiAgents.id))
       .where(eq(schema.aiAgentInstallations.organizationId, organizationId));
   }
 

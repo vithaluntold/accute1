@@ -920,4 +920,7 @@ export type DocumentSubmission = typeof documentSubmissions.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;
+export type InstalledAgentView = AiAgentInstallation & {
+  agent: typeof aiAgents.$inferSelect | null;
+};
 export type AiProviderConfig = typeof aiProviderConfigs.$inferSelect;

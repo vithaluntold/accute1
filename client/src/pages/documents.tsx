@@ -24,9 +24,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calendar } from "lucide-react";
+import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calendar, Sparkles } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
+import type { InstalledAgentView } from "@shared/schema";
 
 export default function Documents() {
   const { toast } = useToast();
@@ -39,6 +40,13 @@ export default function Documents() {
   const { data: documents = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/documents"],
   });
+
+  // Check if Parity copilot is installed
+  const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
+    queryKey: ['/api/ai-agents/installed'],
+  });
+
+  const hasParity = installedAgents.some((agent) => agent.agent?.name === 'Parity');
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -149,6 +157,12 @@ export default function Documents() {
           <h1 className="text-3xl font-display font-bold mb-2 flex items-center gap-2">
             <FileText className="h-8 w-8 text-[#e5a660]" />
             Documents
+            {hasParity && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-parity-copilot">
+                <Sparkles className="h-4 w-4" />
+                Parity AI
+              </Badge>
+            )}
           </h1>
           <p className="text-muted-foreground">
             Manage and organize your client documents securely

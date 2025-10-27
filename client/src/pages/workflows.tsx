@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Play, Edit, Trash2, Copy, Workflow } from "lucide-react";
+import { Plus, Search, Play, Edit, Trash2, Copy, Workflow, Sparkles } from "lucide-react";
+import type { InstalledAgentView } from "@shared/schema";
 
 export default function Workflows() {
   const [, setLocation] = useLocation();
@@ -12,6 +13,13 @@ export default function Workflows() {
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],
   });
+
+  // Check if Cadence copilot is installed
+  const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
+    queryKey: ['/api/ai-agents/installed'],
+  });
+
+  const hasCadence = installedAgents.some((agent) => agent.agent?.name === 'Cadence');
 
   if (isLoading) {
     return (
@@ -28,7 +36,15 @@ export default function Workflows() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-display font-bold mb-2">Workflows</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-display font-bold mb-2">Workflows</h1>
+            {hasCadence && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-cadence-copilot">
+                <Sparkles className="h-4 w-4" />
+                Cadence AI
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Automate your accounting processes with AI-powered workflows
           </p>
