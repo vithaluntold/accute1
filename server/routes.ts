@@ -964,52 +964,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
+          // Use OpenAI SDK to test Azure OpenAI connection
+          const { OpenAI } = await import('openai');
+          
           // Remove trailing slash from endpoint if present
           const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           
-          // Use Azure's REST API to list deployments as a health check
-          const apiVersion = '2024-02-01';
-          const testUrl = `${cleanEndpoint}/openai/deployments?api-version=${apiVersion}`;
-          
-          console.log(`[Azure Health Check] Testing URL: ${testUrl}`);
-          
-          const response = await fetch(testUrl, {
-            method: 'GET',
-            headers: {
-              'api-key': apiKey,
-              'Content-Type': 'application/json'
-            },
-            signal: AbortSignal.timeout(10000) // 10 second timeout
+          const client = new OpenAI({
+            apiKey,
+            baseURL: `${cleanEndpoint}/openai/deployments`,
+            defaultQuery: { 'api-version': '2024-12-01-preview' },
+            defaultHeaders: { 'api-key': apiKey },
+            timeout: 10000
           });
           
-          console.log(`[Azure Health Check] Response status: ${response.status}`);
-          
-          if (response.ok) {
-            testResult = { success: true, message: "Azure OpenAI connection successful" };
-          } else {
-            // Try to parse JSON error, fallback to text
-            let errorMessage = `HTTP ${response.status}`;
-            try {
-              const errorJson = await response.json();
-              console.log('[Azure Health Check] Error JSON:', errorJson);
-              errorMessage = errorJson.error?.message || errorJson.message || JSON.stringify(errorJson);
-            } catch {
-              const errorText = await response.text();
-              console.log('[Azure Health Check] Error text:', errorText);
-              errorMessage = errorText || errorMessage;
-            }
-            testResult = { 
-              success: false, 
-              message: `${errorMessage}` 
-            };
-          }
+          // Try to list models as a simple health check
+          await client.models.list();
+          testResult = { success: true, message: "Azure OpenAI connection successful" };
         } catch (error: any) {
-          console.log('[Azure Health Check] Exception:', error);
           testResult = { 
             success: false, 
-            message: error.name === 'AbortError' 
-              ? "Connection timeout - please check your Azure endpoint" 
-              : error.message || "Failed to connect to Azure OpenAI" 
+            message: error.message || "Failed to connect to Azure OpenAI" 
           };
         }
       } else {
