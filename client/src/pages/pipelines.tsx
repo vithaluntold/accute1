@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Pipeline, PipelineStage, PipelineStep, PipelineTask, TaskSubtask, TaskChecklist, User } from "@shared/schema";
@@ -494,7 +495,13 @@ function StepItem({
     description: "", 
     type: "manual" as "manual" | "automated",
     priority: "medium",
-    order: 0 
+    order: 0,
+    dueDate: undefined as string | undefined,
+    reminderEnabled: false,
+    reminderDuration: 1440, // Default: 1 day before (1440 minutes)
+    notifyAssignee: true,
+    notifyManager: false,
+    notifyClient: false
   });
 
   const { data: tasks } = useQuery<PipelineTask[]>({
@@ -508,7 +515,19 @@ function StepItem({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/steps", step.id, "tasks"] });
       setTaskDialogOpen(false);
-      setNewTask({ name: "", description: "", type: "manual", priority: "medium", order: (tasks?.length || 0) + 1 });
+      setNewTask({ 
+        name: "", 
+        description: "", 
+        type: "manual", 
+        priority: "medium", 
+        order: (tasks?.length || 0) + 1,
+        dueDate: undefined,
+        reminderEnabled: false,
+        reminderDuration: 1440,
+        notifyAssignee: true,
+        notifyManager: false,
+        notifyClient: false
+      });
       toast({ title: "Task created successfully!" });
     },
     onError: () => {
@@ -609,6 +628,86 @@ function StepItem({
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="task-due-date">Due Date</Label>
+                    <Input
+                      id="task-due-date"
+                      type="datetime-local"
+                      data-testid="input-task-due-date"
+                      value={newTask.dueDate || ""}
+                      onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-3 border rounded-md p-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="reminder-enabled" className="text-sm font-medium">Enable Reminder</Label>
+                      <Switch
+                        id="reminder-enabled"
+                        data-testid="switch-reminder-enabled"
+                        checked={newTask.reminderEnabled}
+                        onCheckedChange={(checked: boolean) => setNewTask({ ...newTask, reminderEnabled: checked })}
+                      />
+                    </div>
+                    {newTask.reminderEnabled && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="reminder-duration">Remind Before</Label>
+                          <Select 
+                            value={newTask.reminderDuration.toString()} 
+                            onValueChange={(value) => setNewTask({ ...newTask, reminderDuration: parseInt(value) })}
+                          >
+                            <SelectTrigger id="reminder-duration" data-testid="select-reminder-duration">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="15">15 minutes before</SelectItem>
+                              <SelectItem value="30">30 minutes before</SelectItem>
+                              <SelectItem value="60">1 hour before</SelectItem>
+                              <SelectItem value="120">2 hours before</SelectItem>
+                              <SelectItem value="360">6 hours before</SelectItem>
+                              <SelectItem value="720">12 hours before</SelectItem>
+                              <SelectItem value="1440">1 day before</SelectItem>
+                              <SelectItem value="2880">2 days before</SelectItem>
+                              <SelectItem value="4320">3 days before</SelectItem>
+                              <SelectItem value="10080">1 week before</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Notify</Label>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="notify-assignee" className="text-xs font-normal">Assigned User</Label>
+                              <Switch
+                                id="notify-assignee"
+                                data-testid="switch-notify-assignee"
+                                checked={newTask.notifyAssignee}
+                                onCheckedChange={(checked: boolean) => setNewTask({ ...newTask, notifyAssignee: checked })}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="notify-manager" className="text-xs font-normal">Manager/Admin</Label>
+                              <Switch
+                                id="notify-manager"
+                                data-testid="switch-notify-manager"
+                                checked={newTask.notifyManager}
+                                onCheckedChange={(checked: boolean) => setNewTask({ ...newTask, notifyManager: checked })}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="notify-client" className="text-xs font-normal">Client (if assigned)</Label>
+                              <Switch
+                                id="notify-client"
+                                data-testid="switch-notify-client"
+                                checked={newTask.notifyClient}
+                                onCheckedChange={(checked: boolean) => setNewTask({ ...newTask, notifyClient: checked })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
