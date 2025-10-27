@@ -3671,12 +3671,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId,
             type: 'task_reminder',
             title: `Task Reminder: ${task.name}`,
-            message: `Task "${task.name}" in pipeline "${pipeline.name}" is due soon (${new Date(task.dueDate!).toLocaleString()})`,
+            message: `Task "${task.name}" in workflow "${pipeline.name}" is due soon (${new Date(task.dueDate!).toLocaleString()})`,
             metadata: {
-              relatedEntityType: 'pipeline_task',
+              relatedEntityType: 'workflow_task',
               relatedEntityId: task.id,
-              workflowId: workflow.id,
-              workflowName: workflow.name,
+              pipelineId: pipeline.id,
+              pipelineName: pipeline.name,
               dueDate: task.dueDate
             },
             isRead: false,

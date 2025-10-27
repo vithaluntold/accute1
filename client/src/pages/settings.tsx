@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock, Sparkles } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,29 @@ const providerSchema = z.object({
 
 type ProviderFormData = z.infer<typeof providerSchema>;
 
+// LLM Configuration schema (for AI agents)
+const llmConfigSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  provider: z.enum(["openai", "azure", "anthropic"]),
+  apiKey: z.string().min(1, "API key is required"),
+  azureEndpoint: z.string().optional(),
+  model: z.string().min(1, "Model is required"),
+  isDefault: z.boolean().default(false),
+}).refine(
+  (data) => {
+    if (data.provider === "azure") {
+      return data.azureEndpoint && data.azureEndpoint.trim().length > 0;
+    }
+    return true;
+  },
+  {
+    message: "Azure OpenAI requires an endpoint URL",
+    path: ["azureEndpoint"],
+  }
+);
+
+type LlmConfigFormData = z.infer<typeof llmConfigSchema>;
+
 interface AiProvider {
   id: string;
   organizationId: string;
@@ -74,7 +97,9 @@ interface AiProvider {
 export default function Settings() {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
+  const [showLlmForm, setShowLlmForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteLlmTarget, setDeleteLlmTarget] = useState<string | null>(null);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [expiresInDays, setExpiresInDays] = useState(30);
   
@@ -100,12 +125,28 @@ export default function Settings() {
     queryKey: ["/api/ai-providers"],
   });
 
+  // LLM Configurations (for AI agents)
+  const llmForm = useForm<LlmConfigFormData>({
+    resolver: zodResolver(llmConfigSchema),
+    defaultValues: {
+      name: "",
+      provider: "openai",
+      apiKey: "",
+      azureEndpoint: "",
+      model: "",
+      isDefault: false,
+    },
+  });
+
+  const selectedLlmProvider = llmForm.watch("provider");
+
+  const { data: llmConfigs = [], isLoading: llmLoading } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: ProviderFormData) => {
-      return apiRequest("/api/ai-providers", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/ai-providers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-providers"] });
@@ -127,9 +168,7 @@ export default function Settings() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/ai-providers/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/ai-providers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-providers"] });
@@ -148,8 +187,56 @@ export default function Settings() {
     },
   });
 
+  // LLM Configuration mutations
+  const createLlmMutation = useMutation({
+    mutationFn: async (data: LlmConfigFormData) => {
+      return apiRequest("POST", "/api/llm-configurations", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations"] });
+      toast({
+        title: "Success",
+        description: "LLM configuration created successfully",
+      });
+      llmForm.reset();
+      setShowLlmForm(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create LLM configuration",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteLlmMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/llm-configurations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations"] });
+      toast({
+        title: "Success",
+        description: "LLM configuration removed successfully",
+      });
+      setDeleteLlmTarget(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove LLM configuration",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ProviderFormData) => {
     createMutation.mutate(data);
+  };
+
+  const onLlmSubmit = (data: LlmConfigFormData) => {
+    createLlmMutation.mutate(data);
   };
 
   const getProviderName = (provider: string) => {
@@ -426,6 +513,182 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              LLM Configuration (AI Agents)
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Configure LLM credentials for AI agent execution
+            </CardDescription>
+          </div>
+          {!showLlmForm && (
+            <Button onClick={() => setShowLlmForm(true)} data-testid="button-add-llm-config">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Configuration
+            </Button>
+          )}
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {showLlmForm && (
+            <div className="border rounded-md p-4 bg-muted/30">
+              <Form {...llmForm}>
+                <form onSubmit={llmForm.handleSubmit(onLlmSubmit)} className="space-y-4">
+                  <FormField
+                    control={llmForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Configuration Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Production OpenAI" data-testid="input-llm-name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={llmForm.control}
+                    name="provider"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Provider</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-llm-provider">
+                              <SelectValue placeholder="Select LLM provider" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                            <SelectItem value="azure">Azure OpenAI</SelectItem>
+                            <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={llmForm.control}
+                    name="model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Model</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder={selectedLlmProvider === "openai" ? "gpt-4" : selectedLlmProvider === "anthropic" ? "claude-3-opus-20240229" : "gpt-4"} 
+                            data-testid="input-llm-model" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={llmForm.control}
+                    name="apiKey"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>API Key</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="sk-..." data-testid="input-llm-api-key" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Encrypted with AES-256-GCM before storage
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {selectedLlmProvider === "azure" && (
+                    <FormField
+                      control={llmForm.control}
+                      name="azureEndpoint"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Azure Endpoint</FormLabel>
+                          <FormControl>
+                            <Input type="url" placeholder="https://your-resource.openai.azure.com" data-testid="input-llm-azure-endpoint" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={llmForm.control}
+                    name="isDefault"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-2">
+                        <FormControl>
+                          <input type="checkbox" checked={field.value} onChange={field.onChange} data-testid="checkbox-llm-default" />
+                        </FormControl>
+                        <FormLabel className="mt-0">Set as default configuration</FormLabel>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={createLlmMutation.isPending} data-testid="button-save-llm-config">
+                      {createLlmMutation.isPending ? "Saving..." : "Save Configuration"}
+                    </Button>
+                    <Button variant="outline" onClick={() => { llmForm.reset(); setShowLlmForm(false); }} type="button">
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          )}
+
+          <div>
+            {llmConfigs.length === 0 ? (
+              <div className="text-center p-8 border rounded-md bg-muted/20">
+                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No LLM configurations yet
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add your first configuration to enable AI agents
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {llmConfigs.map((config: any) => (
+                  <div key={config.id} className="flex items-center justify-between p-4 border rounded-md hover-elevate" data-testid={`llm-config-card-${config.id}`}>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{config.name}</span>
+                        {config.isDefault && (
+                          <Badge variant="default" className="text-xs">Default</Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {config.provider === "openai" ? "OpenAI" : config.provider === "azure" ? "Azure OpenAI" : "Anthropic"} • {config.model}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteLlmTarget(config.id)} data-testid={`button-delete-llm-${config.id}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {isSuperAdmin && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
@@ -538,6 +801,36 @@ export default function Settings() {
                 </>
               ) : (
                 "Remove Provider"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteLlmTarget} onOpenChange={() => setDeleteLlmTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove LLM Configuration</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this LLM configuration? AI agents using this configuration will fail to execute.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-llm">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteLlmTarget && deleteLlmMutation.mutate(deleteLlmTarget)}
+              data-testid="button-confirm-delete-llm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLlmMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove Configuration"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
