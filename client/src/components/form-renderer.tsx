@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { FormField, FormTemplate } from "@shared/schema";
+import type { FormField, FormTemplate, FormConditionalRule } from "@shared/schema";
+import { evaluateConditionalRules } from "@/lib/conditional-logic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,13 +29,29 @@ interface FormRendererProps {
 export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSubmitting = false }: FormRendererProps) {
   const fields = (formTemplate.fields as FormField[]) || [];
   const sortedFields = [...fields].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const conditionalRules = (formTemplate.conditionalRules as FormConditionalRule[]) || [];
 
-  // Build dynamic Zod schema based on fields
-  const buildSchema = () => {
+  // State for conditional field visibility/requirements
+  const [conditionalStates, setConditionalStates] = useState({
+    hidden: new Set<string>(),
+    required: new Set<string>(),
+    disabled: new Set<string>(),
+  });
+
+  // Build dynamic Zod schema based on fields and conditional requirements
+  const buildSchema = (condStates: typeof conditionalStates) => {
     const schemaFields: Record<string, z.ZodTypeAny> = {};
 
     fields.forEach((field) => {
+      // Skip hidden fields in validation
+      if (condStates.hidden.has(field.id)) {
+        schemaFields[field.id] = z.any().optional();
+        return;
+      }
+
       let fieldSchema: z.ZodTypeAny;
+      // Check if field is required (either by field config or conditional rule)
+      const isRequired = field.validation?.required || condStates.required.has(field.id);
 
       switch (field.type) {
         case "number":
@@ -44,7 +61,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
         case "slider":
           // Accept both string and number inputs, then coerce to number
           fieldSchema = z.union([z.string(), z.number()]).pipe(z.coerce.number());
-          if (field.validation?.required) {
+          if (isRequired) {
             // Required: reject empty strings, null, undefined, and NaN
             fieldSchema = fieldSchema.refine(
               (val) => val !== undefined && val !== null && val !== "" && !isNaN(val),
@@ -63,14 +80,14 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               { message: `Value must be at most ${field.validation.max}` }
             );
           }
-          if (!field.validation?.required) {
+          if (!isRequired) {
             fieldSchema = fieldSchema.optional();
           }
           break;
 
         case "email":
           fieldSchema = z.string();
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = (fieldSchema as z.ZodString).min(1, "Email is required");
           }
           fieldSchema = (fieldSchema as z.ZodString).email("Invalid email address");
@@ -78,7 +95,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
         case "url":
           fieldSchema = z.string();
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = (fieldSchema as z.ZodString).min(1, "URL is required");
           }
           fieldSchema = (fieldSchema as z.ZodString).url("Invalid URL");
@@ -86,7 +103,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
         case "phone":
           fieldSchema = z.string();
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = (fieldSchema as z.ZodString).min(1, "Phone number is required");
           }
           fieldSchema = (fieldSchema as z.ZodString).regex(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/, "Invalid phone number");
@@ -96,7 +113,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
         case "time":
         case "datetime":
           fieldSchema = z.date().or(z.string());
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = fieldSchema.refine((val) => val !== null && val !== undefined && val !== "", {
               message: "This field is required",
             });
@@ -104,7 +121,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
           break;
 
         case "checkbox":
-          if (field.validation?.required) {
+          if (isRequired) {
             // Required checkbox must be true
             fieldSchema = z.literal(true, {
               errorMap: () => ({ message: "You must accept this" }),
@@ -116,7 +133,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
         case "multi_select":
           fieldSchema = z.array(z.string());
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = (fieldSchema as z.ZodArray<any>).min(1, "Please select at least one option");
           }
           break;
@@ -129,7 +146,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             zip: z.string(),
             country: z.string(),
           });
-          if (field.validation?.required) {
+          if (isRequired) {
             // Required address must have at least street and city
             fieldSchema = (fieldSchema as any).refine(
               (val: any) => val && val.street && val.street.trim().length > 0 && val.city && val.city.trim().length > 0,
@@ -140,7 +157,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
         case "file_upload":
           fieldSchema = z.any(); // File handling
-          if (field.validation?.required) {
+          if (isRequired) {
             fieldSchema = fieldSchema.refine((val) => val && (val.length > 0 || val instanceof FileList && val.length > 0), {
               message: "Please upload a file",
             });
@@ -149,8 +166,8 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
         default:
           fieldSchema = z.string();
-          if (field.validation?.required) {
-            fieldSchema = (fieldSchema as z.ZodString).min(1, field.validation.errorMessage || "This field is required");
+          if (isRequired) {
+            fieldSchema = (fieldSchema as z.ZodString).min(1, field.validation?.errorMessage || "This field is required");
           }
           if (field.validation?.minLength) {
             fieldSchema = (fieldSchema as z.ZodString).min(field.validation.minLength);
@@ -165,7 +182,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
       }
 
       // Apply optional for non-required fields (except checkbox which handles its own)
-      if (!field.validation?.required && field.type !== "checkbox") {
+      if (!isRequired && field.type !== "checkbox") {
         fieldSchema = fieldSchema.optional();
       }
 
@@ -175,11 +192,34 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
     return z.object(schemaFields);
   };
 
-  const schema = buildSchema();
+  // Reactive schema that updates when conditional states change
+  const schema = useMemo(() => buildSchema(conditionalStates), [conditionalStates, fields]);
+  
   const form = useForm({
     resolver: zodResolver(schema),
     defaultValues,
   });
+
+  // Watch form values and evaluate conditional rules
+  const formValues = form.watch();
+  
+  useEffect(() => {
+    if (conditionalRules.length > 0) {
+      const newStates = evaluateConditionalRules(conditionalRules, formValues);
+      // Only update if states actually changed to avoid infinite loops
+      const hasChanged = 
+        newStates.hidden.size !== conditionalStates.hidden.size ||
+        newStates.required.size !== conditionalStates.required.size ||
+        newStates.disabled.size !== conditionalStates.disabled.size ||
+        Array.from(newStates.hidden).some(id => !conditionalStates.hidden.has(id)) ||
+        Array.from(newStates.required).some(id => !conditionalStates.required.has(id)) ||
+        Array.from(newStates.disabled).some(id => !conditionalStates.disabled.has(id));
+      
+      if (hasChanged) {
+        setConditionalStates(newStates);
+      }
+    }
+  }, [formValues, conditionalRules]);
 
   const handleSubmit = (data: Record<string, any>) => {
     onSubmit(data);
@@ -188,10 +228,20 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
   const renderField = (field: FormField) => {
     const { id, type, label, placeholder, description, helpText, validation, width = "full" } = field;
 
+    // Skip hidden fields from conditional logic
+    if (conditionalStates.hidden.has(id)) {
+      return null;
+    }
+
     // Skip non-input field types
     if (type === "heading" || type === "divider" || type === "html") {
       return renderStaticField(field);
     }
+
+    // Check if field is required (field validation OR conditional logic)
+    const isFieldRequired = validation?.required || conditionalStates.required.has(id);
+    // Check if field is disabled by conditional logic
+    const isFieldDisabled = conditionalStates.disabled.has(id);
 
     const widthClass = {
       full: "col-span-12",
@@ -206,7 +256,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
           {label && (
             <Label htmlFor={id} className="flex items-center gap-1">
               {label}
-              {validation?.required && <span className="text-destructive">*</span>}
+              {isFieldRequired && <span className="text-destructive">*</span>}
             </Label>
           )}
 
@@ -215,7 +265,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             control={form.control}
             render={({ field: controllerField, fieldState }) => (
               <>
-                {renderFieldInput(field, controllerField, fieldState)}
+                {renderFieldInput(field, controllerField, fieldState, isFieldDisabled)}
                 {fieldState.error && (
                   <p className="text-sm text-destructive" data-testid={`error-${id}`}>
                     {fieldState.error.message}
@@ -236,7 +286,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
     );
   };
 
-  const renderFieldInput = (field: FormField, controllerField: any, fieldState: any) => {
+  const renderFieldInput = (field: FormField, controllerField: any, fieldState: any, disabled: boolean = false) => {
     const { id, type, placeholder, options = [] } = field;
 
     switch (type) {
@@ -250,6 +300,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             id={id}
             type={type === "text" ? "text" : type}
             placeholder={placeholder}
+            disabled={disabled}
             data-testid={`input-${id}`}
           />
         );
@@ -261,6 +312,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             id={id}
             placeholder={placeholder}
             rows={4}
+            disabled={disabled}
             data-testid={`textarea-${id}`}
           />
         );
@@ -274,6 +326,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             id={id}
             type="number"
             placeholder={placeholder}
+            disabled={disabled}
             data-testid={`input-${id}`}
             onChange={(e) => {
               const val = e.target.value;
@@ -288,6 +341,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
+                disabled={disabled}
                 className={cn(
                   "w-full justify-start text-left font-normal",
                   !controllerField.value && "text-muted-foreground"
@@ -303,6 +357,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                 mode="single"
                 selected={controllerField.value ? new Date(controllerField.value) : undefined}
                 onSelect={(date) => controllerField.onChange(date)}
+                disabled={disabled}
                 initialFocus
               />
             </PopoverContent>
@@ -315,6 +370,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             {...controllerField}
             id={id}
             type="time"
+            disabled={disabled}
             data-testid={`input-${id}`}
           />
         );
@@ -325,13 +381,14 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             {...controllerField}
             id={id}
             type="datetime-local"
+            disabled={disabled}
             data-testid={`input-${id}`}
           />
         );
 
       case "select":
         return (
-          <Select value={controllerField.value} onValueChange={controllerField.onChange}>
+          <Select value={controllerField.value} onValueChange={controllerField.onChange} disabled={disabled}>
             <SelectTrigger data-testid={`select-${id}`}>
               <SelectValue placeholder={placeholder || "Select an option"} />
             </SelectTrigger>
@@ -347,7 +404,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
       case "radio":
         return (
-          <RadioGroup value={controllerField.value} onValueChange={controllerField.onChange}>
+          <RadioGroup value={controllerField.value} onValueChange={controllerField.onChange} disabled={disabled}>
             {options.map((option) => (
               <div key={option.value} className="flex items-center space-x-2">
                 <RadioGroupItem value={option.value} id={`${id}-${option.value}`} data-testid={`radio-${id}-${option.value}`} />
@@ -363,6 +420,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             <Checkbox
               checked={controllerField.value || false}
               onCheckedChange={controllerField.onChange}
+              disabled={disabled}
               id={id}
               data-testid={`checkbox-${id}`}
             />
@@ -386,6 +444,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                       : current.filter((v: string) => v !== option.value);
                     controllerField.onChange(updated);
                   }}
+                  disabled={disabled}
                   id={`${id}-${option.value}`}
                   data-testid={`checkbox-${id}-${option.value}`}
                 />
@@ -404,6 +463,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               min={field.validation?.min || 0}
               max={field.validation?.max || 100}
               step={1}
+              disabled={disabled}
               data-testid={`slider-${id}`}
             />
             <div className="text-sm text-muted-foreground text-center">
@@ -419,8 +479,9 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               <button
                 key={rating}
                 type="button"
-                onClick={() => controllerField.onChange(rating)}
-                className="p-1 hover:scale-110 transition-transform"
+                onClick={() => !disabled && controllerField.onChange(rating)}
+                disabled={disabled}
+                className="p-1 hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid={`rating-${id}-${rating}`}
               >
                 <Star
@@ -444,12 +505,13 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               type="file"
               id={id}
               onChange={(e) => controllerField.onChange(e.target.files)}
+              disabled={disabled}
               className="hidden"
               data-testid={`file-${id}`}
             />
-            <Label htmlFor={id} className="cursor-pointer">
+            <Label htmlFor={id} className={cn("cursor-pointer", disabled && "opacity-50 cursor-not-allowed")}>
               <span className="text-sm text-muted-foreground">
-                Click to upload or drag and drop
+                {disabled ? "File upload disabled" : "Click to upload or drag and drop"}
               </span>
             </Label>
           </div>
@@ -463,6 +525,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                 {...controllerField}
                 id={id}
                 placeholder="Type your signature"
+                disabled={disabled}
                 className="border-0 text-2xl font-cursive text-center"
                 data-testid={`signature-${id}`}
               />
@@ -478,6 +541,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
               value={addressValue.street || ""}
               onChange={(e) => controllerField.onChange({ ...addressValue, street: e.target.value })}
               placeholder="Street Address"
+              disabled={disabled}
               data-testid={`address-street-${id}`}
             />
             <div className="grid grid-cols-2 gap-2">
@@ -485,12 +549,14 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                 value={addressValue.city || ""}
                 onChange={(e) => controllerField.onChange({ ...addressValue, city: e.target.value })}
                 placeholder="City"
+                disabled={disabled}
                 data-testid={`address-city-${id}`}
               />
               <Input
                 value={addressValue.state || ""}
                 onChange={(e) => controllerField.onChange({ ...addressValue, state: e.target.value })}
                 placeholder="State/Province"
+                disabled={disabled}
                 data-testid={`address-state-${id}`}
               />
             </div>
@@ -499,12 +565,14 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
                 value={addressValue.zip || ""}
                 onChange={(e) => controllerField.onChange({ ...addressValue, zip: e.target.value })}
                 placeholder="ZIP/Postal Code"
+                disabled={disabled}
                 data-testid={`address-zip-${id}`}
               />
               <Input
                 value={addressValue.country || ""}
                 onChange={(e) => controllerField.onChange({ ...addressValue, country: e.target.value })}
                 placeholder="Country"
+                disabled={disabled}
                 data-testid={`address-country-${id}`}
               />
             </div>
@@ -517,6 +585,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             {...controllerField}
             id={id}
             placeholder={placeholder}
+            disabled={disabled}
             data-testid={`input-${id}`}
           />
         );
