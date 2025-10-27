@@ -46,7 +46,7 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
 
 ## Recent Changes
 
-### 2025-10-26 (Latest - Dynamic Form Renderer Complete)
+### 2025-10-27 (Latest - Dynamic Form Renderer Complete with Backend Persistence)
 - ✅ Built production-ready Form Renderer component (client/src/components/form-renderer.tsx):
   - Renders all 22 field types dynamically at runtime
   - Field types: text, textarea, number, email, phone, url, date, time, datetime, select, multi_select, radio, checkbox, file_upload, signature, address, currency, percentage, rating, slider, calculated, heading, divider, html
@@ -54,27 +54,43 @@ The project structure separates concerns into `client/` (frontend), `server/` (b
   - Required field enforcement (asterisks, non-empty checks, literal true for checkboxes)
   - Field-specific validation (email format, phone regex, URL validation, min/max, pattern matching)
   - Address field as structured object {street, city, state, zip, country} with proper validation
+  - Numeric fields handle empty values as undefined (not 0) for proper validation
   - Responsive grid layout (12-column with width support: full, half, third, quarter)
   - Error messages below each field
   - Help text and description support
 - ✅ Built Form Preview page (/forms/:id/preview):
   - Standalone preview for end users
   - Fully functional with validation
+  - Backend submission integration (POST /api/forms/:id/submit)
   - Success/error toasts
   - Back navigation
-- ✅ Fixed critical validation bugs:
-  - Text fields now enforce `.min(1)` when required
+- ✅ Backend submission API (server/routes.ts):
+  - POST /api/forms/:id/submit endpoint
+  - Database persistence via storage.createFormSubmission
+  - Auto-increment submissionCount on form template
+  - Activity logging for all submissions
+  - Multi-tenant security with organization validation
+  - Proper error handling
+- ✅ Fixed all validation bugs:
+  - Text/email/phone/url fields enforce `.min(1)` when required
   - Checkboxes use `z.literal(true)` for required (must be checked)
   - Multi-select enforces `.min(1)` (at least one selection)
-  - Address fields bound to form controller with validation
+  - Address fields bound to form controller with structured data validation
+  - Numeric fields use `z.union([z.string(), z.number()]).pipe(z.coerce.number())` to accept both types
+  - Numeric onChange handler uses undefined for empty (not 0)
   - File uploads validated when required
   - Date/time fields use refinement for required check
-- ✅ Verified with automated E2E tests:
+  - Fixed missing `sql` import in storage.ts
+- ✅ Verified with comprehensive E2E tests:
   - All 22 field types render correctly
   - Required validation blocks empty submissions
-  - Field-specific validation (email, address, etc.)
-  - Address field captures structured data
+  - Field-specific validation (email, numeric min/max, address, etc.)
+  - Address field captures structured data {street, city, state, zip, country}
+  - Numeric fields store actual numbers (not strings)
   - Success toast on valid submission
+  - **Database persistence confirmed**: submissions stored in form_submissions table
+  - **submissionCount increments** on form_templates
+  - **Activity logs created** for all submissions
 - 📋 Next: Add conditional logic engine (show/hide fields based on rules)
 
 ### 2025-10-26 (Earlier - Form Builder UI Complete)
