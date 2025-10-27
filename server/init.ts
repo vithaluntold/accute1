@@ -122,6 +122,61 @@ export async function initializeSystem() {
       
       // Analytics
       { name: "analytics.view", resource: "analytics", action: "view", description: "View analytics" },
+      
+      // Email Templates
+      { name: "templates.view", resource: "templates", action: "view", description: "View email templates" },
+      { name: "templates.create", resource: "templates", action: "create", description: "Create email templates" },
+      { name: "templates.update", resource: "templates", action: "update", description: "Update email templates" },
+      { name: "templates.delete", resource: "templates", action: "delete", description: "Delete email templates" },
+      
+      // Messages/Conversations
+      { name: "conversations.view", resource: "conversations", action: "view", description: "View conversations" },
+      { name: "conversations.create", resource: "conversations", action: "create", description: "Create conversations" },
+      { name: "conversations.send", resource: "conversations", action: "send", description: "Send messages" },
+      
+      // Time Tracking
+      { name: "timeEntries.view", resource: "timeEntries", action: "view", description: "View time entries" },
+      { name: "timeEntries.create", resource: "timeEntries", action: "create", description: "Create time entries" },
+      { name: "timeEntries.update", resource: "timeEntries", action: "update", description: "Update time entries" },
+      { name: "timeEntries.delete", resource: "timeEntries", action: "delete", description: "Delete time entries" },
+      
+      // Invoices
+      { name: "invoices.view", resource: "invoices", action: "view", description: "View invoices" },
+      { name: "invoices.create", resource: "invoices", action: "create", description: "Create invoices" },
+      { name: "invoices.update", resource: "invoices", action: "update", description: "Update invoices" },
+      { name: "invoices.delete", resource: "invoices", action: "delete", description: "Delete invoices" },
+      
+      // Projects
+      { name: "projects.view", resource: "projects", action: "view", description: "View projects" },
+      { name: "projects.create", resource: "projects", action: "create", description: "Create projects" },
+      { name: "projects.update", resource: "projects", action: "update", description: "Update projects" },
+      { name: "projects.delete", resource: "projects", action: "delete", description: "Delete projects" },
+      
+      // Tasks
+      { name: "tasks.view", resource: "tasks", action: "view", description: "View tasks" },
+      { name: "tasks.create", resource: "tasks", action: "create", description: "Create tasks" },
+      { name: "tasks.update", resource: "tasks", action: "update", description: "Update tasks" },
+      { name: "tasks.delete", resource: "tasks", action: "delete", description: "Delete tasks" },
+      
+      // Payments
+      { name: "payments.view", resource: "payments", action: "view", description: "View payments" },
+      { name: "payments.create", resource: "payments", action: "create", description: "Create payments" },
+      { name: "payments.update", resource: "payments", action: "update", description: "Update payments" },
+      
+      // Signature Requests
+      { name: "signatures.view", resource: "signatures", action: "view", description: "View signature requests" },
+      { name: "signatures.create", resource: "signatures", action: "create", description: "Create signature requests" },
+      { name: "signatures.sign", resource: "signatures", action: "sign", description: "Sign documents" },
+      
+      // Team Chat
+      { name: "chat.view", resource: "chat", action: "view", description: "View team chat" },
+      { name: "chat.send", resource: "chat", action: "send", description: "Send chat messages" },
+      
+      // Appointments
+      { name: "appointments.view", resource: "appointments", action: "view", description: "View appointments" },
+      { name: "appointments.create", resource: "appointments", action: "create", description: "Create appointments" },
+      { name: "appointments.update", resource: "appointments", action: "update", description: "Update appointments" },
+      { name: "appointments.delete", resource: "appointments", action: "delete", description: "Delete appointments" },
     ];
 
     const createdPermissions: any[] = [];
