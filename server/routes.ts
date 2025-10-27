@@ -3521,12 +3521,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check and send task reminders
   app.post("/api/tasks/process-reminders", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const allTasks = await storage.getPipelinesByOrganization(req.user!.organizationId!);
+      // SECURITY: Strictly scope to authenticated user's organization only
+      const organizationId = req.user!.organizationId!;
+      const organizationPipelines = await storage.getPipelinesByOrganization(organizationId);
       const tasksNeedingReminders: any[] = [];
       const now = new Date();
       
-      // Get all tasks from all pipelines (flatten the hierarchy)
-      for (const pipeline of allTasks) {
+      // Get all tasks from all pipelines within this organization (flatten the hierarchy)
+      for (const pipeline of organizationPipelines) {
         const stages = await storage.getStagesByPipeline(pipeline.id);
         for (const stage of stages) {
           const steps = await storage.getStepsByStage(stage.id);
@@ -3576,18 +3578,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Notify client (if assigned user is a client)
         if (task.notifyClient && task.assignedTo) {
-          const assignedUser = await storage.getUserById(task.assignedTo);
+          const orgUsers = await storage.getUsersByOrganization(organizationId);
+          const assignedUser = orgUsers.find(u => u.id === task.assignedTo);
           if (assignedUser && assignedUser.roleId && assignedUser.roleId.includes('client')) {
             recipientIds.push(task.assignedTo);
           }
         }
         
         // Create notifications
-        const uniqueRecipients = [...new Set(recipientIds)];
+        const uniqueRecipients = Array.from(new Set(recipientIds));
         for (const userId of uniqueRecipients) {
           const notification = await storage.createNotification({
             userId,
-            organizationId: req.user!.organizationId!,
             type: 'task_reminder',
             title: `Task Reminder: ${task.name}`,
             message: `Task "${task.name}" in pipeline "${pipeline.name}" is due soon (${new Date(task.dueDate!).toLocaleString()})`,
