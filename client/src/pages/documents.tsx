@@ -27,6 +27,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calendar, Sparkles } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
+import { AIAgentChat } from "@/components/ai-agent-chat";
 import type { InstalledAgentView } from "@shared/schema";
 
 export default function Documents() {
@@ -168,71 +169,80 @@ export default function Documents() {
             Manage and organize your client documents securely
           </p>
         </div>
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-upload-document">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Document
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Upload Document</DialogTitle>
-              <DialogDescription>
-                Upload a new document to your secure storage
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="border-2 border-dashed rounded-md p-8 text-center">
-                <Input
-                  type="file"
-                  onChange={handleFileSelect}
-                  data-testid="input-file-upload"
-                  className="mb-4"
-                />
-                {selectedFile && (
-                  <div className="mt-4 p-4 bg-muted rounded-md">
-                    <p className="text-sm font-medium" data-testid="text-selected-file">
-                      {selectedFile.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(selectedFile.size)}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setUploadDialogOpen(false);
-                    setSelectedFile(null);
-                  }}
-                  data-testid="button-cancel-upload"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpload}
-                  disabled={!selectedFile || isUploading}
-                  data-testid="button-confirm-upload"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload
-                    </>
+        <div className="flex gap-2">
+          {hasParity && (
+            <AIAgentChat
+              agentName="Parity"
+              mode="dialog"
+              contextData={{ documents: filteredDocuments }}
+            />
+          )}
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-upload-document">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Document
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Upload Document</DialogTitle>
+                <DialogDescription>
+                  Upload a new document to your secure storage
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed rounded-md p-8 text-center">
+                  <Input
+                    type="file"
+                    onChange={handleFileSelect}
+                    data-testid="input-file-upload"
+                    className="mb-4"
+                  />
+                  {selectedFile && (
+                    <div className="mt-4 p-4 bg-muted rounded-md">
+                      <p className="text-sm font-medium" data-testid="text-selected-file">
+                        {selectedFile.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(selectedFile.size)}
+                      </p>
+                    </div>
                   )}
-                </Button>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setUploadDialogOpen(false);
+                      setSelectedFile(null);
+                    }}
+                    data-testid="button-cancel-upload"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={!selectedFile || isUploading}
+                    data-testid="button-confirm-upload"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="mb-6">

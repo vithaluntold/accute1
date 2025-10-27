@@ -21,6 +21,13 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data for multiple organizations.
 - **Role-Based Access Control**: Granular permissions for Super Admin, Admin, Employee, and Client roles.
+- **AI Agent Chat Interface** (October 2025): Interactive chat dialog for Parity, Cadence, and Forma AI agents. Features include:
+  - Real-time chat interface with message history
+  - LLM provider selection (supports OpenAI, Anthropic, Azure OpenAI)
+  - Context-aware conversations (passes relevant data to agents)
+  - Available on Documents (Parity), Workflows (Cadence), and Forms (Forma) pages
+  - Both dialog and popover modes for flexible UX
+  - Integrated with existing LLM configuration management
 - **Unified Workflows System** (October 2025 - Merged Pipelines into Workflows):
   - **TaxDome-Style Unified Interface**: Single "Workflows" feature combining visual automation (node-based canvas) AND hierarchical project management
   - **Dual Capabilities in ONE Feature**:
