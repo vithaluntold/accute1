@@ -1,0 +1,328 @@
+/**
+ * Automation Engine - Processes triggers, evaluates conditions, executes actions
+ * for the unified pipeline system with automation capabilities
+ */
+
+import { LLMService } from './llm-service';
+import type { IStorage } from './storage';
+
+export interface TriggerConfig {
+  type: 'email' | 'form' | 'webhook' | 'schedule' | 'manual' | 'completion';
+  config: Record<string, any>;
+}
+
+export interface ConditionConfig {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'exists';
+  value: any;
+}
+
+export interface ActionConfig {
+  type: 'create_task' | 'send_notification' | 'call_api' | 'run_ai_agent' | 'update_field';
+  config: Record<string, any>;
+}
+
+/**
+ * Automation Engine - Main class for processing pipeline automations
+ */
+export class AutomationEngine {
+  constructor(private storage: IStorage) {}
+
+  /**
+   * Evaluate a set of conditions against provided data
+   */
+  evaluateConditions(conditions: ConditionConfig[], data: Record<string, any>): boolean {
+    if (!conditions || conditions.length === 0) {
+      return true; // No conditions means always true
+    }
+
+    return conditions.every(condition => {
+      const fieldValue = this.getNestedValue(data, condition.field);
+
+      switch (condition.operator) {
+        case 'equals':
+          return fieldValue == condition.value;
+        case 'not_equals':
+          return fieldValue != condition.value;
+        case 'contains':
+          return String(fieldValue).includes(String(condition.value));
+        case 'greater_than':
+          return Number(fieldValue) > Number(condition.value);
+        case 'less_than':
+          return Number(fieldValue) < Number(condition.value);
+        case 'exists':
+          return fieldValue !== undefined && fieldValue !== null;
+        default:
+          return false;
+      }
+    });
+  }
+
+  /**
+   * Execute a list of actions
+   */
+  async executeActions(
+    actions: ActionConfig[],
+    context: {
+      pipelineId: string;
+      stageId?: string;
+      stepId?: string;
+      taskId?: string;
+      organizationId: string;
+      userId: string;
+      data?: Record<string, any>;
+    }
+  ): Promise<any[]> {
+    const results = [];
+
+    for (const action of actions) {
+      try {
+        const result = await this.executeAction(action, context);
+        results.push({ success: true, action: action.type, result });
+      } catch (error: any) {
+        results.push({ success: false, action: action.type, error: error.message });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Execute a single action
+   */
+  private async executeAction(
+    action: ActionConfig,
+    context: {
+      pipelineId: string;
+      stageId?: string;
+      stepId?: string;
+      taskId?: string;
+      organizationId: string;
+      userId: string;
+      data?: Record<string, any>;
+    }
+  ): Promise<any> {
+    switch (action.type) {
+      case 'create_task':
+        return this.createTask(action.config, context);
+      
+      case 'send_notification':
+        return this.sendNotification(action.config, context);
+      
+      case 'call_api':
+        return this.callApi(action.config, context);
+      
+      case 'run_ai_agent':
+        return this.runAiAgent(action.config, context);
+      
+      case 'update_field':
+        return this.updateField(action.config, context);
+      
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  }
+
+  /**
+   * Create a new task in the pipeline
+   */
+  private async createTask(config: any, context: any): Promise<any> {
+    if (!context.stepId) {
+      throw new Error('stepId required to create task');
+    }
+
+    const task = await this.storage.createPipelineTask({
+      stepId: context.stepId,
+      name: config.name || 'Auto-created Task',
+      description: config.description || '',
+      type: config.type || 'manual',
+      assignedTo: config.assignedTo || null,
+      priority: config.priority || 'medium',
+      order: config.order || 0,
+    });
+
+    return task;
+  }
+
+  /**
+   * Send a notification
+   */
+  private async sendNotification(config: any, context: any): Promise<any> {
+    // Create a notification in the database
+    const notification = await this.storage.createNotification({
+      userId: config.userId || context.userId,
+      title: config.title || 'Pipeline Notification',
+      message: config.message || '',
+      type: config.notificationType || 'info',
+      metadata: {
+        pipelineId: context.pipelineId,
+        stageId: context.stageId,
+        stepId: context.stepId,
+        taskId: context.taskId,
+      },
+    });
+
+    return notification;
+  }
+
+  /**
+   * Call an external API
+   */
+  private async callApi(config: any, context: any): Promise<any> {
+    const { url, method = 'POST', headers = {}, body } = config;
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    return await response.json();
+  }
+
+  /**
+   * Run an AI agent
+   */
+  private async runAiAgent(config: any, context: any): Promise<any> {
+    const { agentName, input, llmConfigId } = config;
+
+    // Get LLM configuration
+    let llmConfig;
+    if (llmConfigId) {
+      llmConfig = await this.storage.getLlmConfiguration(llmConfigId);
+    } else {
+      llmConfig = await this.storage.getDefaultLlmConfiguration(context.organizationId);
+    }
+
+    if (!llmConfig) {
+      throw new Error('No LLM configuration available for AI agent execution');
+    }
+
+    // Load and execute agent (simplified - actual implementation would use dynamic imports)
+    const llmService = new LLMService(llmConfig);
+    const result = await llmService.sendPrompt(
+      JSON.stringify(input),
+      `You are executing the ${agentName} agent. Process the input and provide a response.`
+    );
+
+    return { agentName, result };
+  }
+
+  /**
+   * Update a field in the pipeline/task/etc
+   */
+  private async updateField(config: any, context: any): Promise<any> {
+    const { entity, field, value } = config;
+
+    switch (entity) {
+      case 'task':
+        if (!context.taskId) throw new Error('taskId required');
+        return this.storage.updatePipelineTask(context.taskId, { [field]: value });
+      
+      case 'step':
+        if (!context.stepId) throw new Error('stepId required');
+        return this.storage.updatePipelineStep(context.stepId, { [field]: value });
+      
+      case 'stage':
+        if (!context.stageId) throw new Error('stageId required');
+        return this.storage.updatePipelineStage(context.stageId, { [field]: value });
+      
+      case 'pipeline':
+        return this.storage.updatePipeline(context.pipelineId, { [field]: value });
+      
+      default:
+        throw new Error(`Unknown entity: ${entity}`);
+    }
+  }
+
+  /**
+   * Process task completion - check if step/stage should auto-progress
+   */
+  async processTaskCompletion(taskId: string): Promise<void> {
+    const task = await this.storage.getPipelineTask(taskId);
+    if (!task) return;
+
+    const step = await this.storage.getPipelineStep(task.stepId);
+    if (!step) return;
+
+    // Check if all tasks in step are completed
+    const tasks = await this.storage.getTasksByStep(step.id);
+    const allComplete = tasks.every(t => t.status === 'completed');
+
+    if (allComplete && step.autoProgress) {
+      // Evaluate step's progress conditions
+      const conditionsMet = this.evaluateConditions(
+        (step.progressConditions as any) || [],
+        { allTasksComplete: true, step }
+      );
+
+      if (conditionsMet) {
+        // Execute step completion actions
+        if (step.onCompleteActions && Array.isArray(step.onCompleteActions)) {
+          await this.executeActions(step.onCompleteActions as ActionConfig[], {
+            pipelineId: step.stageId, // Will be resolved to pipeline
+            stepId: step.id,
+            stageId: step.stageId,
+            organizationId: task.assignedTo || '', // TODO: get from pipeline
+            userId: task.assignedTo || '',
+          });
+        }
+
+        // Mark step as completed
+        await this.storage.updatePipelineStep(step.id, {
+          status: 'completed',
+        } as any);
+
+        // Check if stage should auto-progress
+        await this.processStepCompletion(step.stageId);
+      }
+    }
+  }
+
+  /**
+   * Process step completion - check if stage should auto-progress
+   */
+  async processStepCompletion(stageId: string): Promise<void> {
+    const stage = await this.storage.getPipelineStage(stageId);
+    if (!stage) return;
+
+    // Check if all steps in stage are completed
+    const steps = await this.storage.getStepsByStage(stage.id);
+    const allComplete = steps.every(s => s.status === 'completed');
+
+    if (allComplete && stage.autoProgress) {
+      // Evaluate stage's progress conditions
+      const conditionsMet = this.evaluateConditions(
+        (stage.progressConditions as any) || [],
+        { allStepsComplete: true, stage }
+      );
+
+      if (conditionsMet) {
+        // Execute stage completion actions
+        if (stage.onCompleteActions && Array.isArray(stage.onCompleteActions)) {
+          await this.executeActions(stage.onCompleteActions as ActionConfig[], {
+            pipelineId: stage.pipelineId,
+            stageId: stage.id,
+            organizationId: '', // TODO: get from pipeline
+            userId: '',
+          });
+        }
+
+        // Mark stage as completed
+        await this.storage.updatePipelineStage(stage.id, {
+          status: 'completed',
+        } as any);
+      }
+    }
+  }
+
+  /**
+   * Helper to get nested values from objects (e.g., "user.email")
+   */
+  private getNestedValue(obj: any, path: string): any {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+  }
+}
