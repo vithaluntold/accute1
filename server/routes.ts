@@ -2011,6 +2011,403 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Document Collection Tracking Routes ====================
+
+  // Get all document requests for organization
+  app.get("/api/document-requests", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const requests = await storage.getDocumentRequestsByOrganization(req.user!.organizationId!);
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch document requests" });
+    }
+  });
+
+  // Get document requests for a specific client
+  app.get("/api/clients/:clientId/document-requests", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const client = await storage.getClient(req.params.clientId);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const requests = await storage.getDocumentRequestsByClient(req.params.clientId);
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch document requests" });
+    }
+  });
+
+  // Get a single document request
+  app.get("/api/document-requests/:id", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const request = await storage.getDocumentRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch document request" });
+    }
+  });
+
+  // Create a new document request
+  app.post("/api/document-requests", requireAuth, requirePermission("documents.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { clientId, title, description, assignedTo, priority, dueDate, notes, requiredDocuments } = req.body;
+
+      if (!clientId || !title) {
+        return res.status(400).json({ error: "Client ID and title are required" });
+      }
+
+      const client = await storage.getClient(clientId);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const request = await storage.createDocumentRequest({
+        clientId,
+        title,
+        description: description || null,
+        assignedTo: assignedTo || null,
+        priority: priority || "medium",
+        dueDate: dueDate ? new Date(dueDate) : null,
+        notes: notes || null,
+        status: "pending",
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id,
+      });
+
+      // Create required documents if provided
+      if (requiredDocuments && Array.isArray(requiredDocuments)) {
+        for (let i = 0; i < requiredDocuments.length; i++) {
+          const doc = requiredDocuments[i];
+          await storage.createRequiredDocument({
+            requestId: request.id,
+            name: doc.name,
+            description: doc.description || null,
+            category: doc.category || null,
+            isRequired: doc.isRequired !== false,
+            expectedQuantity: doc.expectedQuantity || 1,
+            sortOrder: i,
+            status: "pending",
+          });
+        }
+      }
+
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "create",
+        "document_request",
+        request.id,
+        { title, clientId },
+        req
+      );
+
+      res.status(201).json(request);
+    } catch (error: any) {
+      console.error("Failed to create document request:", error);
+      res.status(500).json({ error: "Failed to create document request" });
+    }
+  });
+
+  // Update a document request
+  app.put("/api/document-requests/:id", requireAuth, requirePermission("documents.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getDocumentRequest(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { title, description, assignedTo, priority, dueDate, notes, status } = req.body;
+
+      const updateData: any = {
+        title,
+        description,
+        assignedTo,
+        priority,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        notes,
+        status,
+      };
+
+      // Set completedAt when marking as completed
+      if (status === "completed") {
+        updateData.completedAt = new Date();
+      }
+
+      const updated = await storage.updateDocumentRequest(req.params.id, updateData);
+
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "update",
+        "document_request",
+        req.params.id,
+        { status },
+        req
+      );
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update document request" });
+    }
+  });
+
+  // Delete a document request
+  app.delete("/api/document-requests/:id", requireAuth, requirePermission("documents.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getDocumentRequest(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteDocumentRequest(req.params.id);
+
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "delete",
+        "document_request",
+        req.params.id,
+        { title: existing.title },
+        req
+      );
+
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete document request" });
+    }
+  });
+
+  // Get required documents for a request
+  app.get("/api/document-requests/:id/required-documents", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const request = await storage.getDocumentRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const requiredDocs = await storage.getRequiredDocumentsByRequest(req.params.id);
+      res.json(requiredDocs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch required documents" });
+    }
+  });
+
+  // Add a required document to a request
+  app.post("/api/document-requests/:id/required-documents", requireAuth, requirePermission("documents.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const request = await storage.getDocumentRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Document request not found" });
+      }
+      if (request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { name, description, category, isRequired, expectedQuantity } = req.body;
+
+      if (!name) {
+        return res.status(400).json({ error: "Document name is required" });
+      }
+
+      const requiredDoc = await storage.createRequiredDocument({
+        requestId: req.params.id,
+        name,
+        description: description || null,
+        category: category || null,
+        isRequired: isRequired !== false,
+        expectedQuantity: expectedQuantity || 1,
+        sortOrder: 0,
+        status: "pending",
+      });
+
+      res.status(201).json(requiredDoc);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create required document" });
+    }
+  });
+
+  // Update a required document
+  app.put("/api/required-documents/:id", requireAuth, requirePermission("documents.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { name, description, category, isRequired, expectedQuantity, status, sortOrder } = req.body;
+
+      const updated = await storage.updateRequiredDocument(req.params.id, {
+        name,
+        description,
+        category,
+        isRequired,
+        expectedQuantity,
+        status,
+        sortOrder,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update required document" });
+    }
+  });
+
+  // Delete a required document
+  app.delete("/api/required-documents/:id", requireAuth, requirePermission("documents.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteRequiredDocument(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete required document" });
+    }
+  });
+
+  // Get document submissions for a required document
+  app.get("/api/required-documents/:id/submissions", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const submissions = await storage.getDocumentSubmissionsByRequiredDoc(req.params.id);
+      res.json(submissions);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch document submissions" });
+    }
+  });
+
+  // Submit a document for a required document
+  app.post("/api/required-documents/:id/submissions", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+    try {
+      const requiredDoc = await storage.getRequiredDocument(req.params.id);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { documentId } = req.body;
+
+      if (!documentId) {
+        return res.status(400).json({ error: "Document ID is required" });
+      }
+
+      // Verify document exists and belongs to organization
+      const document = await storage.getDocument(documentId);
+      if (!document || document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const submission = await storage.createDocumentSubmission({
+        requiredDocumentId: req.params.id,
+        documentId,
+        submittedBy: req.user!.id,
+        status: "pending_review",
+        reviewNotes: null,
+      });
+
+      // Update required document status
+      await storage.updateRequiredDocument(req.params.id, { status: "submitted" });
+
+      res.status(201).json(submission);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to submit document" });
+    }
+  });
+
+  // Review a document submission
+  app.put("/api/document-submissions/:id/review", requireAuth, requirePermission("documents.review"), async (req: AuthRequest, res: Response) => {
+    try {
+      const submission = await storage.getDocumentSubmission(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: "Document submission not found" });
+      }
+
+      const requiredDoc = await storage.getRequiredDocument(submission.requiredDocumentId);
+      if (!requiredDoc) {
+        return res.status(404).json({ error: "Required document not found" });
+      }
+
+      const request = await storage.getDocumentRequest(requiredDoc.requestId);
+      if (!request || request.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { status, reviewNotes } = req.body;
+
+      if (!status || !["approved", "rejected", "pending_review"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const reviewed = await storage.reviewDocumentSubmission(
+        req.params.id,
+        req.user!.id,
+        status,
+        reviewNotes
+      );
+
+      // Update required document status
+      if (status === "approved") {
+        await storage.updateRequiredDocument(requiredDoc.id, { status: "approved" });
+      } else if (status === "rejected") {
+        await storage.updateRequiredDocument(requiredDoc.id, { status: "rejected" });
+      }
+
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "review",
+        "document_submission",
+        req.params.id,
+        { status, reviewNotes },
+        req
+      );
+
+      res.json(reviewed);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to review document submission" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

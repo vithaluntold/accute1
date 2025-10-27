@@ -42,6 +42,12 @@ import type {
   InsertFormSubmission,
   FormShareLink,
   InsertFormShareLink,
+  DocumentRequest,
+  InsertDocumentRequest,
+  RequiredDocument,
+  InsertRequiredDocument,
+  DocumentSubmission as DocSubmission,
+  InsertDocumentSubmission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -211,6 +217,27 @@ export interface IStorage {
   createRevisionRequest(submissionId: string, requestedBy: string, fieldsToRevise: any): Promise<schema.RevisionRequest>;
   getRevisionRequests(submissionId: string): Promise<Array<schema.RevisionRequest & { requestedByUser: User }>>;
   assignSubmissionReviewer(id: string, reviewerId: string): Promise<FormSubmission | undefined>;
+
+  // Document Requests
+  createDocumentRequest(request: InsertDocumentRequest & { organizationId: string; createdBy: string }): Promise<DocumentRequest>;
+  getDocumentRequest(id: string): Promise<DocumentRequest | undefined>;
+  getDocumentRequestsByOrganization(organizationId: string): Promise<DocumentRequest[]>;
+  getDocumentRequestsByClient(clientId: string): Promise<DocumentRequest[]>;
+  updateDocumentRequest(id: string, request: Partial<InsertDocumentRequest>): Promise<DocumentRequest | undefined>;
+  deleteDocumentRequest(id: string): Promise<void>;
+
+  // Required Documents
+  createRequiredDocument(doc: InsertRequiredDocument): Promise<RequiredDocument>;
+  getRequiredDocument(id: string): Promise<RequiredDocument | undefined>;
+  getRequiredDocumentsByRequest(requestId: string): Promise<RequiredDocument[]>;
+  updateRequiredDocument(id: string, doc: Partial<InsertRequiredDocument>): Promise<RequiredDocument | undefined>;
+  deleteRequiredDocument(id: string): Promise<void>;
+
+  // Document Submissions
+  createDocumentSubmission(submission: InsertDocumentSubmission): Promise<DocSubmission>;
+  getDocumentSubmission(id: string): Promise<DocSubmission | undefined>;
+  getDocumentSubmissionsByRequiredDoc(requiredDocumentId: string): Promise<DocSubmission[]>;
+  reviewDocumentSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<DocSubmission | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -1079,6 +1106,100 @@ export class DbStorage implements IStorage {
     const result = await db.update(schema.formSubmissions)
       .set({ reviewedBy: reviewerId })
       .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Document Requests
+  async createDocumentRequest(request: InsertDocumentRequest & { organizationId: string; createdBy: string }): Promise<DocumentRequest> {
+    const result = await db.insert(schema.documentRequests).values(request).returning();
+    return result[0];
+  }
+
+  async getDocumentRequest(id: string): Promise<DocumentRequest | undefined> {
+    const result = await db.select().from(schema.documentRequests).where(eq(schema.documentRequests.id, id));
+    return result[0];
+  }
+
+  async getDocumentRequestsByOrganization(organizationId: string): Promise<DocumentRequest[]> {
+    return await db.select().from(schema.documentRequests)
+      .where(eq(schema.documentRequests.organizationId, organizationId))
+      .orderBy(desc(schema.documentRequests.createdAt));
+  }
+
+  async getDocumentRequestsByClient(clientId: string): Promise<DocumentRequest[]> {
+    return await db.select().from(schema.documentRequests)
+      .where(eq(schema.documentRequests.clientId, clientId))
+      .orderBy(desc(schema.documentRequests.createdAt));
+  }
+
+  async updateDocumentRequest(id: string, request: Partial<InsertDocumentRequest>): Promise<DocumentRequest | undefined> {
+    const result = await db.update(schema.documentRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(schema.documentRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDocumentRequest(id: string): Promise<void> {
+    await db.delete(schema.documentRequests).where(eq(schema.documentRequests.id, id));
+  }
+
+  // Required Documents
+  async createRequiredDocument(doc: InsertRequiredDocument): Promise<RequiredDocument> {
+    const result = await db.insert(schema.requiredDocuments).values(doc).returning();
+    return result[0];
+  }
+
+  async getRequiredDocument(id: string): Promise<RequiredDocument | undefined> {
+    const result = await db.select().from(schema.requiredDocuments).where(eq(schema.requiredDocuments.id, id));
+    return result[0];
+  }
+
+  async getRequiredDocumentsByRequest(requestId: string): Promise<RequiredDocument[]> {
+    return await db.select().from(schema.requiredDocuments)
+      .where(eq(schema.requiredDocuments.requestId, requestId))
+      .orderBy(schema.requiredDocuments.sortOrder);
+  }
+
+  async updateRequiredDocument(id: string, doc: Partial<InsertRequiredDocument>): Promise<RequiredDocument | undefined> {
+    const result = await db.update(schema.requiredDocuments)
+      .set(doc)
+      .where(eq(schema.requiredDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRequiredDocument(id: string): Promise<void> {
+    await db.delete(schema.requiredDocuments).where(eq(schema.requiredDocuments.id, id));
+  }
+
+  // Document Submissions
+  async createDocumentSubmission(submission: InsertDocumentSubmission): Promise<DocSubmission> {
+    const result = await db.insert(schema.documentSubmissions).values(submission).returning();
+    return result[0];
+  }
+
+  async getDocumentSubmission(id: string): Promise<DocSubmission | undefined> {
+    const result = await db.select().from(schema.documentSubmissions).where(eq(schema.documentSubmissions.id, id));
+    return result[0];
+  }
+
+  async getDocumentSubmissionsByRequiredDoc(requiredDocumentId: string): Promise<DocSubmission[]> {
+    return await db.select().from(schema.documentSubmissions)
+      .where(eq(schema.documentSubmissions.requiredDocumentId, requiredDocumentId))
+      .orderBy(desc(schema.documentSubmissions.createdAt));
+  }
+
+  async reviewDocumentSubmission(id: string, reviewedBy: string, status: string, reviewNotes?: string): Promise<DocSubmission | undefined> {
+    const result = await db.update(schema.documentSubmissions)
+      .set({ 
+        reviewedBy, 
+        status, 
+        reviewNotes,
+        reviewedAt: new Date() 
+      })
+      .where(eq(schema.documentSubmissions.id, id))
       .returning();
     return result[0];
   }
