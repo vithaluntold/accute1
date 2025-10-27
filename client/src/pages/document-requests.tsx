@@ -271,12 +271,20 @@ export default function DocumentRequestsPage() {
 
   // Handlers
   const handleCreateRequest = (data: RequestFormValues) => {
-    createRequestMutation.mutate(data);
+    const transformedData = {
+      ...data,
+      assignedTo: data.assignedTo === "unassigned" ? undefined : data.assignedTo,
+    };
+    createRequestMutation.mutate(transformedData);
   };
 
   const handleUpdateRequest = (data: RequestFormValues) => {
     if (!editingRequest) return;
-    updateRequestMutation.mutate({ id: editingRequest.id, data });
+    const transformedData = {
+      ...data,
+      assignedTo: data.assignedTo === "unassigned" ? undefined : data.assignedTo,
+    };
+    updateRequestMutation.mutate({ id: editingRequest.id, data: transformedData });
   };
 
   const handleEditRequest = (request: DocumentRequest) => {
@@ -286,7 +294,7 @@ export default function DocumentRequestsPage() {
       title: request.title,
       description: request.description || "",
       priority: request.priority as "low" | "medium" | "high" | "urgent",
-      assignedTo: request.assignedTo || "",
+      assignedTo: request.assignedTo || "unassigned",
       dueDate: request.dueDate ? new Date(request.dueDate) : undefined,
       notes: request.notes || "",
     });
@@ -595,7 +603,7 @@ export default function DocumentRequestsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {teamMembers.map((member) => (
                             <SelectItem key={member.id} value={member.id}>
                               {member.firstName && member.lastName

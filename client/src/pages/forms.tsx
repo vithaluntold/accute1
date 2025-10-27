@@ -201,7 +201,7 @@ export default function FormsPage() {
 
   const handleCreateShareLink = () => {
     const data: any = {
-      clientId: shareLinkSettings.clientId || null,
+      clientId: shareLinkSettings.clientId && shareLinkSettings.clientId !== "none" ? shareLinkSettings.clientId : null,
       password: shareLinkSettings.enablePassword ? shareLinkSettings.password : null,
       expiresAt: shareLinkSettings.expiresAt?.toISOString(),
       maxSubmissions: shareLinkSettings.maxSubmissions ? parseInt(shareLinkSettings.maxSubmissions) : null,
@@ -637,7 +637,7 @@ export default function FormsPage() {
                       <SelectValue placeholder="Select a client" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No specific client</SelectItem>
+                      <SelectItem value="none">No specific client</SelectItem>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.companyName}
