@@ -19,6 +19,23 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormDescription, FormField as FormFieldComponent, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -88,6 +105,26 @@ export default function FormBuilderPage() {
       setConditionalRules(formTemplate.conditionalRules as FormConditionalRule[]);
     }
   }, [formTemplate]);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setFields((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -279,50 +316,30 @@ export default function FormBuilderPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {fields.map((field, index) => (
-                <Card key={field.id} data-testid={`field-card-${field.id}`}>
-                  <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-4">
-                    <div className="cursor-move text-muted-foreground">
-                      <GripVertical className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-base">{field.label}</CardTitle>
-                      <CardDescription>
-                        {FIELD_TYPES.find((t) => t.value === field.type)?.label}
-                        {field.validation?.required && " • Required"}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingField(field);
-                          setFieldDialogOpen(true);
-                        }}
-                        data-testid={`button-edit-field-${field.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteField(field.id)}
-                        data-testid={`button-delete-field-${field.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  {field.description && (
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{field.description}</p>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={fields.map((f) => f.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {fields.map((field) => (
+                    <SortableFieldCard
+                      key={field.id}
+                      field={field}
+                      onEdit={() => {
+                        setEditingField(field);
+                        setFieldDialogOpen(true);
+                      }}
+                      onDelete={() => handleDeleteField(field.id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           {/* Conditional Rules Section */}
@@ -800,5 +817,78 @@ function ConditionalRuleDialog({ open, onOpenChange, rule, fields, onSubmit }: C
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface SortableFieldCardProps {
+  field: FormField;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function SortableFieldCard({ field, onEdit, onDelete }: SortableFieldCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      data-testid={`field-card-${field.id}`}
+      className={isDragging ? "shadow-lg" : ""}
+    >
+      <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-4">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground touch-none"
+          data-testid={`drag-handle-${field.id}`}
+        >
+          <GripVertical className="h-5 w-5" />
+        </div>
+        <div className="flex-1">
+          <CardTitle className="text-base">{field.label}</CardTitle>
+          <CardDescription>
+            {FIELD_TYPES.find((t) => t.value === field.type)?.label}
+            {field.validation?.required && " • Required"}
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onEdit}
+            data-testid={`button-edit-field-${field.id}`}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            data-testid={`button-delete-field-${field.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardHeader>
+      {field.description && (
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{field.description}</p>
+        </CardContent>
+      )}
+    </Card>
   );
 }
