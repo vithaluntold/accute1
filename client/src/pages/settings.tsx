@@ -102,12 +102,13 @@ export default function Settings() {
   const [deleteLlmTarget, setDeleteLlmTarget] = useState<string | null>(null);
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [expiresInDays, setExpiresInDays] = useState(30);
+  const [testConnectionResult, setTestConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   
   const { data: currentUser } = useQuery({
     queryKey: ["/api/auth/me"],
   });
 
-  const isSuperAdmin = currentUser?.role?.name === "Super Admin";
+  const isSuperAdmin = (currentUser as any)?.role?.name === "Super Admin";
 
   const form = useForm<ProviderFormData>({
     resolver: zodResolver(providerSchema),
@@ -231,12 +232,72 @@ export default function Settings() {
     },
   });
 
+  const testConnectionMutation = useMutation({
+    mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string }) => {
+      return apiRequest("POST", "/api/llm-configurations/test", data);
+    },
+    onSuccess: (result: any) => {
+      setTestConnectionResult(result);
+      toast({
+        title: result.success ? "Connection Successful" : "Connection Failed",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      const errorResult = { success: false, message: error.message || "Failed to test connection" };
+      setTestConnectionResult(errorResult);
+      toast({
+        title: "Test Failed",
+        description: error.message || "Failed to test connection",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: ProviderFormData) => {
     createMutation.mutate(data);
   };
 
   const onLlmSubmit = (data: LlmConfigFormData) => {
     createLlmMutation.mutate(data);
+  };
+
+  const handleTestConnection = () => {
+    const formData = llmForm.getValues();
+    if (!formData.apiKey) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter an API key before testing",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.provider) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a provider before testing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.provider === "azure" && !formData.azureEndpoint) {
+      toast({
+        title: "Validation Error",
+        description: "Azure OpenAI requires an endpoint URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestConnectionResult(null);
+    testConnectionMutation.mutate({
+      provider: formData.provider === "azure" ? "azure_openai" : formData.provider,
+      apiKey: formData.apiKey,
+      endpoint: formData.azureEndpoint,
+    });
   };
 
   const getProviderName = (provider: string) => {
@@ -639,11 +700,48 @@ export default function Settings() {
                     )}
                   />
 
-                  <div className="flex gap-2">
+                  {testConnectionResult && (
+                    <div
+                      className={`flex items-center gap-2 p-3 rounded-md ${
+                        testConnectionResult.success
+                          ? "bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20"
+                          : "bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                      }`}
+                      data-testid="test-connection-result"
+                    >
+                      {testConnectionResult.success ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4" />
+                      )}
+                      <span className="text-sm">{testConnectionResult.message}</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleTestConnection}
+                      disabled={testConnectionMutation.isPending}
+                      data-testid="button-test-connection"
+                    >
+                      {testConnectionMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Test Connection
+                        </>
+                      )}
+                    </Button>
                     <Button type="submit" disabled={createLlmMutation.isPending} data-testid="button-save-llm-config">
                       {createLlmMutation.isPending ? "Saving..." : "Save Configuration"}
                     </Button>
-                    <Button variant="outline" onClick={() => { llmForm.reset(); setShowLlmForm(false); }} type="button">
+                    <Button variant="outline" onClick={() => { llmForm.reset(); setShowLlmForm(false); setTestConnectionResult(null); }} type="button">
                       Cancel
                     </Button>
                   </div>

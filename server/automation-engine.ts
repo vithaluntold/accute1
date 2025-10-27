@@ -64,7 +64,7 @@ export class AutomationEngine {
   async executeActions(
     actions: ActionConfig[],
     context: {
-      pipelineId: string;
+      workflowId: string;
       stageId?: string;
       stepId?: string;
       taskId?: string;
@@ -93,7 +93,7 @@ export class AutomationEngine {
   private async executeAction(
     action: ActionConfig,
     context: {
-      pipelineId: string;
+      workflowId: string;
       stageId?: string;
       stepId?: string;
       taskId?: string;
@@ -136,28 +136,28 @@ export class AutomationEngine {
     }
 
     // Verify step exists and belongs to same organization (multi-tenant security)
-    const step = await this.storage.getPipelineStep(targetStepId);
+    const step = await this.storage.getWorkflowStep(targetStepId);
     if (!step) {
       throw new Error(`Step ${targetStepId} not found`);
     }
 
     // Verify organization ownership (get pipeline through stage)
-    const stage = await this.storage.getPipelineStage(step.stageId);
+    const stage = await this.storage.getWorkflowStage(step.stageId);
     if (!stage) {
       throw new Error('Stage not found');
     }
 
-    const pipeline = await this.storage.getPipeline(stage.pipelineId);
-    if (!pipeline) {
-      throw new Error('Pipeline not found');
+    const workflow = await this.storage.getWorkflow(stage.workflowId);
+    if (!workflow) {
+      throw new Error('Workflow not found');
     }
 
-    if (pipeline.organizationId !== context.organizationId) {
+    if (workflow.organizationId !== context.organizationId) {
       throw new Error('Unauthorized: Cannot create task in different organization');
     }
 
     // Create the task
-    const task = await this.storage.createPipelineTask({
+    const task = await this.storage.createWorkflowTask({
       stepId: targetStepId,
       name: config.name || 'Auto-created Task',
       description: config.description || '',
@@ -181,7 +181,7 @@ export class AutomationEngine {
       message: config.message || '',
       type: config.notificationType || 'info',
       metadata: {
-        pipelineId: context.pipelineId,
+        workflowId: context.workflowId,
         stageId: context.stageId,
         stepId: context.stepId,
         taskId: context.taskId,
@@ -246,18 +246,18 @@ export class AutomationEngine {
     switch (entity) {
       case 'task':
         if (!context.taskId) throw new Error('taskId required');
-        return this.storage.updatePipelineTask(context.taskId, { [field]: value });
+        return this.storage.updateWorkflowTask(context.taskId, { [field]: value });
       
       case 'step':
         if (!context.stepId) throw new Error('stepId required');
-        return this.storage.updatePipelineStep(context.stepId, { [field]: value });
+        return this.storage.updateWorkflowStep(context.stepId, { [field]: value });
       
       case 'stage':
         if (!context.stageId) throw new Error('stageId required');
-        return this.storage.updatePipelineStage(context.stageId, { [field]: value });
+        return this.storage.updateWorkflowStage(context.stageId, { [field]: value });
       
       case 'pipeline':
-        return this.storage.updatePipeline(context.pipelineId, { [field]: value });
+        return this.storage.updateWorkflow(context.workflowId, { [field]: value });
       
       default:
         throw new Error(`Unknown entity: ${entity}`);
@@ -268,17 +268,17 @@ export class AutomationEngine {
    * Process task completion - check if step/stage should auto-progress
    */
   async processTaskCompletion(taskId: string): Promise<void> {
-    const task = await this.storage.getPipelineTask(taskId);
+    const task = await this.storage.getWorkflowTask(taskId);
     if (!task) return;
 
-    const step = await this.storage.getPipelineStep(task.stepId);
+    const step = await this.storage.getWorkflowStep(task.stepId);
     if (!step) return;
 
-    const stage = await this.storage.getPipelineStage(step.stageId);
+    const stage = await this.storage.getWorkflowStage(step.stageId);
     if (!stage) return;
 
-    const pipeline = await this.storage.getPipeline(stage.pipelineId);
-    if (!pipeline) return;
+    const workflow = await this.storage.getWorkflow(stage.workflowId);
+    if (!workflow) return;
 
     // Check if all tasks in step are completed
     const tasks = await this.storage.getTasksByStep(step.id);
@@ -295,16 +295,16 @@ export class AutomationEngine {
         // Execute step completion actions with proper context
         if (step.onCompleteActions && Array.isArray(step.onCompleteActions)) {
           await this.executeActions(step.onCompleteActions as ActionConfig[], {
-            pipelineId: pipeline.id,
+            workflowId: workflow.id,
             stepId: step.id,
             stageId: stage.id,
-            organizationId: pipeline.organizationId,
-            userId: pipeline.createdBy,
+            organizationId: workflow.organizationId,
+            userId: workflow.createdBy,
           });
         }
 
         // Mark step as completed
-        await this.storage.updatePipelineStep(step.id, {
+        await this.storage.updateWorkflowStep(step.id, {
           status: 'completed',
         } as any);
 
@@ -318,11 +318,11 @@ export class AutomationEngine {
    * Process step completion - check if stage should auto-progress
    */
   async processStepCompletion(stageId: string): Promise<void> {
-    const stage = await this.storage.getPipelineStage(stageId);
+    const stage = await this.storage.getWorkflowStage(stageId);
     if (!stage) return;
 
-    const pipeline = await this.storage.getPipeline(stage.pipelineId);
-    if (!pipeline) return;
+    const workflow = await this.storage.getWorkflow(stage.workflowId);
+    if (!workflow) return;
 
     // Check if all steps in stage are completed
     const steps = await this.storage.getStepsByStage(stage.id);
@@ -339,15 +339,15 @@ export class AutomationEngine {
         // Execute stage completion actions with proper context
         if (stage.onCompleteActions && Array.isArray(stage.onCompleteActions)) {
           await this.executeActions(stage.onCompleteActions as ActionConfig[], {
-            pipelineId: pipeline.id,
+            workflowId: workflow.id,
             stageId: stage.id,
-            organizationId: pipeline.organizationId,
-            userId: pipeline.createdBy,
+            organizationId: workflow.organizationId,
+            userId: workflow.createdBy,
           });
         }
 
         // Mark stage as completed
-        await this.storage.updatePipelineStage(stage.id, {
+        await this.storage.updateWorkflowStage(stage.id, {
           status: 'completed',
         } as any);
       }

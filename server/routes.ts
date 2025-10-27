@@ -912,6 +912,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/llm-configurations/test", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { provider, apiKey, endpoint } = req.body;
+      
+      if (!provider || !apiKey) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Provider and API key are required" 
+        });
+      }
+
+      let testResult = { success: false, message: "" };
+
+      if (provider === "openai") {
+        try {
+          const { OpenAI } = await import('openai');
+          const client = new OpenAI({ apiKey });
+          
+          await client.models.list();
+          testResult = { success: true, message: "OpenAI connection successful" };
+        } catch (error: any) {
+          testResult = { 
+            success: false, 
+            message: error.message || "Failed to connect to OpenAI" 
+          };
+        }
+      } else if (provider === "anthropic") {
+        try {
+          const { Anthropic } = await import('@anthropic-ai/sdk');
+          const client = new Anthropic({ apiKey });
+          
+          await client.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 10,
+            messages: [{ role: "user", content: "test" }]
+          });
+          testResult = { success: true, message: "Anthropic connection successful" };
+        } catch (error: any) {
+          testResult = { 
+            success: false, 
+            message: error.message || "Failed to connect to Anthropic" 
+          };
+        }
+      } else if (provider === "azure_openai") {
+        try {
+          if (!endpoint) {
+            return res.status(400).json({ 
+              success: false, 
+              message: "Azure OpenAI endpoint is required" 
+            });
+          }
+          
+          // Use Azure's REST API to list deployments as a health check
+          const apiVersion = '2024-02-01';
+          const testUrl = `${endpoint}/openai/deployments?api-version=${apiVersion}`;
+          
+          const response = await fetch(testUrl, {
+            method: 'GET',
+            headers: {
+              'api-key': apiKey,
+              'Content-Type': 'application/json'
+            },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+          
+          if (response.ok) {
+            testResult = { success: true, message: "Azure OpenAI connection successful" };
+          } else {
+            // Try to parse JSON error, fallback to text
+            let errorMessage = `HTTP ${response.status}`;
+            try {
+              const errorJson = await response.json();
+              errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+            } catch {
+              const errorText = await response.text();
+              errorMessage = errorText || errorMessage;
+            }
+            testResult = { 
+              success: false, 
+              message: `Azure OpenAI error: ${errorMessage}` 
+            };
+          }
+        } catch (error: any) {
+          testResult = { 
+            success: false, 
+            message: error.name === 'AbortError' 
+              ? "Connection timeout - please check your Azure endpoint" 
+              : error.message || "Failed to connect to Azure OpenAI" 
+          };
+        }
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Unsupported provider" 
+        });
+      }
+
+      res.json(testResult);
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || "Failed to test LLM configuration" 
+      });
+    }
+  });
+
   // ==================== AI Agent Routes ====================
   
   app.get("/api/ai-agents", requireAuth, async (req: Request, res: Response) => {
@@ -3789,11 +3895,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Workflow does not have automation enabled" });
       }
 
-      // Update execution metadata
-      await storage.updateWorkflow(workflow.id, {
-        lastExecutedAt: new Date(),
-        executionCount: (workflow.executionCount || 0) + 1,
-      });
+      // Log automation trigger
+      // Note: Workflow execution metadata tracking would go here if needed
 
       await logActivity(req.user!.id, req.user!.organizationId!, "trigger_automation", "workflow", workflow.id, {}, req);
       res.json({ success: true, message: "Workflow automation triggered" });
