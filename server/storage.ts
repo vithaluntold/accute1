@@ -392,6 +392,14 @@ export interface IStorage {
   updateTaskChecklist(id: string, checklist: Partial<schema.InsertTaskChecklist>): Promise<schema.TaskChecklist | undefined>;
   deleteTaskChecklist(id: string): Promise<void>;
   toggleChecklistItem(id: string, userId: string): Promise<schema.TaskChecklist | undefined>;
+
+  // LLM Configurations
+  createLlmConfiguration(config: schema.InsertLlmConfiguration): Promise<schema.LlmConfiguration>;
+  getLlmConfiguration(id: string): Promise<schema.LlmConfiguration | undefined>;
+  getLlmConfigurationsByOrganization(organizationId: string): Promise<schema.LlmConfiguration[]>;
+  getDefaultLlmConfiguration(organizationId: string): Promise<schema.LlmConfiguration | undefined>;
+  updateLlmConfiguration(id: string, config: Partial<schema.InsertLlmConfiguration>): Promise<schema.LlmConfiguration | undefined>;
+  deleteLlmConfiguration(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -2268,6 +2276,50 @@ export class DbStorage implements IStorage {
         })
         .where(eq(schema.pipelines.id, pipelineId));
     }
+  }
+
+  // ========================================
+  // LLM CONFIGURATIONS
+  // ========================================
+
+  async createLlmConfiguration(config: schema.InsertLlmConfiguration): Promise<schema.LlmConfiguration> {
+    const result = await db.insert(schema.llmConfigurations).values(config).returning();
+    return result[0];
+  }
+
+  async getLlmConfiguration(id: string): Promise<schema.LlmConfiguration | undefined> {
+    const result = await db.select().from(schema.llmConfigurations).where(eq(schema.llmConfigurations.id, id));
+    return result[0];
+  }
+
+  async getLlmConfigurationsByOrganization(organizationId: string): Promise<schema.LlmConfiguration[]> {
+    return await db.select().from(schema.llmConfigurations)
+      .where(eq(schema.llmConfigurations.organizationId, organizationId))
+      .orderBy(schema.llmConfigurations.isDefault);
+  }
+
+  async getDefaultLlmConfiguration(organizationId: string): Promise<schema.LlmConfiguration | undefined> {
+    const result = await db.select().from(schema.llmConfigurations)
+      .where(
+        and(
+          eq(schema.llmConfigurations.organizationId, organizationId),
+          eq(schema.llmConfigurations.isDefault, true),
+          eq(schema.llmConfigurations.isActive, true)
+        )
+      );
+    return result[0];
+  }
+
+  async updateLlmConfiguration(id: string, config: Partial<schema.InsertLlmConfiguration>): Promise<schema.LlmConfiguration | undefined> {
+    const result = await db.update(schema.llmConfigurations)
+      .set({ ...config, updatedAt: new Date() })
+      .where(eq(schema.llmConfigurations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLlmConfiguration(id: string): Promise<void> {
+    await db.delete(schema.llmConfigurations).where(eq(schema.llmConfigurations.id, id));
   }
 }
 

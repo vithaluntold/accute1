@@ -826,6 +826,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== LLM Configuration Routes ====================
+  
+  app.get("/api/llm-configurations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const configs = req.user!.organizationId
+        ? await storage.getLlmConfigurationsByOrganization(req.user!.organizationId)
+        : [];
+      // Don't send back the encrypted API keys in the list
+      const sanitized = configs.map(c => ({
+        ...c,
+        apiKeyEncrypted: '[ENCRYPTED]'
+      }));
+      res.json(sanitized);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch LLM configurations" });
+    }
+  });
+
+  app.post("/api/llm-configurations", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { encrypt } = await import('./llm-service');
+      const { apiKey, ...rest } = req.body;
+      
+      // Encrypt the API key before storing
+      const encryptedKey = encrypt(apiKey);
+      
+      const config = await storage.createLlmConfiguration({
+        ...rest,
+        apiKeyEncrypted: encryptedKey,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "llm_configuration", config.id, {}, req);
+      
+      // Don't send back the encrypted key
+      res.json({ ...config, apiKeyEncrypted: '[ENCRYPTED]' });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create LLM configuration" });
+    }
+  });
+
+  app.patch("/api/llm-configurations/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { encrypt } = await import('./llm-service');
+      const existing = await storage.getLlmConfiguration(req.params.id);
+      
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      const { apiKey, ...rest } = req.body;
+      const updates: any = rest;
+      
+      // If a new API key is provided, encrypt it
+      if (apiKey && apiKey !== '[ENCRYPTED]') {
+        updates.apiKeyEncrypted = encrypt(apiKey);
+      }
+      
+      const config = await storage.updateLlmConfiguration(req.params.id, updates);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "llm_configuration", req.params.id, {}, req);
+      
+      res.json({ ...config, apiKeyEncrypted: '[ENCRYPTED]' });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update LLM configuration" });
+    }
+  });
+
+  app.delete("/api/llm-configurations/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getLlmConfiguration(req.params.id);
+      
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      await storage.deleteLlmConfiguration(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "llm_configuration", req.params.id, {}, req);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete LLM configuration" });
+    }
+  });
+
   // ==================== AI Agent Routes ====================
   
   app.get("/api/ai-agents", requireAuth, async (req: Request, res: Response) => {
