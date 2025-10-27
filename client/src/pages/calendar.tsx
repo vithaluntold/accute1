@@ -39,7 +39,7 @@ export default function CalendarPage() {
   });
 
   const createAppointmentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/appointments", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/appointments", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       setDialogOpen(false);

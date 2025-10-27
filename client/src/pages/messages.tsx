@@ -45,7 +45,7 @@ export default function MessagesPage() {
   });
 
   const createConversationMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/conversations", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/conversations", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
       setNewConversationOpen(false);
@@ -58,7 +58,7 @@ export default function MessagesPage() {
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: any) =>
-      apiRequest(`/api/conversations/${selectedConversation.id}/messages`, "POST", data),
+      apiRequest("POST", `/api/conversations/${selectedConversation.id}/messages`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/conversations", selectedConversation.id, "messages"],

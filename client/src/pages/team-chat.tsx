@@ -26,7 +26,7 @@ export default function TeamChatPage() {
 
   const sendMessageMutation = useMutation({
     mutationFn: (data: any) =>
-      apiRequest(`/api/chat/channels/${selectedChannel.id}/messages`, "POST", data),
+      apiRequest("POST", `/api/chat/channels/${selectedChannel.id}/messages`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/chat/channels", selectedChannel.id, "messages"],

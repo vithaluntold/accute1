@@ -50,7 +50,7 @@ export default function SignaturesPage() {
   });
 
   const createRequestMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/signature-requests", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/signature-requests", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/signature-requests"] });
       setDialogOpen(false);

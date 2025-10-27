@@ -47,7 +47,7 @@ export default function TimeTrackingPage() {
   });
 
   const createEntryMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/time-entries", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/time-entries", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
       setDialogOpen(false);
@@ -56,7 +56,7 @@ export default function TimeTrackingPage() {
   });
 
   const updateEntryMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/time-entries/${id}`, "PUT", data),
+    mutationFn: ({ id, ...data }: any) => apiRequest("PUT", `/api/time-entries/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
       setDialogOpen(false);
@@ -66,7 +66,7 @@ export default function TimeTrackingPage() {
   });
 
   const deleteEntryMutation = useMutation({
-    mutationFn: (id: string) => apiRequest(`/api/time-entries/${id}`, "DELETE"),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/time-entries/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-entries"] });
       toast({ title: "Time entry deleted successfully" });

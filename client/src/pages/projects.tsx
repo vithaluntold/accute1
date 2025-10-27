@@ -41,7 +41,7 @@ export default function ProjectsPage() {
   });
 
   const createProjectMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/projects", "POST", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/projects", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
@@ -51,7 +51,7 @@ export default function ProjectsPage() {
 
   const createTaskMutation = useMutation({
     mutationFn: ({ projectId, ...data }: any) =>
-      apiRequest(`/api/projects/${projectId}/tasks`, "POST", data),
+      apiRequest("POST", `/api/projects/${projectId}/tasks`, data),
     onSuccess: () => {
       if (selectedProject) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", selectedProject.id] });
@@ -62,7 +62,7 @@ export default function ProjectsPage() {
   });
 
   const updateTaskMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/tasks/${id}`, "PUT", data),
+    mutationFn: ({ id, ...data }: any) => apiRequest("PUT", `/api/tasks/${id}`, data),
     onSuccess: () => {
       if (selectedProject) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", selectedProject.id] });
