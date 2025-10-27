@@ -336,6 +336,27 @@ export const invitations = pgTable("invitations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// LLM Configurations for user-managed AI credentials
+export const llmConfigurations = pgTable("llm_configurations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(), // User-friendly name for this configuration
+  provider: text("provider").notNull(), // 'openai', 'anthropic', 'azure'
+  // Encrypted API credentials
+  apiKeyEncrypted: text("api_key_encrypted").notNull(), // AES-256 encrypted
+  azureEndpoint: text("azure_endpoint"), // For Azure OpenAI
+  // Model configuration
+  model: text("model").notNull(), // e.g., 'gpt-4', 'claude-3-opus', etc.
+  modelVersion: text("model_version"), // Optional version specification
+  // Settings
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false), // Default config for organization
+  // Metadata
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Clients for accounting firms
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
