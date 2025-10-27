@@ -26,6 +26,7 @@ import Register from "@/pages/register";
 import PublicFormPage from "@/pages/public-form";
 import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
+import Analytics from "@/pages/analytics";
 import Workflows from "@/pages/workflows";
 import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
@@ -188,6 +189,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Settings />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/analytics">
+        <ProtectedRoute>
+          <AppLayout>
+            <Analytics />
           </AppLayout>
         </ProtectedRoute>
       </Route>

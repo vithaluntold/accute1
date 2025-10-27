@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Play, Edit, Trash2, Copy, Workflow } from "lucide-react";
 
 export default function Workflows() {
+  const [, setLocation] = useLocation();
+  
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],
   });
@@ -30,7 +33,7 @@ export default function Workflows() {
             Automate your accounting processes with AI-powered workflows
           </p>
         </div>
-        <Button data-testid="button-create-workflow">
+        <Button onClick={() => setLocation("/workflows/new")} data-testid="button-create-workflow">
           <Plus className="h-4 w-4 mr-2" />
           Create Workflow
         </Button>
@@ -69,7 +72,7 @@ export default function Workflows() {
               Create your first workflow to automate client onboarding, tax preparation,
               bookkeeping, and more
             </p>
-            <Button data-testid="button-create-first-workflow">
+            <Button onClick={() => setLocation("/workflows/new")} data-testid="button-create-first-workflow">
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Workflow
             </Button>
@@ -108,6 +111,7 @@ export default function Workflows() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => setLocation(`/workflows/${workflow.id}/edit`)}
                       data-testid={`button-edit-workflow-${workflow.id}`}
                     >
                       <Edit className="h-4 w-4" />

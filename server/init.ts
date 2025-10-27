@@ -9,34 +9,40 @@ export async function initializeSystem() {
     // Check if system roles exist
     const existingRoles = await db.select().from(schema.roles).where(eq(schema.roles.isSystemRole, true));
     
+    // Always run to ensure new permissions are added
     if (existingRoles.length >= 4) {
-      console.log("✓ System roles already initialized");
-      return;
+      console.log("✓ System roles exist, checking permissions...");
+      // Continue to add any missing permissions
     }
 
     console.log("📝 Creating system roles and permissions...");
 
-    // Create system roles
+    // Get or create system roles
+    const getSuperAdmin = await db.select().from(schema.roles).where(eq(schema.roles.name, "Super Admin"));
+    const getAdmin = await db.select().from(schema.roles).where(eq(schema.roles.name, "Admin"));
+    const getEmployee = await db.select().from(schema.roles).where(eq(schema.roles.name, "Employee"));
+    const getClient = await db.select().from(schema.roles).where(eq(schema.roles.name, "Client"));
+    
     const roles = {
-      superAdmin: await db.insert(schema.roles).values({
+      superAdmin: getSuperAdmin.length > 0 ? getSuperAdmin[0] : await db.insert(schema.roles).values({
         name: "Super Admin",
         description: "Full system access with organization management",
         isSystemRole: true,
       }).returning().then(r => r[0]).catch(() => null),
 
-      admin: await db.insert(schema.roles).values({
+      admin: getAdmin.length > 0 ? getAdmin[0] : await db.insert(schema.roles).values({
         name: "Admin",
         description: "Organization administrator with team management",
         isSystemRole: true,
       }).returning().then(r => r[0]).catch(() => null),
 
-      employee: await db.insert(schema.roles).values({
+      employee: getEmployee.length > 0 ? getEmployee[0] : await db.insert(schema.roles).values({
         name: "Employee",
         description: "Team member with workflow execution access",
         isSystemRole: true,
       }).returning().then(r => r[0]).catch(() => null),
 
-      client: await db.insert(schema.roles).values({
+      client: getClient.length > 0 ? getClient[0] : await db.insert(schema.roles).values({
         name: "Client",
         description: "Client with portal access for documents and workflow status",
         isSystemRole: true,
@@ -74,6 +80,22 @@ export async function initializeSystem() {
       { name: "documents.view", resource: "documents", action: "view", description: "View documents" },
       { name: "documents.upload", resource: "documents", action: "upload", description: "Upload documents" },
       { name: "documents.delete", resource: "documents", action: "delete", description: "Delete documents" },
+      
+      // Form management
+      { name: "forms.view", resource: "forms", action: "view", description: "View forms" },
+      { name: "forms.create", resource: "forms", action: "create", description: "Create forms" },
+      { name: "forms.edit", resource: "forms", action: "edit", description: "Edit forms" },
+      { name: "forms.delete", resource: "forms", action: "delete", description: "Delete forms" },
+      { name: "forms.publish", resource: "forms", action: "publish", description: "Publish forms" },
+      { name: "forms.share", resource: "forms", action: "share", description: "Share forms" },
+      { name: "forms.submit", resource: "forms", action: "submit", description: "Submit forms" },
+      
+      // Document Request management
+      { name: "documentRequests.view", resource: "documentRequests", action: "view", description: "View document requests" },
+      { name: "documentRequests.create", resource: "documentRequests", action: "create", description: "Create document requests" },
+      { name: "documentRequests.edit", resource: "documentRequests", action: "edit", description: "Edit document requests" },
+      { name: "documentRequests.delete", resource: "documentRequests", action: "delete", description: "Delete document requests" },
+      { name: "documentRequests.manage", resource: "documentRequests", action: "manage", description: "Manage document requests" },
       
       // Client management
       { name: "clients.view", resource: "clients", action: "view", description: "View clients" },
