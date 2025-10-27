@@ -26,7 +26,7 @@ export default function Contacts() {
 
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ["/api/contacts", selectedClientFilter],
-    queryFn: selectedClientFilter ? () => fetch(`/api/contacts?clientId=${selectedClientFilter}`).then(r => r.json()) : undefined,
+    queryFn: (selectedClientFilter && selectedClientFilter !== "all") ? () => fetch(`/api/contacts?clientId=${selectedClientFilter}`).then(r => r.json()) : undefined,
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
@@ -355,7 +355,7 @@ export default function Contacts() {
               <SelectValue placeholder="All Clients" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="" data-testid="select-option-all-clients">All Clients</SelectItem>
+              <SelectItem value="all" data-testid="select-option-all-clients">All Clients</SelectItem>
               {clients.map((client) => (
                 <SelectItem key={client.id} value={client.id} data-testid={`select-option-filter-${client.id}`}>
                   {client.companyName}
