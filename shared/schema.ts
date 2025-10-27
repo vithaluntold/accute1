@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -924,3 +924,314 @@ export type InstalledAgentView = AiAgentInstallation & {
   agent: typeof aiAgents.$inferSelect | null;
 };
 export type AiProviderConfig = typeof aiProviderConfigs.$inferSelect;
+
+// ============================================
+// TAXDOME FEATURES - Practice Management
+// ============================================
+
+// Secure Messaging System
+export const conversations = pgTable("conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  clientId: varchar("client_id").references(() => clients.id),
+  subject: text("subject"),
+  status: text("status").notNull().default("active"), // active, archived, closed
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderType: text("sender_type").notNull(), // staff, client
+  content: text("content").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  attachments: jsonb("attachments").notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Time Tracking & Billing
+export const timeEntries = pgTable("time_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  clientId: varchar("client_id").references(() => clients.id),
+  projectId: varchar("project_id").references(() => workflows.id),
+  description: text("description").notNull(),
+  hours: numeric("hours", { precision: 10, scale: 2 }).notNull(),
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }),
+  isBillable: boolean("is_billable").notNull().default(true),
+  isInvoiced: boolean("is_invoiced").notNull().default(false),
+  invoiceId: varchar("invoice_id"),
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  invoiceNumber: text("invoice_number").notNull(),
+  status: text("status").notNull().default("draft"), // draft, sent, paid, overdue, cancelled
+  issueDate: timestamp("issue_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull().default("0"),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  taxAmount: numeric("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }).notNull().default("0"),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  timeEntryId: varchar("time_entry_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  invoiceId: varchar("invoice_id").references(() => invoices.id),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  method: text("method").notNull(), // card, ach, check, cash, other
+  status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  stripePaymentId: text("stripe_payment_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  transactionDate: timestamp("transaction_date").notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// E-Signatures
+export const signatureRequests = pgTable("signature_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  documentId: varchar("document_id").references(() => documents.id),
+  clientId: varchar("client_id").references(() => clients.id),
+  title: text("title").notNull(),
+  message: text("message"),
+  status: text("status").notNull().default("pending"), // pending, signed, declined, expired
+  requestedBy: varchar("requested_by").notNull().references(() => users.id),
+  signedBy: varchar("signed_by").references(() => users.id),
+  signedAt: timestamp("signed_at"),
+  expiresAt: timestamp("expires_at"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  signatureData: text("signature_data"), // Base64 encoded signature image
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Projects (Kanban)
+export const projects = pgTable("projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  clientId: varchar("client_id").references(() => clients.id),
+  status: text("status").notNull().default("active"), // active, on_hold, completed, cancelled
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  startDate: timestamp("start_date"),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  ownerId: varchar("owner_id").references(() => users.id),
+  budget: numeric("budget", { precision: 10, scale: 2 }),
+  actualCost: numeric("actual_cost", { precision: 10, scale: 2 }),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectTasks = pgTable("project_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("todo"), // todo, in_progress, review, completed
+  priority: text("priority").notNull().default("medium"),
+  assigneeId: varchar("assignee_id").references(() => users.id),
+  position: integer("position").notNull().default(0), // For drag-drop ordering
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  estimatedHours: numeric("estimated_hours", { precision: 10, scale: 2 }),
+  actualHours: numeric("actual_hours", { precision: 10, scale: 2 }),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Team Chat
+export const chatChannels = pgTable("chat_channels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("group"), // direct, group, project
+  projectId: varchar("project_id").references(() => projects.id),
+  isPrivate: boolean("is_private").notNull().default(false),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const chatMembers = pgTable("chat_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  channelId: varchar("channel_id").notNull().references(() => chatChannels.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: text("role").notNull().default("member"), // admin, member
+  lastReadAt: timestamp("last_read_at"),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  channelId: varchar("channel_id").notNull().references(() => chatChannels.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // Array of user IDs
+  attachments: jsonb("attachments").notNull().default(sql`'[]'::jsonb`),
+  isEdited: boolean("is_edited").notNull().default(false),
+  editedAt: timestamp("edited_at"),
+  parentMessageId: varchar("parent_message_id"), // For threading
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Calendar & Appointments
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  clientId: varchar("client_id").references(() => clients.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  location: text("location"),
+  meetingUrl: text("meeting_url"),
+  status: text("status").notNull().default("scheduled"), // scheduled, confirmed, cancelled, completed, no_show
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  notes: text("notes"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Email Templates
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // welcome, reminder, invoice, signature_request, custom
+  subject: text("subject").notNull(),
+  body: text("body").notNull(), // HTML content with merge fields {{client_name}}, etc.
+  variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`), // Available merge fields
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// PDF Annotations
+export const documentAnnotations = pgTable("document_annotations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // comment, highlight, drawing, text
+  pageNumber: integer("page_number").notNull(),
+  position: jsonb("position").notNull(), // {x, y, width, height}
+  content: text("content"), // For comments or text annotations
+  color: text("color").notNull().default("#FFD700"),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // Tagged users
+  resolved: boolean("resolved").notNull().default(false),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Expenses (for time tracking)
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  clientId: varchar("client_id").references(() => clients.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  category: text("category").notNull(), // travel, meals, supplies, software, other
+  description: text("description").notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  isBillable: boolean("is_billable").notNull().default(true),
+  isInvoiced: boolean("is_invoiced").notNull().default(false),
+  invoiceId: varchar("invoice_id"),
+  receipt: text("receipt"), // File path/URL to receipt
+  date: timestamp("date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Zod Schemas and Types
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true });
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSignatureRequestSchema = createInsertSchema(signatureRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertChatChannelSchema = createInsertSchema(chatChannels).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertChatMemberSchema = createInsertSchema(chatMembers).omit({ id: true });
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDocumentAnnotationSchema = createInsertSchema(documentAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+export type TimeEntry = typeof timeEntries.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertSignatureRequest = z.infer<typeof insertSignatureRequestSchema>;
+export type SignatureRequest = typeof signatureRequests.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;
+export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
+export type ProjectTask = typeof projectTasks.$inferSelect;
+export type InsertChatChannel = z.infer<typeof insertChatChannelSchema>;
+export type ChatChannel = typeof chatChannels.$inferSelect;
+export type InsertChatMember = z.infer<typeof insertChatMemberSchema>;
+export type ChatMember = typeof chatMembers.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertDocumentAnnotation = z.infer<typeof insertDocumentAnnotationSchema>;
+export type DocumentAnnotation = typeof documentAnnotations.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+export type Expense = typeof expenses.$inferSelect;
