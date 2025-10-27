@@ -202,6 +202,15 @@ export interface IStorage {
   deleteFormShareLink(id: string): Promise<void>;
   incrementShareLinkView(shareToken: string): Promise<void>;
   incrementShareLinkSubmission(shareToken: string): Promise<void>;
+
+  // Submission Notes
+  addSubmissionNote(submissionId: string, userId: string, note: string): Promise<schema.SubmissionNote>;
+  getSubmissionNotes(submissionId: string): Promise<Array<schema.SubmissionNote & { user: User }>>;
+
+  // Revision Requests
+  createRevisionRequest(submissionId: string, requestedBy: string, fieldsToRevise: any): Promise<schema.RevisionRequest>;
+  getRevisionRequests(submissionId: string): Promise<Array<schema.RevisionRequest & { requestedByUser: User }>>;
+  assignSubmissionReviewer(id: string, reviewerId: string): Promise<FormSubmission | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -949,6 +958,129 @@ export class DbStorage implements IStorage {
         updatedAt: new Date()
       })
       .where(eq(schema.formShareLinks.shareToken, shareToken));
+  }
+
+  // Submission Notes
+  async addSubmissionNote(submissionId: string, userId: string, note: string): Promise<schema.SubmissionNote> {
+    const result = await db.insert(schema.submissionNotes).values({
+      submissionId,
+      userId,
+      note,
+    }).returning();
+    return result[0];
+  }
+
+  async getSubmissionNotes(submissionId: string): Promise<Array<schema.SubmissionNote & { user: User }>> {
+    const result = await db
+      .select({
+        id: schema.submissionNotes.id,
+        submissionId: schema.submissionNotes.submissionId,
+        userId: schema.submissionNotes.userId,
+        note: schema.submissionNotes.note,
+        createdAt: schema.submissionNotes.createdAt,
+        user: {
+          id: schema.users.id,
+          username: schema.users.username,
+          email: schema.users.email,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+        }
+      })
+      .from(schema.submissionNotes)
+      .leftJoin(schema.users, eq(schema.submissionNotes.userId, schema.users.id))
+      .where(eq(schema.submissionNotes.submissionId, submissionId))
+      .orderBy(desc(schema.submissionNotes.createdAt));
+    
+    return result.map(row => ({
+      id: row.id,
+      submissionId: row.submissionId,
+      userId: row.userId,
+      note: row.note,
+      createdAt: row.createdAt,
+      user: {
+        id: row.user?.id || '',
+        username: row.user?.username || '',
+        email: row.user?.email || '',
+        password: '',
+        firstName: row.user?.firstName || null,
+        lastName: row.user?.lastName || null,
+        roleId: '',
+        organizationId: null,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    }));
+  }
+
+  // Revision Requests
+  async createRevisionRequest(submissionId: string, requestedBy: string, fieldsToRevise: any): Promise<schema.RevisionRequest> {
+    // Update submission status to revision_requested
+    await db.update(schema.formSubmissions)
+      .set({ status: 'revision_requested' })
+      .where(eq(schema.formSubmissions.id, submissionId));
+
+    const result = await db.insert(schema.revisionRequests).values({
+      submissionId,
+      requestedBy,
+      fieldsToRevise,
+    }).returning();
+    return result[0];
+  }
+
+  async getRevisionRequests(submissionId: string): Promise<Array<schema.RevisionRequest & { requestedByUser: User }>> {
+    const result = await db
+      .select({
+        id: schema.revisionRequests.id,
+        submissionId: schema.revisionRequests.submissionId,
+        requestedBy: schema.revisionRequests.requestedBy,
+        fieldsToRevise: schema.revisionRequests.fieldsToRevise,
+        status: schema.revisionRequests.status,
+        completedAt: schema.revisionRequests.completedAt,
+        createdAt: schema.revisionRequests.createdAt,
+        requestedByUser: {
+          id: schema.users.id,
+          username: schema.users.username,
+          email: schema.users.email,
+          firstName: schema.users.firstName,
+          lastName: schema.users.lastName,
+        }
+      })
+      .from(schema.revisionRequests)
+      .leftJoin(schema.users, eq(schema.revisionRequests.requestedBy, schema.users.id))
+      .where(eq(schema.revisionRequests.submissionId, submissionId))
+      .orderBy(desc(schema.revisionRequests.createdAt));
+    
+    return result.map(row => ({
+      id: row.id,
+      submissionId: row.submissionId,
+      requestedBy: row.requestedBy,
+      fieldsToRevise: row.fieldsToRevise,
+      status: row.status,
+      completedAt: row.completedAt,
+      createdAt: row.createdAt,
+      requestedByUser: {
+        id: row.requestedByUser?.id || '',
+        username: row.requestedByUser?.username || '',
+        email: row.requestedByUser?.email || '',
+        password: '',
+        firstName: row.requestedByUser?.firstName || null,
+        lastName: row.requestedByUser?.lastName || null,
+        roleId: '',
+        organizationId: null,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    }));
+  }
+
+  async assignSubmissionReviewer(id: string, reviewerId: string): Promise<FormSubmission | undefined> {
+    const result = await db.update(schema.formSubmissions)
+      .set({ reviewedBy: reviewerId })
+      .where(eq(schema.formSubmissions.id, id))
+      .returning();
+    return result[0];
   }
 }
 

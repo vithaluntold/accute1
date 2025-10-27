@@ -393,6 +393,26 @@ export const formShareLinks = pgTable("form_share_links", {
   clientIdx: index("form_share_links_client_idx").on(table.clientId),
 }));
 
+// Staff notes on submissions
+export const submissionNotes = pgTable("submission_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  submissionId: varchar("submission_id").notNull().references(() => formSubmissions.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  note: text("note").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Revision requests
+export const revisionRequests = pgTable("revision_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  submissionId: varchar("submission_id").notNull().references(() => formSubmissions.id, { onDelete: "cascade" }),
+  requestedBy: varchar("requested_by").notNull().references(() => users.id),
+  fieldsToRevise: jsonb("fields_to_revise").notNull(), // Array of {fieldId, notes}
+  status: text("status").notNull().default("pending"), // pending, completed
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Form Builder TypeScript Types
 export type FormFieldType =
   | "text"
@@ -763,6 +783,16 @@ export const insertFormShareLinkSchema = createInsertSchema(formShareLinks).omit
   updatedAt: true,
 });
 
+export const insertSubmissionNoteSchema = createInsertSchema(submissionNotes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRevisionRequestSchema = createInsertSchema(revisionRequests).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -802,6 +832,10 @@ export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
 export type InsertFormShareLink = z.infer<typeof insertFormShareLinkSchema>;
 export type FormShareLink = typeof formShareLinks.$inferSelect;
+export type InsertSubmissionNote = z.infer<typeof insertSubmissionNoteSchema>;
+export type SubmissionNote = typeof submissionNotes.$inferSelect;
+export type InsertRevisionRequest = z.infer<typeof insertRevisionRequestSchema>;
+export type RevisionRequest = typeof revisionRequests.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type RolePermission = typeof rolePermissions.$inferSelect;
 export type AiAgentInstallation = typeof aiAgentInstallations.$inferSelect;

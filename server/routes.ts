@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contacts", requireAuth, requirePermission("contacts.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const validated = schema.insertContactSchema.parse(req.body);
+      const validated = insertContactSchema.parse(req.body);
       
       const client = await storage.getClient(validated.clientId);
       if (!client || client.organizationId !== req.user!.organizationId) {
@@ -1150,7 +1150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Contact not found" });
       }
       
-      const validated = schema.insertContactSchema.partial().parse(req.body);
+      const validated = insertContactSchema.partial().parse(req.body);
       const { organizationId, createdBy, ...safeData } = validated as any;
       
       if (safeData.clientId) {
@@ -1366,11 +1366,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_created",
+        req.user!.organizationId!,
+        "create",
         "form",
         form.id,
-        req.user!.organizationId!,
-        { formName: form.name }
+        { formName: form.name },
+        req
       );
       
       res.status(201).json(form);
@@ -1394,11 +1395,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_updated",
+        req.user!.organizationId!,
+        "update",
         "form",
         req.params.id,
-        req.user!.organizationId!,
-        { formName: updated?.name }
+        { formName: updated?.name },
+        req
       );
       
       res.json(updated);
@@ -1421,11 +1423,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_published",
+        req.user!.organizationId!,
+        "publish",
         "form",
         req.params.id,
-        req.user!.organizationId!,
-        { formName: published?.name }
+        { formName: published?.name },
+        req
       );
       
       res.json(published);
@@ -1448,11 +1451,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_deleted",
+        req.user!.organizationId!,
+        "delete",
         "form",
         req.params.id,
-        req.user!.organizationId!,
-        { formName: existing.name }
+        { formName: existing.name },
+        req
       );
       
       res.status(204).send();
@@ -1496,11 +1500,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_submitted",
+        form.organizationId,
+        "submit",
         "form_submission",
         submission.id,
-        form.organizationId,
-        { formName: form.name, submissionId: submission.id }
+        { formName: form.name, submissionId: submission.id },
+        req
       );
       
       res.status(201).json(submission);
@@ -1561,11 +1566,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_submitted",
+        form.organizationId,
+        "submit",
         "form_submission",
         submission.id,
-        form.organizationId,
-        { formName: form.name, submissionId: submission.id }
+        { formName: form.name, submissionId: submission.id },
+        req
       );
       
       res.status(201).json(submission);
@@ -1599,16 +1605,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(
         req.user!.id,
-        "form_submission_reviewed",
+        req.user!.organizationId!,
+        "review",
         "form_submission",
         req.params.id,
-        req.user!.organizationId!,
-        { status, reviewNotes }
+        { status, reviewNotes },
+        req
       );
       
       res.json(reviewed);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to review submission" });
+    }
+  });
+
+  // Add staff note to submission
+  app.post("/api/form-submissions/:id/notes", requireAuth, requirePermission("form_submissions.review"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { note } = req.body;
+      
+      if (!note || !note.trim()) {
+        return res.status(400).json({ error: "Note is required" });
+      }
+      
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const submissionNote = await storage.addSubmissionNote(
+        req.params.id,
+        req.user!.id,
+        note
+      );
+      
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "submission_note_added",
+        "form_submission",
+        req.params.id,
+        { note },
+        req
+      );
+      
+      res.status(201).json(submissionNote);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add note" });
+    }
+  });
+
+  // Get all staff notes for a submission
+  app.get("/api/form-submissions/:id/notes", requireAuth, requirePermission("form_submissions.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const notes = await storage.getSubmissionNotes(req.params.id);
+      res.json(notes);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get notes" });
+    }
+  });
+
+  // Create revision request
+  app.post("/api/form-submissions/:id/revision-request", requireAuth, requirePermission("form_submissions.review"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { fieldsToRevise } = req.body;
+      
+      if (!fieldsToRevise || !Array.isArray(fieldsToRevise) || fieldsToRevise.length === 0) {
+        return res.status(400).json({ error: "At least one field to revise is required" });
+      }
+      
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const revisionRequest = await storage.createRevisionRequest(
+        req.params.id,
+        req.user!.id,
+        fieldsToRevise
+      );
+      
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "revision_requested",
+        "form_submission",
+        req.params.id,
+        { fieldsCount: fieldsToRevise.length },
+        req
+      );
+      
+      res.status(201).json(revisionRequest);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create revision request" });
+    }
+  });
+
+  // Get revision requests for a submission
+  app.get("/api/form-submissions/:id/revision-requests", requireAuth, requirePermission("form_submissions.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const revisionRequests = await storage.getRevisionRequests(req.params.id);
+      res.json(revisionRequests);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to get revision requests" });
+    }
+  });
+
+  // Assign reviewer to submission
+  app.put("/api/form-submissions/:id/assign", requireAuth, requirePermission("form_submissions.review"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { reviewerId } = req.body;
+      
+      if (!reviewerId) {
+        return res.status(400).json({ error: "Reviewer ID is required" });
+      }
+      
+      const existing = await storage.getFormSubmission(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      if (existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Verify reviewer exists and belongs to same organization
+      const reviewer = await storage.getUser(reviewerId);
+      if (!reviewer || reviewer.organizationId !== req.user!.organizationId) {
+        return res.status(400).json({ error: "Invalid reviewer" });
+      }
+      
+      const updated = await storage.assignSubmissionReviewer(req.params.id, reviewerId);
+      
+      await logActivity(
+        req.user!.id,
+        req.user!.organizationId!,
+        "reviewer_assigned",
+        "form_submission",
+        req.params.id,
+        { reviewerId },
+        req
+      );
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to assign reviewer" });
     }
   });
 
@@ -1652,11 +1814,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await logActivity(
         req.user!.id,
-        "share_link_created",
+        req.user!.organizationId!,
+        "create",
         "form_share_link",
         shareLink.id,
-        req.user!.organizationId!,
-        { formName: form.name, shareToken }
+        { formName: form.name, shareToken },
+        req
       );
 
       res.status(201).json(shareLink);
@@ -1699,11 +1862,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await logActivity(
         req.user!.id,
-        "share_link_deleted",
+        req.user!.organizationId!,
+        "delete",
         "form_share_link",
         req.params.id,
-        req.user!.organizationId!,
-        { shareToken: shareLink.shareToken }
+        { shareToken: shareLink.shareToken },
+        req
       );
 
       res.status(204).send();
