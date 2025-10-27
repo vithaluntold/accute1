@@ -837,6 +837,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Specific routes MUST come before dynamic parameter routes
+  app.get("/api/ai-agents/installed", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const installed = req.user!.organizationId
+        ? await storage.getInstalledAgents(req.user!.organizationId)
+        : [];
+      res.json(installed);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch installed agents" });
+    }
+  });
+
   app.get("/api/ai-agents/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const agent = await storage.getAiAgent(req.params.id);
@@ -874,17 +886,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(installation);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to install AI agent" });
-    }
-  });
-
-  app.get("/api/ai-agents/installed", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const installed = req.user!.organizationId
-        ? await storage.getInstalledAgents(req.user!.organizationId)
-        : [];
-      res.json(installed);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch installed agents" });
     }
   });
 
