@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText, Wrench } from "lucide-react";
+import { 
+  Plus, Search, Edit, Trash2, Eye, Clock, CheckCircle, FileText, Wrench, Sparkles,
+  MessageSquare, Star, Calendar, Briefcase, HeadphonesIcon, ShoppingCart, Mail, DollarSign, UserPlus
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +13,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertFormTemplateSchema, type FormTemplate } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
+import { formTemplates, templateCategories, type FormTemplate as TemplateType } from "@/data/form-templates";
 
 // Only user-editable fields
 const formSchema = z.object({
@@ -26,10 +31,25 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Icon mapping for templates
+const iconMap: Record<string, any> = {
+  MessageSquare,
+  Star,
+  Calendar,
+  Briefcase,
+  HeadphonesIcon,
+  ShoppingCart,
+  Mail,
+  DollarSign,
+  FileText,
+  UserPlus,
+};
+
 export default function FormsPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormTemplate | null>(null);
   const [deleteConfirmForm, setDeleteConfirmForm] = useState<FormTemplate | null>(null);
   const { toast } = useToast();
@@ -47,6 +67,25 @@ export default function FormsPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create form", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createFromTemplateMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/forms", data),
+    onSuccess: (data: any, variables: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      setTemplateGalleryOpen(false);
+      const templateName = variables.templateName;
+      toast({ 
+        title: "Form created from template",
+        description: `${templateName} template has been applied`,
+      });
+      if (data && data.id) {
+        setLocation(`/forms/${data.id}/builder`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create form from template", description: error.message, variant: "destructive" });
     },
   });
 
@@ -100,10 +139,20 @@ export default function FormsPage() {
             Create and manage form templates for clients and workflows
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-form">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Form
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setTemplateGalleryOpen(true)} 
+            data-testid="button-create-from-template"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Create from Template
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-form">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Form
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -290,7 +339,152 @@ export default function FormsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <TemplateGalleryDialog
+        open={templateGalleryOpen}
+        onOpenChange={setTemplateGalleryOpen}
+        onSelectTemplate={(template) => {
+          const categoryMap: Record<string, "custom" | "tax" | "audit" | "onboarding"> = {
+            "Business": "custom",
+            "Survey": "custom",
+            "Registration": "onboarding",
+            "Marketing": "custom",
+            "Tax": "tax",
+            "Onboarding": "onboarding",
+          };
+          
+          createFromTemplateMutation.mutate({
+            name: template.name,
+            description: template.description,
+            category: categoryMap[template.category] || "custom",
+            fields: template.fields,
+            sections: [],
+            pages: [],
+            conditionalRules: [],
+            validationRules: [],
+            calculatedFields: [],
+            folderStructure: {},
+            settings: template.config,
+            templateName: template.name,
+          });
+        }}
+        isPending={createFromTemplateMutation.isPending}
+      />
     </div>
+  );
+}
+
+interface TemplateGalleryDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelectTemplate: (template: TemplateType) => void;
+  isPending: boolean;
+}
+
+function TemplateGalleryDialog({ open, onOpenChange, onSelectTemplate, isPending }: TemplateGalleryDialogProps) {
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredTemplates = formTemplates.filter((template) => {
+    const matchesCategory = selectedCategory === "All" || template.category === selectedCategory;
+    const matchesSearch = 
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="dialog-template-gallery">
+        <DialogHeader>
+          <DialogTitle>Create from Template</DialogTitle>
+          <DialogDescription>
+            Choose a pre-built template to get started quickly
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search templates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-templates"
+            />
+          </div>
+
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto" data-testid="tabs-template-categories">
+              {templateCategories.map((category) => (
+                <TabsTrigger 
+                  key={category} 
+                  value={category}
+                  data-testid={`tab-category-${category.toLowerCase()}`}
+                >
+                  {category}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <div className="flex-1 overflow-y-auto mt-4">
+              <TabsContent value={selectedCategory} className="mt-0">
+                {filteredTemplates.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No templates found</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
+                    {filteredTemplates.map((template) => {
+                      const IconComponent = iconMap[template.icon] || FileText;
+                      return (
+                        <Card 
+                          key={template.id} 
+                          className="hover-elevate flex flex-col"
+                          data-testid={`template-card-${template.id}`}
+                        >
+                          <CardHeader className="flex-1">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 rounded-md bg-primary/10">
+                                <IconComponent className="w-5 h-5 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-base truncate">
+                                  {template.name}
+                                </CardTitle>
+                                <Badge variant="outline" className="mt-1">
+                                  {template.category}
+                                </Badge>
+                              </div>
+                            </div>
+                            <CardDescription className="line-clamp-3 mt-2">
+                              {template.description}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardFooter>
+                            <Button
+                              size="sm"
+                              onClick={() => onSelectTemplate(template)}
+                              disabled={isPending}
+                              className="w-full"
+                              data-testid={`button-use-template-${template.id}`}
+                            >
+                              Use Template
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
