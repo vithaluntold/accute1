@@ -28,6 +28,7 @@ import Dashboard from "@/pages/dashboard";
 import Settings from "@/pages/settings";
 import Analytics from "@/pages/analytics";
 import Workflows from "@/pages/workflows";
+import WorkflowDetail from "@/pages/workflow-detail";
 import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
@@ -212,6 +213,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Workflows />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workflows/:id">
+        <ProtectedRoute>
+          <AppLayout>
+            <WorkflowDetail />
           </AppLayout>
         </ProtectedRoute>
       </Route>

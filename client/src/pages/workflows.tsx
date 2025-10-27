@@ -118,6 +118,14 @@ export default function Workflows() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setLocation(`/workflows/${workflow.id}`)}
+                      data-testid={`button-view-workflow-${workflow.id}`}
+                    >
+                      View Details
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="icon"
                       data-testid={`button-run-workflow-${workflow.id}`}
