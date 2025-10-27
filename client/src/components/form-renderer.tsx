@@ -18,13 +18,99 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { CalendarIcon, Star, Upload, Check, Mic, Video, Camera, Square, Play, RotateCcw, Loader2 } from "lucide-react";
+import { CalendarIcon, Star, Upload, Check, Mic, Video, Camera, Square, Play, RotateCcw, Loader2, Hash, Shuffle, Calculator, Minus, FileText } from "lucide-react";
+import { Parser } from "expr-eval";
 
 interface MediaFieldProps {
   id: string;
   value?: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+}
+
+interface TermsFieldProps {
+  id: string;
+  field: FormField;
+  value?: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}
+
+function TermsField({ id, field, value, onChange, disabled }: TermsFieldProps) {
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+  const termsConfig = field.config as any;
+  const termsText = termsConfig?.termsText || "";
+  const termsLink = termsConfig?.termsLink || "";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start space-x-2">
+        <Checkbox
+          checked={value || false}
+          onCheckedChange={onChange}
+          disabled={disabled}
+          id={id}
+          data-testid={`terms-${id}`}
+        />
+        <div className="flex flex-col gap-1">
+          <Label htmlFor={id} className="text-sm font-normal leading-relaxed cursor-pointer">
+            I agree to the{" "}
+            {termsLink ? (
+              <a
+                href={termsLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:text-primary/80"
+                onClick={(e) => e.stopPropagation()}
+              >
+                terms and conditions
+              </a>
+            ) : termsText ? (
+              <button
+                type="button"
+                className="text-primary underline hover:text-primary/80"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowTermsDialog(true);
+                }}
+              >
+                terms and conditions
+              </button>
+            ) : (
+              <span className="text-primary">terms and conditions</span>
+            )}
+          </Label>
+        </div>
+      </div>
+
+      {termsText && !termsLink && showTermsDialog && (
+        <Card className="mt-2">
+          <CardContent className="p-4 max-h-60 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                <h4 className="font-semibold text-sm">Terms and Conditions</h4>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTermsDialog(false)}
+              >
+                Close
+              </Button>
+            </div>
+            <div
+              className="text-sm text-muted-foreground whitespace-pre-wrap"
+              data-testid={`terms-text-${id}`}
+            >
+              {termsText}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 function AudioField({ id, value, onChange, disabled }: MediaFieldProps) {
@@ -906,6 +992,28 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
           }
           break;
 
+        case "unique_id":
+        case "random_id":
+          // Auto-generated ID fields store as string
+          fieldSchema = z.string();
+          break;
+
+        case "formula":
+          // Computed field can be number or string
+          fieldSchema = z.union([z.string(), z.number()]).optional();
+          break;
+
+        case "terms":
+          // Terms and conditions checkbox
+          if (isRequired) {
+            fieldSchema = z.literal(true, {
+              errorMap: () => ({ message: "You must accept the terms and conditions" }),
+            });
+          } else {
+            fieldSchema = z.boolean().optional();
+          }
+          break;
+
         default:
           fieldSchema = z.string();
           if (isRequired) {
@@ -944,6 +1052,125 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
 
   // Watch form values and evaluate conditional rules
   const formValues = form.watch();
+
+  // Helper function to generate unique ID
+  const generateUniqueId = (field: FormField): string => {
+    const config = field.config as any;
+    const prefix = config?.idPrefix || "";
+    const startingNumber = config?.idStartingNumber || 1;
+    const padding = config?.idPadding || 3;
+    
+    // In a real app, you would fetch the count from submissions
+    // For now, we'll just use the starting number
+    const number = startingNumber;
+    const paddedNumber = number.toString().padStart(padding, "0");
+    
+    return `${prefix}${paddedNumber}`;
+  };
+
+  // Helper function to generate random ID
+  const generateRandomId = (field: FormField): string => {
+    const config = field.config as any;
+    const length = config?.randomIdLength || 8;
+    const charSet = config?.randomIdCharSet || "alphanumeric";
+    
+    let chars = "";
+    switch (charSet) {
+      case "alphanumeric":
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        break;
+      case "alpha":
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        break;
+      case "numeric":
+        chars = "0123456789";
+        break;
+      default:
+        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    }
+    
+    let result = "";
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    return result;
+  };
+
+  // Helper function to evaluate formula
+  const evaluateFormula = (expression: string, values: Record<string, any>): string | number => {
+    try {
+      const parser = new Parser();
+      // Create a safe context with only numeric values
+      const context: Record<string, number> = {};
+      
+      for (const [key, value] of Object.entries(values)) {
+        if (typeof value === "number") {
+          context[key] = value;
+        } else if (typeof value === "string" && !isNaN(parseFloat(value))) {
+          context[key] = parseFloat(value);
+        } else if (typeof value === "object" && value !== null) {
+          // Handle currency fields
+          if ("amount" in value && typeof value.amount === "number") {
+            context[key] = value.amount;
+          }
+        }
+      }
+      
+      const expr = parser.parse(expression);
+      const result = expr.evaluate(context);
+      
+      // Round to 2 decimal places if it's a decimal number
+      if (typeof result === "number" && !Number.isInteger(result)) {
+        return Math.round(result * 100) / 100;
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("Formula evaluation error:", error);
+      return "Error";
+    }
+  };
+
+  // Initialize auto-generated fields (unique_id, random_id) on mount
+  useEffect(() => {
+    const idFields = fields.filter((f) => f.type === "unique_id" || f.type === "random_id");
+    
+    idFields.forEach((field) => {
+      const currentValue = form.getValues(field.id);
+      
+      // Only generate if no value exists
+      if (!currentValue) {
+        if (field.type === "unique_id") {
+          const uniqueId = generateUniqueId(field);
+          form.setValue(field.id, uniqueId);
+        } else if (field.type === "random_id") {
+          const randomId = generateRandomId(field);
+          form.setValue(field.id, randomId);
+        }
+      }
+    });
+  }, [fields]);
+
+  // Calculate formula fields when form values change
+  useEffect(() => {
+    const formulaFields = fields.filter((f) => f.type === "formula");
+    
+    formulaFields.forEach((field) => {
+      const config = field.config as any;
+      const expression = config?.formulaExpression || "";
+      
+      if (expression) {
+        const result = evaluateFormula(expression, formValues);
+        const currentValue = form.getValues(field.id);
+        
+        // Only update if the value changed to avoid infinite loops
+        if (currentValue !== result) {
+          form.setValue(field.id, result);
+        }
+      }
+    });
+  }, [formValues, fields]);
   
   useEffect(() => {
     if (conditionalRules.length > 0) {
@@ -990,7 +1217,7 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
     }
 
     // Skip non-input field types
-    if (type === "heading" || type === "divider" || type === "html") {
+    if (type === "heading" || type === "divider" || type === "html" || type === "page_break") {
       return renderStaticField(field);
     }
 
@@ -1647,6 +1874,58 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
           />
         );
 
+      case "unique_id":
+        return (
+          <div className="flex items-center gap-2">
+            <Hash className="w-4 h-4 text-muted-foreground" />
+            <Input
+              {...controllerField}
+              id={id}
+              readOnly
+              className="font-mono"
+              data-testid={`unique-id-${id}`}
+            />
+          </div>
+        );
+
+      case "random_id":
+        return (
+          <div className="flex items-center gap-2">
+            <Shuffle className="w-4 h-4 text-muted-foreground" />
+            <Input
+              {...controllerField}
+              id={id}
+              readOnly
+              className="font-mono"
+              data-testid={`random-id-${id}`}
+            />
+          </div>
+        );
+
+      case "formula":
+        return (
+          <div className="flex items-center gap-2">
+            <Calculator className="w-4 h-4 text-muted-foreground" />
+            <Input
+              {...controllerField}
+              id={id}
+              readOnly
+              data-testid={`formula-${id}`}
+            />
+          </div>
+        );
+
+      case "terms":
+        return (
+          <TermsField
+            id={id}
+            field={field}
+            value={controllerField.value}
+            onChange={controllerField.onChange}
+            disabled={disabled}
+          />
+        );
+
       default:
         return (
           <Input
@@ -1694,6 +1973,29 @@ export function FormRenderer({ formTemplate, onSubmit, defaultValues = {}, isSub
             dangerouslySetInnerHTML={{ __html: description || "" }}
             data-testid={`html-${id}`}
           />
+        );
+
+      case "page_break":
+        return (
+          <div key={id} className={widthClass} data-testid={`page-break-${id}`}>
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 border-t-2 border-dashed border-muted-foreground/30" />
+              {label && (
+                <>
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Minus className="w-4 h-4" />
+                    <span>{label}</span>
+                  </div>
+                  <div className="flex-1 border-t-2 border-dashed border-muted-foreground/30" />
+                </>
+              )}
+            </div>
+            {description && (
+              <p className="text-sm text-center text-muted-foreground -mt-4 mb-4">
+                {description}
+              </p>
+            )}
+          </div>
         );
 
       default:

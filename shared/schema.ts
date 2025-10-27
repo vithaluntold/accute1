@@ -393,6 +393,11 @@ export type FormFieldType =
   | "audio"         // Audio upload with recording capability
   | "video"         // Video upload with recording capability
   | "camera"        // Camera image capture
+  | "unique_id"     // Auto-incremented sequential ID
+  | "random_id"     // Random alphanumeric ID
+  | "formula"       // Computed field based on other fields
+  | "page_break"    // Multi-page form separator
+  | "terms"         // Terms & Conditions checkbox
   | "calculated"
   | "heading"
   | "divider"
@@ -436,6 +441,18 @@ export interface CompositeFieldConfig {
   matrixRows?: FormFieldOption[]; // Questions/items to rate
   matrixColumns?: FormFieldOption[]; // Rating scale options
   matrixType?: "radio" | "checkbox"; // Single or multiple selections per row
+  // Unique ID configuration
+  idPrefix?: string; // Prefix like "INV-", "ORD-"
+  idStartingNumber?: number; // Starting number (default: 1)
+  idPadding?: number; // Zero padding (default: 3, e.g., 001)
+  // Random ID configuration
+  randomIdLength?: number; // Length of random ID (default: 8)
+  randomIdCharSet?: "alphanumeric" | "alpha" | "numeric"; // Character set
+  // Formula configuration
+  formulaExpression?: string; // Expression to calculate (e.g., "price * quantity")
+  // Terms configuration
+  termsText?: string; // Full terms and conditions text
+  termsLink?: string; // Link to external terms page
 }
 
 export interface FormField {

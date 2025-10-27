@@ -65,8 +65,13 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "signature", label: "Signature" },
   { value: "rating", label: "Rating" },
   { value: "slider", label: "Slider" },
+  { value: "unique_id", label: "Unique ID" },
+  { value: "random_id", label: "Random ID" },
+  { value: "formula", label: "Formula" },
+  { value: "terms", label: "Terms & Conditions" },
   { value: "calculated", label: "Calculated Field" },
   { value: "heading", label: "Heading" },
+  { value: "page_break", label: "Page Break" },
   { value: "divider", label: "Divider" },
   { value: "html", label: "HTML Content" },
 ];
@@ -78,7 +83,8 @@ const fieldSchema = z.object({
     "date", "time", "datetime", "select", "multi_select", "radio",
     "checkbox", "image_choice", "matrix_choice", "file_upload", 
     "audio", "video", "camera", "signature",
-    "rating", "slider", "calculated", "heading", "divider", "html"
+    "rating", "slider", "unique_id", "random_id", "formula", "terms",
+    "calculated", "heading", "page_break", "divider", "html"
   ]),
   label: z.string().min(1, "Label is required"),
   placeholder: z.string().optional(),
