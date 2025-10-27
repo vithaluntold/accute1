@@ -206,6 +206,13 @@ function Router() {
           </AppLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/workflow-builder">
+        <ProtectedRoute>
+          <AppLayout>
+            <WorkflowBuilder />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/workflows/new">
         <ProtectedRoute>
           <AppLayout>
