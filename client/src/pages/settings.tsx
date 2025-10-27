@@ -66,6 +66,7 @@ const llmConfigSchema = z.object({
   provider: z.enum(["openai", "azure", "anthropic"]),
   apiKey: z.string().min(1, "API key is required"),
   azureEndpoint: z.string().optional(),
+  azureApiVersion: z.string().optional(),
   model: z.string().min(1, "Model is required"),
   isDefault: z.boolean().default(false),
 }).refine(
@@ -134,6 +135,7 @@ export default function Settings() {
       provider: "openai",
       apiKey: "",
       azureEndpoint: "",
+      azureApiVersion: "2024-12-01-preview",
       model: "",
       isDefault: false,
     },
@@ -233,7 +235,7 @@ export default function Settings() {
   });
 
   const testConnectionMutation = useMutation({
-    mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string }) => {
+    mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string; apiVersion?: string }) => {
       return apiRequest("POST", "/api/llm-configurations/test", data);
     },
     onSuccess: (result: any) => {
@@ -297,6 +299,7 @@ export default function Settings() {
       provider: formData.provider === "azure" ? "azure_openai" : formData.provider,
       apiKey: formData.apiKey,
       endpoint: formData.azureEndpoint,
+      apiVersion: formData.azureApiVersion,
     });
   };
 
@@ -685,22 +688,40 @@ export default function Settings() {
                   />
 
                   {selectedLlmProvider === "azure" && (
-                    <FormField
-                      control={llmForm.control}
-                      name="azureEndpoint"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Azure Endpoint</FormLabel>
-                          <FormControl>
-                            <Input type="url" placeholder="https://your-resource.openai.azure.com" data-testid="input-llm-azure-endpoint" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Base URL only - do not include /openai/deployments or other paths
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <>
+                      <FormField
+                        control={llmForm.control}
+                        name="azureEndpoint"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Azure Endpoint</FormLabel>
+                            <FormControl>
+                              <Input type="url" placeholder="https://your-resource.openai.azure.com" data-testid="input-llm-azure-endpoint" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Base URL only - do not include /openai/deployments or other paths
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={llmForm.control}
+                        name="azureApiVersion"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Azure API Version</FormLabel>
+                            <FormControl>
+                              <Input placeholder="2024-12-01-preview" data-testid="input-llm-azure-api-version" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Azure OpenAI API version (e.g., 2024-12-01-preview, 2024-02-01)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
                   )}
 
                   <FormField

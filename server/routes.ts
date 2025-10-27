@@ -914,7 +914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/llm-configurations/test", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
     try {
-      const { provider, apiKey, endpoint } = req.body;
+      const { provider, apiKey, endpoint, apiVersion } = req.body;
       
       if (!provider || !apiKey) {
         return res.status(400).json({ 
@@ -970,10 +970,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Remove trailing slash from endpoint if present
           const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           
+          // Use provided API version or default to latest
+          const azureApiVersion = apiVersion || '2024-12-01-preview';
+          
           const client = new OpenAI({
             apiKey,
             baseURL: `${cleanEndpoint}/openai/deployments`,
-            defaultQuery: { 'api-version': '2024-12-01-preview' },
+            defaultQuery: { 'api-version': azureApiVersion },
             defaultHeaders: { 'api-key': apiKey },
             timeout: 10000
           });
