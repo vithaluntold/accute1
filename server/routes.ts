@@ -3518,6 +3518,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check and send task reminders
+  app.post("/api/tasks/process-reminders", requireAuth, requirePermission("pipelines.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const allTasks = await storage.getPipelinesByOrganization(req.user!.organizationId!);
+      const tasksNeedingReminders: any[] = [];
+      const now = new Date();
+      
+      // Get all tasks from all pipelines (flatten the hierarchy)
+      for (const pipeline of allTasks) {
+        const stages = await storage.getStagesByPipeline(pipeline.id);
+        for (const stage of stages) {
+          const steps = await storage.getStepsByStage(stage.id);
+          for (const step of steps) {
+            const tasks = await storage.getTasksByStep(step.id);
+            for (const task of tasks) {
+              // Check if task needs a reminder
+              if (
+                task.reminderEnabled &&
+                task.dueDate &&
+                task.reminderDuration &&
+                task.status !== 'completed' &&
+                (!task.lastReminderSent || 
+                  (now.getTime() - new Date(task.lastReminderSent).getTime()) > 24 * 60 * 60 * 1000) // Only send once per day
+              ) {
+                const dueDate = new Date(task.dueDate);
+                const reminderTime = new Date(dueDate.getTime() - task.reminderDuration * 60 * 1000);
+                
+                // Check if it's time to send the reminder (within the next hour)
+                if (now >= reminderTime && now < new Date(reminderTime.getTime() + 60 * 60 * 1000)) {
+                  tasksNeedingReminders.push({ task, pipeline, stage, step });
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Send notifications for tasks needing reminders
+      const notificationsSent = [];
+      for (const { task, pipeline, stage, step } of tasksNeedingReminders) {
+        const recipientIds: string[] = [];
+        
+        // Notify assigned user
+        if (task.notifyAssignee && task.assignedTo) {
+          recipientIds.push(task.assignedTo);
+        }
+        
+        // Notify managers/admins
+        if (task.notifyManager) {
+          const admins = await storage.getUsersByOrganization(req.user!.organizationId!);
+          const adminUsers = admins.filter(u => 
+            u.roleId && (u.roleId.includes('admin') || u.roleId.includes('manager'))
+          );
+          recipientIds.push(...adminUsers.map(u => u.id));
+        }
+        
+        // Notify client (if assigned user is a client)
+        if (task.notifyClient && task.assignedTo) {
+          const assignedUser = await storage.getUserById(task.assignedTo);
+          if (assignedUser && assignedUser.roleId && assignedUser.roleId.includes('client')) {
+            recipientIds.push(task.assignedTo);
+          }
+        }
+        
+        // Create notifications
+        const uniqueRecipients = [...new Set(recipientIds)];
+        for (const userId of uniqueRecipients) {
+          const notification = await storage.createNotification({
+            userId,
+            organizationId: req.user!.organizationId!,
+            type: 'task_reminder',
+            title: `Task Reminder: ${task.name}`,
+            message: `Task "${task.name}" in pipeline "${pipeline.name}" is due soon (${new Date(task.dueDate!).toLocaleString()})`,
+            relatedEntityType: 'pipeline_task',
+            relatedEntityId: task.id,
+            isRead: false,
+          });
+          notificationsSent.push(notification);
+        }
+        
+        // Update lastReminderSent
+        await storage.updatePipelineTask(task.id, { lastReminderSent: now });
+      }
+      
+      res.json({ 
+        message: "Reminders processed successfully", 
+        tasksProcessed: tasksNeedingReminders.length,
+        notificationsSent: notificationsSent.length 
+      });
+    } catch (error: any) {
+      console.error("Error processing reminders:", error);
+      res.status(500).json({ error: "Failed to process reminders" });
+    }
+  });
+
   app.delete("/api/tasks/:id", requireAuth, requirePermission("pipelines.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const task = await storage.getPipelineTask(req.params.id);
