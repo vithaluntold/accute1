@@ -964,9 +964,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
+          // Remove trailing slash from endpoint if present
+          const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+          
           // Use Azure's REST API to list deployments as a health check
           const apiVersion = '2024-02-01';
-          const testUrl = `${endpoint}/openai/deployments?api-version=${apiVersion}`;
+          const testUrl = `${cleanEndpoint}/openai/deployments?api-version=${apiVersion}`;
+          
+          console.log(`[Azure Health Check] Testing URL: ${testUrl}`);
           
           const response = await fetch(testUrl, {
             method: 'GET',
@@ -977,6 +982,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             signal: AbortSignal.timeout(10000) // 10 second timeout
           });
           
+          console.log(`[Azure Health Check] Response status: ${response.status}`);
+          
           if (response.ok) {
             testResult = { success: true, message: "Azure OpenAI connection successful" };
           } else {
@@ -984,17 +991,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let errorMessage = `HTTP ${response.status}`;
             try {
               const errorJson = await response.json();
-              errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
+              console.log('[Azure Health Check] Error JSON:', errorJson);
+              errorMessage = errorJson.error?.message || errorJson.message || JSON.stringify(errorJson);
             } catch {
               const errorText = await response.text();
+              console.log('[Azure Health Check] Error text:', errorText);
               errorMessage = errorText || errorMessage;
             }
             testResult = { 
               success: false, 
-              message: `Azure OpenAI error: ${errorMessage}` 
+              message: `${errorMessage}` 
             };
           }
         } catch (error: any) {
+          console.log('[Azure Health Check] Exception:', error);
           testResult = { 
             success: false, 
             message: error.name === 'AbortError' 
