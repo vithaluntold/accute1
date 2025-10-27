@@ -3776,15 +3776,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Task not found" });
       }
 
-      // Execute task automation
+      // Resolve hierarchy for complete context
+      const step = await storage.getPipelineStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+
+      const stage = await storage.getPipelineStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+
+      const pipeline = await storage.getPipeline(stage.pipelineId);
+      if (!pipeline) {
+        return res.status(404).json({ error: "Pipeline not found" });
+      }
+
+      // Security: Verify user owns this pipeline
+      if (pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      // Execute task automation with complete context
       const results = await automationEngine.executeActions(
         (task.automationActions as any) || [],
         {
           taskId: task.id,
           stepId: task.stepId,
-          stageId: '', // Will be resolved
-          pipelineId: '', // Will be resolved
-          organizationId: req.user!.organizationId!,
+          stageId: stage.id,
+          pipelineId: pipeline.id,
+          organizationId: pipeline.organizationId,
           userId: req.user!.id,
           data: task.automationInput as any,
         }

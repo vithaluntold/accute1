@@ -125,14 +125,40 @@ export class AutomationEngine {
 
   /**
    * Create a new task in the pipeline
+   * Supports targeting a specific step from action config for pipeline/stage-level automations
    */
   private async createTask(config: any, context: any): Promise<any> {
-    if (!context.stepId) {
-      throw new Error('stepId required to create task');
+    // Get stepId from action config or context
+    const targetStepId = config.stepId || context.stepId;
+    
+    if (!targetStepId) {
+      throw new Error('stepId required to create task - provide it in action config or context');
     }
 
+    // Verify step exists and belongs to same organization (multi-tenant security)
+    const step = await this.storage.getPipelineStep(targetStepId);
+    if (!step) {
+      throw new Error(`Step ${targetStepId} not found`);
+    }
+
+    // Verify organization ownership (get pipeline through stage)
+    const stage = await this.storage.getPipelineStage(step.stageId);
+    if (!stage) {
+      throw new Error('Stage not found');
+    }
+
+    const pipeline = await this.storage.getPipeline(stage.pipelineId);
+    if (!pipeline) {
+      throw new Error('Pipeline not found');
+    }
+
+    if (pipeline.organizationId !== context.organizationId) {
+      throw new Error('Unauthorized: Cannot create task in different organization');
+    }
+
+    // Create the task
     const task = await this.storage.createPipelineTask({
-      stepId: context.stepId,
+      stepId: targetStepId,
       name: config.name || 'Auto-created Task',
       description: config.description || '',
       type: config.type || 'manual',
@@ -248,6 +274,12 @@ export class AutomationEngine {
     const step = await this.storage.getPipelineStep(task.stepId);
     if (!step) return;
 
+    const stage = await this.storage.getPipelineStage(step.stageId);
+    if (!stage) return;
+
+    const pipeline = await this.storage.getPipeline(stage.pipelineId);
+    if (!pipeline) return;
+
     // Check if all tasks in step are completed
     const tasks = await this.storage.getTasksByStep(step.id);
     const allComplete = tasks.every(t => t.status === 'completed');
@@ -260,14 +292,14 @@ export class AutomationEngine {
       );
 
       if (conditionsMet) {
-        // Execute step completion actions
+        // Execute step completion actions with proper context
         if (step.onCompleteActions && Array.isArray(step.onCompleteActions)) {
           await this.executeActions(step.onCompleteActions as ActionConfig[], {
-            pipelineId: step.stageId, // Will be resolved to pipeline
+            pipelineId: pipeline.id,
             stepId: step.id,
-            stageId: step.stageId,
-            organizationId: task.assignedTo || '', // TODO: get from pipeline
-            userId: task.assignedTo || '',
+            stageId: stage.id,
+            organizationId: pipeline.organizationId,
+            userId: pipeline.createdBy,
           });
         }
 
@@ -289,6 +321,9 @@ export class AutomationEngine {
     const stage = await this.storage.getPipelineStage(stageId);
     if (!stage) return;
 
+    const pipeline = await this.storage.getPipeline(stage.pipelineId);
+    if (!pipeline) return;
+
     // Check if all steps in stage are completed
     const steps = await this.storage.getStepsByStage(stage.id);
     const allComplete = steps.every(s => s.status === 'completed');
@@ -301,13 +336,13 @@ export class AutomationEngine {
       );
 
       if (conditionsMet) {
-        // Execute stage completion actions
+        // Execute stage completion actions with proper context
         if (stage.onCompleteActions && Array.isArray(stage.onCompleteActions)) {
           await this.executeActions(stage.onCompleteActions as ActionConfig[], {
-            pipelineId: stage.pipelineId,
+            pipelineId: pipeline.id,
             stageId: stage.id,
-            organizationId: '', // TODO: get from pipeline
-            userId: '',
+            organizationId: pipeline.organizationId,
+            userId: pipeline.createdBy,
           });
         }
 
