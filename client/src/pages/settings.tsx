@@ -236,7 +236,8 @@ export default function Settings() {
 
   const testConnectionMutation = useMutation({
     mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string; apiVersion?: string; model?: string }) => {
-      return apiRequest("POST", "/api/llm-configurations/test", data);
+      const response = await apiRequest("POST", "/api/llm-configurations/test", data);
+      return response.json();
     },
     onSuccess: (result: any) => {
       setTestConnectionResult(result);
