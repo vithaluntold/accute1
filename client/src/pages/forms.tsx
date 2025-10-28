@@ -29,6 +29,7 @@ import { z } from "zod";
 import { formTemplates, templateCategories, type FormTemplate as TemplateType } from "@/data/form-templates";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { AIAgentChat } from "@/components/ai-agent-chat";
 
 // Only user-editable fields
 const formSchema = z.object({
@@ -258,6 +259,19 @@ export default function FormsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {hasForma && (
+            <AIAgentChat
+              agentName="Forma"
+              mode="dialog"
+              contextData={{ forms: filteredForms }}
+              trigger={
+                <Button variant="outline" data-testid="button-forma-chat">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Ask Forma AI
+                </Button>
+              }
+            />
+          )}
           <Button 
             variant="outline" 
             onClick={() => setTemplateGalleryOpen(true)} 

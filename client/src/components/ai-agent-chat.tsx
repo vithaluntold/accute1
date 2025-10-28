@@ -327,6 +327,10 @@ export function AIAgentChat({
         )}
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-2xl h-[600px] p-0 flex flex-col" data-testid={`dialog-chat-${agentName.toLowerCase().replace(" ", "-")}`}>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Chat with {agentName}</DialogTitle>
+              <DialogDescription>{getAgentDescription()}</DialogDescription>
+            </DialogHeader>
             {chatContent}
           </DialogContent>
         </Dialog>

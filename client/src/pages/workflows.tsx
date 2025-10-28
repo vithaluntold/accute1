@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Play, Edit, Trash2, Copy, Workflow, Sparkles } from "lucide-react";
 import type { InstalledAgentView } from "@shared/schema";
+import { AIAgentChat } from "@/components/ai-agent-chat";
 
 export default function Workflows() {
   const [, setLocation] = useLocation();
@@ -49,10 +50,25 @@ export default function Workflows() {
             Automate your accounting processes with AI-powered workflows
           </p>
         </div>
-        <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-workflow">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Workflow
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasCadence && (
+            <AIAgentChat
+              agentName="Cadence"
+              mode="dialog"
+              contextData={{ workflows }}
+              trigger={
+                <Button variant="outline" data-testid="button-cadence-chat">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Ask Cadence AI
+                </Button>
+              }
+            />
+          )}
+          <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-workflow">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Workflow
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 mb-6">
