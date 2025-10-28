@@ -4177,6 +4177,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Unified Workflow Builder Routes ====================
+
+  // Get all steps for a workflow (flat list across all stages)
+  app.get("/api/workflows/:workflowId/steps", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      const stages = await storage.getStagesByWorkflow(req.params.workflowId);
+      const allSteps = [];
+      for (const stage of stages) {
+        const steps = await storage.getStepsByStage(stage.id);
+        allSteps.push(...steps);
+      }
+      res.json(allSteps);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch steps" });
+    }
+  });
+
+  // Get all tasks for a workflow (flat list across all steps)
+  app.get("/api/workflows/:workflowId/tasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      const stages = await storage.getStagesByWorkflow(req.params.workflowId);
+      const allTasks = [];
+      for (const stage of stages) {
+        const steps = await storage.getStepsByStage(stage.id);
+        for (const step of steps) {
+          const tasks = await storage.getTasksByStep(step.id);
+          allTasks.push(...tasks);
+        }
+      }
+      res.json(allTasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get subtasks for a task
+  app.get("/api/tasks/:taskId/subtasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const subtasks = await storage.getSubtasksByTask(req.params.taskId);
+      res.json(subtasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch subtasks" });
+    }
+  });
+
+  // Get checklists for a task
+  app.get("/api/tasks/:taskId/checklists", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const checklists = await storage.getChecklistsByTask(req.params.taskId);
+      res.json(checklists);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch checklists" });
+    }
+  });
+
+  // Save task automation (nodes/edges)
+  app.patch("/api/tasks/:taskId/automation", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      // Verify ownership
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Update task with automation nodes/edges
+      const updated = await storage.updateWorkflowTask(req.params.taskId, {
+        nodes: req.body.nodes,
+        edges: req.body.edges,
+      });
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task_automation", req.params.taskId, { nodes: req.body.nodes, edges: req.body.edges }, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to save automation" });
+    }
+  });
+
   // ==================== Workflow Automation Execution Routes ====================
 
   // Execute task automation
