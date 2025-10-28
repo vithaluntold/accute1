@@ -36,10 +36,15 @@ import {
   insertFormTemplateSchema,
   insertFormSubmissionSchema,
   insertFormShareLinkSchema,
+  insertMarketplaceItemSchema,
+  insertMarketplaceInstallationSchema,
+  insertWorkflowAssignmentSchema,
+  insertFolderSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import * as cryptoUtils from "./crypto-utils";
+import { autoProgressionEngine } from "./auto-progression";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -1382,6 +1387,326 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete AI provider" });
+    }
+  });
+
+  // ==================== Marketplace Routes ====================
+  
+  // Get all published marketplace items (public view)
+  app.get("/api/marketplace/items", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { category } = req.query;
+      const items = req.user!.organizationId
+        ? await storage.getMarketplaceItemsForOrganization(req.user!.organizationId, category as string)
+        : await storage.getAllPublishedMarketplaceItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch marketplace items" });
+    }
+  });
+
+  // Get single marketplace item
+  app.get("/api/marketplace/items/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const item = await storage.getMarketplaceItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: "Marketplace item not found" });
+      }
+      
+      // Check access: public items or org-owned items
+      if (!item.isPublic && item.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch marketplace item" });
+    }
+  });
+
+  // Create marketplace item (Super Admin only)
+  app.post("/api/marketplace/items", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = insertMarketplaceItemSchema.parse(req.body);
+      const item = await storage.createMarketplaceItem({
+        ...validated,
+        createdBy: req.userId!,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "marketplace_item", item.id, { name: item.name, category: item.category }, req);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create marketplace item" });
+    }
+  });
+
+  // Update marketplace item (Super Admin or item creator)
+  app.patch("/api/marketplace/items/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getMarketplaceItem(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Marketplace item not found" });
+      }
+
+      // Check permission: Super Admin or org-owned item
+      const role = await storage.getRole(req.user!.roleId);
+      if (role?.scope !== 'platform' && existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const validated = insertMarketplaceItemSchema.partial().parse(req.body);
+      const item = await storage.updateMarketplaceItem(req.params.id, validated);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "marketplace_item", req.params.id, {}, req);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update marketplace item" });
+    }
+  });
+
+  // Delete marketplace item (Super Admin only)
+  app.delete("/api/marketplace/items/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      await storage.deleteMarketplaceItem(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "marketplace_item", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete marketplace item" });
+    }
+  });
+
+  // Install marketplace item
+  app.post("/api/marketplace/install/:itemId", requireAuth, requirePermission("marketplace.install"), async (req: AuthRequest, res: Response) => {
+    try {
+      const item = await storage.getMarketplaceItem(req.params.itemId);
+      if (!item || item.status !== 'published') {
+        return res.status(404).json({ error: "Marketplace item not found or not published" });
+      }
+
+      // Check if already installed
+      const existing = await storage.getMarketplaceInstallationByItemAndOrg(req.params.itemId, req.user!.organizationId!);
+      if (existing) {
+        return res.status(400).json({ error: "Item already installed" });
+      }
+
+      const installation = await storage.createMarketplaceInstallation({
+        itemId: req.params.itemId,
+        organizationId: req.user!.organizationId!,
+        installedBy: req.userId!,
+        purchasePrice: item.pricingModel !== 'free' ? item.price : null,
+      });
+
+      // Increment install count
+      await storage.incrementMarketplaceInstallCount(req.params.itemId);
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "install", "marketplace_item", req.params.itemId, { name: item.name }, req);
+      res.json(installation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to install marketplace item" });
+    }
+  });
+
+  // Uninstall marketplace item
+  app.delete("/api/marketplace/install/:installationId", requireAuth, requirePermission("marketplace.install"), async (req: AuthRequest, res: Response) => {
+    try {
+      const installation = await storage.getMarketplaceInstallation(req.params.installationId);
+      if (!installation || installation.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Installation not found" });
+      }
+
+      await storage.deleteMarketplaceInstallation(req.params.installationId);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "uninstall", "marketplace_item", installation.itemId, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to uninstall marketplace item" });
+    }
+  });
+
+  // Get organization's installed items
+  app.get("/api/marketplace/installations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const installations = req.user!.organizationId
+        ? await storage.getMarketplaceInstallationsByOrganization(req.user!.organizationId)
+        : [];
+      res.json(installations);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch installations" });
+    }
+  });
+
+  // ==================== Workflow Assignment Routes ====================
+  
+  // Get all assignments for organization
+  app.get("/api/assignments", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const assignments = req.user!.organizationId
+        ? await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId)
+        : [];
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get assignments for a specific client
+  app.get("/api/assignments/client/:clientId", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const assignments = await storage.getWorkflowAssignmentsByClient(req.params.clientId);
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch client assignments" });
+    }
+  });
+
+  // Get assignments for logged-in employee
+  app.get("/api/assignments/my-tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const assignments = await storage.getWorkflowAssignmentsByEmployee(req.userId!);
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch your assignments" });
+    }
+  });
+
+  // Create workflow assignment (Client + Workflow = Assignment)
+  app.post("/api/assignments", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = insertWorkflowAssignmentSchema.parse(req.body);
+      
+      // Verify workflow belongs to org
+      const workflow = await storage.getWorkflow(validated.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      // Verify client belongs to org
+      const client = await storage.getClient(validated.clientId);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Count stages in workflow
+      const stages = await storage.getStagesByWorkflow(validated.workflowId);
+
+      const assignment = await storage.createWorkflowAssignment({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+        assignedBy: req.userId!,
+        totalStages: stages.length,
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_assignment", assignment.id, { client: client.companyName, workflow: workflow.name }, req);
+      res.json(assignment);
+    } catch (error: any) {
+      console.error('Assignment creation error:', error);
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // Update assignment
+  app.patch("/api/assignments/:id", requireAuth, requirePermission("workflows.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getWorkflowAssignment(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      const validated = insertWorkflowAssignmentSchema.partial().parse(req.body);
+      const assignment = await storage.updateWorkflowAssignment(req.params.id, validated);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "workflow_assignment", req.params.id, {}, req);
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Delete assignment
+  app.delete("/api/assignments/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getWorkflowAssignment(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      await storage.deleteWorkflowAssignment(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "workflow_assignment", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // ==================== Folder Routes ====================
+  
+  // Get all folders for organization
+  app.get("/api/folders", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const folders = req.user!.organizationId
+        ? await storage.getFoldersByOrganization(req.user!.organizationId)
+        : [];
+      res.json(folders);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch folders" });
+    }
+  });
+
+  // Get folders by parent (for hierarchical navigation)
+  app.get("/api/folders/parent/:parentId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const parentId = req.params.parentId === 'null' ? null : req.params.parentId;
+      const folders = req.user!.organizationId
+        ? await storage.getFoldersByParent(parentId, req.user!.organizationId)
+        : [];
+      res.json(folders);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch folders" });
+    }
+  });
+
+  // Create folder
+  app.post("/api/folders", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = insertFolderSchema.parse(req.body);
+      const folder = await storage.createFolder({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "folder", folder.id, { name: folder.name }, req);
+      res.json(folder);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create folder" });
+    }
+  });
+
+  // Update folder
+  app.patch("/api/folders/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFolder(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+
+      const validated = insertFolderSchema.partial().parse(req.body);
+      const folder = await storage.updateFolder(req.params.id, validated);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "folder", req.params.id, {}, req);
+      res.json(folder);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update folder" });
+    }
+  });
+
+  // Delete folder
+  app.delete("/api/folders/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getFolder(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+
+      await storage.deleteFolder(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "folder", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete folder" });
     }
   });
 
