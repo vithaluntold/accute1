@@ -115,10 +115,15 @@ export class LLMService {
       throw new Error('Azure endpoint is required for Azure OpenAI');
     }
     
+    // Azure OpenAI requires deployment name in the URL path
+    // Format: https://{resource}.openai.azure.com/openai/deployments/{deployment-name}
+    const baseURL = `${this.config.azureEndpoint}/openai/deployments/${this.config.model}`;
+    const apiVersion = this.config.modelVersion || '2024-02-15-preview';
+    
     const openai = new OpenAI({
       apiKey: this.apiKey,
-      baseURL: this.config.azureEndpoint,
-      defaultQuery: { 'api-version': '2024-02-15-preview' },
+      baseURL,
+      defaultQuery: { 'api-version': apiVersion },
       defaultHeaders: { 'api-key': this.apiKey },
     });
     
@@ -128,8 +133,9 @@ export class LLMService {
     }
     messages.push({ role: 'user', content: prompt });
     
+    // For Azure, the model is already in the baseURL, so we use a placeholder
     const completion = await openai.chat.completions.create({
-      model: this.config.model,
+      model: this.config.model, // Azure ignores this since it's in the URL
       messages,
     });
     
