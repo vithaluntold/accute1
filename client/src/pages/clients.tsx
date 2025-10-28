@@ -40,7 +40,10 @@ import { insertClientSchema } from "@shared/schema";
 import type { Client, InsertClient } from "@shared/schema";
 import { z } from "zod";
 
-const clientFormSchema = insertClientSchema.extend({
+const clientFormSchema = insertClientSchema.omit({
+  organizationId: true,
+  createdBy: true,
+}).extend({
   companyName: z.string().min(1, "Company name is required"),
   email: z.string().email("Invalid email address"),
 });

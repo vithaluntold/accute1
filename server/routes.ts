@@ -2014,7 +2014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/clients", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const validated = insertClientSchema.parse(req.body);
+      const validated = insertClientSchema.omit({ organizationId: true, createdBy: true }).parse(req.body);
       const client = await storage.createClient({
         ...validated,
         organizationId: req.user!.organizationId!,
@@ -2023,6 +2023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "client", client.id, { name: client.companyName }, req);
       res.json(client);
     } catch (error: any) {
+      console.error("[ERROR] Failed to create client:", error);
       res.status(500).json({ error: "Failed to create client" });
     }
   });
