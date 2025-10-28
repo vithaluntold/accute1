@@ -180,6 +180,11 @@ export const workflowTasks = pgTable("workflow_tasks", {
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
   
+  // Visual automation canvas (for task-level automation design)
+  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`), // Visual workflow nodes for this task
+  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`), // Connections between nodes for this task
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`), // Canvas state
+  
   // Automation configuration
   automationTrigger: jsonb("automation_trigger").default(sql`'{}'::jsonb`), // Trigger config for automated tasks
   automationConditions: jsonb("automation_conditions").default(sql`'[]'::jsonb`), // Conditions to check before executing
@@ -209,6 +214,12 @@ export const taskSubtasks = pgTable("task_subtasks", {
   assignedTo: varchar("assigned_to").references(() => users.id), // User assigned to this subtask
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
+  
+  // Visual automation canvas (for subtask-level automation)
+  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`),
+  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`),
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -222,6 +233,12 @@ export const taskChecklists = pgTable("task_checklists", {
   isChecked: boolean("is_checked").notNull().default(false),
   checkedAt: timestamp("checked_at"),
   checkedBy: varchar("checked_by").references(() => users.id),
+  
+  // Visual automation canvas (for checklist-level automation triggers)
+  nodes: jsonb("nodes").notNull().default(sql`'[]'::jsonb`),
+  edges: jsonb("edges").notNull().default(sql`'[]'::jsonb`),
+  viewport: jsonb("viewport").default(sql`'{"x": 0, "y": 0, "zoom": 1}'::jsonb`),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
