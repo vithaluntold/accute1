@@ -51,24 +51,33 @@ export function setupWebSocket(httpServer: Server): WebSocketServer {
 
   wss.on('connection', async (ws: AuthenticatedWebSocket, req) => {
     ws.isAlive = true;
+    console.log('[WebSocket] New connection attempt');
 
     // Authenticate WebSocket connection using session cookie
     try {
       const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
+      console.log('[WebSocket] Cookies received:', Object.keys(cookies));
       const sessionId = cookies['connect.sid'];
 
       if (!sessionId) {
+        console.log('[WebSocket] No session ID found in cookies');
         ws.close(4001, 'Authentication required');
         return;
       }
 
+      console.log('[WebSocket] Session ID found:', sessionId.substring(0, 20) + '...');
+
       // Verify session
       const session = await storage.getSession(sessionId);
       if (!session) {
+        console.log('[WebSocket] Session not found in storage');
         ws.close(4001, 'Invalid session');
         return;
       }
+      console.log('[WebSocket] Session found for user:', session.userId);
+      
       if (session.expiresAt < new Date()) {
+        console.log('[WebSocket] Session expired');
         ws.close(4001, 'Session expired');
         return;
       }
@@ -76,6 +85,7 @@ export function setupWebSocket(httpServer: Server): WebSocketServer {
       // Get user details
       const user = await storage.getUser(session.userId);
       if (!user) {
+        console.log('[WebSocket] User not found:', session.userId);
         ws.close(4001, 'User not found');
         return;
       }
