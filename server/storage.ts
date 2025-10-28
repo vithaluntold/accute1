@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, or, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -76,6 +76,8 @@ export interface IStorage {
   deleteRole(id: string): Promise<void>;
   getRolesByOrganization(organizationId: string): Promise<Role[]>;
   getSystemRoles(): Promise<Role[]>;
+  getPlatformRoles(): Promise<Role[]>;
+  getTenantRoles(organizationId?: string): Promise<Role[]>;
 
   // Permissions
   getPermission(id: string): Promise<Permission | undefined>;
@@ -511,7 +513,41 @@ export class DbStorage implements IStorage {
   }
 
   async getSystemRoles(): Promise<Role[]> {
-    return await db.select().from(schema.roles).where(eq(schema.roles.isSystemRole, true));
+    // Only return tenant-scoped system roles (NEVER platform roles like Super Admin)
+    return await db.select().from(schema.roles).where(
+      and(
+        eq(schema.roles.isSystemRole, true),
+        eq(schema.roles.scope, "tenant")
+      )
+    );
+  }
+
+  async getPlatformRoles(): Promise<Role[]> {
+    return await db.select().from(schema.roles).where(eq(schema.roles.scope, "platform"));
+  }
+
+  async getTenantRoles(organizationId?: string): Promise<Role[]> {
+    // Get all tenant-scoped roles (system templates + org-specific custom roles)
+    if (organizationId) {
+      // Return tenant-scoped system roles + custom roles for this organization
+      return await db.select().from(schema.roles).where(
+        and(
+          eq(schema.roles.scope, "tenant"),
+          or(
+            eq(schema.roles.isSystemRole, true),
+            eq(schema.roles.organizationId, organizationId)
+          )
+        )
+      );
+    } else {
+      // Return only tenant-scoped system role templates
+      return await db.select().from(schema.roles).where(
+        and(
+          eq(schema.roles.scope, "tenant"),
+          eq(schema.roles.isSystemRole, true)
+        )
+      );
+    }
   }
 
   // Permissions

@@ -127,6 +127,20 @@ export function requirePermission(permission: string) {
   };
 }
 
+// Platform-level access middleware (Super Admin only)
+export async function requirePlatform(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  const userRole = await storage.getRole(req.user.roleId);
+  if (!userRole || userRole.scope !== "platform") {
+    return res.status(403).json({ error: "Platform administrator access required" });
+  }
+
+  next();
+}
+
 // Rate limiting helper (simple in-memory implementation)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 

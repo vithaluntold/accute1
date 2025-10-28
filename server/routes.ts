@@ -10,6 +10,7 @@ import {
   generateToken,
   requireAuth,
   requirePermission,
+  requirePlatform,
   rateLimit,
   logActivity,
   encrypt,
@@ -257,8 +258,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Super Admin Routes ====================
 
-  // Get super admin keys (requires super admin)
-  app.get("/api/super-admin/keys", requireAuth, requirePermission("super_admin.manage"), async (req: AuthRequest, res: Response) => {
+  // Get super admin keys (requires platform admin)
+  app.get("/api/super-admin/keys", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       const keys = await storage.getSuperAdminKeysByUser(req.userId!);
       res.json(keys);
@@ -268,8 +269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate super admin key (requires existing super admin)
-  app.post("/api/super-admin/keys", requireAuth, requirePermission("super_admin.manage"), async (req: AuthRequest, res: Response) => {
+  // Generate super admin key (requires platform admin)
+  app.post("/api/super-admin/keys", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       const { expiresInDays = 30 } = req.body;
       
@@ -656,11 +657,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users", requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const { password, ...userData } = req.body;
+      const { password, roleId, ...userData } = req.body;
+      
+      // Prevent assigning users to platform roles
+      if (roleId) {
+        const role = await storage.getRole(roleId);
+        if (role && role.scope === "platform") {
+          return res.status(403).json({ error: "Cannot assign users to platform roles" });
+        }
+      }
+      
       const hashedPassword = await hashPassword(password);
       
       const user = await storage.createUser({
         ...userData,
+        roleId,
         password: hashedPassword,
         organizationId: req.user!.organizationId,
       });
@@ -675,11 +686,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:id", requireAuth, requirePermission("users.edit"), async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const { password, ...userData } = req.body;
+      const { password, roleId, ...userData } = req.body;
+      
+      // Prevent assigning users to platform roles
+      if (roleId) {
+        const role = await storage.getRole(roleId);
+        if (role && role.scope === "platform") {
+          return res.status(403).json({ error: "Cannot assign users to platform roles" });
+        }
+      }
       
       const updateData = password 
-        ? { ...userData, password: await hashPassword(password) }
-        : userData;
+        ? { ...userData, roleId, password: await hashPassword(password) }
+        : { ...userData, roleId };
 
       const user = await storage.updateUser(id, updateData);
       if (!user) {
@@ -708,11 +727,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/roles", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const roles = await storage.getSystemRoles();
-      const customRoles = req.user!.organizationId
-        ? await storage.getRolesByOrganization(req.user!.organizationId)
-        : [];
-      res.json([...roles, ...customRoles]);
+      // Only return tenant-scoped roles (never show platform roles like Super Admin)
+      const roles = await storage.getTenantRoles(req.user!.organizationId || undefined);
+      res.json(roles);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch roles" });
     }
@@ -722,6 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const role = await storage.createRole({
         ...req.body,
+        scope: "tenant", // Always create tenant-scoped roles (never platform)
         organizationId: req.user!.organizationId,
         isSystemRole: false,
       });
@@ -745,6 +763,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/roles/:roleId/permissions/:permissionId", requireAuth, requirePermission("roles.edit"), async (req: AuthRequest, res: Response) => {
     try {
       const { roleId, permissionId } = req.params;
+      
+      // Prevent assigning platform permissions to tenant roles
+      const permission = await storage.getPermission(permissionId);
+      if (permission && permission.resource === "platform") {
+        return res.status(403).json({ error: "Cannot assign platform permissions to tenant roles" });
+      }
+      
+      // Prevent modifying platform roles
+      const role = await storage.getRole(roleId);
+      if (role && role.scope === "platform") {
+        return res.status(403).json({ error: "Cannot modify platform roles" });
+      }
+      
       await storage.assignPermissionToRole(roleId, permissionId);
       await logActivity(req.userId, req.user!.organizationId || undefined, "assign_permission", "role", roleId, { permissionId }, req);
       res.json({ success: true });
@@ -756,6 +787,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/roles/:roleId/permissions/:permissionId", requireAuth, requirePermission("roles.edit"), async (req: AuthRequest, res: Response) => {
     try {
       const { roleId, permissionId } = req.params;
+      
+      // Prevent modifying platform roles
+      const role = await storage.getRole(roleId);
+      if (role && role.scope === "platform") {
+        return res.status(403).json({ error: "Cannot modify platform roles" });
+      }
+      
       await storage.removePermissionFromRole(roleId, permissionId);
       await logActivity(req.userId, req.user!.organizationId || undefined, "remove_permission", "role", roleId, { permissionId }, req);
       res.json({ success: true });
@@ -769,6 +807,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const role = await storage.getRole(req.params.id);
       if (!role) {
         return res.status(404).json({ error: "Role not found" });
+      }
+      if (role.scope === "platform") {
+        return res.status(403).json({ error: "Cannot delete platform roles" });
       }
       if (role.isSystemRole) {
         return res.status(403).json({ error: "Cannot delete system roles" });
@@ -786,9 +827,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Permission Routes ====================
   
-  app.get("/api/permissions", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/permissions", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const permissions = await storage.getAllPermissions();
+      const allPermissions = await storage.getAllPermissions();
+      // Filter out platform permissions for tenant users
+      const permissions = allPermissions.filter(p => p.resource !== "platform");
       res.json(permissions);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch permissions" });

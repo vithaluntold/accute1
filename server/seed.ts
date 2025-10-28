@@ -6,41 +6,59 @@ async function seed() {
     console.log("🌱 Seeding database...");
 
     // Create system roles
+    // Super Admin is platform-scoped (SaaS company role), others are tenant-scoped
     const superAdminRole = await db.insert(schema.roles).values({
       name: "Super Admin",
-      description: "Full system access with organization management",
+      description: "Platform administrator for SaaS management (not for client organizations)",
+      scope: "platform",
       isSystemRole: true,
+      organizationId: null, // Platform role has no organization
     }).returning().then(r => r[0]);
 
     const adminRole = await db.insert(schema.roles).values({
       name: "Admin",
       description: "Organization administrator with team management",
+      scope: "tenant",
       isSystemRole: true,
+      organizationId: null, // System role template
     }).returning().then(r => r[0]);
 
     const employeeRole = await db.insert(schema.roles).values({
       name: "Employee",
       description: "Team member with workflow execution access",
+      scope: "tenant",
       isSystemRole: true,
+      organizationId: null, // System role template
     }).returning().then(r => r[0]);
 
     const clientRole = await db.insert(schema.roles).values({
       name: "Client",
       description: "Client with portal access for documents and workflow status",
+      scope: "tenant",
       isSystemRole: true,
+      organizationId: null, // System role template
     }).returning().then(r => r[0]);
 
     console.log("✓ Created system roles");
 
     // Create permissions
     const permissions = [
-      // User management
+      // Platform-level permissions (SaaS Super Admin only)
+      { name: "platform.view_all_organizations", resource: "platform", action: "view_all_organizations", description: "View all client organizations" },
+      { name: "platform.create_organization", resource: "platform", action: "create_organization", description: "Create new client organizations" },
+      { name: "platform.delete_organization", resource: "platform", action: "delete_organization", description: "Delete client organizations" },
+      { name: "platform.manage_billing", resource: "platform", action: "manage_billing", description: "Manage platform billing and subscriptions" },
+      { name: "platform.view_system_logs", resource: "platform", action: "view_system_logs", description: "View platform-wide system logs" },
+      { name: "platform.manage_features", resource: "platform", action: "manage_features", description: "Enable/disable platform features" },
+      { name: "platform.impersonate_users", resource: "platform", action: "impersonate_users", description: "Impersonate users for support" },
+      
+      // User management (tenant-level)
       { name: "users.view", resource: "users", action: "view", description: "View users" },
       { name: "users.create", resource: "users", action: "create", description: "Create users" },
       { name: "users.edit", resource: "users", action: "edit", description: "Edit users" },
       { name: "users.delete", resource: "users", action: "delete", description: "Delete users" },
       
-      // Role management
+      // Role management (tenant-level)
       { name: "roles.view", resource: "roles", action: "view", description: "View roles" },
       { name: "roles.create", resource: "roles", action: "create", description: "Create roles" },
       { name: "roles.edit", resource: "roles", action: "edit", description: "Edit roles" },
@@ -64,9 +82,9 @@ async function seed() {
       { name: "documents.upload", resource: "documents", action: "upload", description: "Upload documents" },
       { name: "documents.delete", resource: "documents", action: "delete", description: "Delete documents" },
       
-      // Organization management
-      { name: "organizations.view", resource: "organizations", action: "view", description: "View organizations" },
-      { name: "organizations.edit", resource: "organizations", action: "edit", description: "Edit organizations" },
+      // Organization management (tenant-level)
+      { name: "organizations.view", resource: "organizations", action: "view", description: "View organization details" },
+      { name: "organizations.edit", resource: "organizations", action: "edit", description: "Edit organization settings" },
       
       // Analytics
       { name: "analytics.view", resource: "analytics", action: "view", description: "View analytics" },
@@ -88,9 +106,9 @@ async function seed() {
       });
     }
 
-    // Assign permissions to Admin
+    // Assign permissions to Admin (exclude platform-level permissions)
     const adminPermissions = createdPermissions.filter(p => 
-      !p.name.startsWith("organizations.") &&
+      !p.name.startsWith("platform.") && // No platform permissions for tenant admins
       !p.name.includes("delete")
     );
     for (const perm of adminPermissions) {

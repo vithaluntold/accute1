@@ -28,10 +28,12 @@ export const organizations = pgTable("organizations", {
 });
 
 // Roles table (Super Admin, Admin, Employee, Client)
+// scope: 'platform' for SaaS-level roles (Super Admin), 'tenant' for organization roles
 export const roles = pgTable("roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
   description: text("description"),
+  scope: text("scope").notNull().default("tenant"), // 'platform' or 'tenant'
   isSystemRole: boolean("is_system_role").notNull().default(false),
   organizationId: varchar("organization_id").references(() => organizations.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
