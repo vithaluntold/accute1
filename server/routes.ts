@@ -1562,6 +1562,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate Engagement Letter PDF
+  app.post("/api/documents/generate-engagement-letter", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { content, clientName, title } = req.body;
+
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      // Import jsPDF dynamically
+      const { default: jsPDF } = await import('jspdf');
+      
+      const doc = new jsPDF();
+      
+      // Set up document styling
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const maxWidth = pageWidth - (margin * 2);
+      let y = margin;
+
+      // Add title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      const docTitle = title || 'Engagement Letter';
+      doc.text(docTitle, margin, y);
+      y += 15;
+
+      // Add content
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      
+      // Split content into lines and paragraphs
+      const paragraphs = content.split('\n\n');
+      
+      for (const paragraph of paragraphs) {
+        if (y > pageHeight - 30) {
+          doc.addPage();
+          y = margin;
+        }
+
+        const lines = doc.splitTextToSize(paragraph, maxWidth);
+        for (const line of lines) {
+          if (y > pageHeight - 20) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.text(line, margin, y);
+          y += 6;
+        }
+        y += 4; // Extra space between paragraphs
+      }
+
+      // Generate filename
+      const timestamp = Date.now();
+      const filename = `engagement-letter-${timestamp}.pdf`;
+      const uploadDir = path.join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      const filepath = path.join(uploadDir, filename);
+      
+      // Save PDF
+      const pdfBuffer = doc.output('arraybuffer');
+      fs.writeFileSync(filepath, Buffer.from(pdfBuffer));
+
+      // Get organization keys for digital signature
+      const keyPair = await cryptoUtils.loadOrganizationKeyPair(req.user!.organizationId!);
+      
+      // Generate hash and signature
+      const documentHash = cryptoUtils.generateDocumentHash(filepath);
+      const signature = cryptoUtils.signDocumentHash(documentHash, keyPair.privateKey);
+
+      // Save to database
+      const document = await storage.createDocument({
+        name: filename,
+        url: `/uploads/${filename}`,
+        type: 'application/pdf',
+        size: fs.statSync(filepath).size,
+        uploadedBy: req.userId!,
+        organizationId: req.user!.organizationId!,
+        documentHash,
+        digitalSignature: signature,
+        signatureAlgorithm: 'RSA-SHA256',
+        signedAt: new Date(),
+        signedBy: req.userId!,
+        verificationStatus: 'verified',
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "document", document.id, { name: filename, type: 'engagement_letter' }, req);
+
+      res.json(document);
+    } catch (error: any) {
+      console.error("Failed to generate engagement letter:", error);
+      res.status(500).json({ error: "Failed to generate engagement letter PDF" });
+    }
+  });
+
   // ==================== Client Routes ====================
   
   app.get("/api/clients", requireAuth, requirePermission("clients.view"), async (req: AuthRequest, res: Response) => {

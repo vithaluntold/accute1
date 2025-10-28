@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Send, Sparkles, User, Loader2, Settings2 } from "lucide-react";
+import { Bot, Send, Sparkles, User, Loader2, Settings2, FileText, Download } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface Message {
   id: string;
@@ -73,6 +74,34 @@ export function AIAgentChat({
       setSelectedLlmConfig(defaultConfig.id);
     }
   }, [llmConfigs, selectedLlmConfig]);
+
+  // Generate PDF document mutation
+  const generateDocumentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await apiRequest('POST', '/api/documents/generate-engagement-letter', {
+        content,
+        title: 'Engagement Letter',
+      });
+      return await response.json();
+    },
+    onSuccess: (document: any) => {
+      toast({
+        title: "Document Generated",
+        description: "Your engagement letter has been created successfully.",
+      });
+      // Download the PDF
+      window.open(`/api/documents/${document.id}/download`, '_blank');
+      // Refresh documents list
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate document. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // WebSocket connection management
   const connectWebSocket = useCallback(() => {
@@ -412,6 +441,44 @@ export function AIAgentChat({
           </div>
         )}
       </ScrollArea>
+
+      {/* Generate Document Button - appears when there's substantial content from Parity */}
+      {agentName === "Parity" && messages.length > 0 && (
+        (() => {
+          const lastAssistantMessage = [...messages].reverse().find(m => m.role === "assistant" && !m.isStreaming);
+          const hasSubstantialContent = lastAssistantMessage && lastAssistantMessage.content.length > 500;
+          
+          if (hasSubstantialContent) {
+            return (
+              <div className="border-t p-3 bg-muted/30">
+                <Button
+                  onClick={() => generateDocumentMutation.mutate(lastAssistantMessage.content)}
+                  disabled={generateDocumentMutation.isPending}
+                  variant="default"
+                  className="w-full gap-2"
+                  data-testid="button-generate-document"
+                >
+                  {generateDocumentMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      Generate Document (PDF)
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Create a professional PDF document from this engagement letter
+                </p>
+              </div>
+            );
+          }
+          return null;
+        })()
+      )}
 
       {/* Input */}
       <div className="border-t p-4">
