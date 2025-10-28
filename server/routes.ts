@@ -975,7 +975,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           
           // Use provided API version or default to latest
-          const azureApiVersion = apiVersion || '2024-12-01-preview';
+          const azureApiVersion = apiVersion || '2025-01-01-preview';
           
           // Use minimal chat completion as health check (like the user's Python code)
           const testUrl = `${cleanEndpoint}/openai/deployments/${model}/chat/completions?api-version=${azureApiVersion}`;

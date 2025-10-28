@@ -135,7 +135,7 @@ export default function Settings() {
       provider: "openai",
       apiKey: "",
       azureEndpoint: "",
-      azureApiVersion: "2024-12-01-preview",
+      azureApiVersion: "2025-01-01-preview",
       model: "",
       isDefault: false,
     },
@@ -235,7 +235,7 @@ export default function Settings() {
   });
 
   const testConnectionMutation = useMutation({
-    mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string; apiVersion?: string }) => {
+    mutationFn: async (data: { provider: string; apiKey: string; endpoint?: string; apiVersion?: string; model?: string }) => {
       return apiRequest("POST", "/api/llm-configurations/test", data);
     },
     onSuccess: (result: any) => {
