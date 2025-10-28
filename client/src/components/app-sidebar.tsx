@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -36,6 +36,12 @@ const menuItems = [
     url: "/ai-agents",
     icon: Bot,
     permission: "ai_agents.view",
+  },
+  {
+    title: "Marketplace",
+    url: "/marketplace",
+    icon: Store,
+    permission: null,
   },
   {
     title: "Documents",
