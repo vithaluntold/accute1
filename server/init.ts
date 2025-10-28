@@ -234,12 +234,23 @@ export async function initializeSystem() {
     }
 
     if (roles.employee) {
+      // Employee should NOT have workflows.view (team-wide) or reports.view (practice-wide)
+      // They can work on their own tasks but not see team/practice statistics
       const employeePermissions = createdPermissions.filter(p =>
-        p.name.includes("view") ||
-        p.name.includes("execute") ||
-        p.name.includes("upload") ||
-        p.name === "workflows.create" ||
-        p.name === "workflows.edit"
+        // Document permissions
+        (p.resource === "documents" && (p.action === "view" || p.action === "upload")) ||
+        // AI Agent permissions
+        (p.resource === "ai_agents" && p.action === "view") ||
+        // Form permissions
+        (p.resource === "forms" && p.action === "view") ||
+        // Workflow execution (their own tasks)
+        p.name === "workflows.execute" ||
+        // Tag view
+        (p.resource === "tags" && p.action === "view") ||
+        // Contact view
+        (p.resource === "contacts" && p.action === "view") ||
+        // Client view
+        (p.resource === "clients" && p.action === "view")
       );
       for (const perm of employeePermissions) {
         try {
@@ -254,9 +265,10 @@ export async function initializeSystem() {
     }
 
     if (roles.client) {
+      // Client should NOT have workflows.view (team-wide visibility)
+      // They can only see documents and their own assigned tasks
       const clientPermissions = createdPermissions.filter(p =>
-        p.resource === "documents" ||
-        (p.resource === "workflows" && p.action === "view")
+        p.resource === "documents" // Only document permissions for clients
       );
       for (const perm of clientPermissions) {
         try {
