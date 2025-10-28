@@ -20,7 +20,16 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data for multiple organizations.
-- **Role-Based Access Control**: Granular permissions for Super Admin, Admin, Employee, and Client roles.
+- **Platform vs Tenant Role Separation** (October 2025): Complete SaaS-level vs tenant-level role architecture with scope-based isolation:
+  - **Platform Roles** (`scope='platform'`): Super Admin for SaaS management with `organizationId=NULL`
+  - **Tenant Roles** (`scope='tenant'`): Admin, Employee, Client for organization management with `organizationId` set
+  - **Permission Namespaces**: `platform.*` (SaaS-level) vs `resource.action` (tenant-level)
+  - **Security Middleware**: `requirePlatform` enforces platform-only access to Super Admin routes
+  - **Privilege Escalation Prevention**: Cannot assign platform permissions to tenant roles, cannot modify platform roles, cannot assign users to platform roles
+  - **API Filtering**: Platform permissions hidden from tenant users, platform roles excluded from organization role lists
+  - **Database Schema**: `roles.scope` enum ('platform' | 'tenant') with proper isolation
+  - **Storage Helpers**: `getPlatformRoles()` and `getTenantRoles(organizationId)` for scope-filtered queries
+- **Role-Based Access Control**: Granular permissions for Super Admin (platform), Admin, Employee, and Client roles (tenant).
 - **AI Agent Chat Interface** (October 2025): Interactive chat dialog for Parity, Cadence, and Forma AI agents. Features include:
   - Real-time chat interface with message history
   - LLM provider selection (supports OpenAI, Anthropic, Azure OpenAI)
@@ -53,7 +62,7 @@ Accute is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for
 - **Unified Workflows Builder** (Replaces separate Pipeline feature): Sophisticated system combining **visual automation AND hierarchical project management** with **Stages → Steps → Tasks** hierarchy. Features include: user assignment to tasks, manual and automated (AI-powered) tasks, progression logic requiring completion of all tasks before advancing, priority levels, status tracking, and comprehensive CRUD operations at every level. Workflows support multi-tenant isolation with granular RBAC permissions (workflows.view, workflows.create, workflows.update, workflows.delete). **Task Reminder System**: Configure reminders for tasks with due dates. Features include: customizable reminder duration (15 minutes to 1 week before due date), granular notification settings to notify assigned user, manager/admin, and/or client (if client is assigned), automated reminder processing endpoint (`POST /api/tasks/process-reminders`), and notification creation for selected recipients. Reminders are sent once per day maximum and track last sent timestamp to prevent spam.
 
 ### System Design Choices
-The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles, permissions, sessions, and feature-specific tables for workflows (combining visual automation and hierarchical project management with workflowStages, workflowSteps, workflowTasks), AI agents, documents, forms, tags, and contacts. Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system.
+The project is structured into `client/` (frontend), `server/` (backend), and `shared/` (common types/schemas). The database schema includes core tables for users, organizations, roles (with `scope` field for platform/tenant separation), permissions (with `resource` field for namespace isolation), sessions, and feature-specific tables for workflows (combining visual automation and hierarchical project management with workflowStages, workflowSteps, workflowTasks), AI agents, documents, forms, tags, and contacts. Security is a paramount design principle, with robust authentication, encryption, and access control implemented throughout the system. The platform implements complete SaaS-level vs tenant-level role separation to prevent privilege escalation and ensure proper multi-tenant isolation.
 
 ### Automation Engine Implementation
 The unified workflow automation system is powered by `AutomationEngine` (`server/automation-engine.ts`) with the following capabilities:
