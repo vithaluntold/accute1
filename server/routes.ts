@@ -1268,9 +1268,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Load and execute the appropriate agent
+      // Normalize agent name to lowercase and remove spaces for matching
+      const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');
+      
       let result;
-      switch (agentName) {
-        case 'kanban': {
+      switch (normalizedAgentName) {
+        case 'kanban':
+        case 'kanbanview': {
           const { KanbanAgent } = await import('../agents/kanban/backend/index');
           const agent = new KanbanAgent(llmConfig);
           result = await agent.execute(input);
