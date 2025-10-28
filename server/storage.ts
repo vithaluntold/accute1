@@ -939,6 +939,223 @@ export class DbStorage implements IStorage {
       .where(eq(schema.documentTemplates.id, id));
   }
 
+  // Marketplace Items
+  async getMarketplaceItem(id: string): Promise<schema.MarketplaceItem | undefined> {
+    const result = await db.select().from(schema.marketplaceItems).where(eq(schema.marketplaceItems.id, id));
+    return result[0];
+  }
+
+  async createMarketplaceItem(item: schema.InsertMarketplaceItem): Promise<schema.MarketplaceItem> {
+    const result = await db.insert(schema.marketplaceItems).values(item).returning();
+    return result[0];
+  }
+
+  async updateMarketplaceItem(id: string, item: Partial<schema.InsertMarketplaceItem>): Promise<schema.MarketplaceItem | undefined> {
+    const result = await db.update(schema.marketplaceItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(schema.marketplaceItems.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMarketplaceItem(id: string): Promise<void> {
+    await db.delete(schema.marketplaceItems).where(eq(schema.marketplaceItems.id, id));
+  }
+
+  async getMarketplaceItemsByCategory(category: string): Promise<schema.MarketplaceItem[]> {
+    return await db.select().from(schema.marketplaceItems)
+      .where(
+        and(
+          eq(schema.marketplaceItems.category, category),
+          eq(schema.marketplaceItems.status, 'published'),
+          eq(schema.marketplaceItems.isPublic, true)
+        )
+      )
+      .orderBy(desc(schema.marketplaceItems.isFeatured), desc(schema.marketplaceItems.rating), desc(schema.marketplaceItems.installCount));
+  }
+
+  async getMarketplaceItemsForOrganization(organizationId: string, category?: string): Promise<schema.MarketplaceItem[]> {
+    const conditions = [
+      eq(schema.marketplaceItems.status, 'published'),
+      or(
+        eq(schema.marketplaceItems.isPublic, true), // Include all public items
+        eq(schema.marketplaceItems.organizationId, organizationId) // Include org-specific items
+      )
+    ];
+    
+    if (category) {
+      conditions.push(eq(schema.marketplaceItems.category, category));
+    }
+
+    return await db.select().from(schema.marketplaceItems)
+      .where(and(...conditions))
+      .orderBy(desc(schema.marketplaceItems.isFeatured), desc(schema.marketplaceItems.rating), desc(schema.marketplaceItems.installCount));
+  }
+
+  async getAllPublishedMarketplaceItems(): Promise<schema.MarketplaceItem[]> {
+    return await db.select().from(schema.marketplaceItems)
+      .where(
+        and(
+          eq(schema.marketplaceItems.status, 'published'),
+          eq(schema.marketplaceItems.isPublic, true)
+        )
+      )
+      .orderBy(desc(schema.marketplaceItems.isFeatured), desc(schema.marketplaceItems.rating));
+  }
+
+  async getOrganizationMarketplaceItems(organizationId: string): Promise<schema.MarketplaceItem[]> {
+    return await db.select().from(schema.marketplaceItems)
+      .where(eq(schema.marketplaceItems.organizationId, organizationId))
+      .orderBy(desc(schema.marketplaceItems.updatedAt));
+  }
+
+  async incrementMarketplaceInstallCount(id: string): Promise<void> {
+    await db.update(schema.marketplaceItems)
+      .set({ installCount: sql`${schema.marketplaceItems.installCount} + 1`, updatedAt: new Date() })
+      .where(eq(schema.marketplaceItems.id, id));
+  }
+
+  // Marketplace Installations
+  async getMarketplaceInstallation(id: string): Promise<schema.MarketplaceInstallation | undefined> {
+    const result = await db.select().from(schema.marketplaceInstallations).where(eq(schema.marketplaceInstallations.id, id));
+    return result[0];
+  }
+
+  async createMarketplaceInstallation(installation: schema.InsertMarketplaceInstallation): Promise<schema.MarketplaceInstallation> {
+    const result = await db.insert(schema.marketplaceInstallations).values(installation).returning();
+    return result[0];
+  }
+
+  async deleteMarketplaceInstallation(id: string): Promise<void> {
+    await db.delete(schema.marketplaceInstallations).where(eq(schema.marketplaceInstallations.id, id));
+  }
+
+  async getMarketplaceInstallationsByOrganization(organizationId: string): Promise<schema.MarketplaceInstallation[]> {
+    return await db.select().from(schema.marketplaceInstallations)
+      .where(
+        and(
+          eq(schema.marketplaceInstallations.organizationId, organizationId),
+          eq(schema.marketplaceInstallations.isActive, true)
+        )
+      )
+      .orderBy(desc(schema.marketplaceInstallations.installedAt));
+  }
+
+  async getMarketplaceInstallationByItemAndOrg(itemId: string, organizationId: string): Promise<schema.MarketplaceInstallation | undefined> {
+    const result = await db.select().from(schema.marketplaceInstallations)
+      .where(
+        and(
+          eq(schema.marketplaceInstallations.itemId, itemId),
+          eq(schema.marketplaceInstallations.organizationId, organizationId)
+        )
+      );
+    return result[0];
+  }
+
+  // Workflow Assignments
+  async getWorkflowAssignment(id: string): Promise<schema.WorkflowAssignment | undefined> {
+    const result = await db.select().from(schema.workflowAssignments).where(eq(schema.workflowAssignments.id, id));
+    return result[0];
+  }
+
+  async createWorkflowAssignment(assignment: schema.InsertWorkflowAssignment): Promise<schema.WorkflowAssignment> {
+    const result = await db.insert(schema.workflowAssignments).values(assignment).returning();
+    return result[0];
+  }
+
+  async updateWorkflowAssignment(id: string, assignment: Partial<schema.InsertWorkflowAssignment>): Promise<schema.WorkflowAssignment | undefined> {
+    const result = await db.update(schema.workflowAssignments)
+      .set({ ...assignment, updatedAt: new Date() })
+      .where(eq(schema.workflowAssignments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWorkflowAssignment(id: string): Promise<void> {
+    await db.delete(schema.workflowAssignments).where(eq(schema.workflowAssignments.id, id));
+  }
+
+  async getWorkflowAssignmentsByOrganization(organizationId: string): Promise<schema.WorkflowAssignment[]> {
+    return await db.select().from(schema.workflowAssignments)
+      .where(eq(schema.workflowAssignments.organizationId, organizationId))
+      .orderBy(desc(schema.workflowAssignments.createdAt));
+  }
+
+  async getWorkflowAssignmentsByClient(clientId: string): Promise<schema.WorkflowAssignment[]> {
+    return await db.select().from(schema.workflowAssignments)
+      .where(eq(schema.workflowAssignments.clientId, clientId))
+      .orderBy(desc(schema.workflowAssignments.createdAt));
+  }
+
+  async getWorkflowAssignmentsByWorkflow(workflowId: string): Promise<schema.WorkflowAssignment[]> {
+    return await db.select().from(schema.workflowAssignments)
+      .where(eq(schema.workflowAssignments.workflowId, workflowId))
+      .orderBy(desc(schema.workflowAssignments.createdAt));
+  }
+
+  async getWorkflowAssignmentsByEmployee(userId: string): Promise<schema.WorkflowAssignment[]> {
+    return await db.select().from(schema.workflowAssignments)
+      .where(eq(schema.workflowAssignments.assignedTo, userId))
+      .orderBy(desc(schema.workflowAssignments.dueDate));
+  }
+
+  // Folders
+  async getFolder(id: string): Promise<schema.Folder | undefined> {
+    const result = await db.select().from(schema.folders).where(eq(schema.folders.id, id));
+    return result[0];
+  }
+
+  async createFolder(folder: schema.InsertFolder): Promise<schema.Folder> {
+    const result = await db.insert(schema.folders).values(folder).returning();
+    return result[0];
+  }
+
+  async updateFolder(id: string, folder: Partial<schema.InsertFolder>): Promise<schema.Folder | undefined> {
+    const result = await db.update(schema.folders)
+      .set({ ...folder, updatedAt: new Date() })
+      .where(eq(schema.folders.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteFolder(id: string): Promise<void> {
+    await db.delete(schema.folders).where(eq(schema.folders.id, id));
+  }
+
+  async getFoldersByOrganization(organizationId: string): Promise<schema.Folder[]> {
+    return await db.select().from(schema.folders)
+      .where(
+        and(
+          eq(schema.folders.organizationId, organizationId),
+          eq(schema.folders.isArchived, false)
+        )
+      )
+      .orderBy(schema.folders.name);
+  }
+
+  async getFoldersByParent(parentId: string | null, organizationId: string): Promise<schema.Folder[]> {
+    if (parentId === null) {
+      return await db.select().from(schema.folders)
+        .where(
+          and(
+            sql`${schema.folders.parentId} IS NULL`,
+            eq(schema.folders.organizationId, organizationId),
+            eq(schema.folders.isArchived, false)
+          )
+        )
+        .orderBy(schema.folders.name);
+    }
+    return await db.select().from(schema.folders)
+      .where(
+        and(
+          eq(schema.folders.parentId, parentId),
+          eq(schema.folders.organizationId, organizationId),
+          eq(schema.folders.isArchived, false)
+        )
+      )
+      .orderBy(schema.folders.name);
+  }
+
   // Notifications
   async getNotification(id: string): Promise<Notification | undefined> {
     const result = await db.select().from(schema.notifications).where(eq(schema.notifications.id, id));

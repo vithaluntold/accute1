@@ -192,6 +192,11 @@ export const workflowTasks = pgTable("workflow_tasks", {
   automationInput: jsonb("automation_input").default(sql`'{}'::jsonb`), // Input data for AI agent or automation
   automationOutput: jsonb("automation_output").default(sql`'{}'::jsonb`), // Output/results from automation
   
+  // Auto-progression (TaxDome-style)
+  autoProgress: boolean("auto_progress").notNull().default(false), // Auto-advance to next task when all checklists/subtasks complete
+  requireAllChecklistsComplete: boolean("require_all_checklists_complete").notNull().default(true), // Must complete all checklists
+  requireAllSubtasksComplete: boolean("require_all_subtasks_complete").notNull().default(true), // Must complete all subtasks
+  
   // Reminder configuration
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   reminderDuration: integer("reminder_duration"), // Minutes before due date to send reminder (e.g., 60 = 1 hour before, 1440 = 1 day before)
@@ -1471,6 +1476,144 @@ export const expenses = pgTable("expenses", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Marketplace Items - Templates for documents, forms, and workflows that can be purchased/installed
+export const marketplaceItems = pgTable("marketplace_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // 'document_template', 'form_template', 'pipeline_template'
+  type: text("type").notNull(), // Specific type within category (e.g., 'engagement_letter', '1120_filing', etc.)
+  
+  // Pricing
+  pricingModel: text("pricing_model").notNull().default("free"), // 'free', 'one_time', 'subscription'
+  price: numeric("price", { precision: 10, scale: 2 }).default(sql`0`), // One-time or monthly price
+  priceYearly: numeric("price_yearly", { precision: 10, scale: 2 }), // Optional yearly price for subscriptions
+  
+  // Content - stores the actual template data
+  content: jsonb("content").notNull(), // Template structure varies by category
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Additional configuration
+  
+  // Marketplace metadata
+  createdBy: varchar("created_by").references(() => users.id), // Super admin who created it
+  organizationId: varchar("organization_id").references(() => organizations.id), // null = system-wide (created by super admin)
+  isPublic: boolean("is_public").notNull().default(true),
+  isFeatured: boolean("is_featured").notNull().default(false),
+  installCount: integer("install_count").notNull().default(0),
+  rating: numeric("rating", { precision: 3, scale: 2 }).default(sql`0`), // 0.00 to 5.00
+  reviewCount: integer("review_count").notNull().default(0),
+  
+  // Status
+  status: text("status").notNull().default("draft"), // 'draft', 'published', 'archived'
+  publishedAt: timestamp("published_at"),
+  
+  // Tags for filtering
+  tags: jsonb("tags").notNull().default(sql`'[]'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  orgCategoryIdx: index("marketplace_items_org_category_idx").on(table.organizationId, table.category),
+  categoryStatusIdx: index("marketplace_items_category_status_idx").on(table.category, table.status),
+  statusPublicIdx: index("marketplace_items_status_public_idx").on(table.status, table.isPublic),
+}));
+
+// Marketplace Installations - Track which organizations have installed which items
+export const marketplaceInstallations = pgTable("marketplace_installations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").notNull().references(() => marketplaceItems.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  installedBy: varchar("installed_by").notNull().references(() => users.id),
+  
+  // Billing information (if paid item)
+  purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
+  transactionId: text("transaction_id"), // Reference to payment/transaction
+  subscriptionStatus: text("subscription_status"), // 'active', 'cancelled', 'expired' (for subscription items)
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  installedAt: timestamp("installed_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  itemOrgIdx: index("marketplace_installations_item_org_idx").on(table.itemId, table.organizationId),
+  orgActiveIdx: index("marketplace_installations_org_active_idx").on(table.organizationId, table.isActive),
+}));
+
+// Workflow Assignments - When a client is added to a workflow, it becomes an "assignment"
+// Example: Acme Corporation + 1120 Filing Workflow = Assignment
+export const workflowAssignments = pgTable("workflow_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Assignment metadata
+  name: text("name").notNull(), // e.g., "Acme Corporation - 1120 Filing 2024"
+  description: text("description"),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id), // Primary employee responsible
+  
+  // Status tracking
+  status: text("status").notNull().default("not_started"), // 'not_started', 'in_progress', 'waiting_client', 'review', 'completed', 'cancelled'
+  currentStageId: varchar("current_stage_id").references(() => workflowStages.id),
+  currentStepId: varchar("current_step_id").references(() => workflowSteps.id),
+  currentTaskId: varchar("current_task_id").references(() => workflowTasks.id),
+  
+  // Progress tracking
+  progress: integer("progress").notNull().default(0), // 0-100 percentage
+  completedStages: integer("completed_stages").notNull().default(0),
+  totalStages: integer("total_stages").notNull().default(0),
+  
+  // Due dates and timeline
+  dueDate: timestamp("due_date"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Client point of contact (POC)
+  clientContactId: varchar("client_contact_id").references(() => contacts.id),
+  
+  // Additional metadata
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  orgClientIdx: index("workflow_assignments_org_client_idx").on(table.organizationId, table.clientId),
+  workflowStatusIdx: index("workflow_assignments_workflow_status_idx").on(table.workflowId, table.status),
+}));
+
+// Folders - Hierarchical folder structure for organizing documents, forms, workflows
+export const folders = pgTable("folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  parentId: varchar("parent_id").references((): any => folders.id), // Self-referencing for hierarchy
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // What type of content does this folder contain?
+  contentType: text("content_type").notNull(), // 'documents', 'forms', 'workflows', 'clients', 'mixed'
+  
+  // Permissions and access
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  sharedWith: jsonb("shared_with").default(sql`'[]'::jsonb`), // Array of user IDs who have access
+  
+  // Metadata
+  color: text("color"), // Optional color for visual organization
+  icon: text("icon"), // Optional icon name
+  description: text("description"),
+  isArchived: boolean("is_archived").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  parentOrgIdx: index("folders_parent_org_idx").on(table.parentId, table.organizationId),
+  orgTypeIdx: index("folders_org_type_idx").on(table.organizationId, table.contentType),
+  orgArchivedIdx: index("folders_org_archived_idx").on(table.organizationId, table.isArchived),
+}));
+
 // Zod Schemas and Types
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
@@ -1491,6 +1634,10 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true,
 export const insertLlmConfigurationSchema = createInsertSchema(llmConfigurations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAiAgentConversationSchema = createInsertSchema(aiAgentConversations).omit({ id: true, createdAt: true, updatedAt: true, lastMessageAt: true });
 export const insertAiAgentMessageSchema = createInsertSchema(aiAgentMessages).omit({ id: true, createdAt: true });
+export const insertMarketplaceItemSchema = createInsertSchema(marketplaceItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMarketplaceInstallationSchema = createInsertSchema(marketplaceInstallations).omit({ id: true, installedAt: true, updatedAt: true });
+export const insertWorkflowAssignmentSchema = createInsertSchema(workflowAssignments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFolderSchema = createInsertSchema(folders).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1530,3 +1677,11 @@ export type InsertAiAgentConversation = z.infer<typeof insertAiAgentConversation
 export type AiAgentConversation = typeof aiAgentConversations.$inferSelect;
 export type InsertAiAgentMessage = z.infer<typeof insertAiAgentMessageSchema>;
 export type AiAgentMessage = typeof aiAgentMessages.$inferSelect;
+export type InsertMarketplaceItem = z.infer<typeof insertMarketplaceItemSchema>;
+export type MarketplaceItem = typeof marketplaceItems.$inferSelect;
+export type InsertMarketplaceInstallation = z.infer<typeof insertMarketplaceInstallationSchema>;
+export type MarketplaceInstallation = typeof marketplaceInstallations.$inferSelect;
+export type InsertWorkflowAssignment = z.infer<typeof insertWorkflowAssignmentSchema>;
+export type WorkflowAssignment = typeof workflowAssignments.$inferSelect;
+export type InsertFolder = z.infer<typeof insertFolderSchema>;
+export type Folder = typeof folders.$inferSelect;
