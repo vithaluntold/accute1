@@ -432,41 +432,59 @@ export default function Assignments() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="assignment-client">Client *</Label>
-              <Select
-                value={newAssignment.clientId}
-                onValueChange={(value) => setNewAssignment({ ...newAssignment, clientId: value })}
-                disabled={clients.length === 0}
-              >
-                <SelectTrigger id="assignment-client" data-testid="select-assignment-client">
-                  <SelectValue placeholder={clients.length === 0 ? "No clients available" : "Select client"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client: any) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.companyName || client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {clients.length === 0 ? (
+                <Input
+                  id="assignment-client"
+                  value="No clients available"
+                  disabled
+                  data-testid="select-assignment-client"
+                  className="cursor-not-allowed"
+                />
+              ) : (
+                <Select
+                  value={newAssignment.clientId}
+                  onValueChange={(value) => setNewAssignment({ ...newAssignment, clientId: value })}
+                >
+                  <SelectTrigger id="assignment-client" data-testid="select-assignment-client">
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.companyName || client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="assignment-workflow">Workflow *</Label>
-              <Select
-                value={newAssignment.workflowId}
-                onValueChange={(value) => setNewAssignment({ ...newAssignment, workflowId: value })}
-                disabled={workflows.length === 0}
-              >
-                <SelectTrigger id="assignment-workflow" data-testid="select-assignment-workflow">
-                  <SelectValue placeholder={workflows.length === 0 ? "No workflows available" : "Select workflow"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {workflows.map((workflow: any) => (
-                    <SelectItem key={workflow.id} value={workflow.id}>
-                      {workflow.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {workflows.length === 0 ? (
+                <Input
+                  id="assignment-workflow"
+                  value="No workflows available"
+                  disabled
+                  data-testid="select-assignment-workflow"
+                  className="cursor-not-allowed"
+                />
+              ) : (
+                <Select
+                  value={newAssignment.workflowId}
+                  onValueChange={(value) => setNewAssignment({ ...newAssignment, workflowId: value })}
+                >
+                  <SelectTrigger id="assignment-workflow" data-testid="select-assignment-workflow">
+                    <SelectValue placeholder="Select workflow" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workflows.map((workflow: any) => (
+                      <SelectItem key={workflow.id} value={workflow.id}>
+                        {workflow.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="assignment-assignee">Assign To</Label>
