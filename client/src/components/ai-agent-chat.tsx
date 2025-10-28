@@ -374,10 +374,19 @@ export function AIAgentChat({
                   }`}
                   data-testid={`message-${message.role}`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs opacity-70 mt-1">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </p>
+                  {message.role === "assistant" && message.isStreaming && !message.content ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Parity is thinking...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </p>
+                    </>
+                  )}
                 </div>
                 {message.role === "user" && (
                   <Avatar className="h-8 w-8">
