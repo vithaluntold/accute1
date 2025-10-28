@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -29,6 +29,12 @@ const menuItems = [
     title: "Workflows",
     url: "/workflows",
     icon: Workflow,
+    permission: "workflows.view",
+  },
+  {
+    title: "Assignments",
+    url: "/assignments",
+    icon: ListTodo,
     permission: "workflows.view",
   },
   {
