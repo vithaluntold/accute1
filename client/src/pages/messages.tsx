@@ -19,8 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { MessageSquare, Plus, Send } from "lucide-react";
+import { MessageSquare, Plus, Send, ListTodo } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -29,6 +30,10 @@ export default function MessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
   const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [convertToTaskOpen, setConvertToTaskOpen] = useState(false);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
+  const [selectedStageId, setSelectedStageId] = useState<string>("");
+  const [selectedStepId, setSelectedStepId] = useState<string>("");
   const { toast } = useToast();
 
   const { data: conversations, isLoading } = useQuery({
@@ -42,6 +47,26 @@ export default function MessagesPage() {
   const { data: messages } = useQuery({
     queryKey: ["/api/conversations", selectedConversation?.id, "messages"],
     enabled: !!selectedConversation,
+  });
+
+  const { data: assignments } = useQuery({
+    queryKey: ["/api/assignments"],
+    enabled: convertToTaskOpen,
+  });
+
+  const { data: workflows } = useQuery({
+    queryKey: ["/api/workflows"],
+    enabled: convertToTaskOpen,
+  });
+
+  const { data: stages } = useQuery({
+    queryKey: [`/api/workflows/${selectedWorkflowId}/stages`],
+    enabled: !!selectedWorkflowId && convertToTaskOpen,
+  });
+
+  const { data: steps } = useQuery({
+    queryKey: [`/api/workflows/stages/${selectedStageId}/steps`],
+    enabled: !!selectedStageId && convertToTaskOpen,
   });
 
   const createConversationMutation = useMutation({
@@ -68,6 +93,31 @@ export default function MessagesPage() {
     },
     onError: () => {
       toast({ title: "Failed to send message", variant: "destructive" });
+    },
+  });
+
+  const convertToTaskMutation = useMutation({
+    mutationFn: async (data: { stepId: string }) => {
+      // Get all messages to create a comprehensive task description
+      const messageContent = (messages as any[])
+        ?.map((m: any) => `${m.senderType === "staff" ? "Staff" : "Client"}: ${m.content}`)
+        .join("\n\n") || "";
+
+      return await apiRequest("POST", `/api/workflows/steps/${data.stepId}/tasks`, {
+        name: selectedConversation.subject || "Task from conversation",
+        description: `Converted from conversation:\n\n${messageContent}`,
+        type: "manual",
+        status: "pending",
+        priority: "medium",
+        order: 0,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Successfully converted to task" });
+      setConvertToTaskOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to convert to task", variant: "destructive" });
     },
   });
 
@@ -192,7 +242,18 @@ export default function MessagesPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{selectedConversation.subject}</CardTitle>
-                  <Badge>{selectedConversation.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConvertToTaskOpen(true)}
+                      data-testid="button-convert-to-task"
+                    >
+                      <ListTodo className="w-4 h-4 mr-2" />
+                      Convert to Task
+                    </Button>
+                    <Badge>{selectedConversation.status}</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
@@ -253,6 +314,129 @@ export default function MessagesPage() {
           )}
         </Card>
       </div>
+
+      {/* Convert to Task Dialog */}
+      <Dialog
+        open={convertToTaskOpen}
+        onOpenChange={(open) => {
+          setConvertToTaskOpen(open);
+          if (!open) {
+            // Reset selections when dialog closes
+            setSelectedWorkflowId("");
+            setSelectedStageId("");
+            setSelectedStepId("");
+          }
+        }}
+      >
+        <DialogContent data-testid="dialog-convert-to-task">
+          <DialogHeader>
+            <DialogTitle>Convert Conversation to Task</DialogTitle>
+            <DialogDescription>
+              Create a workflow task from this conversation. The conversation subject will become the task name, and all messages will be included in the task description.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedStepId) {
+                convertToTaskMutation.mutate({ stepId: selectedStepId });
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <label className="text-sm font-medium">Select Workflow</label>
+              <Select
+                name="workflowId"
+                required
+                value={selectedWorkflowId}
+                onValueChange={(value) => {
+                  setSelectedWorkflowId(value);
+                  setSelectedStageId(""); // Reset stage when workflow changes
+                  setSelectedStepId(""); // Reset step when workflow changes
+                }}
+              >
+                <SelectTrigger data-testid="select-workflow">
+                  <SelectValue placeholder="Choose a workflow" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(workflows as any[])?.map((workflow: any) => (
+                    <SelectItem key={workflow.id} value={workflow.id}>
+                      {workflow.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Select Stage</label>
+              <Select
+                name="stageId"
+                required
+                value={selectedStageId}
+                onValueChange={(value) => {
+                  setSelectedStageId(value);
+                  setSelectedStepId(""); // Reset step when stage changes
+                }}
+                disabled={!selectedWorkflowId}
+              >
+                <SelectTrigger data-testid="select-stage">
+                  <SelectValue placeholder={selectedWorkflowId ? "Choose a stage" : "Select workflow first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(stages as any[])?.map((stage: any) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {stage.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Select Step</label>
+              <Select
+                name="stepId"
+                required
+                value={selectedStepId}
+                onValueChange={setSelectedStepId}
+                disabled={!selectedStageId}
+              >
+                <SelectTrigger data-testid="select-step">
+                  <SelectValue placeholder={selectedStageId ? "Choose a step" : "Select stage first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(steps as any[])?.length > 0 ? (
+                    (steps as any[]).map((step: any) => (
+                      <SelectItem key={step.id} value={step.id}>
+                        {step.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-steps" disabled>No steps available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConvertToTaskOpen(false)}
+                data-testid="button-cancel-convert"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={convertToTaskMutation.isPending || !selectedStepId}
+                data-testid="button-confirm-convert"
+              >
+                {convertToTaskMutation.isPending ? "Converting..." : "Create Task"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
