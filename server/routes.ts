@@ -1664,10 +1664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create folder
   app.post("/api/folders", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      console.log("Creating folder with data:", req.body);
-      console.log("User orgId:", req.user!.organizationId, "UserId:", req.userId);
-      const validated = insertFolderSchema.parse(req.body);
-      console.log("Validated:", validated);
+      const validated = insertFolderSchema.omit({ organizationId: true, createdBy: true }).parse(req.body);
       const folder = await storage.createFolder({
         ...validated,
         organizationId: req.user!.organizationId!,
