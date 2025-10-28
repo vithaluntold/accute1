@@ -39,6 +39,7 @@ import {
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import * as cryptoUtils from "./crypto-utils";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -1407,6 +1408,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
+      // Generate cryptographic hash and digital signature for tamper-proof security
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const documentHash = cryptoUtils.generateDocumentHash(fileBuffer);
+      const digitalSignature = cryptoUtils.signDocumentHash(documentHash, req.user!.organizationId!);
+      const signedAt = new Date();
+
       const documentData = {
         name: req.body.name || req.file.originalname,
         type: req.file.mimetype,
@@ -1417,10 +1424,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "processed",
         workflowId: req.body.workflowId || null,
         encryptedContent: null,
+        // PKI Digital Signature fields
+        documentHash,
+        digitalSignature,
+        signatureAlgorithm: "RSA-SHA256",
+        signedAt,
+        signedBy: req.userId!,
+        verificationStatus: "verified",
       };
 
       const document = await storage.createDocument(documentData);
-      await logActivity(req.userId, req.user!.organizationId || undefined, "upload", "document", document.id, { name: document.name }, req);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "upload", "document", document.id, { 
+        name: document.name,
+        hash: documentHash.substring(0, 16) + "...", // Log partial hash for audit trail
+        signed: true 
+      }, req);
       res.json(document);
     } catch (error: any) {
       console.error("Document upload error:", error);
@@ -1454,6 +1472,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Document download error:", error);
       res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
+  // Verify document integrity and digital signature
+  app.post("/api/documents/:id/verify", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const document = await storage.getDocument(req.params.id);
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Check organization access
+      if (document.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Check if document has been signed
+      if (!document.documentHash || !document.digitalSignature) {
+        return res.json({
+          verified: false,
+          status: "unsigned",
+          message: "Document was not digitally signed during upload",
+        });
+      }
+
+      const filePath = path.join(process.cwd(), document.url.replace(/^\//, ''));
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Read current file and verify integrity
+      const currentFileBuffer = fs.readFileSync(filePath);
+      const isIntegrityValid = cryptoUtils.verifyDocumentIntegrity(document.documentHash, currentFileBuffer);
+
+      // Verify digital signature
+      const isSignatureValid = cryptoUtils.verifySignature(
+        document.documentHash,
+        document.digitalSignature,
+        document.organizationId
+      );
+
+      const verified = isIntegrityValid && isSignatureValid;
+
+      // Update verification status in database
+      if (verified && document.verificationStatus !== "verified") {
+        await storage.updateDocument(document.id, { verificationStatus: "verified" });
+      } else if (!verified && document.verificationStatus !== "tampered") {
+        await storage.updateDocument(document.id, { verificationStatus: "tampered" });
+      }
+
+      res.json({
+        verified,
+        status: verified ? "verified" : "tampered",
+        integrity: isIntegrityValid ? "valid" : "invalid",
+        signature: isSignatureValid ? "valid" : "invalid",
+        algorithm: document.signatureAlgorithm,
+        signedAt: document.signedAt,
+        signedBy: document.signedBy,
+        message: verified 
+          ? "Document is authentic and has not been tampered with" 
+          : "CRITICAL: Document has been modified or signature is invalid",
+      });
+    } catch (error: any) {
+      console.error("Document verification error:", error);
+      res.status(500).json({ error: "Failed to verify document" });
     }
   });
 
