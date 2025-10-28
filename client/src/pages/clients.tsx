@@ -69,10 +69,10 @@ export default function Clients() {
       zipCode: "",
       country: "US",
       taxId: "",
-      status: "active",
+      status: "active" as const,
       industry: "",
       notes: "",
-      assignedTo: null,
+      assignedTo: undefined,
       metadata: {},
     },
   });
@@ -235,7 +235,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>Contact Name</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="John Doe" />
+                          <Input {...field} value={field.value || ""} placeholder="John Doe" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -261,7 +261,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="(555) 123-4567" />
+                          <Input {...field} value={field.value || ""} placeholder="(555) 123-4567" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -274,7 +274,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>Tax ID / EIN</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="12-3456789" />
+                          <Input {...field} value={field.value || ""} placeholder="12-3456789" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -287,7 +287,7 @@ export default function Clients() {
                       <FormItem className="col-span-2">
                         <FormLabel>Address</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="123 Main St" />
+                          <Input {...field} value={field.value || ""} placeholder="123 Main St" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -300,7 +300,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>City</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="New York" />
+                          <Input {...field} value={field.value || ""} placeholder="New York" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -313,7 +313,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>State</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="NY" />
+                          <Input {...field} value={field.value || ""} placeholder="NY" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -326,7 +326,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>ZIP Code</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="10001" />
+                          <Input {...field} value={field.value || ""} placeholder="10001" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -339,7 +339,7 @@ export default function Clients() {
                       <FormItem>
                         <FormLabel>Industry</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Technology" />
+                          <Input {...field} value={field.value || ""} placeholder="Technology" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -352,7 +352,7 @@ export default function Clients() {
                       <FormItem className="col-span-2">
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Additional information..." />
+                          <Input {...field} value={field.value || ""} placeholder="Additional information..." />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
