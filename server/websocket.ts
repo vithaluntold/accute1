@@ -210,12 +210,17 @@ async function handleAgentExecution(
     const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');
     let fullResponse = '';
 
+    console.log(`[WebSocket] Executing agent: ${normalizedAgentName}, input length: ${input.length}`);
+
     switch (normalizedAgentName) {
       case 'parity': {
         const agent = new ParityAgent(llmConfig);
+        console.log('[WebSocket] Starting Parity agent streaming...');
         fullResponse = await agent.executeStream(input, (chunk: string) => {
+          console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
           ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
         });
+        console.log('[WebSocket] Parity agent completed. Response length:', fullResponse.length);
         break;
       }
       case 'cadence': {
