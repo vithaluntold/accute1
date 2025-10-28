@@ -435,14 +435,15 @@ export default function Assignments() {
               <Select
                 value={newAssignment.clientId}
                 onValueChange={(value) => setNewAssignment({ ...newAssignment, clientId: value })}
+                disabled={clients.length === 0}
               >
                 <SelectTrigger id="assignment-client" data-testid="select-assignment-client">
-                  <SelectValue placeholder="Select client" />
+                  <SelectValue placeholder={clients.length === 0 ? "No clients available" : "Select client"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {clients.map((client) => (
+                  {clients.map((client: any) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.companyName}
+                      {client.companyName || client.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -453,12 +454,13 @@ export default function Assignments() {
               <Select
                 value={newAssignment.workflowId}
                 onValueChange={(value) => setNewAssignment({ ...newAssignment, workflowId: value })}
+                disabled={workflows.length === 0}
               >
                 <SelectTrigger id="assignment-workflow" data-testid="select-assignment-workflow">
-                  <SelectValue placeholder="Select workflow" />
+                  <SelectValue placeholder={workflows.length === 0 ? "No workflows available" : "Select workflow"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {workflows.map((workflow) => (
+                  {workflows.map((workflow: any) => (
                     <SelectItem key={workflow.id} value={workflow.id}>
                       {workflow.name}
                     </SelectItem>
