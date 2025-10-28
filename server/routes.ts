@@ -1629,12 +1629,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pdfBuffer = doc.output('arraybuffer');
       fs.writeFileSync(filepath, Buffer.from(pdfBuffer));
 
-      // Get organization keys for digital signature
-      const keyPair = await cryptoUtils.loadOrganizationKeyPair(req.user!.organizationId!);
-      
       // Generate hash and signature
-      const documentHash = cryptoUtils.generateDocumentHash(filepath);
-      const signature = cryptoUtils.signDocumentHash(documentHash, keyPair.privateKey);
+      const pdfBufferForHash = fs.readFileSync(filepath);
+      const documentHash = cryptoUtils.generateDocumentHash(pdfBufferForHash);
+      const signature = await cryptoUtils.signDocumentHash(documentHash, req.user!.organizationId!);
 
       // Save to database
       const document = await storage.createDocument({
@@ -1652,9 +1650,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationStatus: 'verified',
       });
 
-      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "document", document.id, { name: filename, type: 'engagement_letter' }, req);
+      // Save as reusable template (similar to TaxDome's engagement letter templates)
+      const templateName = title || clientName 
+        ? `${title || 'Engagement Letter'}${clientName ? ` - ${clientName}` : ''}`
+        : 'AI-Generated Engagement Letter';
+      
+      const template = await storage.createDocumentTemplate({
+        name: templateName,
+        category: 'engagement_letter',
+        content: content,
+        description: 'AI-generated engagement letter template created by Parity',
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+        isDefault: false,
+        isActive: true,
+      });
 
-      res.json(document);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "document", document.id, { name: filename, type: 'engagement_letter', templateId: template.id }, req);
+
+      res.json({ ...document, templateId: template.id });
     } catch (error: any) {
       console.error("Failed to generate engagement letter:", error);
       res.status(500).json({ error: "Failed to generate engagement letter PDF" });

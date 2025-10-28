@@ -373,6 +373,23 @@ export const documents = pgTable("documents", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Document Templates for reusable engagement letters and contracts
+export const documentTemplates = pgTable("document_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Standard CPA Engagement Letter"
+  category: text("category").notNull().default("engagement_letter"), // engagement_letter, audit_letter, tax_organizer, etc.
+  content: text("content").notNull(), // Template content with placeholders like {{client_name}}
+  description: text("description"), // Brief description of template
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for system templates
+  createdBy: varchar("created_by").references(() => users.id),
+  isDefault: boolean("is_default").notNull().default(false), // System-provided templates
+  isActive: boolean("is_active").notNull().default(true),
+  usageCount: integer("usage_count").notNull().default(0), // Track how many times template was used
+  metadata: jsonb("metadata").default({}), // Additional template settings
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Notifications
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1011,6 +1028,13 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   updatedAt: true,
 });
 
+export const insertDocumentTemplateSchema = createInsertSchema(documentTemplates).omit({
+  id: true,
+  usageCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
@@ -1143,6 +1167,8 @@ export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 export type AiAgent = typeof aiAgents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+export type InsertDocumentTemplate = z.infer<typeof insertDocumentTemplateSchema>;
+export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;

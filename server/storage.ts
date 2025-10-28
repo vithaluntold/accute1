@@ -141,6 +141,15 @@ export interface IStorage {
   getDocumentsByUser(userId: string): Promise<Document[]>;
   getDocumentsByWorkflow(workflowId: string): Promise<Document[]>;
 
+  // Document Templates
+  getDocumentTemplate(id: string): Promise<schema.DocumentTemplate | undefined>;
+  createDocumentTemplate(template: schema.InsertDocumentTemplate): Promise<schema.DocumentTemplate>;
+  updateDocumentTemplate(id: string, template: Partial<schema.InsertDocumentTemplate>): Promise<schema.DocumentTemplate | undefined>;
+  deleteDocumentTemplate(id: string): Promise<void>;
+  getDocumentTemplatesByOrganization(organizationId: string): Promise<schema.DocumentTemplate[]>;
+  getDocumentTemplatesByCategory(organizationId: string, category: string): Promise<schema.DocumentTemplate[]>;
+  incrementTemplateUsage(id: string): Promise<void>;
+
   // Notifications
   getNotification(id: string): Promise<Notification | undefined>;
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -870,6 +879,64 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.documents)
       .where(eq(schema.documents.workflowId, workflowId))
       .orderBy(desc(schema.documents.createdAt));
+  }
+
+  // Document Templates
+  async getDocumentTemplate(id: string): Promise<schema.DocumentTemplate | undefined> {
+    const result = await db.select().from(schema.documentTemplates).where(eq(schema.documentTemplates.id, id));
+    return result[0];
+  }
+
+  async createDocumentTemplate(template: schema.InsertDocumentTemplate): Promise<schema.DocumentTemplate> {
+    const result = await db.insert(schema.documentTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateDocumentTemplate(id: string, template: Partial<schema.InsertDocumentTemplate>): Promise<schema.DocumentTemplate | undefined> {
+    const result = await db.update(schema.documentTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(schema.documentTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDocumentTemplate(id: string): Promise<void> {
+    await db.delete(schema.documentTemplates).where(eq(schema.documentTemplates.id, id));
+  }
+
+  async getDocumentTemplatesByOrganization(organizationId: string): Promise<schema.DocumentTemplate[]> {
+    return await db.select().from(schema.documentTemplates)
+      .where(
+        and(
+          or(
+            eq(schema.documentTemplates.organizationId, organizationId),
+            sql`${schema.documentTemplates.organizationId} IS NULL` // Include system templates
+          ),
+          eq(schema.documentTemplates.isActive, true)
+        )
+      )
+      .orderBy(desc(schema.documentTemplates.createdAt));
+  }
+
+  async getDocumentTemplatesByCategory(organizationId: string, category: string): Promise<schema.DocumentTemplate[]> {
+    return await db.select().from(schema.documentTemplates)
+      .where(
+        and(
+          or(
+            eq(schema.documentTemplates.organizationId, organizationId),
+            sql`${schema.documentTemplates.organizationId} IS NULL` // Include system templates
+          ),
+          eq(schema.documentTemplates.category, category),
+          eq(schema.documentTemplates.isActive, true)
+        )
+      )
+      .orderBy(desc(schema.documentTemplates.usageCount), desc(schema.documentTemplates.createdAt));
+  }
+
+  async incrementTemplateUsage(id: string): Promise<void> {
+    await db.update(schema.documentTemplates)
+      .set({ usageCount: sql`${schema.documentTemplates.usageCount} + 1`, updatedAt: new Date() })
+      .where(eq(schema.documentTemplates.id, id));
   }
 
   // Notifications
