@@ -137,6 +137,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await storage.createSession(user.id, token, expiresAt);
 
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
       // Log activity
       await logActivity(user.id, organization?.id, "register", "user", user.id, {}, req);
 
@@ -149,7 +153,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: user.lastName,
           roleId: user.roleId,
           organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
         },
+        role,
         token,
       });
     } catch (error: any) {
@@ -188,6 +194,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
 
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
       // Log activity
       await logActivity(user.id, user.organizationId || undefined, "login", "user", user.id, {}, req);
 
@@ -208,7 +218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: user.lastName,
           roleId: user.roleId,
           organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
         },
+        role,
         token,
       });
     } catch (error: any) {
@@ -349,6 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
 
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
       await logActivity(user.id, undefined, "register_super_admin", "user", user.id, {}, req);
 
       res.json({
@@ -360,7 +376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: user.lastName,
           roleId: user.roleId,
           organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
         },
+        role,
         token,
       });
     } catch (error: any) {
@@ -424,6 +442,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
 
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
       await logActivity(user.id, organization.id, "register_admin", "user", user.id, { organizationId: organization.id }, req);
 
       res.json({
@@ -435,12 +457,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: user.lastName,
           roleId: user.roleId,
           organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
         },
         organization: {
           id: organization.id,
           name: organization.name,
           slug: organization.slug,
         },
+        role,
         token,
       });
     } catch (error: any) {
@@ -589,6 +613,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
 
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
       await logActivity(user.id, user.organizationId || undefined, "register_invite", "user", user.id, { invitationId: validation.invitation.id }, req);
 
       res.json({
@@ -600,7 +628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: user.lastName,
           roleId: user.roleId,
           organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
         },
+        role,
         token,
       });
     } catch (error: any) {
