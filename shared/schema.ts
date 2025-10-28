@@ -320,7 +320,7 @@ export const aiAgentMessages = pgTable("ai_agent_messages", {
   conversationIdx: index("ai_messages_conversation_idx").on(table.conversationId, table.createdAt),
 }));
 
-// Documents for client portal
+// Documents for client portal with PKI digital signatures
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -332,6 +332,15 @@ export const documents = pgTable("documents", {
   workflowId: varchar("workflow_id").references(() => workflows.id),
   status: text("status").notNull().default("pending"),
   encryptedContent: text("encrypted_content"),
+  
+  // PKI Digital Signature fields for tamper-proof verification
+  documentHash: text("document_hash"), // SHA-256 hash of original file
+  digitalSignature: text("digital_signature"), // RSA signature of hash
+  signatureAlgorithm: text("signature_algorithm").default("RSA-SHA256"), // Algorithm used
+  signedAt: timestamp("signed_at"), // When document was signed
+  signedBy: varchar("signed_by").references(() => users.id), // Who signed it
+  verificationStatus: text("verification_status").default("unverified"), // 'verified', 'unverified', 'tampered'
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
