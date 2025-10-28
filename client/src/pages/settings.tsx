@@ -300,6 +300,7 @@ export default function Settings() {
       apiKey: formData.apiKey,
       endpoint: formData.azureEndpoint,
       apiVersion: formData.azureApiVersion,
+      model: formData.model,
     });
   };
 
