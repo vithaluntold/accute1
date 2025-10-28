@@ -1,177 +1,466 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Workflow, Bot, FileText, Activity } from "lucide-react";
-import { getUser, getToken } from "@/lib/auth";
+import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2 } from "lucide-react";
+import { format } from "date-fns";
+import { getUser } from "@/lib/auth";
+import type { WorkflowTask } from "@shared/schema";
+
+interface TaskStats {
+  total: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+  overdue: number;
+  onTime?: number;
+  teamSize?: number;
+}
+
+interface EnrichedTask extends WorkflowTask {
+  isOverdue?: boolean;
+  isOnTime?: boolean;
+  workflow?: any;
+  stage?: any;
+  step?: any;
+}
+
+interface PracticeStats {
+  taskStats: TaskStats;
+  workflows: {
+    total: number;
+    active: number;
+    completed: number;
+  };
+  clients: {
+    total: number;
+    active: number;
+  };
+  team: {
+    total: number;
+  };
+}
 
 export default function Dashboard() {
   const user = getUser();
-  const token = getToken();
+  const userPermissions = user?.permissions || [];
+  
+  const hasReportsView = userPermissions.includes('reports.view');
+  const hasWorkflowsView = userPermissions.includes('workflows.view');
 
-  const { data: workflows, isLoading: workflowsLoading } = useQuery({
-    queryKey: ["/api/workflows"],
-    enabled: !!token,
+  const { data: myStats, isLoading: myStatsLoading } = useQuery<TaskStats>({
+    queryKey: ['/api/dashboard/my-stats'],
   });
 
-  const { data: aiAgents, isLoading: agentsLoading } = useQuery({
-    queryKey: ["/api/ai-agents"],
-    enabled: !!token,
+  const { data: myTasks, isLoading: myTasksLoading } = useQuery<EnrichedTask[]>({
+    queryKey: ['/api/my-tasks'],
   });
 
-  const { data: documents, isLoading: documentsLoading } = useQuery({
-    queryKey: ["/api/documents"],
-    enabled: !!token,
+  const { data: teamStats, isLoading: teamStatsLoading } = useQuery<TaskStats>({
+    queryKey: ['/api/dashboard/team-stats'],
+    enabled: hasWorkflowsView,
   });
 
-  const stats = [
-    {
-      title: "Active Workflows",
-      value: workflows?.filter((w: any) => w.isActive).length || 0,
-      icon: Workflow,
-      description: "Running automation workflows",
-      loading: workflowsLoading,
-    },
-    {
-      title: "AI Agents",
-      value: aiAgents?.length || 0,
-      icon: Bot,
-      description: "Available AI assistants",
-      loading: agentsLoading,
-    },
-    {
-      title: "Documents",
-      value: documents?.length || 0,
-      icon: FileText,
-      description: "Uploaded and processed",
-      loading: documentsLoading,
-    },
-    {
-      title: "Activity",
-      value: "Live",
-      icon: Activity,
-      description: "System status",
-      loading: false,
-    },
-  ];
+  const { data: practiceStats, isLoading: practiceStatsLoading } = useQuery<PracticeStats>({
+    queryKey: ['/api/dashboard/practice-stats'],
+    enabled: hasReportsView,
+  });
+
+  const { data: tasksDueSoon } = useQuery<any[]>({
+    queryKey: ['/api/tasks/due-soon'],
+  });
+
+  if (myStatsLoading || myTasksLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  const overdueTasks = myTasks?.filter(t => t.isOverdue) || [];
+  const inProgressTasks = myTasks?.filter(t => t.status === 'in_progress') || [];
+  const pendingTasks = myTasks?.filter(t => t.status === 'pending') || [];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-3xl font-display mb-2" data-testid="text-dashboard-title">
+        <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
           Welcome back, {user?.firstName || user?.username}
         </h1>
-        <p className="text-muted-foreground">
-          Here's an overview of your accounting automation platform
-        </p>
+        <p className="text-muted-foreground">Track your tasks and stay on top of deadlines</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <Card key={stat.title} data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
+      {/* My Task Statistics */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">My Tasks</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+              <ListTodo className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {stat.loading ? (
-                <>
-                  <Skeleton className="h-8 w-16 mb-1" />
-                  <Skeleton className="h-4 w-full" />
-                </>
-              ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid={`text-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {stat.value}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {stat.description}
-                  </p>
-                </>
-              )}
+              <div className="text-2xl font-bold" data-testid="stat-my-total">{myStats?.total || 0}</div>
             </CardContent>
           </Card>
-        ))}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-my-pending">{myStats?.pending || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-my-in-progress">{myStats?.in_progress || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="stat-my-completed">{myStats?.completed || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+              <AlertCircle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive" data-testid="stat-my-overdue">
+                {myStats?.overdue || 0}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Team Statistics (Manager View) */}
+      {hasWorkflowsView && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Team Overview</h2>
+          {teamStatsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-4 w-20" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-16" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Team Size</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-team-size">{teamStats?.teamSize || 0}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-team-total">{teamStats?.total || 0}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-team-in-progress">{teamStats?.in_progress || 0}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-destructive" data-testid="stat-team-overdue">
+                    {teamStats?.overdue || 0}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Practice Statistics (Admin View) */}
+      {hasReportsView && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Practice Overview</h2>
+          {practiceStatsLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-4 w-20" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-16" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Workflows</CardTitle>
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-practice-workflows">
+                    {practiceStats?.workflows.active || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {practiceStats?.workflows.total || 0} total
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-practice-clients">
+                    {practiceStats?.clients.active || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {practiceStats?.clients.total || 0} total
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Team Members</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="stat-practice-team">
+                    {practiceStats?.team.total || 0}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Tasks Overdue</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-destructive" data-testid="stat-practice-overdue">
+                    {practiceStats?.taskStats.overdue || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {practiceStats?.taskStats.total || 0} total tasks
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Task Lists */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Overdue Tasks */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Workflows</CardTitle>
-            <CardDescription>Your most recently updated workflows</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Overdue Tasks
+            </CardTitle>
+            <CardDescription>Tasks past their due date</CardDescription>
           </CardHeader>
           <CardContent>
-            {workflowsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : workflows && workflows.length > 0 ? (
-              <div className="space-y-2">
-                {workflows.slice(0, 5).map((workflow: any) => (
+            {overdueTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No overdue tasks</p>
+            ) : (
+              <div className="space-y-3">
+                {overdueTasks.slice(0, 5).map((task) => (
                   <div
-                    key={workflow.id}
-                    className="flex items-center justify-between p-3 border rounded-md hover-elevate"
-                    data-testid={`workflow-item-${workflow.id}`}
+                    key={task.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                    data-testid={`task-overdue-${task.id}`}
                   >
-                    <div>
-                      <p className="font-medium">{workflow.name}</p>
-                      <p className="text-sm text-muted-foreground">{workflow.type}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{task.name}</p>
+                      {task.dueDate && (
+                        <p className="text-xs text-destructive">
+                          Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                        </p>
+                      )}
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      workflow.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                      workflow.status === 'draft' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
-                      'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-                    }`}>
-                      {workflow.status}
-                    </span>
+                    <Badge variant="destructive" className="text-xs">Overdue</Badge>
                   </div>
                 ))}
+                {overdueTasks.length > 5 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    +{overdueTasks.length - 5} more overdue tasks
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">
-                No workflows yet. Create your first workflow to get started.
-              </p>
             )}
           </CardContent>
         </Card>
 
+        {/* In Progress Tasks */}
         <Card>
           <CardHeader>
-            <CardTitle>AI Agents Marketplace</CardTitle>
-            <CardDescription>Popular AI agents for automation</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              In Progress
+            </CardTitle>
+            <CardDescription>Tasks currently being worked on</CardDescription>
           </CardHeader>
           <CardContent>
-            {agentsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : aiAgents && aiAgents.length > 0 ? (
-              <div className="space-y-2">
-                {aiAgents.slice(0, 5).map((agent: any) => (
+            {inProgressTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tasks in progress</p>
+            ) : (
+              <div className="space-y-3">
+                {inProgressTasks.slice(0, 5).map((task) => (
                   <div
-                    key={agent.id}
-                    className="flex items-center justify-between p-3 border rounded-md hover-elevate"
-                    data-testid={`agent-item-${agent.id}`}
+                    key={task.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                    data-testid={`task-in-progress-${task.id}`}
                   >
-                    <div>
-                      <p className="font-medium">{agent.name}</p>
-                      <p className="text-sm text-muted-foreground">{agent.category}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{task.name}</p>
+                      {task.dueDate && (
+                        <p className="text-xs text-muted-foreground">
+                          Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                        </p>
+                      )}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      ⭐ {agent.rating}/5
-                    </span>
+                    <Badge variant="secondary" className="text-xs">In Progress</Badge>
                   </div>
                 ))}
+                {inProgressTasks.length > 5 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    +{inProgressTasks.length - 5} more tasks
+                  </p>
+                )}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Tasks */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Pending Tasks
+            </CardTitle>
+            <CardDescription>Tasks not yet started</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {pendingTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No pending tasks</p>
             ) : (
-              <p className="text-center text-muted-foreground py-8">
-                No AI agents available.
-              </p>
+              <div className="space-y-3">
+                {pendingTasks.slice(0, 5).map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                    data-testid={`task-pending-${task.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{task.name}</p>
+                      {task.dueDate && (
+                        <p className="text-xs text-muted-foreground">
+                          Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                        </p>
+                      )}
+                    </div>
+                    <Button size="sm" variant="outline" data-testid={`button-start-${task.id}`}>
+                      Start
+                    </Button>
+                  </div>
+                ))}
+                {pendingTasks.length > 5 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    +{pendingTasks.length - 5} more tasks
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tasks Due Soon */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              Due Soon (Next 7 Days)
+            </CardTitle>
+            <CardDescription>Upcoming tasks requiring attention</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!tasksDueSoon || tasksDueSoon.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No tasks due soon</p>
+            ) : (
+              <div className="space-y-3">
+                {tasksDueSoon.slice(0, 5).map((item: any) => (
+                  <div
+                    key={item.task.id}
+                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                    data-testid={`task-due-soon-${item.task.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{item.task.name}</p>
+                      {item.task.dueDate && (
+                        <p className="text-xs text-muted-foreground">
+                          Due: {format(new Date(item.task.dueDate), 'MMM dd, yyyy')}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {item.task.status}
+                    </Badge>
+                  </div>
+                ))}
+                {tasksDueSoon.length > 5 && (
+                  <p className="text-xs text-muted-foreground text-center pt-2">
+                    +{tasksDueSoon.length - 5} more tasks
+                  </p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
