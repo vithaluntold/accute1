@@ -197,6 +197,13 @@ export const workflowTasks = pgTable("workflow_tasks", {
   requireAllChecklistsComplete: boolean("require_all_checklists_complete").notNull().default(true), // Must complete all checklists
   requireAllSubtasksComplete: boolean("require_all_subtasks_complete").notNull().default(true), // Must complete all subtasks
   
+  // AI Agent Review Workflow
+  reviewRequired: boolean("review_required").notNull().default(false), // Whether AI output needs human review
+  reviewStatus: text("review_status"), // 'pending_review', 'approved', 'rejected'
+  reviewedBy: varchar("reviewed_by").references(() => users.id), // Who reviewed the AI output
+  reviewedAt: timestamp("reviewed_at"), // When it was reviewed
+  reviewNotes: text("review_notes"), // Reviewer's notes or feedback
+  
   // Reminder configuration
   reminderEnabled: boolean("reminder_enabled").notNull().default(false),
   reminderDuration: integer("reminder_duration"), // Minutes before due date to send reminder (e.g., 60 = 1 hour before, 1440 = 1 day before)

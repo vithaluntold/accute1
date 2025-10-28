@@ -4395,32 +4395,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
-      if (task.type !== 'automated') {
-        return res.status(400).json({ error: "Task is not automated" });
+      if (!task.aiAgentId) {
+        return res.status(400).json({ error: "Task does not have an AI agent assigned" });
+      }
+      
+      // Verify AI agent is installed for this organization
+      const agent = await storage.getAiAgent(task.aiAgentId);
+      if (!agent) {
+        return res.status(404).json({ error: "AI agent not found" });
+      }
+      
+      const installation = await storage.getAiAgentInstallation(task.aiAgentId, req.user!.organizationId!);
+      if (!installation) {
+        return res.status(400).json({ error: "AI agent is not installed. Please install it from the marketplace first." });
+      }
+      
+      // Get LLM configuration (use default for the organization)
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      if (!llmConfig) {
+        return res.status(400).json({ error: "No LLM configuration found. Please configure an LLM provider first." });
       }
       
       // Update task status to in_progress
       await storage.updateWorkflowTask(req.params.id, { status: 'in_progress' });
       
-      // In a real implementation, this would trigger AI agent execution
-      // For now, we'll simulate AI execution and auto-complete the task
-      // This is a placeholder for actual AI agent integration
+      // Execute the AI agent with task context
+      const normalizedAgentName = agent.name.toLowerCase().replace(/\s+/g, '');
+      let result;
       
-      await logActivity(req.user!.id, req.user!.organizationId!, "execute_ai", "workflow_task", req.params.id, {}, req);
-      
-      // Auto-complete after simulation (in production, this would be done by the AI agent upon completion)
-      setTimeout(async () => {
-        try {
-          await storage.completeTask(req.params.id, req.user!.id);
-          await logActivity(req.user!.id, req.user!.organizationId!, "ai_complete", "workflow_task", req.params.id, {}, req);
-        } catch (error) {
-          console.error("Failed to auto-complete AI task:", error);
+      try {
+        switch (normalizedAgentName) {
+          case 'kanban':
+          case 'kanbanview': {
+            const { KanbanAgent } = await import('../agents/kanban/backend/index');
+            const agentInstance = new KanbanAgent(llmConfig);
+            result = await agentInstance.execute(task.automationInput as any || {});
+            break;
+          }
+          case 'cadence': {
+            const { CadenceAgent } = await import('../agents/cadence/backend/index');
+            const agentInstance = new CadenceAgent(llmConfig);
+            result = await agentInstance.execute(task.automationInput as any || {});
+            break;
+          }
+          case 'parity': {
+            const { ParityAgent } = await import('../agents/parity/backend/index');
+            const agentInstance = new ParityAgent(llmConfig);
+            result = await agentInstance.execute(task.automationInput as any || {});
+            break;
+          }
+          case 'forma': {
+            const { FormaAgent } = await import('../agents/forma/backend/index');
+            const agentInstance = new FormaAgent(llmConfig);
+            result = await agentInstance.execute(task.automationInput as any || {});
+            break;
+          }
+          default:
+            throw new Error(`Unknown AI agent: ${agent.name}`);
         }
-      }, 2000);
-      
-      res.json({ message: "AI agent execution started", taskId: req.params.id });
+        
+        // Store the AI output
+        await storage.updateWorkflowTask(req.params.id, {
+          automationOutput: result as any,
+        });
+        
+        // If review is required, set status to pending_review
+        if (task.reviewRequired) {
+          await storage.updateWorkflowTask(req.params.id, {
+            reviewStatus: 'pending_review',
+          });
+          
+          await logActivity(req.user!.id, req.user!.organizationId!, "ai_execute_pending_review", "workflow_task", req.params.id, {}, req);
+          res.json({ 
+            message: "AI agent execution completed. Awaiting human review.", 
+            taskId: req.params.id,
+            output: result,
+            requiresReview: true
+          });
+        } else {
+          // Auto-complete if no review needed
+          await storage.completeTask(req.params.id, req.user!.id);
+          
+          await logActivity(req.user!.id, req.user!.organizationId!, "ai_execute_complete", "workflow_task", req.params.id, {}, req);
+          
+          // Trigger auto-progression
+          await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+          
+          res.json({ 
+            message: "AI agent execution completed successfully.", 
+            taskId: req.params.id,
+            output: result,
+            requiresReview: false
+          });
+        }
+      } catch (error: any) {
+        console.error("AI agent execution error:", error);
+        await storage.updateWorkflowTask(req.params.id, { 
+          status: 'pending',
+          automationOutput: { error: error.message } as any 
+        });
+        throw error;
+      }
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to execute AI agent" });
+      res.status(500).json({ error: "Failed to execute AI agent", details: error.message });
+    }
+  });
+
+  // Review AI agent output - Approve
+  app.post("/api/tasks/:id/review/approve", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      if (task.reviewStatus !== 'pending_review') {
+        return res.status(400).json({ error: "Task is not pending review" });
+      }
+      
+      const { reviewNotes } = req.body;
+      
+      // Approve the AI output and update review status
+      await storage.updateWorkflowTask(req.params.id, {
+        reviewStatus: 'approved',
+        reviewedBy: req.user!.id,
+        reviewedAt: new Date(),
+        reviewNotes: reviewNotes || null,
+      });
+      
+      // Complete the task using the dedicated method
+      await storage.completeTask(req.params.id, req.user!.id);
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "approve_ai_output", "workflow_task", req.params.id, { reviewNotes }, req);
+      
+      // Trigger auto-progression
+      await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+      
+      res.json({ message: "AI output approved and task completed", taskId: req.params.id });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to approve AI output" });
+    }
+  });
+
+  // Review AI agent output - Reject
+  app.post("/api/tasks/:id/review/reject", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      if (task.reviewStatus !== 'pending_review') {
+        return res.status(400).json({ error: "Task is not pending review" });
+      }
+      
+      const { reviewNotes } = req.body;
+      if (!reviewNotes) {
+        return res.status(400).json({ error: "Review notes are required when rejecting" });
+      }
+      
+      // Reject the AI output and reset task to pending
+      await storage.updateWorkflowTask(req.params.id, {
+        reviewStatus: 'rejected',
+        reviewedBy: req.user!.id,
+        reviewedAt: new Date(),
+        reviewNotes,
+        status: 'pending',
+        automationOutput: {} as any, // Clear the rejected output
+      });
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "reject_ai_output", "workflow_task", req.params.id, { reviewNotes }, req);
+      
+      res.json({ message: "AI output rejected. Task reset to pending.", taskId: req.params.id });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to reject AI output" });
     }
   });
 

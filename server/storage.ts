@@ -109,6 +109,7 @@ export interface IStorage {
   getAllPublicAiAgents(): Promise<AiAgent[]>;
   getAiAgentsByCategory(category: string): Promise<AiAgent[]>;
   installAiAgent(agentId: string, organizationId: string, userId: string, configuration: any): Promise<AiAgentInstallation>;
+  getAiAgentInstallation(agentId: string, organizationId: string): Promise<AiAgentInstallation | undefined>;
   getInstalledAgents(organizationId: string): Promise<schema.InstalledAgentView[]>;
 
   // AI Provider Configs
@@ -700,6 +701,16 @@ export class DbStorage implements IStorage {
       .set({ installCount: db.$count(schema.aiAgentInstallations) })
       .where(eq(schema.aiAgents.id, agentId));
 
+    return result[0];
+  }
+
+  async getAiAgentInstallation(agentId: string, organizationId: string): Promise<AiAgentInstallation | undefined> {
+    const result = await db.select().from(schema.aiAgentInstallations)
+      .where(and(
+        eq(schema.aiAgentInstallations.agentId, agentId),
+        eq(schema.aiAgentInstallations.organizationId, organizationId),
+        eq(schema.aiAgentInstallations.isActive, true)
+      ));
     return result[0];
   }
 
