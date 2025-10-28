@@ -15,7 +15,9 @@ import {
   Calendar,
   User,
   Flag,
-  MoreVertical
+  MoreVertical,
+  Sparkles,
+  Play
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -55,6 +57,10 @@ interface WorkflowTask {
   priority?: string;
   dueDate?: string;
   order: number;
+  type?: string;
+  aiAgentId?: string;
+  automationInput?: string;
+  automationOutput?: any;
 }
 
 export default function WorkflowDetail() {
@@ -472,6 +478,9 @@ function StepCard({ step, stageId, workflowId }: { step: WorkflowStep; stageId: 
 
 // Task Card Component
 function TaskCard({ task }: { task: WorkflowTask }) {
+  const { toast } = useToast();
+  const isAiPowered = task.type === 'automated' && task.aiAgentId;
+
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
       case 'high':
@@ -496,6 +505,40 @@ function TaskCard({ task }: { task: WorkflowTask }) {
     }
   };
 
+  // Execute AI agent mutation
+  const executeAiMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', `/api/tasks/${task.id}/execute-ai`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows/steps"] });
+      toast({
+        title: 'Success',
+        description: 'AI agent executed successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to execute AI agent',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleExecuteAi = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!task.aiAgentId) {
+      toast({
+        title: 'Error',
+        description: 'No AI agent configured for this task',
+        variant: 'destructive',
+      });
+      return;
+    }
+    executeAiMutation.mutate();
+  };
+
   return (
     <div
       className="flex items-center justify-between p-3 rounded-lg border hover-elevate"
@@ -504,9 +547,17 @@ function TaskCard({ task }: { task: WorkflowTask }) {
       <div className="flex items-center gap-3 flex-1">
         {getStatusIcon(task.status)}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate" data-testid={`task-name-${task.id}`}>
-            {task.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-sm truncate" data-testid={`task-name-${task.id}`}>
+              {task.name}
+            </p>
+            {isAiPowered && (
+              <Badge variant="secondary" className="text-xs gap-1" data-testid={`task-ai-badge-${task.id}`}>
+                <Sparkles className="h-3 w-3" />
+                AI
+              </Badge>
+            )}
+          </div>
           {task.description && (
             <p className="text-xs text-muted-foreground truncate" data-testid={`task-description-${task.id}`}>
               {task.description}
@@ -533,6 +584,18 @@ function TaskCard({ task }: { task: WorkflowTask }) {
             <User className="h-3 w-3 mr-1" />
             Assigned
           </Badge>
+        )}
+        {isAiPowered && task.status !== 'completed' && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExecuteAi}
+            disabled={executeAiMutation.isPending}
+            data-testid={`button-execute-ai-${task.id}`}
+          >
+            <Play className="h-3 w-3 mr-1" />
+            {executeAiMutation.isPending ? 'Running...' : 'Run AI'}
+          </Button>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

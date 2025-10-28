@@ -4152,6 +4152,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST with workflowId in URL path (used by frontend)
+  app.post("/api/workflows/:workflowId/stages", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      const stage = await storage.createWorkflowStage({
+        ...req.body,
+        workflowId: req.params.workflowId,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_stage", stage.id, { name: stage.name }, req);
+      res.json(stage);
+    } catch (error: any) {
+      console.error("Failed to create workflow stage:", error);
+      res.status(500).json({ error: "Failed to create stage", details: error.message });
+    }
+  });
+
+  // Legacy POST with workflowId in body
   app.post("/api/stages", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
       const workflow = await storage.getWorkflow(req.body.workflowId);
@@ -4220,6 +4240,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST with stageId in URL path (used by frontend)
+  app.post("/api/workflows/stages/:stageId/steps", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getWorkflowStage(req.params.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const step = await storage.createWorkflowStep({
+        ...req.body,
+        stageId: req.params.stageId,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_step", step.id, { name: step.name }, req);
+      res.status(201).json(step);
+    } catch (error: any) {
+      console.error("Failed to create workflow step:", error);
+      res.status(500).json({ error: "Failed to create step", details: error.message });
+    }
+  });
+
+  // Legacy POST with stageId in body
   app.post("/api/steps", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
       const stage = await storage.getWorkflowStage(req.body.stageId);
@@ -4304,6 +4348,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST with stepId in URL path (used by frontend)
+  app.post("/api/workflows/steps/:stepId/tasks", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getWorkflowStep(req.params.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getWorkflow(stage.workflowId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const task = await storage.createWorkflowTask({
+        ...req.body,
+        stepId: req.params.stepId,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_task", task.id, { name: task.name }, req);
+      res.status(201).json(task);
+    } catch (error: any) {
+      console.error("Failed to create workflow task:", error);
+      res.status(500).json({ error: "Failed to create task", details: error.message });
+    }
+  });
+
+  // Legacy POST with stepId in body
   app.post("/api/tasks", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {
       const step = await storage.getWorkflowStep(req.body.stepId);

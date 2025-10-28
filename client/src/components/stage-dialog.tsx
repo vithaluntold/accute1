@@ -84,7 +84,10 @@ export function StageDialog({ open, onOpenChange, workflowId, stage, stagesCount
       });
     },
     onSuccess: () => {
+      // Invalidate multiple related queries to ensure UI refreshes
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
       toast({
         title: "Success",
         description: "Stage created successfully",
@@ -106,7 +109,10 @@ export function StageDialog({ open, onOpenChange, workflowId, stage, stagesCount
       return await apiRequest("PATCH", `/api/workflows/stages/${stage!.id}`, data);
     },
     onSuccess: () => {
+      // Invalidate multiple related queries to ensure UI refreshes
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows"] });
       toast({
         title: "Success",
         description: "Stage updated successfully",
