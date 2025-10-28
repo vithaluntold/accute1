@@ -1,0 +1,62 @@
+
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_RESET
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+chrome-extension://d…kb/content-all.js:1 Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.
+    at y (content-all.js:1:56614)
+stallwart.build.js:1 stallwart: failed ping 1
+ingest.app.coframe.c…4cddb58cf3a1f93d/:1 
+ Failed to load resource: the server responded with a status of 502 ()
+ingest.app.coframe.c…4cddb58cf3a1f93d/:1 
+ Failed to load resource: the server responded with a status of 502 ()
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.htm…2F&id=%3Ar1kg%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+client:536 WebSocket connection to 'wss://b04b888b-2b91-4fe1-b78b-c3d0241cd307-00-1nco9sqahlmqg.worf.replit.dev/?token=QbyhLryLS-4z' failed: 
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=QbyhLryLS-4z' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+injected.js:27 [AI Chat] handleSend called - input: I want an Engagement letter for a bookkeeping assi isStreaming: false
+injected.js:27 [AI Chat] Creating user message and connecting WebSocket
+injected.js:27 [AI Chat] Calling connectWebSocket()...
+injected.js:27 [AI Chat] WebSocket readyState: 0 (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)
+injected.js:27 [AI Chat] WebSocket connected successfully
+injected.js:27 [AI Chat] WebSocket disconnected - Code: 4001 Reason: Authentication failed
+stallwart.build.js:1 stallwart: failed ping 1
+﻿
+
