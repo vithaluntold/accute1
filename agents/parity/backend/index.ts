@@ -30,6 +30,9 @@ export interface ParityInput {
 /**
  * Parity AI Agent
  * Checks data consistency, balance, and validates against rules
+ * Can operate in two modes:
+ * 1. Structured validation: Pass ParityInput object for detailed data validation
+ * 2. Conversational: Pass string for Q&A about data validation and document analysis
  */
 export class ParityAgent {
   private llmService: LLMService;
@@ -38,7 +41,38 @@ export class ParityAgent {
     this.llmService = new LLMService(llmConfig);
   }
   
-  async execute(input: ParityInput): Promise<ParityCheck> {
+  async execute(input: ParityInput | string): Promise<ParityCheck | string> {
+    // Handle conversational mode (string input)
+    if (typeof input === 'string') {
+      return this.executeConversational(input);
+    }
+    
+    // Handle structured validation mode
+    return this.executeValidation(input);
+  }
+  
+  private async executeConversational(userMessage: string): Promise<string> {
+    const systemPrompt = `You are Parity, an expert AI assistant specializing in document validation, data consistency, and accounting compliance.
+
+Your expertise includes:
+- Document analysis and validation
+- Financial data consistency checks
+- Engagement letter preparation
+- Compliance verification
+- Data parity checks across accounting systems
+
+Be helpful, professional, and provide actionable guidance. If the user asks about creating documents or validating data, guide them through the process and explain what information you need.`;
+
+    try {
+      const response = await this.llmService.sendPrompt(userMessage, systemPrompt);
+      return response;
+    } catch (error) {
+      console.error('Parity conversational mode failed:', error);
+      return 'I apologize, but I encountered an error processing your request. Please check your LLM configuration and try again.';
+    }
+  }
+  
+  private async executeValidation(input: ParityInput): Promise<ParityCheck> {
     const systemPrompt = `You are an expert data validation AI specialized in checking consistency, balance, and parity.
 Your task is to analyze data and identify inconsistencies, imbalances, or rule violations.
 
