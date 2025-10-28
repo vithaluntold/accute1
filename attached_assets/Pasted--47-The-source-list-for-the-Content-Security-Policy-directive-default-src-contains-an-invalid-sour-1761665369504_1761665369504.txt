@@ -1,0 +1,193 @@
+
+47
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+47
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+47
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+AgentFlow:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+AgentFlow:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+AgentFlow:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+_app-72ccde1adae661ed.js:13 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+_app-72ccde1adae661ed.js:13 [LaunchDarkly] LaunchDarkly client initialized
+AgentFlow:1 Access to fetch at 'https://sp.replit.com/v1/t' from origin 'https://replit.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+sp.replit.com/v1/t:1 
+ Failed to load resource: net::ERR_FAILED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+30
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'ambient-light-sensor'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'battery'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'layout-animations'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'legacy-image-formats'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'navigation-override'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'oversized-images'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'publickey-credentials'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'speaker-selection'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'unoptimized-images'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'unsized-media'.
+framework-feb12df8fd4c4694.js:1 Unrecognized feature: 'pointer-lock'.
+framework-feb12df8fd4c4694.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+framework-feb12df8fd4c4694.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+AgentFlow:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+_app-72ccde1adae661ed.js:13 task queue exceeded allotted deadline by 141ms
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_TIMED_OUT
+_app-72ccde1adae661ed.js:13 task queue exceeded allotted deadline by 107ms
+_app-72ccde1adae661ed.js:13 task queue exceeded allotted deadline by 130ms
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+_app-72ccde1adae661ed.js:13 task queue exceeded allotted deadline by 123ms
+stallwart.build.js:1 stallwart: failed ping 1
+content-all.js:1 Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.
+    at y (content-all.js:1:56614)
+_app-72ccde1adae661ed.js:13 [Coframe] Failed to wait for treatmentApplied callback command 
+Object
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+_app-72ccde1adae661ed.js:13 [Coframe] Mutation callback infinite loop protection triggered, disconnecting mutation observer 
+Object
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_RESET
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+/~:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_RESET
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel/act:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+main.MWI5ZTBkMTQ4MQ.js:1 
+Array(2)
+main.MWI5ZTBkMTQ4MQ.js:1 
+Object
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com/api/v2/pixel:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+analytics.tiktok.com…pi/v2/pixel/inter:1 
+ Failed to load resource: net::ERR_CONNECTION_CLOSED
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.htm…2F&id=%3Ar1gs%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+client:536 WebSocket connection to 'wss://b04b888b-2b91-4fe1-b78b-c3d0241cd307-00-1nco9sqahlmqg.worf.replit.dev/?token=bos1lWu2_vKC' failed: 
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=bos1lWu2_vKC' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+injected.js:27 [AI Chat] WebSocket connected successfully
+injected.js:27 [AI Chat] WebSocket disconnected - Code: 4001 Reason: Authentication required
+content-all.js:1 Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.
+    at y (content-all.js:1:56614)
+stallwart.build.js:1 stallwart: failed ping 1

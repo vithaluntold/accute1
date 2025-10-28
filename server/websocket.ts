@@ -57,20 +57,20 @@ export function setupWebSocket(httpServer: Server): WebSocketServer {
     try {
       const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
       console.log('[WebSocket] Cookies received:', Object.keys(cookies));
-      const sessionId = cookies['connect.sid'];
+      const sessionToken = cookies['session_token'];
 
-      if (!sessionId) {
-        console.log('[WebSocket] No session ID found in cookies');
+      if (!sessionToken) {
+        console.log('[WebSocket] No session token found in cookies');
         ws.close(4001, 'Authentication required');
         return;
       }
 
-      console.log('[WebSocket] Session ID found:', sessionId.substring(0, 20) + '...');
+      console.log('[WebSocket] Session token found:', sessionToken.substring(0, 20) + '...');
 
-      // Verify session
-      const session = await storage.getSession(sessionId);
+      // Verify session using token
+      const session = await storage.getSession(sessionToken);
       if (!session) {
-        console.log('[WebSocket] Session not found in storage');
+        console.log('[WebSocket] Session not found for token');
         ws.close(4001, 'Invalid session');
         return;
       }
