@@ -1664,7 +1664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create folder
   app.post("/api/folders", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      console.log("Creating folder with data:", req.body);
+      console.log("User orgId:", req.user!.organizationId, "UserId:", req.userId);
       const validated = insertFolderSchema.parse(req.body);
+      console.log("Validated:", validated);
       const folder = await storage.createFolder({
         ...validated,
         organizationId: req.user!.organizationId!,
@@ -1673,7 +1676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "folder", folder.id, { name: folder.name }, req);
       res.json(folder);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to create folder" });
+      console.error("Failed to create folder:", error);
+      res.status(500).json({ error: "Failed to create folder", details: error.message });
     }
   });
 

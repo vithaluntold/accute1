@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -90,6 +90,12 @@ const menuItems = [
     url: "/tags",
     icon: Tag,
     permission: "tags.view",
+  },
+  {
+    title: "Folders",
+    url: "/folders",
+    icon: Folder,
+    permission: "folders.view",
   },
   {
     title: "Analytics",

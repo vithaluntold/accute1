@@ -45,6 +45,7 @@ import SubmissionDetail from "@/pages/submission-detail";
 import Clients from "@/pages/clients";
 import Contacts from "@/pages/contacts";
 import Tags from "@/pages/tags";
+import Folders from "@/pages/folders";
 import DocumentRequests from "@/pages/document-requests";
 import MyDocumentRequests from "@/pages/my-document-requests";
 import Messages from "@/pages/messages";
@@ -349,6 +350,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Tags />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/folders">
+        <ProtectedRoute>
+          <AppLayout>
+            <Folders />
           </AppLayout>
         </ProtectedRoute>
       </Route>
