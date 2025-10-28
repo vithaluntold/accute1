@@ -12,7 +12,7 @@ export default function Landing() {
     {
       icon: Workflow,
       title: "Unified Workflow Engine",
-      description: "TaxDome-style system combining visual automation AND hierarchical project management (Stages → Steps → Tasks) with AI-powered triggers",
+      description: "Enterprise-grade system combining visual automation AND hierarchical project management (Stages → Steps → Tasks) with AI-powered triggers",
     },
     {
       icon: Bot,
@@ -133,7 +133,7 @@ export default function Landing() {
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Accute combines TaxDome's workflow power with cutting-edge AI agents. 
+              Accute combines traditional workflow tools' power with cutting-edge AI agents. 
               Automate data entry, client communication, and compliance—saving 15+ hours per week.
             </p>
 
@@ -294,7 +294,7 @@ export default function Landing() {
                           </div>
                         </th>
                         <th className="text-center p-4 font-medium text-muted-foreground">
-                          TaxDome
+                          Traditional Tools
                         </th>
                       </tr>
                     </thead>
