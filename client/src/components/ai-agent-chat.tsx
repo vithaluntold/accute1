@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Bot, Send, Sparkles, User, Loader2, Settings2 } from "lucide-react";
 
@@ -33,6 +32,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  isStreaming?: boolean;
 }
 
 interface AIAgentChatProps {
@@ -54,7 +54,11 @@ export function AIAgentChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const streamingMessageIdRef = useRef<string | null>(null);
+  const streamingContentRef = useRef<string>("");
   const { toast } = useToast();
 
   // Fetch available LLM configurations
@@ -70,37 +74,129 @@ export function AIAgentChat({
     }
   }, [llmConfigs, selectedLlmConfig]);
 
-  // Execute AI agent mutation
-  const executeMutation = useMutation({
-    mutationFn: async (data: { input: string; llmConfigId?: string }) => {
-      const response = await apiRequest("POST", "/api/ai-agents/execute", {
-        agentName,
-        input: data.input,
-        llmConfigId: data.llmConfigId || selectedLlmConfig,
-        contextData,
-      });
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      const assistantMessage: Message = {
-        id: Date.now().toString(),
-        role: "assistant",
-        content: data.response || JSON.stringify(data, null, 2),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      if (onResponse) {
-        onResponse(data.response || JSON.stringify(data));
+  // WebSocket connection management
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      return wsRef.current;
+    }
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const ws = new WebSocket(`${protocol}//${host}/ws/ai-stream`);
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'connected') {
+          console.log('WebSocket authenticated');
+        } else if (data.type === 'stream_start') {
+          // Create a new assistant message placeholder
+          const messageId = Date.now().toString();
+          streamingMessageIdRef.current = messageId;
+          streamingContentRef.current = "";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              role: "assistant",
+              content: "",
+              timestamp: new Date(),
+              isStreaming: true,
+            },
+          ]);
+        } else if (data.type === 'stream_chunk') {
+          // Append chunk to the streaming message
+          if (streamingMessageIdRef.current) {
+            streamingContentRef.current += data.chunk;
+            setMessages((prev) => 
+              prev.map((msg) =>
+                msg.id === streamingMessageIdRef.current
+                  ? { ...msg, content: streamingContentRef.current }
+                  : msg
+              )
+            );
+          }
+        } else if (data.type === 'stream_end') {
+          // Mark streaming as complete
+          if (streamingMessageIdRef.current) {
+            const finalContent = streamingContentRef.current;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageIdRef.current
+                  ? { ...msg, isStreaming: false, content: finalContent }
+                  : msg
+              )
+            );
+            // Call onResponse with the complete content from ref (not stale closure)
+            if (onResponse && finalContent) {
+              onResponse(finalContent);
+            }
+          }
+          streamingMessageIdRef.current = null;
+          streamingContentRef.current = "";
+          setIsStreaming(false);
+        } else if (data.type === 'error') {
+          // Display error in the streaming message
+          if (streamingMessageIdRef.current) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageIdRef.current
+                  ? { 
+                      ...msg, 
+                      content: `❌ Error: ${data.error || 'Failed to get AI response'}`,
+                      isStreaming: false 
+                    }
+                  : msg
+              )
+            );
+          } else {
+            toast({
+              title: "Error",
+              description: data.error || "Failed to get AI response",
+              variant: "destructive",
+            });
+          }
+          setIsStreaming(false);
+          streamingMessageIdRef.current = null;
+          streamingContentRef.current = "";
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
       }
-    },
-    onError: (error: any) => {
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to get AI response",
+        title: "Connection Error",
+        description: "Failed to connect to AI streaming service",
         variant: "destructive",
       });
-    },
-  });
+      setIsStreaming(false);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      wsRef.current = null;
+      setIsStreaming(false);
+    };
+
+    wsRef.current = ws;
+    return ws;
+  }, [toast, onResponse, messages]);
+
+  // Cleanup WebSocket on unmount or when dialog closes
+  useEffect(() => {
+    if (!open && wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, [open]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -109,7 +205,7 @@ export function AIAgentChat({
   }, [messages]);
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
 
     if (!selectedLlmConfig) {
       toast({
@@ -128,10 +224,39 @@ export function AIAgentChat({
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    executeMutation.mutate({
-      input: input.trim(),
-      llmConfigId: selectedLlmConfig,
-    });
+    setIsStreaming(true);
+
+    // Connect and send via WebSocket
+    const ws = connectWebSocket();
+    
+    // Wait for connection to open if not already open
+    if (ws.readyState === WebSocket.CONNECTING) {
+      ws.addEventListener('open', () => {
+        ws.send(JSON.stringify({
+          type: 'execute_agent',
+          agentName,
+          input: input.trim(),
+          llmConfigId: selectedLlmConfig,
+          contextData,
+        }));
+      }, { once: true });
+    } else if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'execute_agent',
+        agentName,
+        input: input.trim(),
+        llmConfigId: selectedLlmConfig,
+        contextData,
+      }));
+    } else {
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to AI service",
+        variant: "destructive",
+      });
+      setIsStreaming(false);
+    }
+
     setInput("");
   };
 
@@ -263,7 +388,7 @@ export function AIAgentChat({
                 )}
               </div>
             ))}
-            {executeMutation.isPending && (
+            {isStreaming && streamingMessageIdRef.current === null && (
               <div className="flex gap-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10">
@@ -293,12 +418,12 @@ export function AIAgentChat({
               }
             }}
             className="min-h-[60px] resize-none"
-            disabled={executeMutation.isPending}
+            disabled={isStreaming}
             data-testid="input-chat-message"
           />
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || executeMutation.isPending}
+            disabled={!input.trim() || isStreaming}
             size="icon"
             className="h-[60px] w-[60px]"
             data-testid="button-send-message"

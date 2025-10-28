@@ -92,6 +92,30 @@ export class LLMService {
         throw new Error(`Unsupported LLM provider: ${this.config.provider}`);
     }
   }
+
+  /**
+   * Send a prompt with streaming response
+   * @param prompt User prompt
+   * @param systemPrompt System prompt
+   * @param onChunk Callback for each chunk
+   * @returns Full response
+   */
+  async sendPromptStream(
+    prompt: string,
+    systemPrompt: string | undefined,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    switch (this.config.provider) {
+      case 'openai':
+        return this.sendToOpenAIStream(prompt, systemPrompt, onChunk);
+      case 'azure':
+        return this.sendToAzureStream(prompt, systemPrompt, onChunk);
+      case 'anthropic':
+        return this.sendToAnthropicStream(prompt, systemPrompt, onChunk);
+      default:
+        throw new Error(`Unsupported LLM provider: ${this.config.provider}`);
+    }
+  }
   
   private async sendToOpenAI(prompt: string, systemPrompt?: string): Promise<string> {
     const openai = new OpenAI({ apiKey: this.apiKey });
@@ -157,5 +181,107 @@ export class LLMService {
       return content.text;
     }
     return '';
+  }
+
+  // Streaming implementations
+  private async sendToOpenAIStream(
+    prompt: string,
+    systemPrompt: string | undefined,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    const openai = new OpenAI({ apiKey: this.apiKey });
+    
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+    
+    const stream = await openai.chat.completions.create({
+      model: this.config.model,
+      messages,
+      stream: true,
+    });
+
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        fullResponse += content;
+        onChunk(content);
+      }
+    }
+    
+    return fullResponse;
+  }
+
+  private async sendToAzureStream(
+    prompt: string,
+    systemPrompt: string | undefined,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    if (!this.config.azureEndpoint) {
+      throw new Error('Azure endpoint is required for Azure OpenAI');
+    }
+    
+    const baseURL = `${this.config.azureEndpoint}/openai/deployments/${this.config.model}`;
+    const apiVersion = this.config.modelVersion || '2024-02-15-preview';
+    
+    const openai = new OpenAI({
+      apiKey: this.apiKey,
+      baseURL,
+      defaultQuery: { 'api-version': apiVersion },
+      defaultHeaders: { 'api-key': this.apiKey },
+    });
+    
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    messages.push({ role: 'user', content: prompt });
+    
+    const stream = await openai.chat.completions.create({
+      model: this.config.model,
+      messages,
+      stream: true,
+    });
+
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        fullResponse += content;
+        onChunk(content);
+      }
+    }
+    
+    return fullResponse;
+  }
+
+  private async sendToAnthropicStream(
+    prompt: string,
+    systemPrompt: string | undefined,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    const anthropic = new Anthropic({ apiKey: this.apiKey });
+    
+    const stream = await anthropic.messages.create({
+      model: this.config.model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
+      stream: true,
+    });
+
+    let fullResponse = '';
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        const content = event.delta.text;
+        fullResponse += content;
+        onChunk(content);
+      }
+    }
+    
+    return fullResponse;
   }
 }

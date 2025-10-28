@@ -107,4 +107,14 @@ Format the data properly, validate it, and provide detailed transformation infor
       };
     }
   }
+
+  /**
+   * Execute in streaming mode (streams JSON result in one chunk)
+   */
+  async executeStream(input: FormaInput, onChunk: (chunk: string) => void): Promise<string> {
+    const result = await this.execute(input);
+    const resultStr = JSON.stringify(result, null, 2);
+    onChunk(resultStr);
+    return resultStr;
+  }
 }

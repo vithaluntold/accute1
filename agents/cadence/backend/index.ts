@@ -100,4 +100,14 @@ Provide a comprehensive cadence analysis with actionable recommendations for opt
       };
     }
   }
+
+  /**
+   * Execute in streaming mode (streams JSON result in one chunk)
+   */
+  async executeStream(input: CadenceInput, onChunk: (chunk: string) => void): Promise<string> {
+    const result = await this.execute(input);
+    const resultStr = JSON.stringify(result, null, 2);
+    onChunk(resultStr);
+    return resultStr;
+  }
 }

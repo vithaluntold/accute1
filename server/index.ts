@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
+import { setupWebSocket } from "./websocket";
 import path from "path";
 
 // Security check: Warn if encryption key is not set
@@ -66,6 +67,10 @@ app.use((req, res, next) => {
     console.log('✅ System initialized successfully');
     
     const server = await registerRoutes(app);
+    
+    // Setup WebSocket server for streaming AI agents
+    const wss = setupWebSocket(server);
+    console.log('🔌 WebSocket server initialized at /ws/ai-stream');
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

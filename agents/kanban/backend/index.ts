@@ -138,4 +138,14 @@ Create an intuitive Kanban board with appropriate columns and cards. Use meaning
       ]
     };
   }
+
+  /**
+   * Execute in streaming mode (streams JSON result in one chunk)
+   */
+  async executeStream(input: KanbanInput, onChunk: (chunk: string) => void): Promise<string> {
+    const result = await this.execute(input);
+    const resultStr = JSON.stringify(result, null, 2);
+    onChunk(resultStr);
+    return resultStr;
+  }
 }

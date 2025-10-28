@@ -57,9 +57,11 @@ export class ParityAgent {
 Your expertise includes:
 - Document analysis and validation
 - Financial data consistency checks
-- Engagement letter preparation
+- Engagement letter preparation and generation
 - Compliance verification
 - Data parity checks across accounting systems
+
+When generating engagement letters or other documents, provide comprehensive, industry-grade content with all necessary sections, proper legal language, and professional formatting. Include all standard clauses and provisions expected in professional accounting documents.
 
 Be helpful, professional, and provide actionable guidance. If the user asks about creating documents or validating data, guide them through the process and explain what information you need.`;
 
@@ -69,6 +71,60 @@ Be helpful, professional, and provide actionable guidance. If the user asks abou
     } catch (error) {
       console.error('Parity conversational mode failed:', error);
       return 'I apologize, but I encountered an error processing your request. Please check your LLM configuration and try again.';
+    }
+  }
+
+  /**
+   * Execute in streaming mode for long-form content generation
+   * @param input User input (string for conversational, object for validation)
+   * @param onChunk Callback for each chunk of streamed content
+   * @returns Full response content
+   */
+  async executeStream(
+    input: ParityInput | string,
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    // Only support streaming for conversational mode
+    if (typeof input !== 'string') {
+      const result = await this.executeValidation(input);
+      const resultStr = JSON.stringify(result, null, 2);
+      onChunk(resultStr);
+      return resultStr;
+    }
+
+    const systemPrompt = `You are Parity, an expert AI assistant specializing in document validation, data consistency, and accounting compliance.
+
+Your expertise includes:
+- Document analysis and validation
+- Financial data consistency checks
+- Engagement letter preparation and generation
+- Compliance verification
+- Data parity checks across accounting systems
+
+When generating engagement letters or other documents, provide comprehensive, industry-grade content with all necessary sections, proper legal language, and professional formatting. Include:
+
+For Bookkeeping Engagement Letters:
+1. Letter header with date and client information
+2. Engagement overview and scope of services
+3. Detailed description of bookkeeping services provided
+4. Client responsibilities and information requirements
+5. Professional standards and compliance
+6. Fees and billing terms
+7. Term and termination clauses
+8. Confidentiality and data security provisions
+9. Limitation of liability
+10. Signatures section
+
+Provide complete, ready-to-use documents that meet professional standards and industry best practices. Use proper legal language and ensure all necessary clauses are included.`;
+
+    try {
+      const fullResponse = await this.llmService.sendPromptStream(input, systemPrompt, onChunk);
+      return fullResponse;
+    } catch (error) {
+      console.error('Parity streaming mode failed:', error);
+      const errorMsg = 'I apologize, but I encountered an error processing your request. Please check your LLM configuration and try again.';
+      onChunk(errorMsg);
+      return errorMsg;
     }
   }
   
