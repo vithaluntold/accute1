@@ -753,6 +753,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/roles/:roleId/permissions/:permissionId", requireAuth, requirePermission("roles.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { roleId, permissionId } = req.params;
+      await storage.removePermissionFromRole(roleId, permissionId);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "remove_permission", "role", roleId, { permissionId }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove permission" });
+    }
+  });
+
+  app.delete("/api/roles/:id", requireAuth, requirePermission("roles.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const role = await storage.getRole(req.params.id);
+      if (!role) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      if (role.isSystemRole) {
+        return res.status(403).json({ error: "Cannot delete system roles" });
+      }
+      if (role.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteRole(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "role", req.params.id, { name: role.name }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete role" });
+    }
+  });
+
   // ==================== Permission Routes ====================
   
   app.get("/api/permissions", requireAuth, async (req: Request, res: Response) => {

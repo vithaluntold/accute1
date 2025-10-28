@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network 
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -144,6 +144,12 @@ const menuItems = [
     url: "/team",
     icon: Users,
     permission: "users.view",
+  },
+  {
+    title: "Roles & Permissions",
+    url: "/roles",
+    icon: Shield,
+    permission: "roles.view",
   },
   {
     title: "Settings",

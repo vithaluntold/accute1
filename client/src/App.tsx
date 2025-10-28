@@ -32,6 +32,7 @@ import WorkflowDetail from "@/pages/workflow-detail";
 import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
 import Team from "@/pages/team";
+import Roles from "@/pages/roles";
 import Documents from "@/pages/documents";
 import Forms from "@/pages/forms";
 import FormBuilder from "@/pages/form-builder";
@@ -255,6 +256,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Team />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/roles">
+        <ProtectedRoute>
+          <AppLayout>
+            <Roles />
           </AppLayout>
         </ProtectedRoute>
       </Route>
