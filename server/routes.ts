@@ -914,7 +914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/llm-configurations/test", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
     try {
-      const { provider, apiKey, endpoint, apiVersion } = req.body;
+      const { provider, apiKey, endpoint, apiVersion, model } = req.body;
       
       if (!provider || !apiKey) {
         return res.status(400).json({ 
@@ -964,29 +964,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
+          if (!model) {
+            return res.status(400).json({ 
+              success: false, 
+              message: "Model/Deployment name is required for Azure OpenAI" 
+            });
+          }
+          
           // Remove trailing slash from endpoint if present
           const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
           
           // Use provided API version or default to latest
           const azureApiVersion = apiVersion || '2024-12-01-preview';
           
-          // Use Azure REST API to list deployments as health check
-          const testUrl = `${cleanEndpoint}/openai/deployments?api-version=${azureApiVersion}`;
+          // Use minimal chat completion as health check (like the user's Python code)
+          const testUrl = `${cleanEndpoint}/openai/deployments/${model}/chat/completions?api-version=${azureApiVersion}`;
           
           console.log('[Azure Health Check] Testing URL:', testUrl);
           
           const response = await fetch(testUrl, {
-            method: 'GET',
+            method: 'POST',
             headers: {
               'api-key': apiKey,
               'Content-Type': 'application/json'
             },
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: 'Hi' }],
+              max_tokens: 5
+            }),
             signal: AbortSignal.timeout(10000)
           });
           
           console.log('[Azure Health Check] Response status:', response.status);
           
           if (response.ok) {
+            const data = await response.json();
+            console.log('[Azure Health Check] Success:', data);
             testResult = { success: true, message: "Azure OpenAI connection successful" };
           } else {
             let errorMessage = `HTTP ${response.status}`;
