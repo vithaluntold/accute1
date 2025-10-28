@@ -4345,6 +4345,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.updateWorkflowTask(req.params.id, req.body);
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task", req.params.id, req.body, req);
+      
+      // Trigger auto-progression if task status changed to completed
+      if (req.body.status === 'completed' && task.status !== 'completed') {
+        await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+      }
+      
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update task" });
@@ -4373,6 +4379,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.completeTask(req.params.id, req.user!.id);
       await logActivity(req.user!.id, req.user!.organizationId!, "complete", "workflow_task", req.params.id, {}, req);
+      
+      // Trigger auto-progression cascade
+      await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+      
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to complete task" });
@@ -4672,12 +4682,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Update automation output
+      const allSuccessful = results.every((r: any) => r.success);
       await storage.updateWorkflowTask(task.id, {
         automationOutput: results as any,
-        status: results.every((r: any) => r.success) ? 'completed' : 'in_progress',
+        status: allSuccessful ? 'completed' : 'in_progress',
       } as any);
 
       await logActivity(req.user!.id, req.user!.organizationId!, "execute_automation", "workflow_task", task.id, {}, req);
+      
+      // Trigger auto-progression if automation completed successfully
+      if (allSuccessful) {
+        await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+      }
+      
       res.json({ success: true, results });
     } catch (error: any) {
       console.error("Automation execution error:", error);
@@ -4786,6 +4803,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.completeSubtask(req.params.id, req.user!.id);
       await logActivity(req.user!.id, req.user!.organizationId!, "complete", "task_subtask", req.params.id, {}, req);
+      
+      // Trigger auto-progression when subtask is completed
+      await autoProgressionEngine.tryAutoProgressTask(subtask.taskId);
+      
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to complete subtask" });
@@ -4842,6 +4863,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updated = await storage.toggleChecklistItem(req.params.id, req.user!.id);
       await logActivity(req.user!.id, req.user!.organizationId!, "toggle", "task_checklist", req.params.id, {}, req);
+      
+      // Trigger auto-progression when checklist is completed
+      if (updated.isChecked) {
+        await autoProgressionEngine.tryAutoProgressTask(checklist.taskId);
+      }
+      
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to toggle checklist item" });
