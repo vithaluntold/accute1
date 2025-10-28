@@ -8,6 +8,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -43,6 +52,18 @@ export default function WorkflowBuilder() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  
+  // Dialog states
+  const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [stepDialogOpen, setStepDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [selectedStageForStep, setSelectedStageForStep] = useState<string | null>(null);
+  const [selectedStepForTask, setSelectedStepForTask] = useState<string | null>(null);
+  
+  // Form states
+  const [newStage, setNewStage] = useState({ name: '', description: '' });
+  const [newStep, setNewStep] = useState({ name: '', description: '' });
+  const [newTask, setNewTask] = useState({ name: '', description: '', type: 'manual' });
 
   const isEditMode = Boolean(id);
 
@@ -147,6 +168,74 @@ export default function WorkflowBuilder() {
         description: error.message || 'Failed to save automation',
         variant: 'destructive',
       });
+    },
+  });
+
+  // Create stage mutation
+  const createStageMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string }) => {
+      return apiRequest('POST', '/api/workflow-stages', {
+        name: data.name,
+        description: data.description,
+        workflowId: id,
+        order: stages.length + 1,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows', id, 'stages'] });
+      toast({ title: 'Success', description: 'Stage created successfully' });
+      setStageDialogOpen(false);
+      setNewStage({ name: '', description: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create stage', variant: 'destructive' });
+    },
+  });
+
+  // Create step mutation
+  const createStepMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; stageId: string }) => {
+      const stageSteps = steps.filter(s => s.stageId === data.stageId);
+      return apiRequest('POST', '/api/workflow-steps', {
+        name: data.name,
+        description: data.description,
+        stageId: data.stageId,
+        order: stageSteps.length + 1,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows', id, 'steps'] });
+      toast({ title: 'Success', description: 'Step created successfully' });
+      setStepDialogOpen(false);
+      setNewStep({ name: '', description: '' });
+      setSelectedStageForStep(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create step', variant: 'destructive' });
+    },
+  });
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; type: string; stepId: string }) => {
+      const stepTasks = tasks.filter(t => t.stepId === data.stepId);
+      return apiRequest('POST', '/api/workflow-tasks', {
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        stepId: data.stepId,
+        order: stepTasks.length + 1,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows', id, 'tasks'] });
+      toast({ title: 'Success', description: 'Task created successfully' });
+      setTaskDialogOpen(false);
+      setNewTask({ name: '', description: '', type: 'manual' });
+      setSelectedStepForTask(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create task', variant: 'destructive' });
     },
   });
 
@@ -260,15 +349,64 @@ export default function WorkflowBuilder() {
           <div className="p-4 border-b bg-background">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-semibold">Workflow Structure</h2>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => toast({ title: 'Coming soon', description: 'Add new stage' })}
-                data-testid="button-add-stage"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Stage
-              </Button>
+              <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid="button-add-stage"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Stage
+                  </Button>
+                </DialogTrigger>
+                <DialogContent data-testid="dialog-create-stage">
+                  <DialogHeader>
+                    <DialogTitle>Create New Stage</DialogTitle>
+                    <DialogDescription>
+                      Add a new stage to your workflow
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="stage-name">Name</Label>
+                      <Input
+                        id="stage-name"
+                        placeholder="e.g., Client Onboarding"
+                        value={newStage.name}
+                        onChange={(e) => setNewStage({ ...newStage, name: e.target.value })}
+                        data-testid="input-stage-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="stage-description">Description (Optional)</Label>
+                      <Textarea
+                        id="stage-description"
+                        placeholder="Brief description"
+                        value={newStage.description}
+                        onChange={(e) => setNewStage({ ...newStage, description: e.target.value })}
+                        data-testid="textarea-stage-description"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setStageDialogOpen(false)}
+                      data-testid="button-cancel-stage"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => createStageMutation.mutate(newStage)}
+                      disabled={!newStage.name.trim() || createStageMutation.isPending}
+                      data-testid="button-submit-stage"
+                    >
+                      {createStageMutation.isPending ? 'Creating...' : 'Create Stage'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
             <p className="text-xs text-muted-foreground">
               Select a task to configure its automation
@@ -284,7 +422,7 @@ export default function WorkflowBuilder() {
                     size="sm"
                     variant="outline"
                     className="mt-2"
-                    onClick={() => toast({ title: 'Coming soon', description: 'Add your first stage' })}
+                    onClick={() => setStageDialogOpen(true)}
                     data-testid="button-add-first-stage"
                   >
                     <Plus className="h-3 w-3 mr-1" />
@@ -321,6 +459,23 @@ export default function WorkflowBuilder() {
                     {/* Steps under this stage */}
                     {isExpanded && (
                       <div className="ml-6 space-y-1">
+                        {stageSteps.length === 0 && (
+                          <div className="text-center py-4">
+                            <p className="text-xs text-muted-foreground mb-2">No steps yet</p>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedStageForStep(stage.id);
+                                setStepDialogOpen(true);
+                              }}
+                              data-testid={`button-add-step-${stage.id}`}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add Step
+                            </Button>
+                          </div>
+                        )}
                         {stageSteps.map((step: WorkflowStep) => {
                           const stepTasks = tasks.filter((t: WorkflowTask) => t.stepId === step.id);
                           const isStepExpanded = expandedSteps.has(step.id);
@@ -349,6 +504,23 @@ export default function WorkflowBuilder() {
                               {/* Tasks under this step */}
                               {isStepExpanded && (
                                 <div className="ml-6 space-y-1">
+                                  {stepTasks.length === 0 && (
+                                    <div className="text-center py-3">
+                                      <p className="text-xs text-muted-foreground mb-2">No tasks yet</p>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          setSelectedStepForTask(step.id);
+                                          setTaskDialogOpen(true);
+                                        }}
+                                        data-testid={`button-add-task-${step.id}`}
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Add Task
+                                      </Button>
+                                    </div>
+                                  )}
                                   {stepTasks.map((task: WorkflowTask) => (
                                     <button
                                       key={task.id}
@@ -453,6 +625,135 @@ export default function WorkflowBuilder() {
           )}
         </div>
       </div>
+
+      {/* Step Creation Dialog */}
+      <Dialog open={stepDialogOpen} onOpenChange={setStepDialogOpen}>
+        <DialogContent data-testid="dialog-create-step">
+          <DialogHeader>
+            <DialogTitle>Create New Step</DialogTitle>
+            <DialogDescription>
+              Add a new step to this stage
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="step-name">Name</Label>
+              <Input
+                id="step-name"
+                placeholder="e.g., Collect Documents"
+                value={newStep.name}
+                onChange={(e) => setNewStep({ ...newStep, name: e.target.value })}
+                data-testid="input-step-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="step-description">Description (Optional)</Label>
+              <Textarea
+                id="step-description"
+                placeholder="Brief description"
+                value={newStep.description}
+                onChange={(e) => setNewStep({ ...newStep, description: e.target.value })}
+                data-testid="textarea-step-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStepDialogOpen(false);
+                setSelectedStageForStep(null);
+              }}
+              data-testid="button-cancel-step"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedStageForStep) {
+                  createStepMutation.mutate({ ...newStep, stageId: selectedStageForStep });
+                }
+              }}
+              disabled={!newStep.name.trim() || !selectedStageForStep || createStepMutation.isPending}
+              data-testid="button-submit-step"
+            >
+              {createStepMutation.isPending ? 'Creating...' : 'Create Step'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Creation Dialog */}
+      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+        <DialogContent data-testid="dialog-create-task">
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
+              Add a new task to this step
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-name">Name</Label>
+              <Input
+                id="task-name"
+                placeholder="e.g., Review Tax Documents"
+                value={newTask.name}
+                onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                data-testid="input-task-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-description">Description (Optional)</Label>
+              <Textarea
+                id="task-description"
+                placeholder="Brief description"
+                value={newTask.description}
+                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                data-testid="textarea-task-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-type">Task Type</Label>
+              <Select
+                value={newTask.type}
+                onValueChange={(value) => setNewTask({ ...newTask, type: value })}
+              >
+                <SelectTrigger id="task-type" data-testid="select-task-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="automated">Automated (AI)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTaskDialogOpen(false);
+                setSelectedStepForTask(null);
+              }}
+              data-testid="button-cancel-task"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedStepForTask) {
+                  createTaskMutation.mutate({ ...newTask, stepId: selectedStepForTask });
+                }
+              }}
+              disabled={!newTask.name.trim() || !selectedStepForTask || createTaskMutation.isPending}
+              data-testid="button-submit-task"
+            >
+              {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

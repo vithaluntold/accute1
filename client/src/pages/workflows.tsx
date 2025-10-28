@@ -75,6 +75,52 @@ export default function Workflows() {
     },
   });
 
+  // Delete workflow mutation
+  const deleteWorkflow = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/workflows/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+      toast({
+        title: 'Success',
+        description: 'Workflow deleted successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete workflow',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Copy workflow mutation
+  const copyWorkflow = useMutation({
+    mutationFn: async (workflow: any) => {
+      return apiRequest('POST', '/api/workflows', {
+        name: `${workflow.name} (Copy)`,
+        description: workflow.description,
+        category: workflow.category,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+      toast({
+        title: 'Success',
+        description: 'Workflow copied successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to copy workflow',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleCreateWorkflow = () => {
     if (!newWorkflow.name.trim()) {
       toast({
@@ -85,6 +131,18 @@ export default function Workflows() {
       return;
     }
     createWorkflow.mutate(newWorkflow);
+  };
+
+  const handleDeleteWorkflow = (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
+      deleteWorkflow.mutate(id);
+    }
+  };
+
+  const handleCopyWorkflow = (workflow: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    copyWorkflow.mutate(workflow);
   };
 
   if (isLoading) {
@@ -347,6 +405,7 @@ export default function Workflows() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => toast({ title: 'Coming soon', description: 'Workflow execution will be available soon' })}
                       data-testid={`button-run-workflow-${workflow.id}`}
                     >
                       <Play className="h-4 w-4" />
@@ -354,7 +413,7 @@ export default function Workflows() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setLocation(`/workflows/${workflow.id}/edit`)}
+                      onClick={() => setLocation(`/workflows/${workflow.id}`)}
                       data-testid={`button-edit-workflow-${workflow.id}`}
                     >
                       <Edit className="h-4 w-4" />
@@ -362,6 +421,8 @@ export default function Workflows() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={(e) => handleCopyWorkflow(workflow, e)}
+                      disabled={copyWorkflow.isPending}
                       data-testid={`button-copy-workflow-${workflow.id}`}
                     >
                       <Copy className="h-4 w-4" />
@@ -369,6 +430,8 @@ export default function Workflows() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={(e) => handleDeleteWorkflow(workflow.id, workflow.name, e)}
+                      disabled={deleteWorkflow.isPending}
                       data-testid={`button-delete-workflow-${workflow.id}`}
                     >
                       <Trash2 className="h-4 w-4" />

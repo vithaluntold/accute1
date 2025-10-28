@@ -95,7 +95,7 @@ export interface IStorage {
 
   // Workflows
   getWorkflow(id: string): Promise<Workflow | undefined>;
-  createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
+  createWorkflow(workflow: InsertWorkflow & { organizationId: string; createdBy: string }): Promise<Workflow>;
   updateWorkflow(id: string, workflow: Partial<InsertWorkflow>): Promise<Workflow | undefined>;
   deleteWorkflow(id: string): Promise<void>;
   getWorkflowsByOrganization(organizationId: string): Promise<Workflow[]>;
@@ -622,7 +622,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createWorkflow(workflow: InsertWorkflow): Promise<Workflow> {
+  async createWorkflow(workflow: InsertWorkflow & { organizationId: string; createdBy: string }): Promise<Workflow> {
     const result = await db.insert(schema.workflows).values(workflow).returning();
     return result[0];
   }
