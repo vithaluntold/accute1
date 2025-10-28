@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -11,6 +11,7 @@ import {
   type Edge,
   type Connection,
   type NodeTypes,
+  type ReactFlowInstance,
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -188,7 +189,8 @@ const nodePalette: NodePaletteItem[] = [
 interface WorkflowCanvasProps {
   initialNodes?: WorkflowNodeType[];
   initialEdges?: WorkflowEdge[];
-  onSave?: (nodes: Node[], edges: Edge[]) => void;
+  initialViewport?: { x: number; y: number; zoom: number };
+  onSave?: (nodes: Node[], edges: Edge[], viewport: { x: number; y: number; zoom: number }) => void;
   onNodesChange?: (nodes: Node[]) => void;
   onEdgesChange?: (edges: Edge[]) => void;
   readOnly?: boolean;
@@ -197,11 +199,14 @@ interface WorkflowCanvasProps {
 export function WorkflowCanvas({
   initialNodes = [],
   initialEdges = [],
+  initialViewport = { x: 0, y: 0, zoom: 1 },
   onSave,
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
   readOnly = false,
 }: WorkflowCanvasProps) {
+  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
+  const [viewport, setViewport] = useState(initialViewport);
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState(
     initialNodes.map((node) => ({
       ...node,
@@ -209,6 +214,31 @@ export function WorkflowCanvas({
     }))
   );
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges as Edge[]);
+
+  // Handle ReactFlow initialization
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    reactFlowInstanceRef.current = instance;
+    
+    // Apply saved viewport if it's not the default
+    if (initialViewport.x !== 0 || initialViewport.y !== 0 || initialViewport.zoom !== 1) {
+      instance.setViewport(initialViewport);
+    } else if (nodes.length > 0) {
+      // If no viewport is saved and there are nodes, fit view once
+      instance.fitView();
+    }
+  }, [initialViewport, nodes.length]);
+
+  // Apply saved viewport when initialViewport changes (e.g., when switching tasks)
+  useEffect(() => {
+    const instance = reactFlowInstanceRef.current;
+    if (instance && initialViewport) {
+      if (initialViewport.x !== 0 || initialViewport.y !== 0 || initialViewport.zoom !== 1) {
+        instance.setViewport(initialViewport);
+      } else if (nodes.length > 0) {
+        instance.fitView();
+      }
+    }
+  }, [initialViewport, nodes.length]);
 
   // Wrap internal change handlers to notify parent
   const handleNodesChange = useCallback((changes: any) => {
@@ -219,21 +249,22 @@ export function WorkflowCanvas({
     onEdgesChangeInternal(changes);
   }, [onEdgesChangeInternal]);
 
-  // Sync canvas state when initialNodes/initialEdges props change (for edit mode)
+  // Sync canvas state when initialNodes/initialEdges props change (including empty arrays for task switching)
   useEffect(() => {
-    if (initialNodes.length > 0) {
-      setNodes(initialNodes.map((node) => ({
-        ...node,
-        type: 'workflowNode',
-      })));
-    }
+    setNodes(initialNodes.map((node) => ({
+      ...node,
+      type: 'workflowNode',
+    })));
   }, [initialNodes, setNodes]);
 
   useEffect(() => {
-    if (initialEdges.length > 0 || edges.length === 0) {
-      setEdges(initialEdges as Edge[]);
-    }
-  }, [initialEdges, setEdges, edges.length]);
+    setEdges(initialEdges as Edge[]);
+  }, [initialEdges, setEdges]);
+
+  // Sync local viewport state when initialViewport prop changes (for task switching)
+  useEffect(() => {
+    setViewport(initialViewport);
+  }, [initialViewport]);
 
   // Notify parent when nodes or edges change
   useEffect(() => {
@@ -323,9 +354,13 @@ export function WorkflowCanvas({
 
   const handleSave = () => {
     if (onSave) {
-      onSave(nodes, edges);
+      onSave(nodes, edges, viewport);
     }
   };
+
+  const handleMove = useCallback((event: any, viewportData: { x: number; y: number; zoom: number }) => {
+    setViewport(viewportData);
+  }, []);
 
   return (
     <div className="flex h-full w-full gap-4">
@@ -433,8 +468,9 @@ export function WorkflowCanvas({
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onMove={handleMove}
+          onInit={onInit}
           nodeTypes={nodeTypes}
-          fitView
           data-testid="workflow-canvas"
         >
           <Background />

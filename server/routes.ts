@@ -4248,7 +4248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Save task automation (nodes/edges)
+  // Save task automation (nodes/edges/viewport)
   app.patch("/api/tasks/:taskId/automation", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
     try {
       const task = await storage.getWorkflowTask(req.params.taskId);
@@ -4270,13 +4270,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Update task with automation nodes/edges
+      // Update task with automation nodes/edges/viewport
       const updated = await storage.updateWorkflowTask(req.params.taskId, {
         nodes: req.body.nodes,
         edges: req.body.edges,
+        viewport: req.body.viewport,
       });
       
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task_automation", req.params.taskId, { nodes: req.body.nodes, edges: req.body.edges }, req);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task_automation", req.params.taskId, { nodes: req.body.nodes, edges: req.body.edges, viewport: req.body.viewport }, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to save automation" });

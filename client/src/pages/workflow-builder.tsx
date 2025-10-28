@@ -127,10 +127,11 @@ export default function WorkflowBuilder() {
 
   // Save task automation
   const saveTaskAutomation = useMutation({
-    mutationFn: async (data: { taskId: string; nodes: WorkflowNode[]; edges: WorkflowEdge[] }) => {
+    mutationFn: async (data: { taskId: string; nodes: WorkflowNode[]; edges: WorkflowEdge[]; viewport: { x: number; y: number; zoom: number } }) => {
       return apiRequest('PATCH', `/api/tasks/${data.taskId}/automation`, {
         nodes: data.nodes,
         edges: data.edges,
+        viewport: data.viewport,
       });
     },
     onSuccess: () => {
@@ -149,12 +150,12 @@ export default function WorkflowBuilder() {
     },
   });
 
-  const handleSaveAutomation = (updatedNodes: Node[], updatedEdges: Edge[]) => {
+  const handleSaveAutomation = (updatedNodes: Node[], updatedEdges: Edge[], viewport: { x: number; y: number; zoom: number }) => {
     if (!selectedTaskId) return;
 
     const workflowNodes: WorkflowNode[] = updatedNodes.map((node) => ({
       id: node.id,
-      type: node.data.type as WorkflowNodeType,
+      type: node.data.type as WorkflowNodeType, // Get type from node.data.type (set by WorkflowNode component)
       position: node.position,
       data: node.data as any,
     }));
@@ -172,6 +173,7 @@ export default function WorkflowBuilder() {
       taskId: selectedTaskId,
       nodes: workflowNodes,
       edges: workflowEdges,
+      viewport,
     });
   };
 
@@ -423,11 +425,13 @@ export default function WorkflowBuilder() {
                 )}
               </div>
 
-              {/* Automation Canvas */}
+              {/* Automation Canvas - Key forces remount on task switch for proper state isolation */}
               <div className="flex-1 overflow-hidden">
                 <WorkflowCanvas
+                  key={selectedTask.id}
                   initialNodes={selectedTask.nodes as WorkflowNode[] || []}
                   initialEdges={selectedTask.edges as WorkflowEdge[] || []}
+                  initialViewport={selectedTask.viewport as { x: number; y: number; zoom: number } || { x: 0, y: 0, zoom: 1 }}
                   onNodesChange={() => {}}
                   onEdgesChange={() => {}}
                   onSave={handleSaveAutomation}
