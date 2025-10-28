@@ -4200,6 +4200,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Dashboard Routes ====================
+  
+  // Employee/Client Dashboard - Get my tasks with status
+  app.get("/api/my-tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const tasks = await storage.getTasksByUser(req.userId!);
+      const now = new Date();
+      
+      // Enrich tasks with status info (overdue/on-time)
+      const enrichedTasks = tasks.map(task => ({
+        ...task,
+        isOverdue: task.dueDate && new Date(task.dueDate) < now && task.status !== 'completed',
+        isOnTime: !task.dueDate || new Date(task.dueDate) >= now || task.status === 'completed'
+      }));
+      
+      res.json(enrichedTasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Employee/Client Dashboard Statistics
+  app.get("/api/dashboard/my-stats", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const stats = await storage.getTaskStatsByUser(req.userId!);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch dashboard statistics" });
+    }
+  });
+
+  // Manager Dashboard - Get team tasks (users in same organization)
+  app.get("/api/team-tasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      // Get all tasks for the organization with workflow context
+      const tasksData = await storage.getTasksByOrganization(req.user!.organizationId);
+      const now = new Date();
+      
+      // Enrich with status
+      const enrichedTasks = tasksData.map((item: any) => ({
+        ...item.task,
+        workflow: item.workflow,
+        stage: item.stage,
+        step: item.step,
+        isOverdue: item.task.dueDate && new Date(item.task.dueDate) < now && item.task.status !== 'completed',
+        isOnTime: !item.task.dueDate || new Date(item.task.dueDate) >= now || item.task.status === 'completed'
+      }));
+      
+      res.json(enrichedTasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch team tasks" });
+    }
+  });
+
+  // Manager Dashboard Statistics
+  app.get("/api/dashboard/team-stats", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const stats = await storage.getTaskStatsByOrganization(req.user!.organizationId);
+      
+      // Get team members
+      const teamMembers = await storage.getUsersByOrganization(req.user!.organizationId);
+      
+      res.json({
+        ...stats,
+        teamSize: teamMembers.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch team statistics" });
+    }
+  });
+
+  // Admin Dashboard - Practice-wide statistics
+  app.get("/api/dashboard/practice-stats", requireAuth, requirePermission("reports.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const stats = await storage.getTaskStatsByOrganization(req.user!.organizationId);
+      
+      // Get workflows
+      const workflows = await storage.getWorkflowsByOrganization(req.user!.organizationId);
+      
+      // Get clients
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId);
+      
+      // Get team members
+      const teamMembers = await storage.getUsersByOrganization(req.user!.organizationId);
+      
+      res.json({
+        taskStats: stats,
+        workflows: {
+          total: workflows.length,
+          active: workflows.filter((w: any) => w.status === 'active').length,
+          completed: workflows.filter((w: any) => w.status === 'completed').length
+        },
+        clients: {
+          total: clients.length,
+          active: clients.filter((c: any) => c.status === 'active').length
+        },
+        team: {
+          total: teamMembers.length
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch practice statistics" });
+    }
+  });
+
+  // Get overdue tasks (accessible to managers and admins)
+  app.get("/api/tasks/overdue", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const overdueTasks = await storage.getOverdueTasks(req.user!.organizationId);
+      res.json(overdueTasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch overdue tasks" });
+    }
+  });
+
+  // Get tasks due soon (accessible to all authenticated users)
+  app.get("/api/tasks/due-soon", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const daysAhead = parseInt(req.query.days as string) || 7;
+      const tasksDueSoon = await storage.getTasksDueSoon(req.user!.organizationId, daysAhead);
+      res.json(tasksDueSoon);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks due soon" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,4 +1,4 @@
-import { eq, and, or, desc, sql } from "drizzle-orm";
+import { eq, and, or, desc, sql, lt, lte, gt, gte, ne } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -2133,6 +2133,120 @@ export class DbStorage implements IStorage {
     }
     
     return result[0];
+  }
+
+  // Dashboard Task Queries
+  async getTasksByUser(userId: string): Promise<schema.WorkflowTask[]> {
+    return await db.select().from(schema.workflowTasks)
+      .where(eq(schema.workflowTasks.assignedTo, userId))
+      .orderBy(desc(schema.workflowTasks.createdAt));
+  }
+
+  async getTasksByOrganization(organizationId: string): Promise<any[]> {
+    // Get tasks with workflow context for organization filtering
+    return await db.select({
+      task: schema.workflowTasks,
+      step: schema.workflowSteps,
+      stage: schema.workflowStages,
+      workflow: schema.workflows
+    })
+    .from(schema.workflowTasks)
+    .innerJoin(schema.workflowSteps, eq(schema.workflowTasks.stepId, schema.workflowSteps.id))
+    .innerJoin(schema.workflowStages, eq(schema.workflowSteps.stageId, schema.workflowStages.id))
+    .innerJoin(schema.workflows, eq(schema.workflowStages.workflowId, schema.workflows.id))
+    .where(eq(schema.workflows.organizationId, organizationId))
+    .orderBy(desc(schema.workflowTasks.createdAt));
+  }
+
+  async getOverdueTasks(organizationId: string): Promise<any[]> {
+    const now = new Date();
+    return await db.select({
+      task: schema.workflowTasks,
+      step: schema.workflowSteps,
+      stage: schema.workflowStages,
+      workflow: schema.workflows
+    })
+    .from(schema.workflowTasks)
+    .innerJoin(schema.workflowSteps, eq(schema.workflowTasks.stepId, schema.workflowSteps.id))
+    .innerJoin(schema.workflowStages, eq(schema.workflowSteps.stageId, schema.workflowStages.id))
+    .innerJoin(schema.workflows, eq(schema.workflowStages.workflowId, schema.workflows.id))
+    .where(
+      and(
+        eq(schema.workflows.organizationId, organizationId),
+        lt(schema.workflowTasks.dueDate, now),
+        ne(schema.workflowTasks.status, 'completed')
+      )
+    )
+    .orderBy(schema.workflowTasks.dueDate);
+  }
+
+  async getTasksDueSoon(organizationId: string, daysAhead: number = 7): Promise<any[]> {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    
+    return await db.select({
+      task: schema.workflowTasks,
+      step: schema.workflowSteps,
+      stage: schema.workflowStages,
+      workflow: schema.workflows
+    })
+    .from(schema.workflowTasks)
+    .innerJoin(schema.workflowSteps, eq(schema.workflowTasks.stepId, schema.workflowSteps.id))
+    .innerJoin(schema.workflowStages, eq(schema.workflowSteps.stageId, schema.workflowStages.id))
+    .innerJoin(schema.workflows, eq(schema.workflowStages.workflowId, schema.workflows.id))
+    .where(
+      and(
+        eq(schema.workflows.organizationId, organizationId),
+        gte(schema.workflowTasks.dueDate, now),
+        lte(schema.workflowTasks.dueDate, futureDate),
+        ne(schema.workflowTasks.status, 'completed')
+      )
+    )
+    .orderBy(schema.workflowTasks.dueDate);
+  }
+
+  async getTaskStatsByUser(userId: string): Promise<{
+    total: number;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    overdue: number;
+  }> {
+    const tasks = await this.getTasksByUser(userId);
+    const now = new Date();
+    
+    return {
+      total: tasks.length,
+      pending: tasks.filter(t => t.status === 'pending').length,
+      in_progress: tasks.filter(t => t.status === 'in_progress').length,
+      completed: tasks.filter(t => t.status === 'completed').length,
+      overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed').length
+    };
+  }
+
+  async getTaskStatsByOrganization(organizationId: string): Promise<{
+    total: number;
+    pending: number;
+    in_progress: number;
+    completed: number;
+    overdue: number;
+    onTime: number;
+  }> {
+    const tasksData = await this.getTasksByOrganization(organizationId);
+    const now = new Date();
+    
+    const tasks = tasksData.map((t: any) => t.task);
+    const overdueCount = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < now && t.status !== 'completed').length;
+    const onTimeCount = tasks.filter((t: any) => !t.dueDate || (new Date(t.dueDate) >= now) || t.status === 'completed').length;
+    
+    return {
+      total: tasks.length,
+      pending: tasks.filter((t: any) => t.status === 'pending').length,
+      in_progress: tasks.filter((t: any) => t.status === 'in_progress').length,
+      completed: tasks.filter((t: any) => t.status === 'completed').length,
+      overdue: overdueCount,
+      onTime: onTimeCount - overdueCount
+    };
   }
 
   // Task Subtasks
