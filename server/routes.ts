@@ -5008,11 +5008,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Checklist item not found" });
       }
       const updated = await storage.toggleChecklistItem(req.params.id, req.user!.id);
+      if (!updated) {
+        return res.status(404).json({ error: "Failed to toggle checklist item" });
+      }
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "toggle", "task_checklist", req.params.id, {}, req);
       
       // Trigger auto-progression when checklist is completed
       if (updated.isChecked) {
-        await autoProgressionEngine.tryAutoProgressTask(checklist.taskId);
+        await autoProgressionEngine.tryAutoProgressStep(checklist.taskId);
       }
       
       res.json(updated);
