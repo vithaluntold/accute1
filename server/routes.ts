@@ -1411,7 +1411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate cryptographic hash and digital signature for tamper-proof security
       const fileBuffer = fs.readFileSync(req.file.path);
       const documentHash = cryptoUtils.generateDocumentHash(fileBuffer);
-      const digitalSignature = cryptoUtils.signDocumentHash(documentHash, req.user!.organizationId!);
+      const digitalSignature = await cryptoUtils.signDocumentHash(documentHash, req.user!.organizationId!);
       const signedAt = new Date();
 
       const documentData = {
@@ -1507,7 +1507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isIntegrityValid = cryptoUtils.verifyDocumentIntegrity(document.documentHash, currentFileBuffer);
 
       // Verify digital signature
-      const isSignatureValid = cryptoUtils.verifySignature(
+      const isSignatureValid = await cryptoUtils.verifySignature(
         document.documentHash,
         document.digitalSignature,
         document.organizationId

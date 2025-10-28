@@ -1,8 +1,13 @@
 import crypto from 'crypto';
+import { db } from './db';
+import * as schema from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * PKI Digital Signature Utilities for Document Security
  * Implements RSA-SHA256 signatures with 2048-bit keys for tamper-proof verification
+ * 
+ * SECURITY: Keys are persisted to database to survive server restarts
  */
 
 interface KeyPair {
@@ -10,33 +15,103 @@ interface KeyPair {
   privateKey: string;
 }
 
-// Store organization keys in memory (in production, use HSM or secure key vault)
-const organizationKeyPairs = new Map<string, KeyPair>();
+// Memory cache for loaded keys (cleared on restart, reloaded from DB)
+const keyCache = new Map<string, KeyPair>();
 
 /**
- * Generate or retrieve RSA key pair for an organization
+ * Generate and persist RSA key pair for an organization
  * @param organizationId Organization ID
  * @returns RSA key pair
  */
-export function getOrganizationKeyPair(organizationId: string): KeyPair {
-  if (!organizationKeyPairs.has(organizationId)) {
-    // Generate 2048-bit RSA key pair
-    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: {
-        type: 'spki',
-        format: 'pem',
-      },
-      privateKeyEncoding: {
-        type: 'pkcs8',
-        format: 'pem',
-      },
-    });
-    
-    organizationKeyPairs.set(organizationId, { publicKey, privateKey });
+async function generateAndPersistKeyPair(organizationId: string): Promise<KeyPair> {
+  // Generate 2048-bit RSA key pair
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: {
+      type: 'spki',
+      format: 'pem',
+    },
+    privateKeyEncoding: {
+      type: 'pkcs8',
+      format: 'pem',
+    },
+  });
+  
+  // Persist to database
+  await db.insert(schema.organizationKeys).values({
+    organizationId,
+    publicKey,
+    privateKey, // In production, encrypt this with ENCRYPTION_KEY
+    algorithm: 'RSA-2048',
+  }).onConflictDoNothing(); // Prevent race condition
+  
+  const keyPair = { publicKey, privateKey };
+  keyCache.set(organizationId, keyPair);
+  
+  return keyPair;
+}
+
+/**
+ * Load RSA key pair from database or generate if first time
+ * @param organizationId Organization ID
+ * @returns RSA key pair
+ */
+async function getOrganizationKeyPair(organizationId: string): Promise<KeyPair> {
+  // Check cache first
+  if (keyCache.has(organizationId)) {
+    return keyCache.get(organizationId)!;
   }
   
-  return organizationKeyPairs.get(organizationId)!;
+  // Load from database
+  const existingKeys = await db
+    .select()
+    .from(schema.organizationKeys)
+    .where(eq(schema.organizationKeys.organizationId, organizationId))
+    .limit(1);
+  
+  if (existingKeys.length > 0) {
+    const keyPair = {
+      publicKey: existingKeys[0].publicKey,
+      privateKey: existingKeys[0].privateKey,
+    };
+    keyCache.set(organizationId, keyPair);
+    return keyPair;
+  }
+  
+  // Generate new key pair if first time
+  return await generateAndPersistKeyPair(organizationId);
+}
+
+/**
+ * Load RSA key pair from database - STRICT MODE (errors if missing)
+ * Used during verification to prevent accidental key generation
+ * @param organizationId Organization ID
+ * @returns RSA key pair
+ * @throws Error if keys don't exist
+ */
+async function loadOrganizationKeyPair(organizationId: string): Promise<KeyPair> {
+  // Check cache first
+  if (keyCache.has(organizationId)) {
+    return keyCache.get(organizationId)!;
+  }
+  
+  // Load from database
+  const existingKeys = await db
+    .select()
+    .from(schema.organizationKeys)
+    .where(eq(schema.organizationKeys.organizationId, organizationId))
+    .limit(1);
+  
+  if (existingKeys.length === 0) {
+    throw new Error(`Cryptographic keys not found for organization ${organizationId}. Cannot verify signature.`);
+  }
+  
+  const keyPair = {
+    publicKey: existingKeys[0].publicKey,
+    privateKey: existingKeys[0].privateKey,
+  };
+  keyCache.set(organizationId, keyPair);
+  return keyPair;
 }
 
 /**
@@ -54,8 +129,8 @@ export function generateDocumentHash(buffer: Buffer): string {
  * @param organizationId Organization ID for key retrieval
  * @returns Base64-encoded digital signature
  */
-export function signDocumentHash(documentHash: string, organizationId: string): string {
-  const keyPair = getOrganizationKeyPair(organizationId);
+export async function signDocumentHash(documentHash: string, organizationId: string): Promise<string> {
+  const keyPair = await getOrganizationKeyPair(organizationId);
   
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(documentHash);
@@ -67,18 +142,20 @@ export function signDocumentHash(documentHash: string, organizationId: string): 
 
 /**
  * Verify digital signature of document hash
+ * SECURITY: Uses loadOrganizationKeyPair which errors if keys missing (prevents key generation attack)
  * @param documentHash Original SHA-256 hash
  * @param signature Base64-encoded signature to verify
  * @param organizationId Organization ID for key retrieval
  * @returns True if signature is valid, false otherwise
  */
-export function verifySignature(
+export async function verifySignature(
   documentHash: string,
   signature: string,
   organizationId: string
-): boolean {
+): Promise<boolean> {
   try {
-    const keyPair = getOrganizationKeyPair(organizationId);
+    // Use strict loading - errors if keys don't exist instead of generating new ones
+    const keyPair = await loadOrganizationKeyPair(organizationId);
     
     const verify = crypto.createVerify('RSA-SHA256');
     verify.update(documentHash);
@@ -98,13 +175,13 @@ export function verifySignature(
  * @param organizationId Organization ID
  * @returns Signed timestamp proof
  */
-export function generateTimestampProof(
+export async function generateTimestampProof(
   documentHash: string,
   timestamp: string,
   organizationId: string
-): string {
+): Promise<string> {
   const timestampData = `${documentHash}:${timestamp}`;
-  return signDocumentHash(timestampData, organizationId);
+  return await signDocumentHash(timestampData, organizationId);
 }
 
 /**
@@ -112,8 +189,8 @@ export function generateTimestampProof(
  * @param organizationId Organization ID
  * @returns PEM-formatted public key
  */
-export function getOrganizationPublicKey(organizationId: string): string {
-  const keyPair = getOrganizationKeyPair(organizationId);
+export async function getOrganizationPublicKey(organizationId: string): Promise<string> {
+  const keyPair = await getOrganizationKeyPair(organizationId);
   return keyPair.publicKey;
 }
 

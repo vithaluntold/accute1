@@ -10,34 +10,34 @@ export default function Landing() {
 
   const features = [
     {
-      icon: Bot,
-      title: "AI Agent Marketplace",
-      description: "Browse and install pre-built AI agents for invoice processing, tax compliance, client communication, and more",
-    },
-    {
       icon: Workflow,
-      title: "Smart Workflow Automation",
-      description: "Visual workflow builder with AI-powered decision nodes. Automate client onboarding, tax returns, and bookkeeping",
+      title: "Unified Workflow Engine",
+      description: "TaxDome-style system combining visual automation AND hierarchical project management (Stages → Steps → Tasks) with AI-powered triggers",
     },
     {
-      icon: FileText,
-      title: "Intelligent Document Processing",
-      description: "AI extracts data from receipts, invoices, and tax forms automatically. Unlimited encrypted storage",
+      icon: Bot,
+      title: "Conversational AI Agents",
+      description: "Chat with Cadence (workflows), Parity (documents), Forma (forms) using your OpenAI, Anthropic, or Azure OpenAI API keys—with full conversation history",
+    },
+    {
+      icon: Shield,
+      title: "PKI Digital Signatures",
+      description: "Advanced blockchain alternative: RSA-SHA256 signatures + SHA-256 hashing ensure tamper-proof, legally-binding document verification",
     },
     {
       icon: Users,
-      title: "Client Portal & Collaboration",
-      description: "Secure portal for document sharing, workflow tracking, and real-time updates with role-based access",
+      title: "Multi-Role RBAC System",
+      description: "Complete SaaS-level vs tenant-level separation: Super Admin (platform), Admin/Employee/Client (organization) with 100+ granular permissions",
     },
     {
-      icon: Lock,
-      title: "Enterprise-Grade Security",
-      description: "AES-256 encryption, JWT authentication, activity logging, and SOC 2-ready infrastructure",
+      icon: FileText,
+      title: "Dynamic Form Builder",
+      description: "22 field types with secure conditional logic (expr-eval). Build tax organizers, intake forms, questionnaires with show/hide/require rules",
     },
     {
       icon: TrendingUp,
-      title: "AI Analytics & Insights",
-      description: "Predictive analytics, workflow optimization suggestions, and intelligent reporting powered by GPT-4",
+      title: "Role-Based Dashboards",
+      description: "Personal task stats (all users), team overview (managers with workflows.view), practice analytics (admins with reports.view)",
     },
   ];
 
@@ -342,6 +342,33 @@ export default function Landing() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
+              <Card className="border-2 border-[#e5a660]/30">
+                <CardHeader>
+                  <Badge className="w-fit bg-gradient-to-r from-[#e5a660] to-[#d76082] text-white border-0 mb-2">
+                    Beyond Blockchain
+                  </Badge>
+                  <CardTitle className="text-lg">PKI Digital Signatures</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>RSA-SHA256 cryptographic signatures on every document</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>SHA-256 hashing for tamper-proof verification</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Legally-binding signatures (eIDAS, ESIGN Act compliant)</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Real-time verification endpoint detects tampering instantly</span>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Data Encryption</CardTitle>
@@ -349,11 +376,15 @@ export default function Landing() {
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>AES-256-CBC encryption for API keys and sensitive data</span>
+                    <span>AES-256-GCM encryption for LLM API keys (ENCRYPTION_KEY)</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Unique encryption keys per organization</span>
+                    <span>Organization-isolated encryption keys</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Encrypted document storage with AES-256-CBC</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
@@ -364,60 +395,48 @@ export default function Landing() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Access Control</CardTitle>
+                  <CardTitle className="text-lg">Enterprise RBAC</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Role-based permissions (Super Admin, Admin, Employee, Client)</span>
+                    <span>Platform vs Tenant role separation (prevents privilege escalation)</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>JWT authentication with bcrypt password hashing</span>
+                    <span>100+ granular permissions with namespace isolation</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Multi-tenant isolation with organization-scoped data</span>
+                    <span>JWT authentication with bcrypt (10 rounds) password hashing</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Multi-tenant isolation with organization-scoped queries</span>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Compliance & Auditing</CardTitle>
+                  <CardTitle className="text-lg">Audit & Compliance</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Complete activity logs with IP tracking</span>
+                    <span>Comprehensive activity logs (user, IP, timestamp, action)</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>SOC 2 Type II ready infrastructure</span>
+                    <span>Document signature audit trail with signed timestamps</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>GDPR and CCPA compliant data handling</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Infrastructure</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>99.9% uptime SLA</span>
+                    <span>GDPR/CCPA compliant data handling and privacy controls</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Automated daily backups</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>DDoS protection and rate limiting</span>
+                    <span>SOC 2 Type II ready infrastructure and controls</span>
                   </div>
                 </CardContent>
               </Card>

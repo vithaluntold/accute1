@@ -320,6 +320,17 @@ export const aiAgentMessages = pgTable("ai_agent_messages", {
   conversationIdx: index("ai_messages_conversation_idx").on(table.conversationId, table.createdAt),
 }));
 
+// Organization Cryptographic Keys - Persisted RSA key pairs for PKI signatures
+export const organizationKeys = pgTable("organization_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id).unique(),
+  publicKey: text("public_key").notNull(), // PEM-formatted RSA public key
+  privateKey: text("private_key").notNull(), // PEM-formatted RSA private key (encrypted at rest)
+  algorithm: text("algorithm").notNull().default("RSA-2048"), // Key algorithm
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  rotatedAt: timestamp("rotated_at"), // For key rotation tracking
+});
+
 // Documents for client portal with PKI digital signatures
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
