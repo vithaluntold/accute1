@@ -235,9 +235,15 @@ export function AIAgentChat({
   }, [messages]);
 
   const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
+    console.log('[AI Chat] handleSend called - input:', input.trim().substring(0, 50), 'isStreaming:', isStreaming);
+    
+    if (!input.trim() || isStreaming) {
+      console.log('[AI Chat] Early return - empty input or already streaming');
+      return;
+    }
 
     if (!selectedLlmConfig) {
+      console.log('[AI Chat] No LLM config selected');
       toast({
         title: "Configuration Required",
         description: "Please configure an LLM provider in Settings first",
@@ -246,6 +252,7 @@ export function AIAgentChat({
       return;
     }
 
+    console.log('[AI Chat] Creating user message and connecting WebSocket');
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -257,7 +264,9 @@ export function AIAgentChat({
     setIsStreaming(true);
 
     // Connect and send via WebSocket
+    console.log('[AI Chat] Calling connectWebSocket()...');
     const ws = connectWebSocket();
+    console.log('[AI Chat] WebSocket readyState:', ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
     
     // Wait for connection to open if not already open
     if (ws.readyState === WebSocket.CONNECTING) {
