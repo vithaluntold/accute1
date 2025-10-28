@@ -49,15 +49,27 @@ const taskSchema = z.object({
   automationInput: z.string().optional(),
 }).refine(
   (data) => {
-    // If type is automated, aiAgentId and automationInput are required
+    // If type is automated, aiAgentId and non-empty automationInput are required
     if (data.type === "automated") {
-      return !!data.aiAgentId && !!data.automationInput;
+      return !!data.aiAgentId && !!data.automationInput && data.automationInput.trim().length > 0;
     }
     return true;
   },
   {
     message: "AI agent and automation prompt are required for AI-powered tasks",
     path: ["aiAgentId"],
+  }
+).refine(
+  (data) => {
+    // Validate automationInput is not just whitespace when provided
+    if (data.type === "automated" && data.automationInput) {
+      return data.automationInput.trim().length > 0;
+    }
+    return true;
+  },
+  {
+    message: "Automation prompt cannot be empty or whitespace only",
+    path: ["automationInput"],
   }
 );
 
@@ -194,10 +206,21 @@ export function TaskDialog({ open, onOpenChange, stepId, task, tasksCount }: Tas
   });
 
   const onSubmit = (data: TaskFormData) => {
+    // Build clean payload - only include automation fields for automated tasks
+    const cleanData: any = { ...data };
+    
+    if (data.type === "automated" && data.automationInput) {
+      cleanData.automationInput = data.automationInput.trim();
+    } else if (data.type === "manual") {
+      // For manual tasks, remove automation fields entirely instead of setting to null
+      delete cleanData.automationInput;
+      delete cleanData.aiAgentId;
+    }
+    
     if (isEditing) {
-      updateMutation.mutate(data);
+      updateMutation.mutate(cleanData);
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(cleanData);
     }
   };
 

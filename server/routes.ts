@@ -4363,9 +4363,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
+      
+      // Validate automated tasks have required AI configuration
+      if (req.body.type === "automated") {
+        if (!req.body.aiAgentId || !req.body.automationInput?.trim()) {
+          return res.status(400).json({ 
+            error: "AI agent and automation prompt are required for automated tasks" 
+          });
+        }
+      }
+      
       const task = await storage.createWorkflowTask({
         ...req.body,
         stepId: req.params.stepId,
+        automationInput: req.body.automationInput?.trim(),
       });
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_task", task.id, { name: task.name }, req);
       res.status(201).json(task);
@@ -4390,7 +4401,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const task = await storage.createWorkflowTask(req.body);
+      
+      // Validate automated tasks have required AI configuration
+      if (req.body.type === "automated") {
+        if (!req.body.aiAgentId || !req.body.automationInput?.trim()) {
+          return res.status(400).json({ 
+            error: "AI agent and automation prompt are required for automated tasks" 
+          });
+        }
+      }
+      
+      const task = await storage.createWorkflowTask({
+        ...req.body,
+        automationInput: req.body.automationInput?.trim(),
+      });
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_task", task.id, task, req);
       res.status(201).json(task);
     } catch (error: any) {
@@ -4416,7 +4440,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updateWorkflowTask(req.params.id, req.body);
+      
+      // Validate automated tasks have required AI configuration
+      const taskType = req.body.type || task.type;
+      if (taskType === "automated") {
+        const aiAgentId = req.body.aiAgentId !== undefined ? req.body.aiAgentId : task.aiAgentId;
+        const automationInput = req.body.automationInput !== undefined ? req.body.automationInput : task.automationInput;
+        if (!aiAgentId || !automationInput?.trim()) {
+          return res.status(400).json({ 
+            error: "AI agent and automation prompt are required for automated tasks" 
+          });
+        }
+      }
+      
+      // Build update payload - only include automationInput if provided to avoid wiping existing prompt
+      const updatePayload: any = { ...req.body };
+      if (req.body.automationInput !== undefined && req.body.automationInput !== null) {
+        updatePayload.automationInput = req.body.automationInput.trim();
+      }
+      
+      const updated = await storage.updateWorkflowTask(req.params.id, updatePayload);
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task", req.params.id, req.body, req);
       
       // Trigger auto-progression if task status changed to completed
