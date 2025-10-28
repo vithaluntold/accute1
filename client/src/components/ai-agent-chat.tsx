@@ -114,15 +114,16 @@ export function AIAgentChat({
     const ws = new WebSocket(`${protocol}//${host}/ws/ai-stream`);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('[AI Chat] WebSocket connected successfully');
     };
 
     ws.onmessage = (event) => {
       try {
+        console.log('[AI Chat] Received message:', event.data.substring(0, 100));
         const data = JSON.parse(event.data);
         
         if (data.type === 'connected') {
-          console.log('WebSocket authenticated');
+          console.log('[AI Chat] WebSocket authenticated, userId:', data.userId);
         } else if (data.type === 'stream_start') {
           // Create a new assistant message placeholder
           const messageId = Date.now().toString();
@@ -200,7 +201,7 @@ export function AIAgentChat({
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[AI Chat] WebSocket error:', error);
       toast({
         title: "Connection Error",
         description: "Failed to connect to AI streaming service",
@@ -209,8 +210,8 @@ export function AIAgentChat({
       setIsStreaming(false);
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
+    ws.onclose = (event) => {
+      console.log('[AI Chat] WebSocket disconnected - Code:', event.code, 'Reason:', event.reason || 'No reason provided');
       wsRef.current = null;
       setIsStreaming(false);
     };
