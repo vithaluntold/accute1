@@ -1,15 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Search, Play, Edit, Trash2, Copy, Workflow, Sparkles } from "lucide-react";
 import type { InstalledAgentView } from "@shared/schema";
 import { AIAgentChat } from "@/components/ai-agent-chat";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Workflows() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newWorkflow, setNewWorkflow] = useState({
+    name: "",
+    description: "",
+    category: "tax_preparation",
+  });
   
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],
@@ -21,6 +49,43 @@ export default function Workflows() {
   });
 
   const hasCadence = installedAgents.some((agent) => agent.agent?.name === 'Cadence');
+
+  // Create workflow mutation
+  const createWorkflow = useMutation({
+    mutationFn: async (data: { name: string; description: string; category: string }) => {
+      return apiRequest('POST', '/api/workflows', data);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+      toast({
+        title: 'Success',
+        description: 'Workflow created successfully',
+      });
+      setCreateDialogOpen(false);
+      setNewWorkflow({ name: "", description: "", category: "tax_preparation" });
+      // Navigate to the workflow builder for the newly created workflow
+      setLocation(`/workflows/${data.id}`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create workflow',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCreateWorkflow = () => {
+    if (!newWorkflow.name.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a workflow name',
+        variant: 'destructive',
+      });
+      return;
+    }
+    createWorkflow.mutate(newWorkflow);
+  };
 
   if (isLoading) {
     return (
@@ -64,10 +129,79 @@ export default function Workflows() {
               }
             />
           )}
-          <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-workflow">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Workflow
-          </Button>
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-workflow">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Workflow
+              </Button>
+            </DialogTrigger>
+            <DialogContent data-testid="dialog-create-workflow">
+              <DialogHeader>
+                <DialogTitle>Create New Workflow</DialogTitle>
+                <DialogDescription>
+                  Create a new workflow to automate your accounting processes
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g., Client Onboarding"
+                    value={newWorkflow.name}
+                    onChange={(e) => setNewWorkflow({ ...newWorkflow, name: e.target.value })}
+                    data-testid="input-workflow-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Brief description of this workflow"
+                    value={newWorkflow.description}
+                    onChange={(e) => setNewWorkflow({ ...newWorkflow, description: e.target.value })}
+                    data-testid="textarea-workflow-description"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={newWorkflow.category}
+                    onValueChange={(value) => setNewWorkflow({ ...newWorkflow, category: value })}
+                  >
+                    <SelectTrigger data-testid="select-workflow-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tax_preparation">Tax Preparation</SelectItem>
+                      <SelectItem value="bookkeeping">Bookkeeping</SelectItem>
+                      <SelectItem value="client_onboarding">Client Onboarding</SelectItem>
+                      <SelectItem value="audit">Audit</SelectItem>
+                      <SelectItem value="payroll">Payroll</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateDialogOpen(false)}
+                  data-testid="button-cancel-create"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateWorkflow}
+                  disabled={createWorkflow.isPending}
+                  data-testid="button-submit-create"
+                >
+                  {createWorkflow.isPending ? 'Creating...' : 'Create Workflow'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -104,10 +238,79 @@ export default function Workflows() {
               Create your first workflow to automate client onboarding, tax preparation,
               bookkeeping, and more
             </p>
-            <Button onClick={() => setLocation("/workflow-builder")} data-testid="button-create-first-workflow">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Your First Workflow
-            </Button>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-first-workflow">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Workflow
+                </Button>
+              </DialogTrigger>
+              <DialogContent data-testid="dialog-create-workflow">
+                <DialogHeader>
+                  <DialogTitle>Create New Workflow</DialogTitle>
+                  <DialogDescription>
+                    Create a new workflow to automate your accounting processes
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name-empty">Name</Label>
+                    <Input
+                      id="name-empty"
+                      placeholder="e.g., Client Onboarding"
+                      value={newWorkflow.name}
+                      onChange={(e) => setNewWorkflow({ ...newWorkflow, name: e.target.value })}
+                      data-testid="input-workflow-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description-empty">Description</Label>
+                    <Textarea
+                      id="description-empty"
+                      placeholder="Brief description of this workflow"
+                      value={newWorkflow.description}
+                      onChange={(e) => setNewWorkflow({ ...newWorkflow, description: e.target.value })}
+                      data-testid="textarea-workflow-description"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category-empty">Category</Label>
+                    <Select
+                      value={newWorkflow.category}
+                      onValueChange={(value) => setNewWorkflow({ ...newWorkflow, category: value })}
+                    >
+                      <SelectTrigger data-testid="select-workflow-category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tax_preparation">Tax Preparation</SelectItem>
+                        <SelectItem value="bookkeeping">Bookkeeping</SelectItem>
+                        <SelectItem value="client_onboarding">Client Onboarding</SelectItem>
+                        <SelectItem value="audit">Audit</SelectItem>
+                        <SelectItem value="payroll">Payroll</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCreateDialogOpen(false)}
+                    data-testid="button-cancel-create"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateWorkflow}
+                    disabled={createWorkflow.isPending}
+                    data-testid="button-submit-create"
+                  >
+                    {createWorkflow.isPending ? 'Creating...' : 'Create Workflow'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
