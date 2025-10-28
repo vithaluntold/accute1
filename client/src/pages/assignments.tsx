@@ -248,7 +248,28 @@ export default function Assignments() {
             Manage client workflow assignments and track progress
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-assignment">
+        <Button
+          onClick={() => {
+            if (clients.length === 0) {
+              toast({
+                title: 'No clients available',
+                description: 'Please create a client first before creating an assignment.',
+                variant: 'destructive',
+              });
+              return;
+            }
+            if (workflows.length === 0) {
+              toast({
+                title: 'No workflows available',
+                description: 'Please create a workflow first before creating an assignment.',
+                variant: 'destructive',
+              });
+              return;
+            }
+            setCreateDialogOpen(true);
+          }}
+          data-testid="button-create-assignment"
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Assignment
         </Button>
@@ -304,7 +325,28 @@ export default function Assignments() {
               : 'No assignments yet. Create one to get started.'}
           </p>
           {!searchQuery && statusFilter === 'all' && priorityFilter === 'all' && (
-            <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-assignment">
+            <Button
+              onClick={() => {
+                if (clients.length === 0) {
+                  toast({
+                    title: 'No clients available',
+                    description: 'Please create a client first before creating an assignment.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                if (workflows.length === 0) {
+                  toast({
+                    title: 'No workflows available',
+                    description: 'Please create a workflow first before creating an assignment.',
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+                setCreateDialogOpen(true);
+              }}
+              data-testid="button-create-first-assignment"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Assignment
             </Button>
