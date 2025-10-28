@@ -117,6 +117,19 @@ export interface IStorage {
   deleteAiProviderConfig(id: string): Promise<void>;
   getActiveProviders(organizationId: string): Promise<AiProviderConfig[]>;
 
+  // AI Agent Conversations
+  createAiConversation(conversation: schema.InsertAiAgentConversation): Promise<schema.AiAgentConversation>;
+  getAiConversation(id: string): Promise<schema.AiAgentConversation | undefined>;
+  getAiConversationsByUser(userId: string, agentName?: string): Promise<schema.AiAgentConversation[]>;
+  getAiConversationByContext(contextType: string, contextId: string, userId: string, agentName: string): Promise<schema.AiAgentConversation | undefined>;
+  updateAiConversationTitle(id: string, title: string): Promise<void>;
+  closeAiConversation(id: string): Promise<void>;
+  
+  // AI Agent Messages
+  createAiMessage(message: schema.InsertAiAgentMessage): Promise<schema.AiAgentMessage>;
+  getAiMessagesByConversation(conversationId: string): Promise<schema.AiAgentMessage[]>;
+  updateAiMessageWithToolExecutions(id: string, toolExecutions: any[]): Promise<void>;
+
   // Documents
   getDocument(id: string): Promise<Document | undefined>;
   createDocument(document: InsertDocument): Promise<Document>;
@@ -700,6 +713,86 @@ export class DbStorage implements IStorage {
         eq(schema.aiProviderConfigs.isActive, true)
       ))
       .orderBy(desc(schema.aiProviderConfigs.priority));
+  }
+
+  // AI Agent Conversations
+  async createAiConversation(conversation: schema.InsertAiAgentConversation): Promise<schema.AiAgentConversation> {
+    const result = await db.insert(schema.aiAgentConversations).values(conversation).returning();
+    return result[0];
+  }
+
+  async getAiConversation(id: string): Promise<schema.AiAgentConversation | undefined> {
+    const result = await db.select().from(schema.aiAgentConversations)
+      .where(eq(schema.aiAgentConversations.id, id));
+    return result[0];
+  }
+
+  async getAiConversationsByUser(userId: string, agentName?: string): Promise<schema.AiAgentConversation[]> {
+    const conditions = [
+      eq(schema.aiAgentConversations.userId, userId),
+      eq(schema.aiAgentConversations.isActive, true)
+    ];
+    
+    if (agentName) {
+      conditions.push(eq(schema.aiAgentConversations.agentName, agentName));
+    }
+    
+    return await db.select().from(schema.aiAgentConversations)
+      .where(and(...conditions))
+      .orderBy(desc(schema.aiAgentConversations.lastMessageAt));
+  }
+
+  async getAiConversationByContext(
+    contextType: string,
+    contextId: string,
+    userId: string,
+    agentName: string
+  ): Promise<schema.AiAgentConversation | undefined> {
+    const result = await db.select().from(schema.aiAgentConversations)
+      .where(and(
+        eq(schema.aiAgentConversations.contextType, contextType),
+        eq(schema.aiAgentConversations.contextId, contextId),
+        eq(schema.aiAgentConversations.userId, userId),
+        eq(schema.aiAgentConversations.agentName, agentName),
+        eq(schema.aiAgentConversations.isActive, true)
+      ));
+    return result[0];
+  }
+
+  async updateAiConversationTitle(id: string, title: string): Promise<void> {
+    await db.update(schema.aiAgentConversations)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(schema.aiAgentConversations.id, id));
+  }
+
+  async closeAiConversation(id: string): Promise<void> {
+    await db.update(schema.aiAgentConversations)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(schema.aiAgentConversations.id, id));
+  }
+
+  // AI Agent Messages
+  async createAiMessage(message: schema.InsertAiAgentMessage): Promise<schema.AiAgentMessage> {
+    const result = await db.insert(schema.aiAgentMessages).values(message).returning();
+    
+    // Update conversation's lastMessageAt timestamp
+    await db.update(schema.aiAgentConversations)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(schema.aiAgentConversations.id, message.conversationId));
+    
+    return result[0];
+  }
+
+  async getAiMessagesByConversation(conversationId: string): Promise<schema.AiAgentMessage[]> {
+    return await db.select().from(schema.aiAgentMessages)
+      .where(eq(schema.aiAgentMessages.conversationId, conversationId))
+      .orderBy(schema.aiAgentMessages.createdAt);
+  }
+
+  async updateAiMessageWithToolExecutions(id: string, toolExecutions: any[]): Promise<void> {
+    await db.update(schema.aiAgentMessages)
+      .set({ toolExecutions })
+      .where(eq(schema.aiAgentMessages.id, id));
   }
 
   // Documents

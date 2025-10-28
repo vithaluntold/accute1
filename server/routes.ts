@@ -1105,10 +1105,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Execute AI Agent
+  // Execute AI Agent with conversation persistence and function calling
   app.post("/api/ai-agents/execute", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { agentName, input, llmConfigId } = req.body;
+      const { agentName, input, llmConfigId, conversationId, contextType, contextId, contextData } = req.body;
+      const startTime = Date.now();
       
       // Get LLM configuration - use specified or default
       let llmConfig;
@@ -1123,6 +1124,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
         }
       }
+      
+      // Find or create conversation
+      let conversation;
+      if (conversationId) {
+        conversation = await storage.getAiConversation(conversationId);
+        if (!conversation || conversation.userId !== req.user!.id) {
+          return res.status(404).json({ error: "Conversation not found" });
+        }
+      } else if (contextType && contextId) {
+        // Try to find existing conversation for this context
+        conversation = await storage.getAiConversationByContext(
+          contextType,
+          contextId,
+          req.user!.id,
+          agentName
+        );
+      }
+      
+      // Create new conversation if none exists
+      if (!conversation) {
+        conversation = await storage.createAiConversation({
+          agentName,
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id,
+          contextType: contextType || null,
+          contextId: contextId || null,
+          contextData: contextData || {}
+        });
+      }
+      
+      // Save user message
+      const userMessage = await storage.createAiMessage({
+        conversationId: conversation.id,
+        role: "user",
+        content: input,
+        llmConfigId: llmConfig.id
+      });
       
       // Load and execute the appropriate agent
       let result;
@@ -1155,8 +1193,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: `Unknown agent: ${agentName}` });
       }
       
+      // TODO: Parse result for function/tool calls and execute them
+      // For now, just save the agent's response
+      const executionTime = Date.now() - startTime;
+      
+      // Create response message
+      const assistantMessage = await storage.createAiMessage({
+        conversationId: conversation.id,
+        role: "assistant",
+        content: typeof result === 'string' ? result : JSON.stringify(result),
+        llmConfigId: llmConfig.id,
+        executionTimeMs: executionTime
+      });
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "execute", "ai_agent", agentName, { input }, req);
-      res.json({ success: true, result });
+      
+      res.json({ 
+        success: true, 
+        result,
+        conversationId: conversation.id,
+        messageId: assistantMessage.id
+      });
     } catch (error: any) {
       console.error('Agent execution error:', error);
       res.status(500).json({ error: "Failed to execute AI agent", details: error.message });

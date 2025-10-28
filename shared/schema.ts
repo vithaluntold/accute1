@@ -274,6 +274,50 @@ export const aiProviderConfigs = pgTable("ai_provider_configs", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// AI Agent Conversations - Persistent chat sessions
+export const aiAgentConversations = pgTable("ai_agent_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentName: text("agent_name").notNull(), // 'cadence', 'forma', 'parity', 'kanban'
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  title: text("title"), // Optional user-defined title
+  contextType: text("context_type"), // 'workflow', 'form', 'document', etc.
+  contextId: varchar("context_id"), // ID of the workflow/form/document being discussed
+  contextData: jsonb("context_data").default(sql`'{}'::jsonb`), // Snapshot of context at conversation start
+  isActive: boolean("is_active").notNull().default(true),
+  lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Index for finding user's conversations with specific agent
+  userAgentIdx: index("ai_conversations_user_agent_idx").on(table.userId, table.agentName),
+  // Index for finding conversations by context
+  contextIdx: index("ai_conversations_context_idx").on(table.contextType, table.contextId),
+}));
+
+// AI Agent Messages - Individual messages in conversations
+export const aiAgentMessages = pgTable("ai_agent_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => aiAgentConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  
+  // Function calling / tool execution
+  functionCalls: jsonb("function_calls").default(sql`'[]'::jsonb`), // Array of {name, arguments, result}
+  toolExecutions: jsonb("tool_executions").default(sql`'[]'::jsonb`), // Results of any actions taken
+  
+  // Metadata
+  llmConfigId: varchar("llm_config_id"), // Which LLM was used for this message
+  tokensUsed: integer("tokens_used"), // Track token usage
+  executionTimeMs: integer("execution_time_ms"), // How long the agent took to respond
+  error: text("error"), // Any errors that occurred
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Index for fetching messages in a conversation
+  conversationIdx: index("ai_messages_conversation_idx").on(table.conversationId, table.createdAt),
+}));
+
 // Documents for client portal
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1380,6 +1424,8 @@ export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit
 export const insertDocumentAnnotationSchema = createInsertSchema(documentAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLlmConfigurationSchema = createInsertSchema(llmConfigurations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAiAgentConversationSchema = createInsertSchema(aiAgentConversations).omit({ id: true, createdAt: true, updatedAt: true, lastMessageAt: true });
+export const insertAiAgentMessageSchema = createInsertSchema(aiAgentMessages).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1415,3 +1461,7 @@ export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
 export type InsertLlmConfiguration = z.infer<typeof insertLlmConfigurationSchema>;
 export type LlmConfiguration = typeof llmConfigurations.$inferSelect;
+export type InsertAiAgentConversation = z.infer<typeof insertAiAgentConversationSchema>;
+export type AiAgentConversation = typeof aiAgentConversations.$inferSelect;
+export type InsertAiAgentMessage = z.infer<typeof insertAiAgentMessageSchema>;
+export type AiAgentMessage = typeof aiAgentMessages.$inferSelect;
