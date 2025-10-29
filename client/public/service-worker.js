@@ -33,44 +33,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - DEVELOPMENT MODE: Always fetch from network (no caching)
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
-  // Skip API requests and WebSocket connections
-  if (event.request.url.includes('/api/') || event.request.url.includes('/ws/')) {
-    return;
-  }
-
+  // In development, always fetch from network (bypass cache)
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
+    fetch(event.request).catch(() => {
+      // Only use cache as offline fallback
+      if (event.request.mode === 'navigate') {
+        return caches.match('/index.html');
       }
-
-      return caches.open(RUNTIME_CACHE).then(cache => {
-        return fetch(event.request).then(response => {
-          // Cache successful GET requests for static assets
-          const url = new URL(event.request.url);
-          const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|svg|woff2?|ttf|eot)$/i.test(url.pathname);
-          const isViteAsset = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/src/');
-          
-          if (event.request.method === 'GET' && response.status === 200 && (isStaticAsset || isViteAsset)) {
-            cache.put(event.request, response.clone());
-          }
-          return response;
-        }).catch(() => {
-          // Offline fallback for navigation requests (SPA routing)
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-          // For other failed requests, return a fallback if available
-          return caches.match(event.request);
-        });
-      });
+      return caches.match(event.request);
     })
   );
 });
