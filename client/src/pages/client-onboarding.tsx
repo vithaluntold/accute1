@@ -95,7 +95,9 @@ export default function ClientOnboarding() {
   // Update AI context when session data changes
   useEffect(() => {
     if (sessionData?.collectedData) {
+      console.log("📋 Updating AI Context from session data:", sessionData.collectedData);
       setAiContext(sessionData.collectedData as any);
+      console.log("✅ AI Context updated. Required fields:", (sessionData.collectedData as any).requiredFields);
     }
   }, [sessionData]);
 

@@ -2581,15 +2581,19 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       // Extract metadata from AI response (if present)
       let aiMetadata = {};
       let cleanAnswer = answer;
-      const metadataMatch = answer.match(/METADATA:\s*({.*})/);
+      const metadataMatch = answer.match(/METADATA:\s*(\{[\s\S]*\})/);
       if (metadataMatch) {
         try {
           aiMetadata = JSON.parse(metadataMatch[1]);
+          console.log("✅ Extracted AI metadata:", JSON.stringify(aiMetadata, null, 2));
           // Remove metadata from visible response
-          cleanAnswer = answer.replace(/METADATA:\s*{.*}/, '').trim();
+          cleanAnswer = answer.replace(/METADATA:\s*\{[\s\S]*\}/, '').trim();
         } catch (e) {
-          console.error("Failed to parse AI metadata:", e);
+          console.error("❌ Failed to parse AI metadata:", e);
+          console.error("Raw metadata string:", metadataMatch[1]);
         }
+      } else {
+        console.log("⚠️  No metadata found in AI response");
       }
 
       // Store AI response (with metadata)
