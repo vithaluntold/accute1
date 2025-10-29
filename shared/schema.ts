@@ -1687,17 +1687,28 @@ export const appointments = pgTable("appointments", {
 // Email Templates
 export const emailTemplates = pgTable("email_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   name: text("name").notNull(),
   category: text("category").notNull(), // welcome, reminder, invoice, signature_request, custom
   subject: text("subject").notNull(),
-  body: text("body").notNull(), // HTML content with merge fields {{client_name}}, etc.
+  body: text("body").notNull(), // HTML content with merge fields {{client_name}}, {{portal_link}}, etc.
   variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`), // Available merge fields
   isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false), // System-provided templates
+  // Branding customization
+  logoUrl: text("logo_url"), // Firm logo for email header/footer
+  footerText: text("footer_text"), // Custom footer text
+  socialLinks: jsonb("social_links").default(sql`'{}'::jsonb`), // {facebook: "url", linkedin: "url", twitter: "url"}
+  brandingColors: jsonb("branding_colors").default(sql`'{}'::jsonb`), // {primary: "#hex", secondary: "#hex"}
+  // Usage tracking
+  usageCount: integer("usage_count").notNull().default(0),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Additional settings (attachments, etc.)
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  orgCategoryIdx: index("email_templates_org_category_idx").on(table.organizationId, table.category),
+}));
 
 // PDF Annotations
 export const documentAnnotations = pgTable("document_annotations", {

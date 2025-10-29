@@ -514,6 +514,16 @@ export interface IStorage {
   getPendingFollowups(): Promise<schema.TaskFollowup[]>;
   updateTaskFollowup(id: string, followup: Partial<schema.InsertTaskFollowup>): Promise<schema.TaskFollowup | undefined>;
   deleteTaskFollowup(id: string): Promise<void>;
+  
+  // Email Templates
+  createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate>;
+  getEmailTemplate(id: string, organizationId: string): Promise<schema.EmailTemplate | undefined>;
+  getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]>;
+  getEmailTemplateByCategory(organizationId: string, category: string): Promise<schema.EmailTemplate | undefined>;
+  getDefaultEmailTemplate(category: string): Promise<schema.EmailTemplate | undefined>;
+  updateEmailTemplate(id: string, organizationId: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string, organizationId: string): Promise<void>;
+  renderEmailTemplate(templateId: string, placeholders: Record<string, string>): Promise<{subject: string, body: string}>;
 }
 
 export class DbStorage implements IStorage {
@@ -1716,6 +1726,126 @@ export class DbStorage implements IStorage {
 
   async deleteTaskFollowup(id: string): Promise<void> {
     await db.delete(schema.taskFollowups).where(eq(schema.taskFollowups.id, id));
+  }
+
+  // Email Templates
+  async createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate> {
+    const result = await db.insert(schema.emailTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async getEmailTemplate(id: string, organizationId: string): Promise<schema.EmailTemplate | undefined> {
+    const result = await db.select().from(schema.emailTemplates)
+      .where(
+        and(
+          eq(schema.emailTemplates.id, id),
+          eq(schema.emailTemplates.organizationId, organizationId)
+        )
+      );
+    return result[0];
+  }
+
+  async getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]> {
+    return await db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.organizationId, organizationId))
+      .orderBy(schema.emailTemplates.category, schema.emailTemplates.name);
+  }
+
+  async getEmailTemplateByCategory(organizationId: string, category: string): Promise<schema.EmailTemplate | undefined> {
+    // First try to find organization-specific template
+    const orgTemplate = await db.select().from(schema.emailTemplates)
+      .where(
+        and(
+          eq(schema.emailTemplates.organizationId, organizationId),
+          eq(schema.emailTemplates.category, category),
+          eq(schema.emailTemplates.isActive, true)
+        )
+      )
+      .limit(1);
+
+    if (orgTemplate[0]) {
+      return orgTemplate[0];
+    }
+
+    // Fall back to default template if no org-specific template found
+    return await this.getDefaultEmailTemplate(category);
+  }
+
+  async getDefaultEmailTemplate(category: string): Promise<schema.EmailTemplate | undefined> {
+    const result = await db.select().from(schema.emailTemplates)
+      .where(
+        and(
+          eq(schema.emailTemplates.isDefault, true),
+          eq(schema.emailTemplates.category, category),
+          eq(schema.emailTemplates.isActive, true)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async updateEmailTemplate(id: string, organizationId: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined> {
+    // Whitelist mutable fields only - exclude protected system fields
+    const allowedUpdates: Partial<schema.InsertEmailTemplate> = {};
+    
+    // Allowed fields for update
+    if (template.name !== undefined) allowedUpdates.name = template.name;
+    if (template.category !== undefined) allowedUpdates.category = template.category;
+    if (template.subject !== undefined) allowedUpdates.subject = template.subject;
+    if (template.body !== undefined) allowedUpdates.body = template.body;
+    if (template.variables !== undefined) allowedUpdates.variables = template.variables;
+    if (template.isActive !== undefined) allowedUpdates.isActive = template.isActive;
+    if (template.logoUrl !== undefined) allowedUpdates.logoUrl = template.logoUrl;
+    if (template.footerText !== undefined) allowedUpdates.footerText = template.footerText;
+    if (template.socialLinks !== undefined) allowedUpdates.socialLinks = template.socialLinks;
+    if (template.brandingColors !== undefined) allowedUpdates.brandingColors = template.brandingColors;
+    if (template.usageCount !== undefined) allowedUpdates.usageCount = template.usageCount;
+    if (template.metadata !== undefined) allowedUpdates.metadata = template.metadata;
+    
+    // Protected fields are NOT included: organizationId, isDefault, createdBy
+    
+    const result = await db.update(schema.emailTemplates)
+      .set({ ...allowedUpdates, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.emailTemplates.id, id),
+          eq(schema.emailTemplates.organizationId, organizationId)
+        )
+      )
+      .returning();
+    return result[0];
+  }
+
+  async deleteEmailTemplate(id: string, organizationId: string): Promise<void> {
+    await db.delete(schema.emailTemplates)
+      .where(
+        and(
+          eq(schema.emailTemplates.id, id),
+          eq(schema.emailTemplates.organizationId, organizationId)
+        )
+      );
+  }
+
+  async renderEmailTemplate(templateId: string, placeholders: Record<string, string>): Promise<{subject: string, body: string}> {
+    const template = await db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.id, templateId))
+      .limit(1);
+
+    if (!template[0]) {
+      throw new Error('Template not found');
+    }
+
+    let subject = template[0].subject;
+    let body = template[0].body;
+
+    // Replace placeholders in subject and body
+    Object.entries(placeholders).forEach(([key, value]) => {
+      const placeholder = `{{${key}}}`;
+      subject = subject.replace(new RegExp(placeholder, 'g'), value);
+      body = body.replace(new RegExp(placeholder, 'g'), value);
+    });
+
+    return { subject, body };
   }
 
   // Folders

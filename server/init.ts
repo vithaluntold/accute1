@@ -1,6 +1,6 @@
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function initializeSystem() {
   try {
@@ -345,6 +345,119 @@ export async function initializeSystem() {
       } catch (error) {
         console.log(`⚠️  Copilot ${copilot.name} may already exist`);
       }
+    }
+
+    // Seed default welcome email template
+    try {
+      const existingWelcomeTemplate = await db.select().from(schema.emailTemplates)
+        .where(
+          and(
+            eq(schema.emailTemplates.category, "welcome"),
+            eq(schema.emailTemplates.isDefault, true)
+          )
+        );
+      
+      if (existingWelcomeTemplate.length === 0) {
+        // Get Super Admin role first
+        const superAdminRole = await db.select().from(schema.roles)
+          .where(eq(schema.roles.name, "Super Admin"))
+          .limit(1);
+
+        // Find a system user with Super Admin role
+        let createdBy = null;
+        if (superAdminRole.length > 0) {
+          const systemUser = await db.select().from(schema.users)
+            .where(eq(schema.users.roleId, superAdminRole[0].id))
+            .limit(1);
+          createdBy = systemUser.length > 0 ? systemUser[0].id : null;
+        }
+
+        if (createdBy) {
+          await db.insert(schema.emailTemplates).values({
+            organizationId: null, // System-wide template (schema now allows null)
+            name: "Client Portal Welcome Email",
+            category: "welcome",
+            subject: "Welcome to {{firm_name}} - Set Up Your Client Portal Access",
+            body: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #ec4899 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
+    .button { display: inline-block; background: #1e3a8a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    .social-links { margin: 15px 0; }
+    .social-links a { margin: 0 10px; color: #1e3a8a; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      {{#if logo_url}}<img src="{{logo_url}}" alt="{{firm_name}}" style="max-width: 200px; margin-bottom: 15px;">{{/if}}
+      <h1>Welcome to {{firm_name}}!</h1>
+    </div>
+    <div class="content">
+      <p>Hi {{contact_name}},</p>
+      
+      <p>We're excited to have you as a client! We've created a secure client portal where you can:</p>
+      
+      <ul>
+        <li>View and manage your pending tasks</li>
+        <li>Upload documents securely</li>
+        <li>Track the progress of your assignments</li>
+        <li>Communicate directly with our team</li>
+        <li>Access important documents and reports</li>
+      </ul>
+      
+      <p>To get started, please set up your client portal access by clicking the button below:</p>
+      
+      <div style="text-align: center;">
+        <a href="{{portal_link}}" class="button">Set Up My Portal Access</a>
+      </div>
+      
+      <p><strong>Note:</strong> This link will expire in 7 days for security purposes. If you need a new link, please contact us.</p>
+      
+      <p>If you have any questions or need assistance, don't hesitate to reach out to our team.</p>
+      
+      <p>Best regards,<br>The {{firm_name}} Team</p>
+    </div>
+    <div class="footer">
+      {{#if footer_text}}
+        <p>{{footer_text}}</p>
+      {{/if}}
+      {{#if social_links}}
+        <div class="social-links">
+          {{#if social_links.linkedin}}<a href="{{social_links.linkedin}}">LinkedIn</a>{{/if}}
+          {{#if social_links.facebook}}<a href="{{social_links.facebook}}">Facebook</a>{{/if}}
+          {{#if social_links.twitter}}<a href="{{social_links.twitter}}">Twitter</a>{{/if}}
+        </div>
+      {{/if}}
+      <p>&copy; {{current_year}} {{firm_name}}. All rights reserved.</p>
+      <p style="font-size: 10px; margin-top: 15px;">This email was sent to {{contact_email}}. If you received this in error, please contact us.</p>
+    </div>
+  </div>
+</body>
+</html>
+            `.trim(),
+            variables: ["firm_name", "contact_name", "portal_link", "logo_url", "footer_text", "social_links", "current_year", "contact_email"],
+            isActive: true,
+            isDefault: true,
+            logoUrl: null,
+            footerText: null,
+            socialLinks: {},
+            brandingColors: { primary: "#1e3a8a", secondary: "#ec4899" },
+            usageCount: 0,
+            metadata: {},
+            createdBy,
+          });
+          console.log("✓ Seeded default welcome email template");
+        }
+      }
+    } catch (error) {
+      console.log("⚠️  Default welcome template may already exist or failed to create:", error);
     }
 
     console.log("✅ System initialized successfully");
