@@ -1,5 +1,5 @@
-const CACHE_NAME = 'accute-v1';
-const RUNTIME_CACHE = 'accute-runtime';
+const CACHE_NAME = 'accute-v2';
+const RUNTIME_CACHE = 'accute-runtime-v2';
 
 // Assets to cache on install
 const PRECACHE_URLS = [
