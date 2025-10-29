@@ -12,10 +12,11 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 5. **Kanban Board** - Drag-and-drop assignment management across workflow stages
 6. **Analytics Dashboard** - Comprehensive metrics with role-based filtering (All/User/Admin/Team Manager)
 7. **Assignment Status Bot** - AI-powered conversational assistant for assignment queries at /assignment-bot
-8. **E2E Test Coverage** - Playwright-based testing for core features
+8. **AI Client Onboarding** - Privacy-first conversational client onboarding with dynamic country-specific tax field collection
+9. **E2E Test Coverage** - Playwright-based testing for core features
 
 ### Configuration Requirements:
-- **LLM Provider Setup Required**: Assignment Status Bot and AI Email Processor require LLM configuration (OpenAI/Azure OpenAI/Anthropic) in Settings → LLM Configurations. Create a default LLM config to enable these features.
+- **LLM Provider Setup Required**: Assignment Status Bot, AI Email Processor, and AI Client Onboarding require LLM configuration (OpenAI/Azure OpenAI/Anthropic) in Settings → LLM Configurations. Create a default LLM config to enable these features.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
@@ -44,6 +45,7 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data and distinct SaaS/tenant-level roles.
 - **Role-Based Access Control**: Granular permission management.
+- **AI Client Onboarding System**: Privacy-first conversational interface at /client-onboarding that uses AI's knowledge of global tax systems to dynamically collect country-specific information (PAN/GST for India, EIN/SSN for USA, VAT/UTR for UK, etc.) without hardcoded configurations. Sensitive data (names, emails, addresses) collected via secure forms, not sent to AI model. Complete audit trail stored in database (client_onboarding_sessions, onboarding_messages tables).
 - **AI Agent Chat Interface**: Real-time WebSocket streaming for interactive AI agents (Parity, Cadence, Forma, Luca).
 - **Luca AI Chatbot Widget**: TaxDome-style floating chat assistant in bottom-right corner with custom Luca logo branding. Features cross-browser and cross-device compatibility including:
   - Responsive design with mobile-first approach (full-screen on mobile, dialog on desktop)

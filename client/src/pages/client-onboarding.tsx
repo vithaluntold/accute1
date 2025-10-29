@@ -59,11 +59,16 @@ export default function ClientOnboarding() {
   // Start onboarding session
   const startMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest<{ session: ClientOnboardingSession; messages: OnboardingMessage[] }>(
-        "/api/client-onboarding/start",
+      const response = await apiRequest(
         "POST",
+        "/api/client-onboarding/start",
         {}
       );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to start onboarding session");
+      }
+      return await response.json() as { session: ClientOnboardingSession; messages: OnboardingMessage[] };
     },
     onSuccess: (data) => {
       setSessionId(data.session.id);
@@ -89,11 +94,16 @@ export default function ClientOnboarding() {
       sensitiveData?: Record<string, any>;
       collectedData?: Record<string, any>;
     }) => {
-      return await apiRequest<{ messages: OnboardingMessage[] }>(
-        "/api/client-onboarding/chat",
+      const response = await apiRequest(
         "POST",
+        "/api/client-onboarding/chat",
         params
       );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send message");
+      }
+      return await response.json() as { messages: OnboardingMessage[] };
     },
     onSuccess: (data) => {
       setMessages(data.messages.map(m => ({
@@ -115,11 +125,16 @@ export default function ClientOnboarding() {
   // Complete onboarding
   const completeMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      return await apiRequest<{ client: any; success: boolean }>(
-        "/api/client-onboarding/complete",
+      const response = await apiRequest(
         "POST",
+        "/api/client-onboarding/complete",
         { sessionId }
       );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to complete onboarding");
+      }
+      return await response.json() as { client: any; success: boolean };
     },
     onSuccess: (data) => {
       toast({
