@@ -1,0 +1,56 @@
+Excellent. For a GST-registered business in India, you will need two tax identifiers:
+
+1. PAN (Permanent Account Number)  
+   - Purpose: Unique identifier for tax payments and business verification.  
+   - Format: 10 alphanumeric characters (e.g., AAAPL1234C).  
+
+2. GSTIN (Goods and Services Tax Identification Number)  
+   - Purpose: Identifies your GST registration for invoicing and filings.  
+   - Format: 15 characters where:
+     • First 2 digits = state code (36 for Telangana)  
+     • Next 10 characters = your PAN exactly  
+     • 13th character = entity number (1–9, A–Z)  
+     • 14th character = always ‘Z’  
+     • 15th character = check digit  
+
+Please fill out the Contact & Company Information form below with the company name, contact details, PAN, and GSTIN. Don’t share these values in chat—enter them securely on the form.
+
+METADATA: {
+  "country": "India",
+  "clientType": "business",
+  "industry": "Consulting",
+  "gstRegistered": true,
+  "state": "Telangana",
+  "requiredFields": ["pan", "gstin"],
+  "validations": {
+    "pan": {
+      "placeholder": "AAAPL1234C",
+      "format": "10 alphanumeric characters",
+      "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$",
+      "length": 10,
+      "rules": [
+        "First 5 characters: Alphabet uppercase",
+        "Next 4 characters: Numerics",
+        "Last character: Alphabetic check digit"
+      ]
+    },
+    "gstin": {
+      "placeholder": "36AAAPL1234C1Z5",
+      "format": "15 characters",
+      "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
+      "length": 15,
+      "rules": [
+        "First 2 digits: State code = 36 (Telangana)",
+        "Characters 3–12: Must match the PAN exactly",
+        "13th character: Entity number (1–9, A–Z)",
+        "14th character: Always 'Z'",
+        "15th character: Check digit"
+      ],
+      "crossFieldValidation": {
+        "contains": "pan",
+        "expectedPrefix": "36",
+        "message": "GSTIN must start with the state code (36) and contain the PAN"
+      }
+    }
+  }
+}
