@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Bot, Send, Sparkles, User, Loader2, Settings2, MessageCircle } from "lucide-react";
+import lucaLogoUrl from "@assets/Luca Transparent symbol (1)_1761720299435.png";
 
 interface Message {
   id: string;
@@ -202,7 +203,7 @@ export function LucaChatWidget() {
       {/* Floating Chat Button - Fixed positioning, high z-index */}
       <Button
         size="lg"
-        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-105 transition-all duration-200"
+        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-105 transition-all duration-200 !p-2"
         onClick={() => {
           console.log('[Luca Widget] Button clicked');
           setIsOpen(true);
@@ -215,7 +216,11 @@ export function LucaChatWidget() {
           zIndex: 9999,
         }}
       >
-        <Bot className="h-6 w-6" />
+        <img 
+          src={lucaLogoUrl} 
+          alt="Luca" 
+          className="w-full h-full object-contain"
+        />
         <span className="sr-only">Open Luca AI Assistant</span>
       </Button>
 
@@ -232,7 +237,11 @@ export function LucaChatWidget() {
             <div className="border-b p-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 rounded-lg bg-primary/10">
-                  <Bot className="h-5 w-5" />
+                  <img 
+                    src={lucaLogoUrl} 
+                    alt="Luca" 
+                    className="h-6 w-6 object-contain"
+                  />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -290,7 +299,11 @@ export function LucaChatWidget() {
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-8">
                   <div className="p-4 rounded-full bg-primary/10 mb-4">
-                    <Bot className="h-8 w-8 text-primary" />
+                    <img 
+                      src={lucaLogoUrl} 
+                      alt="Luca" 
+                      className="h-12 w-12 object-contain"
+                    />
                   </div>
                   <h4 className="font-semibold mb-2">Welcome to Luca</h4>
                   <p className="text-sm text-muted-foreground max-w-md">
@@ -310,7 +323,11 @@ export function LucaChatWidget() {
                       {message.role === "assistant" && (
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-primary/10">
-                            <Bot className="h-4 w-4" />
+                            <img 
+                              src={lucaLogoUrl} 
+                              alt="Luca" 
+                              className="h-5 w-5 object-contain"
+                            />
                           </AvatarFallback>
                         </Avatar>
                       )}
