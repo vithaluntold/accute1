@@ -2533,23 +2533,26 @@ ${JSON.stringify((session.collectedData as Record<string, any>) || {}, null, 2)}
 
 Remember: You are a guide, not a data collector. All sensitive information goes into the secure form, never into our chat. Use your deep knowledge of global tax systems to provide accurate, country-specific validation rules.`;
 
+      // Decrypt API key
+      const { decrypt } = await import('./llm-service');
+      const apiKey = decrypt(llmConfig.apiKeyEncrypted);
+
       // Call LLM
-      const { decryptedCredentials } = llmConfig;
       let answer;
 
       if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure') {
         const OpenAI = (await import('openai')).default;
         const openai = new OpenAI({
-          apiKey: decryptedCredentials.apiKey,
-          ...(llmConfig.provider === 'azure' && {
-            baseURL: `${decryptedCredentials.endpoint}/openai/deployments/${decryptedCredentials.deploymentName}`,
-            defaultQuery: { 'api-version': decryptedCredentials.apiVersion || '2024-02-15-preview' },
-            defaultHeaders: { 'api-key': decryptedCredentials.apiKey },
+          apiKey: apiKey,
+          ...(llmConfig.provider === 'azure' && llmConfig.azureEndpoint && {
+            baseURL: `${llmConfig.azureEndpoint}/openai/deployments/${llmConfig.model}`,
+            defaultQuery: { 'api-version': llmConfig.modelVersion || '2024-02-15-preview' },
+            defaultHeaders: { 'api-key': apiKey },
           })
         });
 
         const completion = await openai.chat.completions.create({
-          model: llmConfig.provider === 'azure' ? decryptedCredentials.deploymentName : (llmConfig.model || 'gpt-4'),
+          model: llmConfig.model || 'gpt-4',
           messages: [
             { role: 'system', content: systemPrompt },
             ...conversationHistory
@@ -2561,7 +2564,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         answer = completion.choices[0]?.message?.content || "I couldn't generate a response.";
       } else if (llmConfig.provider === 'anthropic') {
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
-        const anthropic = new Anthropic({ apiKey: decryptedCredentials.apiKey });
+        const anthropic = new Anthropic({ apiKey: apiKey });
 
         const message = await anthropic.messages.create({
           model: llmConfig.model || 'claude-3-5-sonnet-20241022',
