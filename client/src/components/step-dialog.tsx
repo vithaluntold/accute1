@@ -85,8 +85,7 @@ export function StepDialog({ open, onOpenChange, workflowId, stageId, step, step
       });
     },
     onSuccess: () => {
-      // Invalidate multiple related queries to ensure UI refreshes
-      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages", stageId, "steps"] });
+      // Invalidate parent stages query to refresh the complete hierarchy
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
       toast({
@@ -110,8 +109,7 @@ export function StepDialog({ open, onOpenChange, workflowId, stageId, step, step
       return await apiRequest("PATCH", `/api/workflows/steps/${step!.id}`, data);
     },
     onSuccess: () => {
-      // Invalidate multiple related queries to ensure UI refreshes
-      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages", stageId, "steps"] });
+      // Invalidate parent stages query to refresh the complete hierarchy
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
       toast({
@@ -198,8 +196,11 @@ export function StepDialog({ open, onOpenChange, workflowId, stageId, step, step
                   <FormControl>
                     <Input
                       type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      value={field.value}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        field.onChange(val === "" ? 0 : parseInt(val, 10));
+                      }}
                       data-testid="input-step-order"
                     />
                   </FormControl>

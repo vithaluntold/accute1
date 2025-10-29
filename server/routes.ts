@@ -4147,7 +4147,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Workflow not found" });
       }
       const stages = await storage.getStagesByWorkflow(req.params.workflowId);
-      res.json(stages);
+      
+      // Include steps for each stage, and tasks for each step
+      const stagesWithStepsAndTasks = await Promise.all(
+        stages.map(async (stage) => {
+          const steps = await storage.getStepsByStage(stage.id);
+          const stepsWithTasks = await Promise.all(
+            steps.map(async (step) => {
+              const tasks = await storage.getTasksByStep(step.id);
+              return { ...step, tasks };
+            })
+          );
+          return { ...stage, steps: stepsWithTasks };
+        })
+      );
+      
+      res.json(stagesWithStepsAndTasks);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch stages" });
     }
@@ -4374,8 +4389,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const task = await storage.createWorkflowTask({
+      // Sanitize dates - convert empty strings to undefined
+      const sanitizedBody = {
         ...req.body,
+        dueDate: req.body.dueDate && req.body.dueDate !== "" ? req.body.dueDate : undefined,
+      };
+      
+      const task = await storage.createWorkflowTask({
+        ...sanitizedBody,
         stepId: req.params.stepId,
         automationInput: req.body.automationInput?.trim(),
       });
@@ -4412,8 +4433,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const task = await storage.createWorkflowTask({
+      // Sanitize dates - convert empty strings to undefined
+      const sanitizedBody = {
         ...req.body,
+        dueDate: req.body.dueDate && req.body.dueDate !== "" ? req.body.dueDate : undefined,
+      };
+      
+      const task = await storage.createWorkflowTask({
+        ...sanitizedBody,
         automationInput: req.body.automationInput?.trim(),
       });
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_task", task.id, task, req);

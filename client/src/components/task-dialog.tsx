@@ -79,6 +79,7 @@ interface TaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stepId: string;
+  workflowId: string;
   task?: {
     id: string;
     name: string;
@@ -91,7 +92,7 @@ interface TaskDialogProps {
   tasksCount: number;
 }
 
-export function TaskDialog({ open, onOpenChange, stepId, task, tasksCount }: TaskDialogProps) {
+export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasksCount }: TaskDialogProps) {
   const { toast } = useToast();
   const isEditing = !!task;
   const [selectedTab, setSelectedTab] = useState<string>("manual");
@@ -167,7 +168,9 @@ export function TaskDialog({ open, onOpenChange, stepId, task, tasksCount }: Tas
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workflows/steps", stepId, "tasks"] });
+      // Invalidate parent stages query to refresh the complete hierarchy
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
       toast({
         title: "Success",
         description: "Task created successfully",
@@ -189,7 +192,9 @@ export function TaskDialog({ open, onOpenChange, stepId, task, tasksCount }: Tas
       return await apiRequest("PATCH", `/api/workflows/tasks/${task!.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workflows/steps", stepId, "tasks"] });
+      // Invalidate parent stages query to refresh the complete hierarchy
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
       toast({
         title: "Success",
         description: "Task updated successfully",
@@ -464,8 +469,11 @@ export function TaskDialog({ open, onOpenChange, stepId, task, tasksCount }: Tas
                       <FormControl>
                         <Input
                           type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                          value={field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === "" ? 0 : parseInt(val, 10));
+                          }}
                           data-testid="input-task-order"
                         />
                       </FormControl>

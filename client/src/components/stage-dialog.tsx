@@ -197,8 +197,11 @@ export function StageDialog({ open, onOpenChange, workflowId, stage, stagesCount
                   <FormControl>
                     <Input
                       type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      value={field.value}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        field.onChange(val === "" ? 0 : parseInt(val, 10));
+                      }}
                       data-testid="input-stage-order"
                     />
                   </FormControl>

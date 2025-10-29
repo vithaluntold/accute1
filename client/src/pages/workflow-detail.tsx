@@ -37,6 +37,7 @@ interface WorkflowStage {
   name: string;
   description?: string;
   order: number;
+  steps?: WorkflowStep[];
 }
 
 interface WorkflowStep {
@@ -45,6 +46,7 @@ interface WorkflowStep {
   name: string;
   description?: string;
   order: number;
+  tasks?: WorkflowTask[];
 }
 
 interface WorkflowTask {
@@ -255,10 +257,9 @@ function StageCard({ stage, workflowId }: { stage: WorkflowStage; workflowId: st
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<WorkflowStep | undefined>();
   
-  // Fetch steps for this stage
-  const { data: steps = [], isLoading: stepsLoading } = useQuery<WorkflowStep[]>({
-    queryKey: ["/api/workflows", workflowId, "stages", stage.id, "steps"],
-  });
+  // Use steps from the stage object (already fetched from parent query)
+  const steps = stage.steps || [];
+  const stepsLoading = false;
 
   return (
     <AccordionItem value={stage.id} className="border rounded-lg overflow-hidden" data-testid={`stage-${stage.id}`}>
@@ -368,10 +369,9 @@ function StepCard({ step, stageId, workflowId }: { step: WorkflowStep; stageId: 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<WorkflowTask | undefined>();
   
-  // Fetch tasks for this step
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery<WorkflowTask[]>({
-    queryKey: ["/api/workflows/steps", step.id, "tasks"],
-  });
+  // Use tasks from the step object (already fetched from parent query)
+  const tasks = step.tasks || [];
+  const tasksLoading = false;
 
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const totalTasks = tasks.length;
@@ -467,6 +467,7 @@ function StepCard({ step, stageId, workflowId }: { step: WorkflowStep; stageId: 
             open={taskDialogOpen}
             onOpenChange={setTaskDialogOpen}
             stepId={step.id}
+            workflowId={workflowId}
             task={editingTask}
             tasksCount={tasks.length}
           />
