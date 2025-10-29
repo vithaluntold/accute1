@@ -42,6 +42,11 @@ export function LucaChatWidget() {
   const streamingContentRef = useRef<string>("");
   const { toast } = useToast();
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[Luca Widget] Component mounted and rendered');
+  }, []);
+
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
     queryKey: ["/api/llm-configurations"],
@@ -197,9 +202,18 @@ export function LucaChatWidget() {
       {/* Floating Chat Button - Fixed positioning, high z-index */}
       <Button
         size="lg"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-[60] hover:scale-110 transition-all duration-300 animate-pulse hover:animate-none"
-        onClick={() => setIsOpen(true)}
+        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-110 transition-all duration-300 animate-pulse hover:animate-none"
+        onClick={() => {
+          console.log('[Luca Widget] Button clicked');
+          setIsOpen(true);
+        }}
         data-testid="button-open-luca-chat"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+        }}
       >
         <Bot className="h-6 w-6" />
         <span className="sr-only">Open Luca AI Assistant</span>
