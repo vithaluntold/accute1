@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp, Users, Briefcase, CheckCircle2, DollarSign, Ticket, Bot, Clock } from "lucide-react";
@@ -97,32 +99,82 @@ function StatCard({ title, value, description, icon, trend }: StatCardProps) {
 }
 
 export default function Analytics() {
+  const [filterBy, setFilterBy] = useState<string>("all");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+
+  const queryParams = filterBy === "user" && selectedUserId 
+    ? `?userId=${selectedUserId}` 
+    : filterBy === "admin" 
+    ? "?role=admin" 
+    : filterBy === "team_manager" 
+    ? "?role=team_manager" 
+    : "";
+
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
   const { data: overview, isLoading: overviewLoading } = useQuery<AnalyticsOverview>({
-    queryKey: ["/api/analytics/overview"],
+    queryKey: ["/api/analytics/overview", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/overview${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: workflowCompletion = [], isLoading: workflowLoading } = useQuery<WorkflowCompletionMetrics[]>({
-    queryKey: ["/api/analytics/workflow-completion"],
+    queryKey: ["/api/analytics/workflow-completion", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/workflow-completion${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: assignmentTrends = [], isLoading: trendsLoading } = useQuery<AssignmentTrend[]>({
-    queryKey: ["/api/analytics/assignment-trends"],
+    queryKey: ["/api/analytics/assignment-trends", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/assignment-trends${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: revenueTrends = [], isLoading: revenueLoading } = useQuery<RevenueTrend[]>({
-    queryKey: ["/api/analytics/revenue-trends"],
+    queryKey: ["/api/analytics/revenue-trends", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/revenue-trends${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: supportMetrics, isLoading: supportLoading } = useQuery<SupportMetrics>({
-    queryKey: ["/api/analytics/support-metrics"],
+    queryKey: ["/api/analytics/support-metrics", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/support-metrics${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: agentUsage = [], isLoading: agentLoading } = useQuery<AgentUsage[]>({
-    queryKey: ["/api/analytics/agent-usage"],
+    queryKey: ["/api/analytics/agent-usage", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/agent-usage${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   const { data: timeTracking, isLoading: timeLoading } = useQuery<TimeTracking>({
-    queryKey: ["/api/analytics/time-tracking"],
+    queryKey: ["/api/analytics/time-tracking", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/time-tracking${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
   });
 
   if (overviewLoading) {
@@ -156,9 +208,38 @@ export default function Analytics() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-analytics">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">Comprehensive insights into your practice performance</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-analytics">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Comprehensive insights into your practice performance</p>
+        </div>
+        <div className="flex gap-2">
+          <Select value={filterBy} onValueChange={(value) => { setFilterBy(value); setSelectedUserId(""); }}>
+            <SelectTrigger className="w-48" data-testid="select-filter-type">
+              <SelectValue placeholder="Filter by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Data</SelectItem>
+              <SelectItem value="user">Specific User</SelectItem>
+              <SelectItem value="admin">Admins Only</SelectItem>
+              <SelectItem value="team_manager">Team Managers</SelectItem>
+            </SelectContent>
+          </Select>
+          {filterBy === "user" && (
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger className="w-48" data-testid="select-user">
+                <SelectValue placeholder="Select user" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user: any) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* Overview Stats */}

@@ -5633,6 +5633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const orgId = req.user!.organizationId;
+      const { userId, role } = req.query;
 
       // Fetch all metrics in parallel
       const [
@@ -5653,18 +5654,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         db.select().from(schema.payments).where(eq(schema.payments.organizationId, orgId))
       ]);
 
+      // Apply filters
+      let filteredAssignments = assignments;
+      let filteredUsers = users;
+      let filteredTickets = supportTickets;
+
+      if (userId) {
+        filteredAssignments = assignments.filter((a: any) => a.assignedToId === userId);
+        filteredTickets = supportTickets.filter((t: any) => t.assignedToId === userId);
+        filteredUsers = users.filter((u: any) => u.id === userId);
+      } else if (role) {
+        const roleUsers = users.filter((u: any) => u.role === role);
+        const roleUserIds = roleUsers.map((u: any) => u.id);
+        filteredAssignments = assignments.filter((a: any) => roleUserIds.includes(a.assignedToId));
+        filteredTickets = supportTickets.filter((t: any) => roleUserIds.includes(t.assignedToId));
+        filteredUsers = roleUsers;
+      }
+
       // Calculate metrics
       const totalRevenue = invoices.reduce((sum, inv) => sum + parseFloat(inv.total as string || '0'), 0);
       const totalPaid = payments.reduce((sum, pay) => sum + parseFloat(pay.amount as string || '0'), 0);
-      const activeAssignments = assignments.filter(a => a.status === 'active').length;
-      const completedAssignments = assignments.filter(a => a.status === 'completed').length;
-      const openTickets = supportTickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
+      const activeAssignments = filteredAssignments.filter(a => a.status === 'active').length;
+      const completedAssignments = filteredAssignments.filter(a => a.status === 'completed').length;
+      const openTickets = filteredTickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
 
       res.json({
         users: {
-          total: users.length,
-          active: users.filter(u => u.isActive).length,
-          inactive: users.filter(u => !u.isActive).length
+          total: filteredUsers.length,
+          active: filteredUsers.filter(u => u.isActive).length,
+          inactive: filteredUsers.filter(u => !u.isActive).length
         },
         clients: {
           total: clients.length,
@@ -5676,10 +5694,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           draft: workflows.filter(w => w.status === 'draft').length
         },
         assignments: {
-          total: assignments.length,
+          total: filteredAssignments.length,
           active: activeAssignments,
           completed: completedAssignments,
-          completionRate: assignments.length > 0 ? (completedAssignments / assignments.length * 100).toFixed(1) : '0'
+          completionRate: filteredAssignments.length > 0 ? (completedAssignments / filteredAssignments.length * 100).toFixed(1) : '0'
         },
         revenue: {
           total: totalRevenue.toFixed(2),
@@ -5687,9 +5705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           outstanding: (totalRevenue - totalPaid).toFixed(2)
         },
         support: {
-          total: supportTickets.length,
+          total: filteredTickets.length,
           open: openTickets,
-          closed: supportTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
+          closed: filteredTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
         }
       });
     } catch (error: any) {
@@ -5705,7 +5723,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      const { userId, role } = req.query;
+      let assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      
+      // Apply filters
+      if (userId) {
+        assignments = assignments.filter((a: any) => a.assignedToId === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        assignments = assignments.filter((a: any) => roleUserIds.includes(a.assignedToId));
+      }
       
       // Group by workflow
       const workflowStats = new Map<string, { name: string; total: number; completed: number; inProgress: number; }>();
@@ -5742,11 +5770,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
+      const { userId, role } = req.query;
       const days = parseInt(req.query.days as string) || 30;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      let assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      
+      // Apply filters
+      if (userId) {
+        assignments = assignments.filter((a: any) => a.assignedToId === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        assignments = assignments.filter((a: any) => roleUserIds.includes(a.assignedToId));
+      }
       
       // Group by date
       const trendData = new Map<string, { date: string; created: number; completed: number; }>();
@@ -5820,7 +5858,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const tickets = await storage.getSupportTickets(req.user!.organizationId);
+      const { userId, role } = req.query;
+      let tickets = await storage.getSupportTickets(req.user!.organizationId);
+      
+      // Apply filters
+      if (userId) {
+        tickets = tickets.filter((t: any) => t.assignedToId === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        tickets = tickets.filter((t: any) => roleUserIds.includes(t.assignedToId));
+      }
       
       // Status distribution
       const statusCounts = {
@@ -5862,8 +5910,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const conversations = await db.select().from(schema.aiAgentConversations)
+      const { userId, role } = req.query;
+      let conversations = await db.select().from(schema.aiAgentConversations)
         .where(eq(schema.aiAgentConversations.organizationId, req.user!.organizationId));
+      
+      // Apply filters
+      if (userId) {
+        conversations = conversations.filter((c: any) => c.userId === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        conversations = conversations.filter((c: any) => roleUserIds.includes(c.userId));
+      }
 
       // Group by agent
       const agentStats = new Map<string, { agent: string; conversations: number; messages: number; }>();
@@ -5899,8 +5957,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const timeEntries = await db.select().from(schema.timeEntries)
+      const { userId, role } = req.query;
+      let timeEntries = await db.select().from(schema.timeEntries)
         .where(eq(schema.timeEntries.organizationId, req.user!.organizationId));
+      
+      // Apply filters
+      if (userId) {
+        timeEntries = timeEntries.filter((e: any) => e.userId === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        timeEntries = timeEntries.filter((e: any) => roleUserIds.includes(e.userId));
+      }
 
       // Total hours
       const totalHours = timeEntries.reduce((sum, entry) => sum + parseFloat(entry.hours || '0'), 0);
