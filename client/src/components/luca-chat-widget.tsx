@@ -202,7 +202,7 @@ export function LucaChatWidget() {
       {/* Floating Chat Button - Fixed positioning, high z-index */}
       <Button
         size="lg"
-        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-110 transition-all duration-300 animate-pulse hover:animate-none"
+        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-105 transition-all duration-200"
         onClick={() => {
           console.log('[Luca Widget] Button clicked');
           setIsOpen(true);
