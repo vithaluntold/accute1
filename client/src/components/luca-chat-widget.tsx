@@ -279,11 +279,12 @@ export function LucaChatWidget() {
             {/* Header */}
             <div className={`border-b ${isMobile ? 'p-3' : 'p-4'}`}>
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-primary/10">
+                <div className="p-2 rounded-full bg-gradient-to-br from-primary/20 to-pink-500/20 border border-primary/20">
                   <img 
                     src={lucaLogoUrl} 
                     alt="Luca" 
-                    className="h-6 w-6 object-contain"
+                    className="h-7 w-7 object-contain"
+                    draggable={false}
                   />
                 </div>
                 <div className="flex-1">

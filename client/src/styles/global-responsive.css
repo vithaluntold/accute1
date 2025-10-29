@@ -1,0 +1,157 @@
+/* Global cross-browser and cross-device compatibility styles */
+
+/* Responsive viewport configuration */
+html {
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport for mobile browsers */
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Safe area support for notched devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Disable blue tap highlight on touch devices */
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  /* Prevent zoom on input focus (iOS) */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px !important;
+  }
+
+  /* Smooth scrolling on iOS */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Firefox-specific optimizations */
+@-moz-document url-prefix() {
+  * {
+    scrollbar-width: thin;
+  }
+}
+
+/* Safari-specific fixes */
+@supports (-webkit-appearance: none) {
+  /* Fix for iOS Safari address bar */
+  .app-container {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Edge/IE11 compatibility */
+@supports (-ms-ime-align: auto) {
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* Responsive breakpoints */
+@media (max-width: 640px) {
+  /* Mobile: Full width, reduced spacing */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 768px) {
+  /* Tablet: Medium spacing */
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Desktop: Standard spacing */
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Prevent layout shift */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Accessible focus states */
+*:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  * {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Fix for Android Chrome dynamic toolbar */
+@supports (height: 100dvh) {
+  .full-height {
+    height: 100dvh;
+  }
+}
+
+/* Ensure buttons are tappable on touch devices */
+button,
+a,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (min-width: 768px) {
+  button,
+  a,
+  [role="button"] {
+    min-height: auto;
+    min-width: auto;
+  }
+}
