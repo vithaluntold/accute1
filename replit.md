@@ -100,3 +100,95 @@ Implemented centralized agent registry and dynamic loading system to eliminate h
 - `server/agent-loader.ts` - NEW: Dynamic agent loading utilities
 - `agents/luca/backend/index.ts` - Moved from `server/agents/luca/index.ts`, updated imports
 - `server/websocket.ts` - Replaced hardcoded switch statement with dynamic loader
+
+### Workflow Template Installation System
+Implemented marketplace-to-workflow conversion enabling users to create actual workflows from installed pipeline templates.
+
+**1. Template Installation Flow**
+- Users browse marketplace for pipeline templates
+- Install templates to their organization (tracked in `marketplaceInstallations`)
+- Create workflows from installed templates via new API endpoint
+
+**2. API Endpoint: POST `/api/marketplace/create-from-template/:itemId`**
+- **Authentication**: Requires `workflows.create` permission
+- **Validation**:
+  - Verifies template is installed by organization
+  - Ensures item is `pipeline_template` category
+  - Validates template structure integrity
+- **Request Body**: Optional name and description overrides
+- **Response**: Complete workflow object with all hierarchy
+
+**3. Workflow Cloning Process**
+- **Step 1**: Create workflow with metadata (name, description, category, tags)
+- **Step 2**: Clone hierarchical structure:
+  - Stages with order and autoProgress settings
+  - Steps nested under stages
+  - Tasks nested under steps
+- **Step 3**: ID Remapping for nodes/edges:
+  - Track old→new ID mappings during cloning
+  - Remap node data references (stageId, stepId, taskId)
+  - Update workflow with remapped graph structure
+- **Step 4**: Activity logging with template reference
+
+**4. Error Handling & Cleanup**
+- **Field Name Fix**: Handles both `type` and `taskType` fields for backward compatibility
+- **Orphan Prevention**: Deletes workflow on failure (cascade deletes handle stages/steps/tasks)
+- **Detailed Error Messages**: Logs specific failure reasons
+- **Multi-tenant Security**: Installation verification prevents unauthorized template usage
+
+**5. Template Content Structure**
+Templates stored in `marketplaceItems.content` JSONB field with structure:
+```json
+{
+  "name": "Template Name",
+  "description": "Template description",
+  "category": "tax/audit/bookkeeping",
+  "tags": ["tag1", "tag2"],
+  "nodes": [...],  // Workflow visualization nodes
+  "edges": [...],  // Workflow connections
+  "stages": [
+    {
+      "id": "stage-1",  // Used for ID remapping
+      "name": "Stage Name",
+      "description": "Stage description",
+      "order": 0,
+      "autoProgress": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "name": "Step Name",
+          "description": "Step description",
+          "order": 0,
+          "autoProgress": true,
+          "tasks": [
+            {
+              "id": "task-1",
+              "name": "Task Name",
+              "description": "Task description",
+              "type": "manual",
+              "order": 0,
+              "autoProgress": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Benefits:**
+- **Reusability**: Create multiple workflows from single template
+- **Consistency**: Ensures standard processes across organization
+- **Efficiency**: Eliminates manual workflow setup
+- **Marketplace Integration**: Seamless flow from browse → install → create
+- **Customization**: Override name/description per workflow instance
+- **Data Integrity**: ID remapping maintains graph structure integrity
+
+**Files Modified:**
+- `server/routes.ts` - New endpoint with cloning logic, ID remapping, and cleanup
+
+**Future Enhancements (Suggested by Architect):**
+- Database transactions for atomic cloning
+- Enhanced node/edge remapping for complex graph structures
+- Template versioning and update mechanisms
