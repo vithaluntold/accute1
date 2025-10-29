@@ -4,6 +4,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -1563,7 +1566,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.userId!,
         category: templateContent.category || 'general',
         status: 'draft',
-        tags: templateContent.tags || [],
         nodes: [],  // Don't copy nodes/edges yet - they need ID remapping
         edges: [],
       });
@@ -1578,7 +1580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create stages from template
       if (templateContent.stages && Array.isArray(templateContent.stages)) {
         for (const stageData of templateContent.stages) {
-          const stage = await storage.createStage({
+          const stage = await storage.createWorkflowStage({
             workflowId: workflow.id,
             name: stageData.name,
             description: stageData.description,
@@ -1593,7 +1595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create steps for this stage
           if (stageData.steps && Array.isArray(stageData.steps)) {
             for (const stepData of stageData.steps) {
-              const step = await storage.createStep({
+              const step = await storage.createWorkflowStep({
                 stageId: stage.id,
                 name: stepData.name,
                 description: stepData.description,
@@ -1608,15 +1610,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Create tasks for this step
               if (stepData.tasks && Array.isArray(stepData.tasks)) {
                 for (const taskData of stepData.tasks) {
-                  const task = await storage.createTask({
+                  const task = await storage.createWorkflowTask({
                     stepId: step.id,
                     name: taskData.name,
                     description: taskData.description,
                     order: taskData.order || 0,
                     type: taskData.type || taskData.taskType || 'manual',  // Fixed: use 'type' instead of 'taskType'
-                    assigneeId: null, // Not assigned yet
+                    assignedTo: null, // Not assigned yet
                     autoProgress: taskData.autoProgress !== undefined ? taskData.autoProgress : false,
-                    onCompleteAction: taskData.onCompleteAction || null,
                   });
                   
                   if (taskData.id) {
@@ -5478,6 +5479,310 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(tasksDueSoon);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch tasks due soon" });
+    }
+  });
+
+  // ==================== Analytics Routes ====================
+
+  // Get overall analytics dashboard stats
+  app.get("/api/analytics/overview", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const orgId = req.user!.organizationId;
+
+      // Fetch all metrics in parallel
+      const [
+        users,
+        clients,
+        workflows,
+        assignments,
+        supportTickets,
+        invoices,
+        payments
+      ] = await Promise.all([
+        storage.getUsersByOrganization(orgId),
+        storage.getClientsByOrganization(orgId),
+        storage.getWorkflowsByOrganization(orgId),
+        storage.getWorkflowAssignmentsByOrganization(orgId),
+        storage.getSupportTickets(orgId),
+        db.select().from(schema.invoices).where(eq(schema.invoices.organizationId, orgId)),
+        db.select().from(schema.payments).where(eq(schema.payments.organizationId, orgId))
+      ]);
+
+      // Calculate metrics
+      const totalRevenue = invoices.reduce((sum, inv) => sum + parseFloat(inv.total as string || '0'), 0);
+      const totalPaid = payments.reduce((sum, pay) => sum + parseFloat(pay.amount as string || '0'), 0);
+      const activeAssignments = assignments.filter(a => a.status === 'active').length;
+      const completedAssignments = assignments.filter(a => a.status === 'completed').length;
+      const openTickets = supportTickets.filter(t => t.status === 'open' || t.status === 'in_progress').length;
+
+      res.json({
+        users: {
+          total: users.length,
+          active: users.filter(u => u.isActive).length,
+          inactive: users.filter(u => !u.isActive).length
+        },
+        clients: {
+          total: clients.length,
+          active: clients.filter(c => c.status === 'active').length
+        },
+        workflows: {
+          total: workflows.length,
+          active: workflows.filter(w => w.status === 'active').length,
+          draft: workflows.filter(w => w.status === 'draft').length
+        },
+        assignments: {
+          total: assignments.length,
+          active: activeAssignments,
+          completed: completedAssignments,
+          completionRate: assignments.length > 0 ? (completedAssignments / assignments.length * 100).toFixed(1) : '0'
+        },
+        revenue: {
+          total: totalRevenue.toFixed(2),
+          paid: totalPaid.toFixed(2),
+          outstanding: (totalRevenue - totalPaid).toFixed(2)
+        },
+        support: {
+          total: supportTickets.length,
+          open: openTickets,
+          closed: supportTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length
+        }
+      });
+    } catch (error: any) {
+      console.error('Analytics overview error:', error);
+      res.status(500).json({ error: "Failed to fetch analytics overview" });
+    }
+  });
+
+  // Get workflow completion metrics
+  app.get("/api/analytics/workflow-completion", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      
+      // Group by workflow
+      const workflowStats = new Map<string, { name: string; total: number; completed: number; inProgress: number; }>();
+      
+      for (const assignment of assignments) {
+        const workflow = await storage.getWorkflow(assignment.workflowId);
+        if (!workflow) continue;
+
+        if (!workflowStats.has(workflow.id)) {
+          workflowStats.set(workflow.id, {
+            name: workflow.name,
+            total: 0,
+            completed: 0,
+            inProgress: 0
+          });
+        }
+
+        const stats = workflowStats.get(workflow.id)!;
+        stats.total++;
+        if (assignment.status === 'completed') stats.completed++;
+        if (assignment.status === 'active') stats.inProgress++;
+      }
+
+      res.json(Array.from(workflowStats.values()));
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch workflow completion metrics" });
+    }
+  });
+
+  // Get assignment status distribution over time
+  app.get("/api/analytics/assignment-trends", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const days = parseInt(req.query.days as string) || 30;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const assignments = await storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId);
+      
+      // Group by date
+      const trendData = new Map<string, { date: string; created: number; completed: number; }>();
+      
+      for (const assignment of assignments) {
+        const createdDate = new Date(assignment.createdAt).toISOString().split('T')[0];
+        
+        if (!trendData.has(createdDate)) {
+          trendData.set(createdDate, { date: createdDate, created: 0, completed: 0 });
+        }
+        
+        trendData.get(createdDate)!.created++;
+        
+        if (assignment.status === 'completed' && assignment.completedAt) {
+          const completedDate = new Date(assignment.completedAt).toISOString().split('T')[0];
+          if (!trendData.has(completedDate)) {
+            trendData.set(completedDate, { date: completedDate, created: 0, completed: 0 });
+          }
+          trendData.get(completedDate)!.completed++;
+        }
+      }
+
+      res.json(Array.from(trendData.values()).sort((a, b) => a.date.localeCompare(b.date)));
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch assignment trends" });
+    }
+  });
+
+  // Get revenue metrics over time
+  app.get("/api/analytics/revenue-trends", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const invoices = await db.select().from(schema.invoices)
+        .where(eq(schema.invoices.organizationId, req.user!.organizationId));
+      
+      const payments = await db.select().from(schema.payments)
+        .where(eq(schema.payments.organizationId, req.user!.organizationId));
+
+      // Group by month
+      const monthlyData = new Map<string, { month: string; invoiced: number; paid: number; }>();
+      
+      for (const invoice of invoices) {
+        const month = new Date(invoice.createdAt).toISOString().slice(0, 7); // YYYY-MM
+        if (!monthlyData.has(month)) {
+          monthlyData.set(month, { month, invoiced: 0, paid: 0 });
+        }
+        monthlyData.get(month)!.invoiced += parseFloat(invoice.total as string || '0');
+      }
+
+      for (const payment of payments) {
+        const month = new Date(payment.createdAt).toISOString().slice(0, 7);
+        if (!monthlyData.has(month)) {
+          monthlyData.set(month, { month, invoiced: 0, paid: 0 });
+        }
+        monthlyData.get(month)!.paid += parseFloat(payment.amount as string || '0');
+      }
+
+      res.json(Array.from(monthlyData.values()).sort((a, b) => a.month.localeCompare(b.month)));
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch revenue trends" });
+    }
+  });
+
+  // Get support ticket metrics
+  app.get("/api/analytics/support-metrics", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const tickets = await storage.getSupportTickets(req.user!.organizationId);
+      
+      // Status distribution
+      const statusCounts = {
+        open: tickets.filter(t => t.status === 'open').length,
+        in_progress: tickets.filter(t => t.status === 'in_progress').length,
+        resolved: tickets.filter(t => t.status === 'resolved').length,
+        closed: tickets.filter(t => t.status === 'closed').length
+      };
+
+      // Priority distribution
+      const priorityCounts = {
+        low: tickets.filter(t => t.priority === 'low').length,
+        medium: tickets.filter(t => t.priority === 'medium').length,
+        high: tickets.filter(t => t.priority === 'high').length,
+        urgent: tickets.filter(t => t.priority === 'urgent').length
+      };
+
+      // Category distribution
+      const categoryCounts = new Map<string, number>();
+      for (const ticket of tickets) {
+        categoryCounts.set(ticket.category, (categoryCounts.get(ticket.category) || 0) + 1);
+      }
+
+      res.json({
+        total: tickets.length,
+        byStatus: statusCounts,
+        byPriority: priorityCounts,
+        byCategory: Object.fromEntries(categoryCounts)
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch support metrics" });
+    }
+  });
+
+  // Get agent usage statistics
+  app.get("/api/analytics/agent-usage", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const conversations = await db.select().from(schema.aiAgentConversations)
+        .where(eq(schema.aiAgentConversations.organizationId, req.user!.organizationId));
+
+      // Group by agent
+      const agentStats = new Map<string, { agent: string; conversations: number; messages: number; }>();
+      
+      for (const conv of conversations) {
+        if (!agentStats.has(conv.agentName)) {
+          agentStats.set(conv.agentName, {
+            agent: conv.agentName,
+            conversations: 0,
+            messages: 0
+          });
+        }
+        
+        const stats = agentStats.get(conv.agentName)!;
+        stats.conversations++;
+        
+        // Count messages in this conversation
+        const messages = await db.select().from(schema.aiAgentMessages)
+          .where(eq(schema.aiAgentMessages.conversationId, conv.id));
+        stats.messages += messages.length;
+      }
+
+      res.json(Array.from(agentStats.values()));
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch agent usage statistics" });
+    }
+  });
+
+  // Get time tracking metrics
+  app.get("/api/analytics/time-tracking", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const timeEntries = await db.select().from(schema.timeEntries)
+        .where(eq(schema.timeEntries.organizationId, req.user!.organizationId));
+
+      // Total hours
+      const totalHours = timeEntries.reduce((sum, entry) => sum + parseFloat(entry.hours || '0'), 0);
+      
+      // Billable vs non-billable
+      const billableHours = timeEntries.filter(e => e.isBillable).reduce((sum, e) => sum + parseFloat(e.hours || '0'), 0);
+      const nonBillableHours = totalHours - billableHours;
+
+      // By user
+      const userHours = new Map<string, number>();
+      for (const entry of timeEntries) {
+        userHours.set(entry.userId, (userHours.get(entry.userId) || 0) + parseFloat(entry.hours || '0'));
+      }
+
+      res.json({
+        totalHours: totalHours.toFixed(2),
+        billableHours: billableHours.toFixed(2),
+        nonBillableHours: nonBillableHours.toFixed(2),
+        billablePercentage: totalHours > 0 ? (billableHours / totalHours * 100).toFixed(1) : '0',
+        byUser: Object.fromEntries(userHours)
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch time tracking metrics" });
     }
   });
 

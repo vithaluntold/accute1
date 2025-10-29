@@ -192,3 +192,119 @@ Templates stored in `marketplaceItems.content` JSONB field with structure:
 - Database transactions for atomic cloning
 - Enhanced node/edge remapping for complex graph structures
 - Template versioning and update mechanisms
+
+### Analytics Dashboard System
+Implemented comprehensive analytics dashboard with backend API endpoints and interactive frontend visualizations.
+
+**1. Backend Analytics API Endpoints**
+- **GET `/api/analytics/overview`**: Overall dashboard statistics
+  - User metrics (total, active, inactive)
+  - Client metrics (total, active)
+  - Workflow metrics (total, active, draft)
+  - Assignment metrics (total, active, completed, completion rate)
+  - Revenue metrics (total, paid, outstanding)
+  - Support ticket metrics (total, open, closed)
+  - Uses Promise.all for efficient parallel data fetching
+
+- **GET `/api/analytics/workflow-completion`**: Workflow completion rates
+  - Groups assignments by workflow
+  - Calculates total, completed, and in-progress counts
+  - Returns array of workflow statistics
+
+- **GET `/api/analytics/assignment-trends`**: Assignment trends over time
+  - Supports configurable date range (default: 30 days)
+  - Groups by creation and completion dates
+  - Returns time-series data for trend visualization
+
+- **GET `/api/analytics/revenue-trends`**: Monthly revenue metrics
+  - Groups invoices and payments by month (YYYY-MM)
+  - Calculates invoiced vs paid amounts
+  - Returns chronological monthly data
+
+- **GET `/api/analytics/support-metrics`**: Support ticket analytics
+  - Distribution by status (open, in_progress, resolved, closed)
+  - Distribution by priority (low, medium, high, urgent)
+  - Distribution by category
+  - Returns comprehensive ticket statistics
+
+- **GET `/api/analytics/agent-usage`**: AI agent usage statistics
+  - Groups conversations by agent name
+  - Counts conversations and messages per agent
+  - Returns agent usage metrics
+
+- **GET `/api/analytics/time-tracking`**: Time tracking metrics
+  - Total hours tracked
+  - Billable vs non-billable breakdown
+  - Hours by user
+  - Billable percentage calculation
+
+**2. Frontend Analytics Dashboard**
+- **Overview Section**: 9 stat cards showing key metrics
+  - User statistics (total, active, inactive)
+  - Client statistics (total, active)
+  - Workflow statistics (total, active, draft)
+  - Completion rate
+  - Revenue metrics (total, paid, outstanding)
+  - Support tickets (total, open, closed)
+  - Time tracking (total hours, billable percentage)
+
+- **Interactive Tab System**:
+  - **Workflows Tab**: Bar chart for workflow completion rates
+  - **Trends Tab**: Line chart for assignment trends (created vs completed)
+  - **Revenue Tab**: Line chart for monthly revenue (invoiced vs paid)
+  - **Support Tab**: Pie charts for ticket distribution by status and priority
+  - **Agents Tab**: Bar chart for AI agent usage statistics
+
+**3. Visualization Features**
+- Uses Recharts library for all charts (bar, line, pie)
+- Responsive containers for mobile/tablet/desktop support
+- Themed tooltips matching app design system
+- Color palette using CSS custom properties
+- Smooth animations and transitions
+
+**4. Type Safety**
+- Comprehensive TypeScript interfaces for all API responses:
+  - `AnalyticsOverview`: Overview statistics
+  - `WorkflowCompletionMetrics[]`: Workflow completion data
+  - `AssignmentTrend[]`: Time-series assignment data
+  - `RevenueTrend[]`: Monthly revenue data
+  - `SupportMetrics`: Support ticket statistics
+  - `AgentUsage[]`: AI agent usage data
+  - `TimeTracking`: Time tracking metrics
+- Type-safe useQuery hooks with proper defaults
+- Prevents runtime errors with optional chaining
+
+**5. User Experience**
+- Skeleton loading states for all data sections
+- Empty state messages when no data available
+- Responsive grid layouts for all screen sizes
+- Intuitive tab navigation
+- Visual indicators using Lucide icons
+- Clean, modern design following Carbon Design System
+
+**6. Security & Performance**
+- Multi-tenant security on all endpoints (organization filtering)
+- Efficient data aggregation using maps and filters
+- Parallel API calls using Promise.all
+- Proper error handling and loading states
+- Safe type conversions (parseFloat for numeric strings)
+
+**Benefits:**
+- **Data-Driven Decisions**: Comprehensive insights into practice performance
+- **Visual Analytics**: Easy-to-understand charts and graphs
+- **Real-Time Metrics**: Up-to-date statistics across all platform features
+- **Multi-Dimensional Analysis**: Track workflows, revenue, support, agents, and time
+- **Scalability**: Efficient queries that scale with organization size
+- **Type Safety**: Compile-time checking prevents runtime errors
+
+**Files Modified:**
+- `server/routes.ts` - 7 analytics API endpoints with organization filtering
+- `client/src/pages/analytics.tsx` - Comprehensive dashboard with charts and metrics
+
+**Future Enhancements:**
+- Export analytics data to CSV/PDF
+- Custom date range filters
+- Scheduled analytics reports via email
+- Advanced filtering and segmentation
+- Budget vs actual comparisons
+- Predictive analytics using AI

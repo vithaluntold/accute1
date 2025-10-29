@@ -1,254 +1,460 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  BarChart3, 
-  FileText, 
-  Users, 
-  Workflow, 
-  TrendingUp, 
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Activity
-} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { TrendingUp, Users, Briefcase, CheckCircle2, DollarSign, Ticket, Bot, Clock } from "lucide-react";
+
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+// Type definitions for analytics API responses
+interface AnalyticsOverview {
+  users: { total: number; active: number; inactive: number };
+  clients: { total: number; active: number };
+  workflows: { total: number; active: number; draft: number };
+  assignments: { total: number; active: number; completed: number; completionRate: string };
+  revenue: { total: string; paid: string; outstanding: string };
+  support: { total: number; open: number; closed: number };
+}
+
+interface WorkflowCompletionMetrics {
+  name: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+}
+
+interface AssignmentTrend {
+  date: string;
+  created: number;
+  completed: number;
+}
+
+interface RevenueTrend {
+  month: string;
+  invoiced: number;
+  paid: number;
+}
+
+interface SupportMetrics {
+  total: number;
+  byStatus: {
+    open: number;
+    in_progress: number;
+    resolved: number;
+    closed: number;
+  };
+  byPriority: {
+    low: number;
+    medium: number;
+    high: number;
+    urgent: number;
+  };
+  byCategory: Record<string, number>;
+}
+
+interface AgentUsage {
+  agent: string;
+  conversations: number;
+  messages: number;
+}
+
+interface TimeTracking {
+  totalHours: string;
+  billableHours: string;
+  nonBillableHours: string;
+  billablePercentage: string;
+  byUser: Record<string, number>;
+}
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  description?: string;
+  icon: React.ReactNode;
+  trend?: string;
+}
+
+function StatCard({ title, value, description, icon, trend }: StatCardProps) {
+  return (
+    <Card data-testid={`card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div className="text-muted-foreground">{icon}</div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold" data-testid={`value-${title.toLowerCase().replace(/\s+/g, '-')}`}>{value}</div>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        {trend && (
+          <div className="flex items-center gap-1 mt-1 text-xs text-primary">
+            <TrendingUp className="h-3 w-3" />
+            <span>{trend}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Analytics() {
-  const { data: forms = [] } = useQuery<any[]>({
-    queryKey: ["/api/forms"],
+  const { data: overview, isLoading: overviewLoading } = useQuery<AnalyticsOverview>({
+    queryKey: ["/api/analytics/overview"],
   });
 
-  const { data: workflows = [] } = useQuery<any[]>({
-    queryKey: ["/api/workflows"],
+  const { data: workflowCompletion = [], isLoading: workflowLoading } = useQuery<WorkflowCompletionMetrics[]>({
+    queryKey: ["/api/analytics/workflow-completion"],
   });
 
-  const { data: documents = [] } = useQuery<any[]>({
-    queryKey: ["/api/documents"],
+  const { data: assignmentTrends = [], isLoading: trendsLoading } = useQuery<AssignmentTrend[]>({
+    queryKey: ["/api/analytics/assignment-trends"],
   });
 
-  const { data: clients = [] } = useQuery<any[]>({
-    queryKey: ["/api/clients"],
+  const { data: revenueTrends = [], isLoading: revenueLoading } = useQuery<RevenueTrend[]>({
+    queryKey: ["/api/analytics/revenue-trends"],
   });
 
-  const { data: documentRequests = [] } = useQuery<any[]>({
-    queryKey: ["/api/document-requests"],
+  const { data: supportMetrics, isLoading: supportLoading } = useQuery<SupportMetrics>({
+    queryKey: ["/api/analytics/support-metrics"],
   });
 
-  // Calculate statistics
-  const stats = {
-    totalForms: forms.length,
-    publishedForms: forms.filter((f: any) => f.isPublished).length,
-    totalWorkflows: workflows.length,
-    activeWorkflows: workflows.filter((w: any) => w.isActive).length,
-    totalDocuments: documents.length,
-    totalClients: clients.length,
-    pendingRequests: documentRequests.filter((r: any) => r.status === 'pending').length,
-    completedRequests: documentRequests.filter((r: any) => r.status === 'completed').length,
-  };
+  const { data: agentUsage = [], isLoading: agentLoading } = useQuery<AgentUsage[]>({
+    queryKey: ["/api/analytics/agent-usage"],
+  });
 
-  const statCards = [
-    {
-      title: "Total Forms",
-      value: stats.totalForms,
-      subtitle: `${stats.publishedForms} published`,
-      icon: FileText,
-      trend: "+12%",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-950",
-    },
-    {
-      title: "Workflows",
-      value: stats.totalWorkflows,
-      subtitle: `${stats.activeWorkflows} active`,
-      icon: Workflow,
-      trend: "+8%",
-      color: "text-purple-600",
-      bgColor: "bg-purple-50 dark:bg-purple-950",
-    },
-    {
-      title: "Documents",
-      value: stats.totalDocuments,
-      subtitle: "Total uploaded",
-      icon: Activity,
-      trend: "+24%",
-      color: "text-green-600",
-      bgColor: "bg-green-50 dark:bg-green-950",
-    },
-    {
-      title: "Clients",
-      value: stats.totalClients,
-      subtitle: "Active clients",
-      icon: Users,
-      trend: "+5%",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-950",
-    },
-  ];
+  const { data: timeTracking, isLoading: timeLoading } = useQuery<TimeTracking>({
+    queryKey: ["/api/analytics/time-tracking"],
+  });
 
-  const requestStats = [
-    {
-      label: "Pending Requests",
-      value: stats.pendingRequests,
-      icon: Clock,
-      variant: "default" as const,
-    },
-    {
-      label: "Completed Requests",
-      value: stats.completedRequests,
-      icon: CheckCircle2,
-      variant: "default" as const,
-    },
-  ];
+  if (overviewLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare data for status pie chart
+  const statusData = supportMetrics ? [
+    { name: 'Open', value: supportMetrics.byStatus.open },
+    { name: 'In Progress', value: supportMetrics.byStatus.in_progress },
+    { name: 'Resolved', value: supportMetrics.byStatus.resolved },
+    { name: 'Closed', value: supportMetrics.byStatus.closed },
+  ].filter(item => item.value > 0) : [];
+
+  // Prepare priority data
+  const priorityData = supportMetrics ? [
+    { name: 'Low', value: supportMetrics.byPriority.low },
+    { name: 'Medium', value: supportMetrics.byPriority.medium },
+    { name: 'High', value: supportMetrics.byPriority.high },
+    { name: 'Urgent', value: supportMetrics.byPriority.urgent },
+  ].filter(item => item.value > 0) : [];
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-display font-bold mb-2" data-testid="text-analytics-title">
-          Analytics
-        </h1>
-        <p className="text-muted-foreground">
-          Track your platform performance and key metrics
-        </p>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-analytics">Analytics Dashboard</h1>
+        <p className="text-muted-foreground">Comprehensive insights into your practice performance</p>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        {statCards.map((stat) => (
-          <Card key={stat.title} data-testid={`card-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <div className={`p-2 rounded-md ${stat.bgColor}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-              </div>
+      {/* Overview Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Users"
+          value={overview?.users.total || 0}
+          description={`${overview?.users.active || 0} active, ${overview?.users.inactive || 0} inactive`}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Total Clients"
+          value={overview?.clients.total || 0}
+          description={`${overview?.clients.active || 0} active`}
+          icon={<Briefcase className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Total Workflows"
+          value={overview?.workflows.total || 0}
+          description={`${overview?.workflows.active || 0} active, ${overview?.workflows.draft || 0} draft`}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Completion Rate"
+          value={`${overview?.assignments.completionRate || 0}%`}
+          description={`${overview?.assignments.completed || 0} of ${overview?.assignments.total || 0} assignments`}
+          icon={<TrendingUp className="h-4 w-4" />}
+        />
+      </div>
+
+      {/* Revenue Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          title="Total Revenue"
+          value={`$${overview?.revenue.total || '0.00'}`}
+          icon={<DollarSign className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Paid Amount"
+          value={`$${overview?.revenue.paid || '0.00'}`}
+          icon={<DollarSign className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Outstanding"
+          value={`$${overview?.revenue.outstanding || '0.00'}`}
+          icon={<DollarSign className="h-4 w-4" />}
+        />
+      </div>
+
+      {/* Support & Time Tracking */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <StatCard
+          title="Support Tickets"
+          value={overview?.support.total || 0}
+          description={`${overview?.support.open || 0} open, ${overview?.support.closed || 0} closed`}
+          icon={<Ticket className="h-4 w-4" />}
+        />
+        <StatCard
+          title="Time Tracked"
+          value={`${timeTracking?.totalHours || '0'} hrs`}
+          description={`${timeTracking?.billablePercentage || 0}% billable`}
+          icon={<Clock className="h-4 w-4" />}
+        />
+      </div>
+
+      {/* Charts */}
+      <Tabs defaultValue="workflows" className="space-y-4">
+        <TabsList data-testid="tabs-analytics">
+          <TabsTrigger value="workflows" data-testid="tab-workflows">Workflows</TabsTrigger>
+          <TabsTrigger value="trends" data-testid="tab-trends">Trends</TabsTrigger>
+          <TabsTrigger value="revenue" data-testid="tab-revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="support" data-testid="tab-support">Support</TabsTrigger>
+          <TabsTrigger value="agents" data-testid="tab-agents">AI Agents</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="workflows" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Workflow Completion</CardTitle>
+              <CardDescription>Completion rates by workflow type</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid={`text-stat-value-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                {stat.value}
-              </div>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-muted-foreground">
-                  {stat.subtitle}
-                </p>
-                <Badge variant="outline" className="text-xs gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  {stat.trend}
-                </Badge>
-              </div>
+              {workflowLoading ? (
+                <Skeleton className="h-80" />
+              ) : workflowCompletion && workflowCompletion.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={workflowCompletion}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="name" className="text-sm" />
+                    <YAxis className="text-sm" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="total" fill={COLORS[0]} name="Total" />
+                    <Bar dataKey="completed" fill={COLORS[1]} name="Completed" />
+                    <Bar dataKey="inProgress" fill={COLORS[2]} name="In Progress" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  No workflow data available
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Document Requests Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-        <Card className="md:col-span-2 lg:col-span-2" data-testid="card-document-requests">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Document Requests Status
-            </CardTitle>
-            <CardDescription>
-              Current status of document collection requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {requestStats.map((stat) => (
-                <div key={stat.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-muted">
-                      <stat.icon className="h-4 w-4" />
-                    </div>
-                    <span className="font-medium">{stat.label}</span>
+        <TabsContent value="trends" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assignment Trends</CardTitle>
+              <CardDescription>Created and completed assignments over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {trendsLoading ? (
+                <Skeleton className="h-80" />
+              ) : assignmentTrends && assignmentTrends.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={assignmentTrends}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-sm" />
+                    <YAxis className="text-sm" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="created" stroke={COLORS[0]} name="Created" strokeWidth={2} />
+                    <Line type="monotone" dataKey="completed" stroke={COLORS[1]} name="Completed" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  No trend data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="revenue" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Trends</CardTitle>
+              <CardDescription>Monthly invoiced vs paid amounts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {revenueLoading ? (
+                <Skeleton className="h-80" />
+              ) : revenueTrends && revenueTrends.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={revenueTrends}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-sm" />
+                    <YAxis className="text-sm" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="invoiced" stroke={COLORS[0]} name="Invoiced" strokeWidth={2} />
+                    <Line type="monotone" dataKey="paid" stroke={COLORS[1]} name="Paid" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  No revenue data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="support" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tickets by Status</CardTitle>
+                <CardDescription>Distribution of support tickets by status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {supportLoading ? (
+                  <Skeleton className="h-80" />
+                ) : statusData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={statusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(entry) => entry.name}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-80 text-muted-foreground">
+                    No support ticket data available
                   </div>
-                  <Badge variant={stat.variant} data-testid={`badge-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {stat.value}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
 
-        <Card data-testid="card-quick-actions">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>
-              Common tasks and shortcuts
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <a 
-              href="/forms" 
-              className="block p-3 rounded-md hover-elevate active-elevate-2 border"
-              data-testid="link-create-form"
-            >
-              <div className="font-medium">Create Form</div>
-              <div className="text-xs text-muted-foreground">Build a new form template</div>
-            </a>
-            <a 
-              href="/workflows" 
-              className="block p-3 rounded-md hover-elevate active-elevate-2 border"
-              data-testid="link-create-workflow"
-            >
-              <div className="font-medium">Create Workflow</div>
-              <div className="text-xs text-muted-foreground">Automate processes</div>
-            </a>
-            <a 
-              href="/document-requests" 
-              className="block p-3 rounded-md hover-elevate active-elevate-2 border"
-              data-testid="link-document-requests"
-            >
-              <div className="font-medium">Document Requests</div>
-              <div className="text-xs text-muted-foreground">Manage client documents</div>
-            </a>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity Overview */}
-      <Card data-testid="card-activity-overview">
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            Latest updates and changes across the platform
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {forms.length === 0 && workflows.length === 0 && documents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="text-no-activity">
-                No recent activity to display
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                <div className="grid gap-2">
-                  {forms.slice(0, 3).map((form: any) => (
-                    <div key={form.id} className="flex items-center justify-between p-2 rounded-md hover-elevate">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span>Form: {form.name}</span>
-                      </div>
-                      <Badge variant="outline">{form.isPublished ? "Published" : "Draft"}</Badge>
-                    </div>
-                  ))}
-                  {workflows.slice(0, 3).map((workflow: any) => (
-                    <div key={workflow.id} className="flex items-center justify-between p-2 rounded-md hover-elevate">
-                      <div className="flex items-center gap-2">
-                        <Workflow className="h-4 w-4" />
-                        <span>Workflow: {workflow.name}</span>
-                      </div>
-                      <Badge variant="outline">{workflow.isActive ? "Active" : "Draft"}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Tickets by Priority</CardTitle>
+                <CardDescription>Distribution of support tickets by priority</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {supportLoading ? (
+                  <Skeleton className="h-80" />
+                ) : priorityData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={priorityData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(entry) => entry.name}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {priorityData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-80 text-muted-foreground">
+                    No priority data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="agents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>AI Agent Usage</CardTitle>
+              <CardDescription>Conversations and messages by agent</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {agentLoading ? (
+                <Skeleton className="h-80" />
+              ) : agentUsage && agentUsage.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={agentUsage}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="agent" className="text-sm" />
+                    <YAxis className="text-sm" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="conversations" fill={COLORS[0]} name="Conversations" />
+                    <Bar dataKey="messages" fill={COLORS[1]} name="Messages" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-muted-foreground">
+                  No agent usage data available
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
