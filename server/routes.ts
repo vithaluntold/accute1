@@ -2691,21 +2691,80 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         });
       }
 
+      // Merge tax IDs from both collectedData (AI) and sensitiveData (form)
+      const country = collectedData.country || "US";
+      const clientType = collectedData.clientType || "business";
+      const taxIds: Record<string, string> = { ...(collectedData.taxIds || {}) };
+      
+      // Add/override with form-collected tax IDs (trimmed)
+      const taxFields = ["pan", "gstin", "ein", "ssn", "vat", "utr", "trn", "abn", "gst", "sin", "bn"];
+      for (const field of taxFields) {
+        const value = sensitiveData[field]?.trim();
+        if (value) {
+          taxIds[field.toUpperCase()] = value;
+        }
+      }
+      
+      // Determine primary tax ID based on country and client type
+      let primaryTaxId = collectedData.primaryTaxId || ""; // Start with AI-provided primary
+      
+      // Override with form data if available, prioritizing based on country and client type
+      if (country === "IN") {
+        if (clientType === "business") {
+          primaryTaxId = taxIds.GSTIN || taxIds.PAN || primaryTaxId;
+        } else {
+          primaryTaxId = taxIds.PAN || taxIds.GSTIN || primaryTaxId;
+        }
+      } else if (country === "US") {
+        if (clientType === "business") {
+          primaryTaxId = taxIds.EIN || taxIds.SSN || primaryTaxId;
+        } else {
+          primaryTaxId = taxIds.SSN || taxIds.EIN || primaryTaxId;
+        }
+      } else if (country === "GB") {
+        primaryTaxId = taxIds.VAT || taxIds.UTR || primaryTaxId;
+      } else if (country === "AE") {
+        primaryTaxId = taxIds.TRN || primaryTaxId;
+      } else if (country === "AU") {
+        primaryTaxId = taxIds.ABN || taxIds.GST || primaryTaxId;
+      } else if (country === "CA") {
+        if (clientType === "business") {
+          primaryTaxId = taxIds.BN || taxIds.SIN || primaryTaxId;
+        } else {
+          primaryTaxId = taxIds.SIN || taxIds.BN || primaryTaxId;
+        }
+      }
+      
+      // Fallback: if still no primary ID, use the first available tax ID
+      if (!primaryTaxId && Object.keys(taxIds).length > 0) {
+        primaryTaxId = Object.values(taxIds)[0];
+      }
+      
+      console.log("  - Primary Tax ID:", primaryTaxId);
+      console.log("  - All Tax IDs:", taxIds);
+
+      // Build contact name for legacy field (handle partial names)
+      const contactName = [
+        sensitiveData.contactFirstName?.trim(),
+        sensitiveData.contactLastName?.trim()
+      ].filter(Boolean).join(" ") || "";
+
       // Create client
       const client = await storage.createClient({
         companyName: sensitiveData.companyName || collectedData.companyName || "Unknown Company",
+        contactName: contactName, // Legacy field for backward compatibility
         email: sensitiveData.email || "",
         phone: sensitiveData.phone || "",
         address: sensitiveData.address || "",
         city: sensitiveData.city || "",
         state: sensitiveData.state || "",
         zipCode: sensitiveData.zipCode || "",
-        country: collectedData.country || "US",
-        taxId: collectedData.primaryTaxId || "",
+        country: country,
+        taxId: primaryTaxId,
         industry: collectedData.industry || "",
         notes: collectedData.notes || "",
         metadata: {
-          taxIds: collectedData.taxIds || {},
+          taxIds: taxIds, // Store all tax IDs
           clientType: collectedData.clientType || "business",
           onboardingSessionId: sessionId,
         },
