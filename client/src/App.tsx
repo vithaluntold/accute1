@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Search, Bell, User, Building2, ChevronDown } from "lucide-react";
 import { FinACEverseFooter } from "@/components/finaceverse-footer";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { useMobileDetect } from "@/hooks/use-mobile-detect";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -62,6 +65,7 @@ import NotFound from "@/pages/not-found";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
+  const { isMobile } = useMobileDetect();
 
   const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
@@ -174,11 +178,13 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownMenu>
             </div>
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className={`flex-1 overflow-auto ${isMobile ? 'pb-16' : ''}`}>
             {children}
           </main>
         </div>
         <FinACEverseFooter />
+        {isMobile && <MobileBottomNav />}
+        <PWAInstallPrompt />
       </div>
     </SidebarProvider>
   );
