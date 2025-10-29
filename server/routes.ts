@@ -2774,6 +2774,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       });
 
       // Handle contact - either link to existing or create new
+      let portalInvitation = null;
       if (existingContactId) {
         // Link existing contact to this client
         const existingContact = await storage.getContact(existingContactId);
@@ -2787,19 +2788,115 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
           console.warn("⚠️ Existing contact not found or unauthorized:", existingContactId);
         }
       } else if (sensitiveData.contactFirstName && sensitiveData.contactLastName && sensitiveData.contactEmail) {
-        // Create new contact
-        await storage.createContact({
-          clientId: client.id,
-          firstName: sensitiveData.contactFirstName,
-          lastName: sensitiveData.contactLastName,
-          email: sensitiveData.contactEmail,
-          phone: sensitiveData.contactPhone || "",
-          title: sensitiveData.contactTitle || "",
-          isPrimary: true,
-          organizationId: req.user!.organizationId!,
-          createdBy: req.userId!,
+        // Get Client role
+        const clientRole = await db.select().from(schema.roles)
+          .where(eq(schema.roles.name, "Client"))
+          .limit(1);
+        
+        if (clientRole.length === 0) {
+          return res.status(500).json({ error: "Client role not found. Please contact system administrator." });
+        }
+
+        // Check for email conflicts BEFORE starting transaction
+        const existingUsers = await db.select().from(schema.users)
+          .where(eq(schema.users.email, sensitiveData.contactEmail.toLowerCase()))
+          .limit(1);
+
+        let contactUser;
+        let shouldCreateUser = true;
+
+        if (existingUsers.length > 0) {
+          const existingUser = existingUsers[0];
+          
+          // Check if existing user belongs to same org and has Client role
+          if (existingUser.organizationId === req.user!.organizationId && 
+              existingUser.roleId === clientRole[0].id) {
+            // Perfect match - can reuse the existing Client user
+            contactUser = existingUser;
+            shouldCreateUser = false;
+            console.log("✅ Will reuse existing client user account for contact:", contactUser.id);
+          } else if (existingUser.organizationId === req.user!.organizationId) {
+            // User exists in same org but with different role - conflict
+            return res.status(409).json({ 
+              error: `Email ${sensitiveData.contactEmail} is already registered in your organization with a different role. Please use a different email address for this contact.`
+            });
+          } else {
+            // User exists in different organization - conflict
+            return res.status(409).json({ 
+              error: `Email ${sensitiveData.contactEmail} is already registered by another organization. Please use a different email address for this contact.`
+            });
+          }
+        }
+
+        // Use a transaction to ensure complete atomicity
+        await db.transaction(async (tx) => {
+          let tempPassword: string | null = null;
+          let isNewUser = false;
+
+          if (shouldCreateUser) {
+            // Create new user
+            tempPassword = crypto.randomBytes(16).toString('base64').slice(0, 16);
+            const hashedPassword = await hashPassword(tempPassword);
+
+            // Create user account for the contact within the transaction
+            const [newUser] = await tx.insert(schema.users).values({
+              username: sensitiveData.contactEmail.toLowerCase(),
+              email: sensitiveData.contactEmail.toLowerCase(),
+              password: hashedPassword,
+              firstName: sensitiveData.contactFirstName,
+              lastName: sensitiveData.contactLastName,
+              roleId: clientRole[0].id,
+              organizationId: req.user!.organizationId!,
+              isActive: true,
+            }).returning();
+
+            contactUser = newUser;
+            isNewUser = true;
+            console.log("✅ Created new user account for contact:", contactUser.id);
+          }
+
+          // Create new contact and link to user
+          const [contact] = await tx.insert(schema.contacts).values({
+            clientId: client.id,
+            userId: contactUser.id,
+            firstName: sensitiveData.contactFirstName,
+            lastName: sensitiveData.contactLastName,
+            email: sensitiveData.contactEmail,
+            phone: sensitiveData.contactPhone || "",
+            title: sensitiveData.contactTitle || "",
+            isPrimary: true,
+            organizationId: req.user!.organizationId!,
+            createdBy: req.userId!,
+          }).returning();
+          console.log("✅ Created new contact for client", client.id);
+
+          // Only create portal invitation for new users
+          if (isNewUser && tempPassword) {
+            // Create portal invitation
+            const invitationToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+            await tx.insert(schema.portalInvitations).values({
+              contactId: contact.id,
+              userId: contactUser.id,
+              invitationToken,
+              status: "pending",
+              expiresAt,
+              organizationId: req.user!.organizationId!,
+            });
+
+            portalInvitation = {
+              invitationToken,
+              invitationUrl: `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/portal-setup/${invitationToken}`,
+              contactEmail: sensitiveData.contactEmail,
+              tempPassword,
+              expiresAt,
+            };
+
+            console.log("✅ Created portal invitation for contact:", contact.id);
+          }
         });
-        console.log("✅ Created new contact for client", client.id);
       }
 
       // Mark session as completed
@@ -2815,7 +2912,11 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "client", client.id, { via: "ai_onboarding" }, req);
 
-      res.json({ client, success: true });
+      res.json({ 
+        client, 
+        success: true,
+        portalInvitation, // Include invitation details so they can be shared with the contact
+      });
     } catch (error: any) {
       console.error("Failed to complete onboarding:", error);
       res.status(500).json({ error: "Failed to complete onboarding" });

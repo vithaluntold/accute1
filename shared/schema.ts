@@ -509,6 +509,7 @@ export const clients = pgTable("clients", {
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id), // Link to user account for portal access
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
@@ -519,6 +520,20 @@ export const contacts = pgTable("contacts", {
   notes: text("notes"),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Portal Invitations - Manage client portal access setup
+export const portalInvitations = pgTable("portal_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invitationToken: text("invitation_token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // 'pending', 'accepted', 'expired'
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
