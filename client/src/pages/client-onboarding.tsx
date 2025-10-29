@@ -222,12 +222,23 @@ export default function ClientOnboarding() {
   const shouldShowField = (fieldName: string): boolean => {
     const { country, clientType, gstRegistered, vatRegistered, requiredFields } = aiContext;
     
-    // If AI provided explicit required fields, use those
+    // Essential contact/company fields are ALWAYS shown (never hidden by AI metadata)
+    const essentialFields = [
+      "companyName", "email", "phone", "address", "city", "state", "zipCode",
+      "contactFirstName", "contactLastName", "contactEmail", "contactPhone"
+    ];
+    
+    if (essentialFields.includes(fieldName)) {
+      return true; // Always show contact fields
+    }
+
+    // Tax ID fields - use requiredFields if provided, otherwise use country-based logic
     if (requiredFields && requiredFields.length > 0) {
+      // AI explicitly specified which tax fields are needed
       return requiredFields.includes(fieldName);
     }
 
-    // Otherwise, use country-based logic
+    // Fallback: country-based logic if AI hasn't specified requiredFields
     if (!country) return false; // Don't show tax fields until we know the country
 
     const countryLower = country.toLowerCase();
@@ -243,7 +254,7 @@ export default function ClientOnboarding() {
         return countryLower === "usa" && clientType === "individual";
       case "vat":
         return (countryLower === "uk" || countryLower.includes("united kingdom") || 
-                countryLower.includes("europe")) && vatRegistered;
+                countryLower.includes("europe")) && Boolean(vatRegistered);
       case "utr":
         return countryLower === "uk" || countryLower.includes("united kingdom");
       case "trn":
@@ -257,7 +268,7 @@ export default function ClientOnboarding() {
       case "bn":
         return countryLower === "canada" && clientType === "business";
       default:
-        return true; // Show all contact fields by default
+        return false; // Unknown tax field
     }
   };
 
