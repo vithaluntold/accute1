@@ -4373,6 +4373,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH route for stages (frontend uses this)
+  app.patch("/api/workflows/stages/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const stage = await storage.getWorkflowStage(req.params.id);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateWorkflowStage(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_stage", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update workflow stage:", error);
+      res.status(500).json({ error: "Failed to update stage", details: error.message });
+    }
+  });
+
   app.delete("/api/stages/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const stage = await storage.getWorkflowStage(req.params.id);
@@ -4470,6 +4490,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update step" });
+    }
+  });
+
+  // PATCH route for steps (frontend uses this)
+  app.patch("/api/workflows/steps/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const step = await storage.getWorkflowStep(req.params.id);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateWorkflowStep(req.params.id, req.body);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_step", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update workflow step:", error);
+      res.status(500).json({ error: "Failed to update step", details: error.message });
     }
   });
 
@@ -4651,6 +4695,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  // PATCH route for tasks (frontend uses this)
+  app.patch("/api/workflows/tasks/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      const pipeline = await storage.getWorkflow(stage.workflowId);
+      if (!pipeline || pipeline.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Validate automated tasks have required AI configuration
+      const taskType = req.body.type || task.type;
+      if (taskType === "automated") {
+        const aiAgentId = req.body.aiAgentId !== undefined ? req.body.aiAgentId : task.aiAgentId;
+        const automationInput = req.body.automationInput !== undefined ? req.body.automationInput : task.automationInput;
+        if (!aiAgentId || !automationInput?.trim()) {
+          return res.status(400).json({ 
+            error: "AI agent and automation prompt are required for automated tasks" 
+          });
+        }
+      }
+      
+      // Build update payload - only include automationInput if provided to avoid wiping existing prompt
+      const updatePayload: any = { ...req.body };
+      if (req.body.automationInput !== undefined && req.body.automationInput !== null) {
+        updatePayload.automationInput = req.body.automationInput.trim();
+      }
+      
+      const updated = await storage.updateWorkflowTask(req.params.id, updatePayload);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "workflow_task", req.params.id, req.body, req);
+      
+      // Trigger auto-progression if task status changed to completed
+      if (req.body.status === 'completed' && task.status !== 'completed') {
+        await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update workflow task:", error);
+      res.status(500).json({ error: "Failed to update task", details: error.message });
     }
   });
 
