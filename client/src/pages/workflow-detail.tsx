@@ -311,7 +311,13 @@ export default function WorkflowDetail() {
               {stages
                 .sort((a, b) => a.order - b.order)
                 .map((stage) => (
-                  <StageKanbanCard key={stage.id} stage={stage} workflowId={workflowId!} />
+                  <StageKanbanCard
+                    key={stage.id}
+                    stage={stage}
+                    workflowId={workflowId!}
+                    setEditingStage={setEditingStage}
+                    setStageDialogOpen={setStageDialogOpen}
+                  />
                 ))}
             </Accordion>
             <DragOverlay>
@@ -334,7 +340,17 @@ export default function WorkflowDetail() {
 }
 
 // Stage Kanban Card - Shows steps as horizontal columns
-function StageKanbanCard({ stage, workflowId }: { stage: WorkflowStage; workflowId: string }) {
+function StageKanbanCard({
+  stage,
+  workflowId,
+  setEditingStage,
+  setStageDialogOpen,
+}: {
+  stage: WorkflowStage;
+  workflowId: string;
+  setEditingStage: (stage: WorkflowStage | undefined) => void;
+  setStageDialogOpen: (open: boolean) => void;
+}) {
   const { toast } = useToast();
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [editingStep, setEditingStep] = useState<WorkflowStep | undefined>();
