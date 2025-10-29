@@ -1,7 +1,7 @@
 # Accute - AI-Powered Accounting Workflow Automation Platform
 
 ## Overview
-Accute is an enterprise-grade AI-powered accounting workflow automation platform. It leverages AI to streamline financial operations, offering multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's vision is to provide a comprehensive, secure, and intelligent solution for modern accounting practices, enhancing efficiency and compliance with an "AI-first" approach.
+Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It offers multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to provide a comprehensive, secure, and intelligent "AI-first" solution that enhances efficiency and ensures compliance for modern accounting practices.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
@@ -13,33 +13,34 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 ## System Architecture
 
 ### UI/UX Decisions
-The UI is inspired by applications like Linear and Notion, using the Carbon Design System. It features a Porsche-to-Pink gradient, Orbitron and Exo 2 fonts, a collapsible sidebar, top navigation, card-based dashboards, and data tables with sorting and pagination.
+The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron and Exo 2 fonts, a collapsible sidebar, top navigation, card-based dashboards, and data tables with sorting and pagination.
 
 ### Technical Implementations
-The platform uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui for the frontend, and Node.js, Express, and TypeScript for the backend. PostgreSQL (Neon) with Drizzle ORM is used for data persistence. Authentication relies on JWT and bcrypt, with AES-256 encryption for sensitive data, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
+The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript. Data persistence is managed by PostgreSQL (Neon) with Drizzle ORM. Authentication incorporates JWT and bcrypt, complemented by AES-256 encryption for sensitive data, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
 
 ### Feature Specifications
-- **Multi-tenant Architecture**: Isolated data for organizations with SaaS-level and tenant-level roles.
-- **Role-Based Access Control**: Granular permissions.
-- **AI Agent Chat Interface**: Interactive chat with real-time WebSocket streaming for AI agents (Parity, Cadence, Forma, Luca).
+- **Multi-tenant Architecture**: Isolated data and distinct SaaS/tenant-level roles.
+- **Role-Based Access Control**: Granular permission management.
+- **AI Agent Chat Interface**: Real-time WebSocket streaming for interactive AI agents (Parity, Cadence, Forma, Luca).
 - **Unified Workflows System**: Visual automation with hierarchical project management (Stages → Steps → Tasks), supporting hybrid execution, triggers, conditions, and automated actions.
-- **AI Agent Marketplace & Execution System**: Browse, install, and manage AI agents with secure LLM credential storage.
-- **LLM Configuration Management**: CRUD system for AI provider credentials with AES-256-GCM encryption.
-- **PKI Digital Signatures**: Tamper-proof document verification using RSA-2048, meeting eIDAS and ESIGN Act.
+- **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage. Features a centralized agent registry and dynamic loading system for scalability and flexibility.
+- **LLM Configuration Management**: CRUD operations for AI provider credentials with AES-256-GCM encryption.
+- **PKI Digital Signatures**: Tamper-proof document verification using RSA-2048, compliant with eIDAS and ESIGN Act.
 - **Secure Document Management**: Encrypted storage, authenticated downloads, and access control.
 - **User & Client Management**: Tools for managing users, roles, and client profiles.
-- **Audit Trails**: Comprehensive activity logging.
+- **Audit Trails**: Comprehensive logging of all activities.
 - **Form Builder & Renderer**: Dynamic form creation with 22 field types and conditional logic using `expr-eval`.
-- **Polymorphic Tagging System**: Organize resources with tags.
+- **Polymorphic Tagging System**: Organize resources with flexible tagging.
 - **Contacts Management**: Manage contacts associated with clients.
 - **Clients Management**: CRUD operations for client profiles.
-- **Marketplace System**: Template marketplace (Documents, Forms, Pipelines) with pricing models and installation tracking.
+- **Marketplace System**: Provides templates (Documents, Forms, Pipelines) with pricing models and installation tracking, enabling workflow creation from installed templates.
 - **Workflow Assignment System**: Assign clients to workflows, track progress, and manage status lifecycles.
 - **Hierarchical Folder Structure**: Self-referencing folder tree with unlimited nesting, content categorization, and sharing permissions.
-- **Auto-Progression Engine**: Cascade automation for workflow progression (checklist → task → step → stage → assignment complete) with configurable actions and progress tracking.
+- **Auto-Progression Engine**: Cascading automation for workflow progression (checklist → task → step → stage → assignment complete) with configurable actions.
+- **Analytics Dashboard**: Comprehensive analytics with backend API endpoints and interactive frontend visualizations for overview, workflow completion, assignment trends, revenue trends, support metrics, agent usage, and time tracking.
 
 ### System Design Choices
-The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
+The project is organized into `client/`, `server/`, and `shared/` directories. Security is a foundational principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
@@ -47,264 +48,5 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
 - **Multer**: For file uploads.
-- **expr-eval**: For secure expression evaluation in conditional logic.
-### Agent Management System - Configurable Dynamic Loading
-Implemented centralized agent registry and dynamic loading system to eliminate hardcoded agent imports and enable flexible agent management.
-
-**1. Agent Registry (`server/agent-registry.ts`)**
-- **Centralized Configuration**: Single source of truth for all AI agents with metadata (name, display name, category, capabilities, path)
-- **Agent Metadata**: Each agent configured with:
-  - `path`: Relative path from project root for dynamic importing
-  - `className`: Name of the exported agent class
-  - `capabilities`: Array of agent capabilities
-  - `requiresToolExecution`: Flag for agents needing tool execution context (e.g., Luca)
-  - `supportsStreaming`: Flag for agents supporting streaming responses
-- **Helper Functions**: `getAgentConfig()`, `getAllAgents()`, `getAgentsByCategory()`, `isAgentRegistered()`
-
-**2. Dynamic Agent Loader (`server/agent-loader.ts`)**
-- **Dynamic Module Loading**: `loadAgentModule()` function uses dynamic imports to load agent modules based on registry paths
-- **Module Caching**: Prevents redundant imports with in-memory module cache
-- **Instance Creation**: `createAgentInstance()` dynamically instantiates agents with LLM configuration
-- **Capability Queries**: Helper functions to check agent capabilities (`agentRequiresToolExecution()`, `agentSupportsStreaming()`)
-- **Error Handling**: Robust error handling with descriptive messages for missing agents or failed imports
-
-**3. Standardized Agent Directory Structure**
-- **Unified Location**: All agents now in `agents/{agentname}/backend/index.ts` pattern
-- **Consistency**: Luca moved from `server/agents/luca/` to `agents/luca/backend/` to match other agents
-- **Agent Locations**:
-  - Parity: `agents/parity/backend/index.ts`
-  - Cadence: `agents/cadence/backend/index.ts`
-  - Forma: `agents/forma/backend/index.ts`
-  - Kanban: `agents/kanban/backend/index.ts`
-  - Luca: `agents/luca/backend/index.ts`
-
-**4. WebSocket Handler Refactoring (`server/websocket.ts`)**
-- **Eliminated Hardcoded Imports**: Removed all static agent imports (`import { ParityAgent } from ...`)
-- **Dynamic Agent Loading**: Uses `createAgentInstance()` to load agents at runtime based on agent name
-- **Intelligent Routing**: Automatically determines execution mode based on agent capabilities:
-  - Tool execution mode for agents with `requiresToolExecution: true` (Luca)
-  - Streaming mode for conversational agents (Parity)
-  - Structured response mode for analytical agents (Cadence, Forma, Kanban)
-- **Agent-Specific Input Formatting**: Dynamically prepares input based on agent type (workflow data for Cadence, form data for Forma, etc.)
-
-**Benefits:**
-- **Scalability**: Adding new agents requires only updating the registry, no code changes needed
-- **Maintainability**: Single configuration file instead of scattered imports and hardcoded paths
-- **Flexibility**: Agents can be moved, renamed, or reorganized by updating registry paths
-- **Consistency**: Enforces standardized agent structure and interface across the platform
-- **Type Safety**: Full TypeScript support with type checking for agent interfaces
-- **Performance**: Module caching reduces import overhead for frequently used agents
-
-**Files Modified:**
-- `server/agent-registry.ts` - NEW: Central agent configuration registry
-- `server/agent-loader.ts` - NEW: Dynamic agent loading utilities
-- `agents/luca/backend/index.ts` - Moved from `server/agents/luca/index.ts`, updated imports
-- `server/websocket.ts` - Replaced hardcoded switch statement with dynamic loader
-
-### Workflow Template Installation System
-Implemented marketplace-to-workflow conversion enabling users to create actual workflows from installed pipeline templates.
-
-**1. Template Installation Flow**
-- Users browse marketplace for pipeline templates
-- Install templates to their organization (tracked in `marketplaceInstallations`)
-- Create workflows from installed templates via new API endpoint
-
-**2. API Endpoint: POST `/api/marketplace/create-from-template/:itemId`**
-- **Authentication**: Requires `workflows.create` permission
-- **Validation**:
-  - Verifies template is installed by organization
-  - Ensures item is `pipeline_template` category
-  - Validates template structure integrity
-- **Request Body**: Optional name and description overrides
-- **Response**: Complete workflow object with all hierarchy
-
-**3. Workflow Cloning Process**
-- **Step 1**: Create workflow with metadata (name, description, category, tags)
-- **Step 2**: Clone hierarchical structure:
-  - Stages with order and autoProgress settings
-  - Steps nested under stages
-  - Tasks nested under steps
-- **Step 3**: ID Remapping for nodes/edges:
-  - Track old→new ID mappings during cloning
-  - Remap node data references (stageId, stepId, taskId)
-  - Update workflow with remapped graph structure
-- **Step 4**: Activity logging with template reference
-
-**4. Error Handling & Cleanup**
-- **Field Name Fix**: Handles both `type` and `taskType` fields for backward compatibility
-- **Orphan Prevention**: Deletes workflow on failure (cascade deletes handle stages/steps/tasks)
-- **Detailed Error Messages**: Logs specific failure reasons
-- **Multi-tenant Security**: Installation verification prevents unauthorized template usage
-
-**5. Template Content Structure**
-Templates stored in `marketplaceItems.content` JSONB field with structure:
-```json
-{
-  "name": "Template Name",
-  "description": "Template description",
-  "category": "tax/audit/bookkeeping",
-  "tags": ["tag1", "tag2"],
-  "nodes": [...],  // Workflow visualization nodes
-  "edges": [...],  // Workflow connections
-  "stages": [
-    {
-      "id": "stage-1",  // Used for ID remapping
-      "name": "Stage Name",
-      "description": "Stage description",
-      "order": 0,
-      "autoProgress": true,
-      "steps": [
-        {
-          "id": "step-1",
-          "name": "Step Name",
-          "description": "Step description",
-          "order": 0,
-          "autoProgress": true,
-          "tasks": [
-            {
-              "id": "task-1",
-              "name": "Task Name",
-              "description": "Task description",
-              "type": "manual",
-              "order": 0,
-              "autoProgress": false
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Benefits:**
-- **Reusability**: Create multiple workflows from single template
-- **Consistency**: Ensures standard processes across organization
-- **Efficiency**: Eliminates manual workflow setup
-- **Marketplace Integration**: Seamless flow from browse → install → create
-- **Customization**: Override name/description per workflow instance
-- **Data Integrity**: ID remapping maintains graph structure integrity
-
-**Files Modified:**
-- `server/routes.ts` - New endpoint with cloning logic, ID remapping, and cleanup
-
-**Future Enhancements (Suggested by Architect):**
-- Database transactions for atomic cloning
-- Enhanced node/edge remapping for complex graph structures
-- Template versioning and update mechanisms
-
-### Analytics Dashboard System
-Implemented comprehensive analytics dashboard with backend API endpoints and interactive frontend visualizations.
-
-**1. Backend Analytics API Endpoints**
-- **GET `/api/analytics/overview`**: Overall dashboard statistics
-  - User metrics (total, active, inactive)
-  - Client metrics (total, active)
-  - Workflow metrics (total, active, draft)
-  - Assignment metrics (total, active, completed, completion rate)
-  - Revenue metrics (total, paid, outstanding)
-  - Support ticket metrics (total, open, closed)
-  - Uses Promise.all for efficient parallel data fetching
-
-- **GET `/api/analytics/workflow-completion`**: Workflow completion rates
-  - Groups assignments by workflow
-  - Calculates total, completed, and in-progress counts
-  - Returns array of workflow statistics
-
-- **GET `/api/analytics/assignment-trends`**: Assignment trends over time
-  - Supports configurable date range (default: 30 days)
-  - Groups by creation and completion dates
-  - Returns time-series data for trend visualization
-
-- **GET `/api/analytics/revenue-trends`**: Monthly revenue metrics
-  - Groups invoices and payments by month (YYYY-MM)
-  - Calculates invoiced vs paid amounts
-  - Returns chronological monthly data
-
-- **GET `/api/analytics/support-metrics`**: Support ticket analytics
-  - Distribution by status (open, in_progress, resolved, closed)
-  - Distribution by priority (low, medium, high, urgent)
-  - Distribution by category
-  - Returns comprehensive ticket statistics
-
-- **GET `/api/analytics/agent-usage`**: AI agent usage statistics
-  - Groups conversations by agent name
-  - Counts conversations and messages per agent
-  - Returns agent usage metrics
-
-- **GET `/api/analytics/time-tracking`**: Time tracking metrics
-  - Total hours tracked
-  - Billable vs non-billable breakdown
-  - Hours by user
-  - Billable percentage calculation
-
-**2. Frontend Analytics Dashboard**
-- **Overview Section**: 9 stat cards showing key metrics
-  - User statistics (total, active, inactive)
-  - Client statistics (total, active)
-  - Workflow statistics (total, active, draft)
-  - Completion rate
-  - Revenue metrics (total, paid, outstanding)
-  - Support tickets (total, open, closed)
-  - Time tracking (total hours, billable percentage)
-
-- **Interactive Tab System**:
-  - **Workflows Tab**: Bar chart for workflow completion rates
-  - **Trends Tab**: Line chart for assignment trends (created vs completed)
-  - **Revenue Tab**: Line chart for monthly revenue (invoiced vs paid)
-  - **Support Tab**: Pie charts for ticket distribution by status and priority
-  - **Agents Tab**: Bar chart for AI agent usage statistics
-
-**3. Visualization Features**
-- Uses Recharts library for all charts (bar, line, pie)
-- Responsive containers for mobile/tablet/desktop support
-- Themed tooltips matching app design system
-- Color palette using CSS custom properties
-- Smooth animations and transitions
-
-**4. Type Safety**
-- Comprehensive TypeScript interfaces for all API responses:
-  - `AnalyticsOverview`: Overview statistics
-  - `WorkflowCompletionMetrics[]`: Workflow completion data
-  - `AssignmentTrend[]`: Time-series assignment data
-  - `RevenueTrend[]`: Monthly revenue data
-  - `SupportMetrics`: Support ticket statistics
-  - `AgentUsage[]`: AI agent usage data
-  - `TimeTracking`: Time tracking metrics
-- Type-safe useQuery hooks with proper defaults
-- Prevents runtime errors with optional chaining
-
-**5. User Experience**
-- Skeleton loading states for all data sections
-- Empty state messages when no data available
-- Responsive grid layouts for all screen sizes
-- Intuitive tab navigation
-- Visual indicators using Lucide icons
-- Clean, modern design following Carbon Design System
-
-**6. Security & Performance**
-- Multi-tenant security on all endpoints (organization filtering)
-- Efficient data aggregation using maps and filters
-- Parallel API calls using Promise.all
-- Proper error handling and loading states
-- Safe type conversions (parseFloat for numeric strings)
-
-**Benefits:**
-- **Data-Driven Decisions**: Comprehensive insights into practice performance
-- **Visual Analytics**: Easy-to-understand charts and graphs
-- **Real-Time Metrics**: Up-to-date statistics across all platform features
-- **Multi-Dimensional Analysis**: Track workflows, revenue, support, agents, and time
-- **Scalability**: Efficient queries that scale with organization size
-- **Type Safety**: Compile-time checking prevents runtime errors
-
-**Files Modified:**
-- `server/routes.ts` - 7 analytics API endpoints with organization filtering
-- `client/src/pages/analytics.tsx` - Comprehensive dashboard with charts and metrics
-
-**Future Enhancements:**
-- Export analytics data to CSV/PDF
-- Custom date range filters
-- Scheduled analytics reports via email
-- Advanced filtering and segmentation
-- Budget vs actual comparisons
-- Predictive analytics using AI
+- **expr-eval**: Used for secure expression evaluation in conditional logic.
+- **Recharts**: Frontend library for data visualizations and charts.
