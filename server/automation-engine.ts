@@ -456,10 +456,11 @@ export class AutomationEngine {
     const formRequest = await this.storage.createFormSubmission({
       formTemplateId,
       formVersion: formTemplate.version || 1,
+      organizationId: context.organizationId,
       submittedBy: recipientId || context.userId,
+      clientId: recipientType === 'client' ? recipientId : undefined,
       status: 'pending',
-      data: {},
-      metadata: {
+      data: {
         triggeredBy: 'automation',
         workflowId: context.workflowId,
         taskId: context.taskId,
@@ -521,10 +522,9 @@ export class AutomationEngine {
         amount: (entry.hours || 0) * (entry.hourlyRate || 0),
       }));
     } else if (basedOn === 'assignment' && assignmentId) {
-      // Create invoice for entire assignment
-      const assignment = await this.storage.getWorkflowAssignment(assignmentId);
+      // Create invoice for entire assignment - amount should be provided in config
       invoiceItems = [{
-        description: assignment?.name || 'Workflow Assignment',
+        description: description || 'Workflow Assignment',
         quantity: 1,
         rate: calculatedAmount,
         amount: calculatedAmount,
@@ -535,14 +535,13 @@ export class AutomationEngine {
     const invoice = await this.storage.createInvoice({
       clientId,
       organizationId: context.organizationId,
-      assignmentId,
-      projectId,
-      number: `INV-${Date.now()}`, // Auto-generate invoice number
+      invoiceNumber: `INV-${Date.now()}`, // Auto-generate invoice number
       status: 'draft',
       issueDate: new Date(),
       dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
-      subtotal: calculatedAmount,
-      total: calculatedAmount,
+      subtotal: calculatedAmount.toString(),
+      total: calculatedAmount.toString(),
+      createdBy: context.userId,
       notes: description,
     });
 
