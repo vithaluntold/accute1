@@ -4,7 +4,6 @@ import { useLocation, useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   Plus, 
   Edit, 
@@ -17,8 +16,8 @@ import {
   Flag,
   MoreVertical,
   Sparkles,
-  Play,
-  GripVertical
+  GripVertical,
+  Settings
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -76,6 +75,7 @@ interface WorkflowTask {
   aiAgentId?: string;
   automationInput?: string;
   automationOutput?: any;
+  automationConfig?: any;
 }
 
 export default function WorkflowDetail() {
@@ -158,30 +158,6 @@ export default function WorkflowDetail() {
     });
   };
 
-  const getPriorityColor = (priority?: string) => {
-    switch (priority) {
-      case 'high':
-        return 'destructive';
-      case 'medium':
-        return 'default';
-      case 'low':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'in_progress':
-        return <Circle className="h-4 w-4 text-blue-600 fill-current" />;
-      default:
-        return <Circle className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
   if (workflowLoading || stagesLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -209,9 +185,9 @@ export default function WorkflowDetail() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-full">
+    <div className="container mx-auto p-6 max-w-full h-full flex flex-col">
       {/* Workflow Header */}
-      <div className="mb-6">
+      <div className="mb-4 flex-shrink-0">
         <div className="flex items-center gap-2 mb-2">
           <Button
             variant="ghost"
@@ -224,7 +200,7 @@ export default function WorkflowDetail() {
         </div>
         
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
@@ -267,26 +243,17 @@ export default function WorkflowDetail() {
         </Card>
       </div>
 
-      {/* Kanban Board View: Stages → Steps as Columns → Tasks as Cards */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold" data-testid="heading-hierarchy">
-            Workflow Board
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {stages.length} {stages.length === 1 ? 'stage' : 'stages'}
-          </p>
-        </div>
-
+      {/* Horizontal Kanban Board: Stages Side-by-Side */}
+      <div className="flex-1 overflow-hidden">
         {stages.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16">
+          <Card className="border-dashed h-full">
+            <CardContent className="flex flex-col items-center justify-center h-full py-16">
               <ChevronRight className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold mb-2" data-testid="text-no-stages">
                 No stages yet
               </h3>
               <p className="text-muted-foreground text-center mb-6 max-w-md">
-                Break down your workflow into stages. Each stage contains steps, and each step contains tasks.
+                Break down your workflow into stages. Each stage contains steps, and each step contains tasks with powerful automation.
               </p>
               <Button
                 onClick={() => {
@@ -307,11 +274,12 @@ export default function WorkflowDetail() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <Accordion type="multiple" className="space-y-6" data-testid="stages-accordion">
+            {/* Horizontal Scroll Container */}
+            <div className="flex gap-4 h-full overflow-x-auto pb-4" data-testid="stages-kanban">
               {stages
                 .sort((a, b) => a.order - b.order)
                 .map((stage) => (
-                  <StageKanbanCard
+                  <StageColumn
                     key={stage.id}
                     stage={stage}
                     workflowId={workflowId!}
@@ -319,7 +287,24 @@ export default function WorkflowDetail() {
                     setStageDialogOpen={setStageDialogOpen}
                   />
                 ))}
-            </Accordion>
+              
+              {/* Add Stage Column */}
+              <div className="min-w-[400px] max-w-[400px] flex-shrink-0">
+                <Card 
+                  className="h-full border-dashed hover-elevate cursor-pointer"
+                  onClick={() => {
+                    setEditingStage(undefined);
+                    setStageDialogOpen(true);
+                  }}
+                  data-testid="button-add-stage-column"
+                >
+                  <CardContent className="flex flex-col items-center justify-center h-full py-12">
+                    <Plus className="h-12 w-12 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Add Stage</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
             <DragOverlay>
               {activeTask ? <TaskCard task={activeTask} isDragging /> : null}
             </DragOverlay>
@@ -339,8 +324,8 @@ export default function WorkflowDetail() {
   );
 }
 
-// Stage Kanban Card - Shows steps as horizontal columns
-function StageKanbanCard({
+// Stage Column - Vertical column containing steps and tasks
+function StageColumn({
   stage,
   workflowId,
   setEditingStage,
@@ -370,89 +355,90 @@ function StageKanbanCard({
   });
 
   return (
-    <AccordionItem value={stage.id} className="border rounded-lg overflow-hidden" data-testid={`stage-${stage.id}`}>
-      <Card className="border-0">
-        <AccordionTrigger className="hover:no-underline px-6 py-4" data-testid={`stage-trigger-${stage.id}`}>
-          <div className="flex items-center justify-between flex-1 mr-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold">
-                {stage.order}
-              </div>
-              <div className="text-left">
-                <h3 className="font-semibold text-lg" data-testid={`stage-name-${stage.id}`}>
+    <div className="min-w-[400px] max-w-[400px] flex-shrink-0 flex flex-col h-full" data-testid={`stage-${stage.id}`}>
+      <Card className="flex flex-col h-full">
+        {/* Stage Header */}
+        <CardHeader className="pb-3 border-b flex-shrink-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-semibold text-sm flex-shrink-0">
+                  {stage.order}
+                </div>
+                <CardTitle className="text-base truncate" data-testid={`stage-name-${stage.id}`}>
                   {stage.name}
-                </h3>
-                {stage.description && (
-                  <p className="text-sm text-muted-foreground" data-testid={`stage-description-${stage.id}`}>
-                    {stage.description}
-                  </p>
-                )}
+                </CardTitle>
+              </div>
+              {stage.description && (
+                <CardDescription className="text-xs line-clamp-1" data-testid={`stage-description-${stage.id}`}>
+                  {stage.description}
+                </CardDescription>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary" className="text-xs" data-testid={`stage-steps-count-${stage.id}`}>
+                  {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+                </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Badge variant="outline" data-testid={`stage-steps-count-${stage.id}`}>
-                {steps.length} {steps.length === 1 ? 'step' : 'steps'}
-              </Badge>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" data-testid={`stage-menu-${stage.id}`}>
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    data-testid={`stage-edit-${stage.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingStage(stage);
-                      setStageDialogOpen(true);
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Stage
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    data-testid={`stage-delete-${stage.id}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteStage.mutate(stage.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Stage
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" data-testid={`stage-menu-${stage.id}`}>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  data-testid={`stage-edit-${stage.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingStage(stage);
+                    setStageDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Stage
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  data-testid={`stage-delete-${stage.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteStage.mutate(stage.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Stage
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </AccordionTrigger>
-        
-        <AccordionContent className="px-6 pb-6">
-          {steps.length === 0 ? (
-            <div className="text-center py-12 bg-muted/30 rounded-lg">
-              <p className="text-muted-foreground mb-4">No steps in this stage yet</p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setEditingStep(undefined);
-                  setStepDialogOpen(true);
-                }}
-                data-testid={`button-add-step-${stage.id}`}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Step
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Horizontal Scrollable Kanban Board */}
-              <div className="flex gap-4 overflow-x-auto pb-4">
+        </CardHeader>
+
+        {/* Steps and Tasks Container */}
+        <CardContent className="flex-1 overflow-y-auto pt-3 pb-3">
+          <div className="space-y-3">
+            {steps.length === 0 ? (
+              <div className="text-center py-8 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-3">No steps yet</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingStep(undefined);
+                    setStepDialogOpen(true);
+                  }}
+                  data-testid={`button-add-step-${stage.id}`}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Step
+                </Button>
+              </div>
+            ) : (
+              <>
                 {steps
                   .sort((a, b) => a.order - b.order)
                   .map((step) => (
-                    <StepColumn
+                    <StepSection
                       key={step.id}
                       step={step}
                       stageId={stage.id}
@@ -462,39 +448,41 @@ function StageKanbanCard({
                     />
                   ))}
                 
-                {/* Add Step Column */}
-                <div className="min-w-[320px] flex-shrink-0">
-                  <Card className="h-full border-dashed hover-elevate cursor-pointer" onClick={() => {
+                {/* Add Step Button */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="w-full hover-elevate"
+                  onClick={() => {
                     setEditingStep(undefined);
                     setStepDialogOpen(true);
-                  }}>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                      <Plus className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm font-medium text-muted-foreground">Add Step</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-          )}
+                  }}
+                  data-testid={`button-add-step-${stage.id}`}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Step
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
 
-          {/* Step Dialog */}
-          <StepDialog
-            open={stepDialogOpen}
-            onOpenChange={setStepDialogOpen}
-            workflowId={workflowId}
-            stageId={stage.id}
-            step={editingStep}
-            stepsCount={steps.length}
-          />
-        </AccordionContent>
+        {/* Step Dialog */}
+        <StepDialog
+          open={stepDialogOpen}
+          onOpenChange={setStepDialogOpen}
+          workflowId={workflowId}
+          stageId={stage.id}
+          step={editingStep}
+          stepsCount={steps.length}
+        />
       </Card>
-    </AccordionItem>
+    </div>
   );
 }
 
-// Step Column - Kanban column for tasks
-function StepColumn({
+// Step Section - Shows a step with its tasks
+function StepSection({
   step,
   stageId,
   workflowId,
@@ -536,108 +524,108 @@ function StepColumn({
   });
 
   return (
-    <div className="min-w-[320px] flex-shrink-0" data-testid={`step-${step.id}`}>
-      <Card className="h-full flex flex-col">
-        <CardHeader className="pb-3 border-b">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-sm font-semibold truncate" data-testid={`step-name-${step.id}`}>
-                  {step.name}
-                </CardTitle>
-              </div>
-              {step.description && (
-                <CardDescription className="text-xs line-clamp-2" data-testid={`step-description-${step.id}`}>
-                  {step.description}
-                </CardDescription>
-              )}
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="secondary" className="text-xs" data-testid={`step-progress-${step.id}`}>
-                  {totalTasks} {totalTasks === 1 ? 'task' : 'tasks'}
-                </Badge>
-                {totalTasks > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {completedTasks} done
-                  </span>
-                )}
-              </div>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`step-menu-${step.id}`}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid={`step-edit-${step.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingStep(step);
-                    setStepDialogOpen(true);
-                  }}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Step
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive"
-                  data-testid={`step-delete-${step.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteStep.mutate(step.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Step
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+    <div className="space-y-2" data-testid={`step-${step.id}`}>
+      {/* Step Header */}
+      <div className="flex items-start justify-between gap-2 p-2 bg-muted/30 rounded-lg">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="text-sm font-semibold truncate" data-testid={`step-name-${step.id}`}>
+              {step.name}
+            </p>
           </div>
-        </CardHeader>
-        
-        <CardContent className="flex-1 pt-3 pb-3 min-h-[200px]" ref={setNodeRef}>
-          <div className="space-y-2">
-            <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-              {tasks
-                .sort((a, b) => a.order - b.order)
-                .map((task) => (
-                  <DraggableTaskCard key={task.id} task={task} />
-                ))}
-            </SortableContext>
-            
-            <Button
-              size="sm"
-              variant="ghost"
-              className="w-full hover-elevate"
-              onClick={() => {
-                setEditingTask(undefined);
-                setTaskDialogOpen(true);
-              }}
-              data-testid={`button-add-task-${step.id}`}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
+          {step.description && (
+            <p className="text-xs text-muted-foreground line-clamp-1" data-testid={`step-description-${step.id}`}>
+              {step.description}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-muted-foreground" data-testid={`step-progress-${step.id}`}>
+              {totalTasks} {totalTasks === 1 ? 'task' : 'tasks'}
+              {totalTasks > 0 && ` • ${completedTasks} done`}
+            </span>
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" data-testid={`step-menu-${step.id}`}>
+              <MoreVertical className="h-3.5 w-3.5" />
             </Button>
-          </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              data-testid={`step-edit-${step.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingStep(step);
+                setStepDialogOpen(true);
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Step
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              data-testid={`step-delete-${step.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteStep.mutate(step.id);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Step
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-          {/* Task Dialog */}
-          <TaskDialog
-            open={taskDialogOpen}
-            onOpenChange={setTaskDialogOpen}
-            stepId={step.id}
-            workflowId={workflowId}
-            task={editingTask}
-            tasksCount={tasks.length}
-          />
-        </CardContent>
-      </Card>
+      {/* Tasks */}
+      <div className="space-y-2" ref={setNodeRef}>
+        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks
+            .sort((a, b) => a.order - b.order)
+            .map((task) => (
+              <DraggableTaskCard key={task.id} task={task} setEditingTask={setEditingTask} setTaskDialogOpen={setTaskDialogOpen} />
+            ))}
+        </SortableContext>
+        
+        <Button
+          size="sm"
+          variant="ghost"
+          className="w-full hover-elevate text-xs h-8"
+          onClick={() => {
+            setEditingTask(undefined);
+            setTaskDialogOpen(true);
+          }}
+          data-testid={`button-add-task-${step.id}`}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Add Task
+        </Button>
+      </div>
+
+      {/* Task Dialog */}
+      <TaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        stepId={step.id}
+        workflowId={workflowId}
+        task={editingTask}
+        tasksCount={tasks.length}
+      />
     </div>
   );
 }
 
 // Draggable Task Card
-function DraggableTaskCard({ task }: { task: WorkflowTask }) {
+function DraggableTaskCard({
+  task,
+  setEditingTask,
+  setTaskDialogOpen,
+}: {
+  task: WorkflowTask;
+  setEditingTask: (task: WorkflowTask | undefined) => void;
+  setTaskDialogOpen: (open: boolean) => void;
+}) {
   const {
     attributes,
     listeners,
@@ -657,15 +645,25 @@ function DraggableTaskCard({ task }: { task: WorkflowTask }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} />
+      <TaskCard task={task} setEditingTask={setEditingTask} setTaskDialogOpen={setTaskDialogOpen} />
     </div>
   );
 }
 
 // Task Card Component
-function TaskCard({ task, isDragging = false }: { task: WorkflowTask; isDragging?: boolean }) {
-  const { toast } = useToast();
+function TaskCard({ 
+  task, 
+  isDragging = false,
+  setEditingTask,
+  setTaskDialogOpen,
+}: { 
+  task: WorkflowTask; 
+  isDragging?: boolean;
+  setEditingTask?: (task: WorkflowTask | undefined) => void;
+  setTaskDialogOpen?: (open: boolean) => void;
+}) {
   const isAiPowered = task.type === 'automated' && task.aiAgentId;
+  const hasAutomation = task.automationConfig;
 
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
@@ -683,11 +681,11 @@ function TaskCard({ task, isDragging = false }: { task: WorkflowTask; isDragging
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+        return <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />;
       case 'in_progress':
-        return <Circle className="h-4 w-4 text-blue-600 fill-current" />;
+        return <Circle className="h-3.5 w-3.5 text-blue-600 fill-current" />;
       default:
-        return <Circle className="h-4 w-4 text-muted-foreground" />;
+        return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
 
@@ -695,14 +693,20 @@ function TaskCard({ task, isDragging = false }: { task: WorkflowTask; isDragging
     <Card
       className={`group cursor-grab active:cursor-grabbing hover-elevate ${isDragging ? 'rotate-3 shadow-lg' : ''}`}
       data-testid={`task-${task.id}`}
+      onClick={() => {
+        if (setEditingTask && setTaskDialogOpen) {
+          setEditingTask(task);
+          setTaskDialogOpen(true);
+        }
+      }}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start gap-2 mb-2">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
+      <CardContent className="p-2.5">
+        <div className="flex items-start gap-2">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-2 mb-1">
+            <div className="flex items-start gap-1.5 mb-1">
               {getStatusIcon(task.status)}
               <p className="text-sm font-medium flex-1 line-clamp-2" data-testid={`task-name-${task.id}`}>
                 {task.name}
@@ -710,32 +714,41 @@ function TaskCard({ task, isDragging = false }: { task: WorkflowTask; isDragging
             </div>
             
             {task.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 ml-6" data-testid={`task-description-${task.id}`}>
+              <p className="text-xs text-muted-foreground line-clamp-1 ml-5" data-testid={`task-description-${task.id}`}>
                 {task.description}
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-1.5 mt-2 ml-6">
-              {isAiPowered && (
-                <Badge variant="secondary" className="text-xs gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  AI
+            <div className="flex flex-wrap items-center gap-1 mt-1.5 ml-5">
+              {(isAiPowered || hasAutomation) && (
+                <Badge variant="secondary" className="text-xs gap-1 h-5">
+                  {isAiPowered ? (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      AI
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="h-3 w-3" />
+                      Auto
+                    </>
+                  )}
                 </Badge>
               )}
               {task.priority && (
-                <Badge variant={getPriorityColor(task.priority)} className="text-xs gap-1">
+                <Badge variant={getPriorityColor(task.priority)} className="text-xs gap-1 h-5">
                   <Flag className="h-3 w-3" />
                   {task.priority}
                 </Badge>
               )}
               {task.dueDate && (
-                <Badge variant="outline" className="text-xs gap-1">
+                <Badge variant="outline" className="text-xs gap-1 h-5">
                   <Calendar className="h-3 w-3" />
-                  {new Date(task.dueDate).toLocaleDateString()}
+                  {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Badge>
               )}
               {task.assignedTo && (
-                <Badge variant="outline" className="text-xs gap-1">
+                <Badge variant="outline" className="text-xs gap-1 h-5">
                   <User className="h-3 w-3" />
                   Assigned
                 </Badge>

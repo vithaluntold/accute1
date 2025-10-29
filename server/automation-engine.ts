@@ -18,7 +18,17 @@ export interface ConditionConfig {
 }
 
 export interface ActionConfig {
-  type: 'create_task' | 'send_notification' | 'call_api' | 'run_ai_agent' | 'update_field';
+  type: 
+    | 'create_task' 
+    | 'send_notification' 
+    | 'call_api' 
+    | 'run_ai_agent' 
+    | 'update_field'
+    | 'send_email'
+    | 'trigger_form'
+    | 'send_invoice'
+    | 'schedule_followup'
+    | 'trigger_workflow';
   config: Record<string, any>;
 }
 
@@ -117,6 +127,21 @@ export class AutomationEngine {
       
       case 'update_field':
         return this.updateField(action.config, context);
+      
+      case 'send_email':
+        return this.sendEmail(action.config, context);
+      
+      case 'trigger_form':
+        return this.triggerForm(action.config, context);
+      
+      case 'send_invoice':
+        return this.sendInvoice(action.config, context);
+      
+      case 'schedule_followup':
+        return this.scheduleFollowup(action.config, context);
+      
+      case 'trigger_workflow':
+        return this.triggerWorkflow(action.config, context);
       
       default:
         throw new Error(`Unknown action type: ${action.type}`);
@@ -352,6 +377,321 @@ export class AutomationEngine {
         } as any);
       }
     }
+  }
+
+  /**
+   * Send an email
+   */
+  private async sendEmail(config: any, context: any): Promise<any> {
+    const { to, subject, body, templateId, variables } = config;
+    
+    // Get recipient email
+    let recipientEmail = to;
+    if (!recipientEmail && config.recipientType) {
+      // Fetch recipient based on type (client, assignee, etc.)
+      if (config.recipientType === 'client' && config.clientId) {
+        const client = await this.storage.getClient(config.clientId);
+        recipientEmail = client?.email;
+      } else if (config.recipientType === 'assignee' && context.taskId) {
+        const task = await this.storage.getWorkflowTask(context.taskId);
+        if (task?.assignedTo) {
+          const user = await this.storage.getUser(task.assignedTo);
+          recipientEmail = user?.email;
+        }
+      }
+    }
+
+    if (!recipientEmail) {
+      throw new Error('No recipient email address specified');
+    }
+
+    // Create email record (in production, integrate with email service like SendGrid, AWS SES, etc.)
+    const email = {
+      to: recipientEmail,
+      subject: subject || 'Workflow Notification',
+      body: body || '',
+      templateId,
+      variables,
+      status: 'pending',
+      sentAt: null,
+      metadata: {
+        workflowId: context.workflowId,
+        organizationId: context.organizationId,
+      },
+    };
+
+    // Log the email action
+    console.log('[Automation] Email scheduled:', email);
+    
+    // In a real implementation, this would integrate with an email service
+    // For now, create a notification as fallback
+    await this.storage.createNotification({
+      userId: context.userId,
+      title: `Email sent: ${subject}`,
+      message: `To: ${recipientEmail}\n\n${body}`,
+      type: 'info',
+      metadata: email,
+    });
+
+    return { sent: true, email };
+  }
+
+  /**
+   * Trigger a form to be sent to a client or user
+   */
+  private async triggerForm(config: any, context: any): Promise<any> {
+    const { formTemplateId, recipientId, recipientType, dueDate, message } = config;
+
+    if (!formTemplateId) {
+      throw new Error('formTemplateId is required to trigger a form');
+    }
+
+    // Verify form template exists
+    const formTemplate = await this.storage.getFormTemplate(formTemplateId);
+    if (!formTemplate) {
+      throw new Error(`Form template ${formTemplateId} not found`);
+    }
+
+    // Create form submission request
+    const formRequest = await this.storage.createFormSubmission({
+      formTemplateId,
+      formVersion: formTemplate.version || 1,
+      submittedBy: recipientId || context.userId,
+      status: 'pending',
+      data: {},
+      metadata: {
+        triggeredBy: 'automation',
+        workflowId: context.workflowId,
+        taskId: context.taskId,
+        message,
+        dueDate,
+      },
+    });
+
+    // Send notification to recipient
+    if (recipientId) {
+      await this.storage.createNotification({
+        userId: recipientId,
+        title: 'Form Submission Required',
+        message: message || `Please complete the form: ${formTemplate.name}`,
+        type: 'action_required',
+        metadata: {
+          formTemplateId,
+          formSubmissionId: formRequest.id,
+        },
+      });
+    }
+
+    return formRequest;
+  }
+
+  /**
+   * Send an invoice (based on time entries, assignment, or engagement letter)
+   */
+  private async sendInvoice(config: any, context: any): Promise<any> {
+    const { clientId, basedOn, assignmentId, projectId, timeEntryIds, amount, dueDate, description } = config;
+
+    if (!clientId) {
+      throw new Error('clientId is required to send an invoice');
+    }
+
+    // Verify client exists
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    // Calculate invoice amount based on configuration
+    let calculatedAmount = amount || 0;
+    let invoiceItems: any[] = [];
+
+    if (basedOn === 'time_entries' && clientId) {
+      // Fetch time entries for client and calculate amount
+      const timeEntries = await this.storage.getTimeEntriesByClient(clientId);
+      calculatedAmount = timeEntries.reduce((sum: number, entry: any) => {
+        const hours = entry.hours || 0;
+        const rate = entry.hourlyRate || 0;
+        return sum + (hours * rate);
+      }, 0);
+
+      invoiceItems = timeEntries.map((entry: any) => ({
+        description: entry.description || 'Time Entry',
+        quantity: entry.hours,
+        rate: entry.hourlyRate,
+        amount: (entry.hours || 0) * (entry.hourlyRate || 0),
+      }));
+    } else if (basedOn === 'assignment' && assignmentId) {
+      // Create invoice for entire assignment
+      const assignment = await this.storage.getWorkflowAssignment(assignmentId);
+      invoiceItems = [{
+        description: assignment?.name || 'Workflow Assignment',
+        quantity: 1,
+        rate: calculatedAmount,
+        amount: calculatedAmount,
+      }];
+    }
+
+    // Create invoice
+    const invoice = await this.storage.createInvoice({
+      clientId,
+      organizationId: context.organizationId,
+      assignmentId,
+      projectId,
+      number: `INV-${Date.now()}`, // Auto-generate invoice number
+      status: 'draft',
+      issueDate: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+      subtotal: calculatedAmount,
+      total: calculatedAmount,
+      notes: description,
+    });
+
+    // Add invoice items
+    for (const item of invoiceItems) {
+      await this.storage.createInvoiceItem({
+        invoiceId: invoice.id,
+        ...item,
+      });
+    }
+
+    // Send notification to client
+    await this.storage.createNotification({
+      userId: client.createdBy, // Notify client contact
+      title: 'New Invoice',
+      message: `An invoice for $${calculatedAmount.toFixed(2)} has been generated.`,
+      type: 'info',
+      metadata: {
+        invoiceId: invoice.id,
+      },
+    });
+
+    return invoice;
+  }
+
+  /**
+   * Schedule a follow-up task or reminder
+   */
+  private async scheduleFollowup(config: any, context: any): Promise<any> {
+    const { delay, delayUnit = 'days', taskName, assignedTo, priority = 'medium', stepId } = config;
+
+    if (!delay) {
+      throw new Error('delay is required to schedule a follow-up');
+    }
+
+    // Calculate follow-up date
+    const now = new Date();
+    let followupDate = new Date(now);
+    
+    switch (delayUnit) {
+      case 'minutes':
+        followupDate.setMinutes(now.getMinutes() + delay);
+        break;
+      case 'hours':
+        followupDate.setHours(now.getHours() + delay);
+        break;
+      case 'days':
+        followupDate.setDate(now.getDate() + delay);
+        break;
+      case 'weeks':
+        followupDate.setDate(now.getDate() + (delay * 7));
+        break;
+      case 'months':
+        followupDate.setMonth(now.getMonth() + delay);
+        break;
+      default:
+        followupDate.setDate(now.getDate() + delay);
+    }
+
+    // Create follow-up task
+    const targetStepId = stepId || context.stepId;
+    
+    if (!targetStepId) {
+      throw new Error('stepId required to create follow-up task');
+    }
+
+    const followupTask = await this.storage.createWorkflowTask({
+      stepId: targetStepId,
+      name: taskName || 'Follow-up',
+      description: `Scheduled follow-up after ${delay} ${delayUnit}`,
+      type: 'manual',
+      assignedTo: assignedTo || context.userId,
+      priority,
+      dueDate: followupDate,
+      order: 999, // Place at end
+    });
+
+    // Create reminder notification
+    await this.storage.createNotification({
+      userId: assignedTo || context.userId,
+      title: 'Follow-up Scheduled',
+      message: `A follow-up task "${taskName || 'Follow-up'}" has been scheduled for ${followupDate.toLocaleDateString()}`,
+      type: 'info',
+      metadata: {
+        taskId: followupTask.id,
+        dueDate: followupDate.toISOString(),
+      },
+    });
+
+    return followupTask;
+  }
+
+  /**
+   * Trigger another workflow (for complex multi-workflow automations)
+   */
+  private async triggerWorkflow(config: any, context: any): Promise<any> {
+    const { workflowId, clientId, assignedTo, name, priority = 'medium' } = config;
+
+    if (!workflowId) {
+      throw new Error('workflowId is required to trigger a workflow');
+    }
+
+    if (!clientId) {
+      throw new Error('clientId is required to trigger a workflow');
+    }
+
+    // Verify workflow exists
+    const workflow = await this.storage.getWorkflow(workflowId);
+    if (!workflow) {
+      throw new Error(`Workflow ${workflowId} not found`);
+    }
+
+    // Verify client exists
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    // Get workflow stages for total count
+    const stages = await this.storage.getStagesByWorkflow(workflowId);
+
+    // Create workflow assignment
+    const assignment = await this.storage.createWorkflowAssignment({
+      workflowId,
+      clientId,
+      organizationId: context.organizationId,
+      name: name || `${client.companyName} - ${workflow.name}`,
+      assignedBy: context.userId,
+      assignedTo: assignedTo || context.userId,
+      status: 'not_started',
+      priority,
+      totalStages: stages.length,
+      progress: 0,
+      completedStages: 0,
+    });
+
+    // Send notification
+    await this.storage.createNotification({
+      userId: assignedTo || context.userId,
+      title: 'New Workflow Assignment',
+      message: `You have been assigned to workflow: ${workflow.name}`,
+      type: 'action_required',
+      metadata: {
+        assignmentId: assignment.id,
+        workflowId,
+      },
+    });
+
+    return assignment;
   }
 
   /**
