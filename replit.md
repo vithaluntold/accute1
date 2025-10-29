@@ -49,3 +49,49 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Anthropic Claude API**: AI model integration.
 - **Multer**: Node.js middleware for file uploads.
 - **expr-eval**: Secure expression evaluation for conditional logic.
+
+## Recent Changes (October 29, 2025)
+
+### Critical Bug Fixes - Workflow Hierarchy System
+Fixed four critical bugs affecting the workflow hierarchy (Stages → Steps → Tasks) system:
+
+**1. NaN Parsing Bug (Frontend)**
+- **Issue**: Empty numeric input fields (order fields in Stage/Step/Task dialogs) caused `parseInt()` to return NaN, breaking form submissions and causing console errors.
+- **Fix**: All three dialogs (StageDialog, StepDialog, TaskDialog) now use pattern: `field.onChange(val === "" ? 0 : parseInt(val, 10))` to default empty strings to 0.
+- **Impact**: Forms submit cleanly with no NaN errors.
+
+**2. Empty Due Date 500 Error (Backend)**
+- **Issue**: Empty date strings from frontend caused 500 errors when Drizzle attempted to call `.toISOString()` on empty strings.
+- **Fix**: Backend sanitizes empty date strings to `undefined` before database insertion using pattern: `dueDate: data.dueDate && data.dueDate.trim() ? data.dueDate : undefined`
+- **Impact**: No more 500 errors when submitting forms with empty due dates.
+
+**3. Workflow Hierarchy Not Appearing Without Reload (Backend + Frontend)**
+- **Issue**: Creating steps or tasks required page reload to see them because frontend made separate API calls for stages, steps, and tasks instead of using nested data.
+- **Fix**: 
+  - **Backend**: GET `/api/workflows/:id/stages` now returns complete hierarchy in single optimized query with nested steps and tasks.
+  - **Frontend**: workflow-detail.tsx uses nested data from stages query instead of making separate queries per stage/step.
+- **Impact**: Complete hierarchy loads in single API call, eliminating N+1 query problem and improving performance.
+
+**4. Cache Invalidation Not Working (Frontend)**
+- **Issue**: Creating/updating stages, steps, or tasks didn't refresh UI because mutations invalidated obsolete query keys instead of parent stages query.
+- **Fix**: All three dialogs now invalidate correct parent queries:
+  ```typescript
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId] });
+  }
+  ```
+- **Impact**: UI updates immediately after any create/update operation. Zero page reloads needed.
+
+**End-to-End Testing Results:** ✅ ALL PASSED
+- Workflow → Stage → Step → Task creation: Working perfectly
+- All items appear immediately without page reload
+- Step progress badges update correctly
+- No NaN errors, no 500 errors, complete cache coherence
+
+**Files Modified:**
+- `client/src/components/stage-dialog.tsx` - NaN fix
+- `client/src/components/step-dialog.tsx` - NaN fix + cache invalidation fix
+- `client/src/components/task-dialog.tsx` - NaN fix + cache invalidation fix + workflowId prop
+- `client/src/pages/workflow-detail.tsx` - Nested data usage + workflowId passing to TaskDialog
+- `server/routes.ts` - Nested API response + date sanitization
