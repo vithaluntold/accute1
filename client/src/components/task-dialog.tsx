@@ -34,8 +34,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Zap } from "lucide-react";
 import type { InstalledAgentView } from "@shared/schema";
+import { AutomationActionsEditor, type AutomationAction } from "@/components/automation-actions-editor";
 
 const taskSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -96,6 +97,8 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
   const { toast } = useToast();
   const isEditing = !!task;
   const [selectedTab, setSelectedTab] = useState<string>("manual");
+  const [automationActions, setAutomationActions] = useState<AutomationAction[]>([]);
+  const [automationActionsValid, setAutomationActionsValid] = useState<boolean>(true);
 
   // Fetch installed AI agents
   const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
@@ -134,6 +137,12 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
         aiAgentId: taskData.aiAgentId || undefined,
         automationInput: taskData.automationInput || "",
       });
+      // Load automation actions if they exist
+      if (taskData.automationActions && Array.isArray(taskData.automationActions)) {
+        setAutomationActions(taskData.automationActions);
+      } else {
+        setAutomationActions([]);
+      }
     } else if (open && !task) {
       setSelectedTab("manual");
       form.reset({
@@ -147,17 +156,22 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
         aiAgentId: undefined,
         automationInput: "",
       });
+      setAutomationActions([]);
     }
   }, [open, task, tasksCount, form]);
 
-  // Update type when tab changes
+  // Update type when tab changes (but not for automation tab)
   const handleTabChange = (value: string) => {
     setSelectedTab(value);
-    form.setValue("type", value as "manual" | "automated");
-    if (value === "manual") {
-      form.setValue("aiAgentId", undefined);
-      form.setValue("automationInput", "");
+    // Only update type for manual/automated tabs
+    if (value === "manual" || value === "automated") {
+      form.setValue("type", value as "manual" | "automated");
+      if (value === "manual") {
+        form.setValue("aiAgentId", undefined);
+        form.setValue("automationInput", "");
+      }
     }
+    // Automation tab doesn't change the underlying task type
   };
 
   const createMutation = useMutation({
@@ -211,6 +225,16 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
   });
 
   const onSubmit = (data: TaskFormData) => {
+    // Validate automation actions before submission
+    if (automationActions.length > 0 && !automationActionsValid) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors in automation actions before saving",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Build clean payload - only include automation fields for automated tasks
     const cleanData: any = { ...data };
     
@@ -221,6 +245,9 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
       delete cleanData.automationInput;
       delete cleanData.aiAgentId;
     }
+    
+    // Always include automation actions (even if empty) to allow clearing
+    cleanData.automationActions = automationActions;
     
     if (isEditing) {
       updateMutation.mutate(cleanData);
@@ -247,13 +274,17 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* Task Type Tabs */}
             <Tabs value={selectedTab} onValueChange={handleTabChange} data-testid="tabs-task-type">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="manual" data-testid="tab-manual">
                   Manual Task
                 </TabsTrigger>
                 <TabsTrigger value="automated" data-testid="tab-automated">
                   <Sparkles className="h-4 w-4 mr-2" />
                   AI-Powered
+                </TabsTrigger>
+                <TabsTrigger value="automation" data-testid="tab-automation">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Automation
                 </TabsTrigger>
               </TabsList>
 
@@ -383,6 +414,28 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
                   )}
                 />
               </TabsContent>
+
+              {/* Automation Actions Tab */}
+              <TabsContent value="automation" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Task Configuration</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Basic task information (configure on Manual or AI-Powered tabs)
+                  </p>
+                </div>
+                
+                <div className="space-y-2 pt-4 border-t">
+                  <h4 className="text-sm font-medium">Post-Completion Actions</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Configure actions that automatically execute when this task is completed
+                  </p>
+                  <AutomationActionsEditor
+                    actions={automationActions}
+                    onChange={setAutomationActions}
+                    onValidationChange={setAutomationActionsValid}
+                  />
+                </div>
+              </TabsContent>
             </Tabs>
 
             {/* Common Fields */}
@@ -495,7 +548,11 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={
+                  createMutation.isPending || 
+                  updateMutation.isPending || 
+                  (automationActions.length > 0 && !automationActionsValid)
+                }
                 data-testid="button-save-task"
               >
                 {createMutation.isPending || updateMutation.isPending
