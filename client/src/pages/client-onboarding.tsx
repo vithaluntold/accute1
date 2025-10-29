@@ -96,10 +96,17 @@ export default function ClientOnboarding() {
   useEffect(() => {
     if (sessionData?.collectedData) {
       console.log("📋 Updating AI Context from session data:", sessionData.collectedData);
-      setAiContext(sessionData.collectedData as any);
-      console.log("✅ AI Context updated. Required fields:", (sessionData.collectedData as any).requiredFields);
+      const newContext = sessionData.collectedData as any;
+      setAiContext(newContext);
+      console.log("✅ AI Context updated. Required fields:", newContext.requiredFields);
+      
+      // Auto-show form when AI has determined required fields
+      if (newContext.requiredFields && newContext.requiredFields.length > 0 && !showSensitiveForm) {
+        console.log("🎯 Auto-showing form - AI has collected all information");
+        setShowSensitiveForm(true);
+      }
     }
-  }, [sessionData]);
+  }, [sessionData, showSensitiveForm]);
 
   // Start onboarding session
   const startMutation = useMutation({
@@ -671,37 +678,30 @@ export default function ClientOnboarding() {
                 </Button>
               </div>
 
-              {/* Quick Actions */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSensitiveForm(!showSensitiveForm)}
-                  data-testid="button-toggle-form"
-                >
-                  <Building2 className="h-4 w-4 mr-2" />
-                  {showSensitiveForm ? "Hide" : "Add"} Contact Information
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleCompleteOnboarding}
-                  disabled={completeMutation.isPending}
-                  data-testid="button-complete"
-                >
-                  {completeMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Complete Onboarding
-                    </>
-                  )}
-                </Button>
-              </div>
+              {/* Quick Actions - Only show after AI has collected context */}
+              {aiContext.requiredFields && aiContext.requiredFields.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleCompleteOnboarding}
+                    disabled={completeMutation.isPending}
+                    data-testid="button-complete"
+                  >
+                    {completeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Complete Onboarding
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
