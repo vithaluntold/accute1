@@ -68,6 +68,7 @@ export default function ClientOnboarding() {
       crossFieldValidation?: {
         contains?: string;
         derivedFrom?: string;
+        expectedPrefix?: string; // AI-calculated prefix (e.g., "27" for Maharashtra GSTIN)
         message?: string;
       };
     }>;
@@ -318,9 +319,9 @@ export default function ClientOnboarding() {
 
     // Cross-field validation
     if (validation.crossFieldValidation) {
-      const { contains, derivedFrom, message } = validation.crossFieldValidation;
+      const { contains, expectedPrefix, message } = validation.crossFieldValidation;
       
-      // Check if this field should contain another field's value
+      // Check if this field should contain another field's value (e.g., GSTIN contains PAN)
       if (contains) {
         const otherFieldValue = (sensitiveData as any)[contains];
         if (otherFieldValue && !trimmedValue.includes(otherFieldValue)) {
@@ -328,10 +329,9 @@ export default function ClientOnboarding() {
         }
       }
 
-      // Check if this field should be derived from another field (e.g., state code from address)
-      if (derivedFrom && message) {
-        // This is a hint/warning, not a hard validation error
-        return null; // We can't validate derived fields without complex logic
+      // Check if this field should start with an expected prefix (AI-calculated from state, etc.)
+      if (expectedPrefix && !trimmedValue.startsWith(expectedPrefix)) {
+        return message || `Must start with ${expectedPrefix}`;
       }
     }
 
@@ -425,13 +425,19 @@ export default function ClientOnboarding() {
 
     // Cross-field validation
     if (validation.crossFieldValidation) {
-      const { contains, message } = validation.crossFieldValidation;
+      const { contains, expectedPrefix, message } = validation.crossFieldValidation;
       
+      // Check if this field should contain another field's value (e.g., GSTIN contains PAN)
       if (contains) {
         const otherFieldValue = (data as any)[contains];
         if (otherFieldValue && !trimmedValue.includes(otherFieldValue)) {
           return message || `Must contain ${contains.toUpperCase()}`;
         }
+      }
+
+      // Check if this field should start with an expected prefix (AI-calculated from state, etc.)
+      if (expectedPrefix && !trimmedValue.startsWith(expectedPrefix)) {
+        return message || `Must start with ${expectedPrefix}`;
       }
     }
 
