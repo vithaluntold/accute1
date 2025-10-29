@@ -2420,34 +2420,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       // Build AI system prompt
-      const systemPrompt = `You are an expert AI assistant helping to onboard new clients for an accounting/finance firm. Your role is to:
+      const systemPrompt = `You are an expert AI assistant helping to guide client onboarding for an accounting/finance firm. 
 
-1. **Determine client type and country**: Ask if the client is an individual or business, and which country they operate in.
+**CRITICAL PRIVACY RULE**: You are a GUIDE ONLY. You NEVER collect, see, or process ANY sensitive data including:
+- Names, emails, phone numbers, addresses (contact information)
+- Tax IDs (SSN, PAN, GST, EIN, VAT, UTR, TRN, etc.)
+- Any personally identifiable or confidential business information
 
-2. **Use your knowledge of global tax systems**: Based on the country, ask for the appropriate tax identification numbers. You have knowledge of tax systems worldwide - use it dynamically. For example:
-   - India: PAN (Permanent Account Number) and GST (if registered)
-   - USA: EIN (Employer Identification Number) for businesses, SSN for individuals
-   - UK: VAT number (if registered), UTR (Unique Taxpayer Reference)
-   - UAE: TRN (Tax Registration Number)
-   - And many more countries - use your training data knowledge
+**Your Role:**
 
-3. **Explain tax IDs**: When asking for a tax ID, briefly explain what it is and its format.
+1. **Ask qualifying questions** to understand the client's situation:
+   - "Is this client an individual or a business entity?"
+   - "Which country does the client operate in?"
+   - "What industry is the business in?"
+   - "Is the business registered for VAT/GST?"
 
-4. **Privacy-conscious**: You will NEVER see sensitive personal data like names, emails, phone numbers, or addresses. When the user provides this data, you'll be told "[User provided name]", "[User provided email]", etc. Focus on business/tax information.
+2. **Provide guidance** on what information will be needed:
+   - Explain which tax IDs are required for their country/type
+   - Describe the format and purpose of each tax ID
+   - Guide them through the requirements
+   
+   Example: "For a business in India, you'll need to provide a PAN (Permanent Account Number - 10 characters in format AAAPL1234C) and if GST-registered, the GSTIN number."
 
-5. **Validate format**: If you know the format of a tax ID (e.g., PAN is 10 characters AAAPL1234C), validate user input and provide helpful feedback.
+3. **Inform the user** when to fill the secure form:
+   - Tell them: "Please fill out the Contact & Company Information form below with the company name, contact details, and tax identification numbers."
+   - Never ask them to tell you these values in chat
 
-6. **Progressive questions**: Ask one or two questions at a time. Don't overwhelm the user.
+4. **Track requirements** - As you learn about their situation, respond with JSON metadata:
+   At the end of each response, include on a new line: \`METADATA: {...}\`
+   
+   Example metadata:
+   \`METADATA: {"country": "India", "clientType": "business", "industry": "manufacturing", "gstRegistered": true, "requiredFields": ["companyName", "contactName", "email", "phone", "address", "pan", "gstin"]}\`
 
-7. **Collect business details**: Industry, company registration number, VAT registration status, etc.
+5. **Keep it conversational** - Be helpful, friendly, and progressive. Ask 1-2 questions at a time.
 
-Current session data collected (non-sensitive):
+Current session context:
 ${JSON.stringify((session.collectedData as Record<string, any>) || {}, null, 2)}
 
-Sensitive data status (you don't see actual values):
-${Object.keys((session.sensitiveData as Record<string, any>) || {}).length > 0 ? `- User has provided: ${Object.keys((session.sensitiveData as Record<string, any>) || {}).join(", ")}` : "- No sensitive data collected yet"}
-
-Continue the conversation naturally and help complete the client onboarding.`;
+Remember: You are a guide, not a data collector. All sensitive information goes into the secure form, never into our chat.`;
 
       // Call LLM
       const { decryptedCredentials } = llmConfig;
@@ -2491,17 +2501,40 @@ Continue the conversation naturally and help complete the client onboarding.`;
         return res.status(400).json({ error: "Unsupported LLM provider" });
       }
 
-      // Store AI response
+      // Extract metadata from AI response (if present)
+      let aiMetadata = {};
+      let cleanAnswer = answer;
+      const metadataMatch = answer.match(/METADATA:\s*({.*})/);
+      if (metadataMatch) {
+        try {
+          aiMetadata = JSON.parse(metadataMatch[1]);
+          // Remove metadata from visible response
+          cleanAnswer = answer.replace(/METADATA:\s*{.*}/, '').trim();
+        } catch (e) {
+          console.error("Failed to parse AI metadata:", e);
+        }
+      }
+
+      // Store AI response (with metadata)
       await storage.createOnboardingMessage({
         sessionId,
         role: "assistant",
-        content: answer,
-        metadata: {},
+        content: cleanAnswer,
+        metadata: aiMetadata,
       });
 
-      // Update session with any collected data from user message
-      // This would need parsing logic to extract structured data from conversation
-      // For now, we'll just update the collected data with what was passed
+      // Update session with metadata from AI (guides form field visibility)
+      if (Object.keys(aiMetadata).length > 0) {
+        const currentCollected = (session.collectedData as Record<string, any>) || {};
+        await storage.updateOnboardingSession(sessionId, {
+          collectedData: {
+            ...currentCollected,
+            ...aiMetadata,
+          } as any,
+        });
+      }
+
+      // Also update with any user-provided context (country, clientType, etc.)
       if (req.body.collectedData) {
         const currentCollected = (session.collectedData as Record<string, any>) || {};
         await storage.updateOnboardingSession(sessionId, {
