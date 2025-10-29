@@ -85,6 +85,7 @@ const menuCategories = [
     title: "Client Management",
     items: [
       { title: "Clients", url: "/clients", icon: Building2, permission: "clients.view" },
+      { title: "AI Client Onboarding", url: "/client-onboarding", icon: Bot, permission: "clients.create" },
       { title: "Contacts", url: "/contacts", icon: UserCircle, permission: "contacts.view" },
       { title: "Tags", url: "/tags", icon: Tag, permission: "tags.view" },
     ]

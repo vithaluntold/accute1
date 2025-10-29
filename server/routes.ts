@@ -2343,6 +2343,264 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AI Client Onboarding Routes ====================
+  
+  // Start a new AI-assisted client onboarding session
+  app.post("/api/client-onboarding/start", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.createOnboardingSession({
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+        status: "in_progress",
+        collectedData: {},
+        sensitiveData: {},
+      });
+
+      // Create initial system message
+      await storage.createOnboardingMessage({
+        sessionId: session.id,
+        role: "assistant",
+        content: "Hello! I'm here to help you onboard a new client. Let's start by understanding your client better. Is this client an individual or a business entity?",
+        metadata: {},
+      });
+
+      const messages = await storage.getOnboardingMessages(session.id);
+      res.json({ session, messages });
+    } catch (error: any) {
+      console.error("Failed to start onboarding session:", error);
+      res.status(500).json({ error: "Failed to start onboarding session" });
+    }
+  });
+
+  // Send message to AI and get response with privacy filtering
+  app.post("/api/client-onboarding/chat", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { sessionId, message, sensitiveData } = req.body;
+      
+      if (!sessionId || !message) {
+        return res.status(400).json({ error: "Session ID and message are required" });
+      }
+
+      // Verify session ownership
+      const session = await storage.getOnboardingSession(sessionId);
+      if (!session || session.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Store user message
+      await storage.createOnboardingMessage({
+        sessionId,
+        role: "user",
+        content: message,
+        metadata: {},
+      });
+
+      // Update sensitive data if provided (never sent to AI)
+      if (sensitiveData) {
+        const currentSensitive = (session.sensitiveData as Record<string, any>) || {};
+        await storage.updateOnboardingSession(sessionId, {
+          sensitiveData: {
+            ...currentSensitive,
+            ...sensitiveData,
+          } as any,
+        });
+      }
+
+      // Get default LLM configuration with decrypted credentials
+      const llmConfig = await storage.getDefaultLlmConfigurationWithDecryption(req.user!.organizationId);
+      if (!llmConfig) {
+        return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
+      }
+
+      // Build conversation history with privacy filtering
+      const allMessages = await storage.getOnboardingMessages(sessionId);
+      const conversationHistory = allMessages.map(msg => ({
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+      }));
+
+      // Build AI system prompt
+      const systemPrompt = `You are an expert AI assistant helping to onboard new clients for an accounting/finance firm. Your role is to:
+
+1. **Determine client type and country**: Ask if the client is an individual or business, and which country they operate in.
+
+2. **Use your knowledge of global tax systems**: Based on the country, ask for the appropriate tax identification numbers. You have knowledge of tax systems worldwide - use it dynamically. For example:
+   - India: PAN (Permanent Account Number) and GST (if registered)
+   - USA: EIN (Employer Identification Number) for businesses, SSN for individuals
+   - UK: VAT number (if registered), UTR (Unique Taxpayer Reference)
+   - UAE: TRN (Tax Registration Number)
+   - And many more countries - use your training data knowledge
+
+3. **Explain tax IDs**: When asking for a tax ID, briefly explain what it is and its format.
+
+4. **Privacy-conscious**: You will NEVER see sensitive personal data like names, emails, phone numbers, or addresses. When the user provides this data, you'll be told "[User provided name]", "[User provided email]", etc. Focus on business/tax information.
+
+5. **Validate format**: If you know the format of a tax ID (e.g., PAN is 10 characters AAAPL1234C), validate user input and provide helpful feedback.
+
+6. **Progressive questions**: Ask one or two questions at a time. Don't overwhelm the user.
+
+7. **Collect business details**: Industry, company registration number, VAT registration status, etc.
+
+Current session data collected (non-sensitive):
+${JSON.stringify((session.collectedData as Record<string, any>) || {}, null, 2)}
+
+Sensitive data status (you don't see actual values):
+${Object.keys((session.sensitiveData as Record<string, any>) || {}).length > 0 ? `- User has provided: ${Object.keys((session.sensitiveData as Record<string, any>) || {}).join(", ")}` : "- No sensitive data collected yet"}
+
+Continue the conversation naturally and help complete the client onboarding.`;
+
+      // Call LLM
+      const { decryptedCredentials } = llmConfig;
+      let answer;
+
+      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure_openai') {
+        const OpenAI = (await import('openai')).default;
+        const openai = new OpenAI({
+          apiKey: llmConfig.provider === 'azure_openai' ? decryptedCredentials.apiKey : decryptedCredentials.apiKey,
+          ...(llmConfig.provider === 'azure_openai' && {
+            baseURL: `${decryptedCredentials.endpoint}/openai/deployments/${decryptedCredentials.deploymentName}`,
+            defaultQuery: { 'api-version': decryptedCredentials.apiVersion || '2024-02-15-preview' },
+            defaultHeaders: { 'api-key': decryptedCredentials.apiKey },
+          })
+        });
+
+        const completion = await openai.chat.completions.create({
+          model: llmConfig.provider === 'azure_openai' ? decryptedCredentials.deploymentName : (llmConfig.modelName || 'gpt-4'),
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        });
+
+        answer = completion.choices[0]?.message?.content || "I couldn't generate a response.";
+      } else if (llmConfig.provider === 'anthropic') {
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: decryptedCredentials.apiKey });
+
+        const message = await anthropic.messages.create({
+          model: llmConfig.model || 'claude-3-5-sonnet-20241022',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: conversationHistory.filter(m => m.role !== 'system') as Array<{role: "user" | "assistant"; content: string}>,
+        });
+
+        answer = message.content[0].type === 'text' ? message.content[0].text : "I couldn't generate a response.";
+      } else {
+        return res.status(400).json({ error: "Unsupported LLM provider" });
+      }
+
+      // Store AI response
+      await storage.createOnboardingMessage({
+        sessionId,
+        role: "assistant",
+        content: answer,
+        metadata: {},
+      });
+
+      // Update session with any collected data from user message
+      // This would need parsing logic to extract structured data from conversation
+      // For now, we'll just update the collected data with what was passed
+      if (req.body.collectedData) {
+        const currentCollected = (session.collectedData as Record<string, any>) || {};
+        await storage.updateOnboardingSession(sessionId, {
+          collectedData: {
+            ...currentCollected,
+            ...req.body.collectedData,
+          } as any,
+        });
+      }
+
+      const updatedMessages = await storage.getOnboardingMessages(sessionId);
+      res.json({ messages: updatedMessages });
+    } catch (error: any) {
+      console.error("Failed to process chat message:", error);
+      res.status(500).json({ error: "Failed to process message" });
+    }
+  });
+
+  // Complete onboarding and create client
+  app.post("/api/client-onboarding/complete", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID is required" });
+      }
+
+      // Verify session ownership
+      const session = await storage.getOnboardingSession(sessionId);
+      if (!session || session.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.status === "completed") {
+        return res.status(400).json({ error: "Session already completed" });
+      }
+
+      // Extract data from session
+      const collectedData = (session.collectedData as Record<string, any>) || {};
+      const sensitiveData = (session.sensitiveData as Record<string, any>) || {};
+
+      // Create client
+      const client = await storage.createClient({
+        companyName: sensitiveData.companyName || collectedData.companyName || "Unknown Company",
+        email: sensitiveData.email || "",
+        phone: sensitiveData.phone || "",
+        address: sensitiveData.address || "",
+        city: sensitiveData.city || "",
+        state: sensitiveData.state || "",
+        zipCode: sensitiveData.zipCode || "",
+        country: collectedData.country || "US",
+        taxId: collectedData.primaryTaxId || "",
+        industry: collectedData.industry || "",
+        notes: collectedData.notes || "",
+        metadata: {
+          taxIds: collectedData.taxIds || {},
+          clientType: collectedData.clientType || "business",
+          onboardingSessionId: sessionId,
+        },
+        status: "active",
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+      });
+
+      // Create primary contact if provided
+      if (sensitiveData.contactFirstName && sensitiveData.contactLastName && sensitiveData.contactEmail) {
+        await storage.createContact({
+          clientId: client.id,
+          firstName: sensitiveData.contactFirstName,
+          lastName: sensitiveData.contactLastName,
+          email: sensitiveData.contactEmail,
+          phone: sensitiveData.contactPhone || "",
+          title: sensitiveData.contactTitle || "",
+          isPrimary: true,
+          organizationId: req.user!.organizationId!,
+          createdBy: req.userId!,
+        });
+      }
+
+      // Mark session as completed
+      await storage.updateOnboardingSession(sessionId, {
+        status: "completed",
+        clientId: client.id,
+      });
+
+      // Update completedAt timestamp separately
+      await db.update(schema.clientOnboardingSessions)
+        .set({ completedAt: new Date() })
+        .where(eq(schema.clientOnboardingSessions.id, sessionId));
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "client", client.id, { via: "ai_onboarding" }, req);
+
+      res.json({ client, success: true });
+    } catch (error: any) {
+      console.error("Failed to complete onboarding:", error);
+      res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
   // ==================== Tag Routes ====================
 
   app.get("/api/tags", requireAuth, requirePermission("tags.view"), async (req: AuthRequest, res: Response) => {

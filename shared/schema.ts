@@ -523,6 +523,34 @@ export const contacts = pgTable("contacts", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Client Onboarding Sessions - Track AI-assisted client onboarding conversations
+export const clientOnboardingSessions = pgTable("client_onboarding_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  status: text("status").notNull().default("in_progress"), // 'in_progress', 'completed', 'cancelled'
+  // Collected data (non-sensitive metadata about what was collected)
+  collectedData: jsonb("collected_data").default({}), // Stores: country, clientType, industry, etc.
+  // Sensitive data collected via direct form (not sent to AI)
+  sensitiveData: jsonb("sensitive_data").default({}), // Stores: names, emails, phones, addresses
+  // Final client ID once created
+  clientId: varchar("client_id").references(() => clients.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// Onboarding Messages - Conversation history for audit trail
+export const onboardingMessages = pgTable("onboarding_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => clientOnboardingSessions.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user', 'assistant', 'system'
+  content: text("content").notNull(),
+  // Metadata about the message
+  metadata: jsonb("metadata").default({}), // Can store: field_collected, validation_result, etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Tags for organizing resources
 export const tags = pgTable("tags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1079,6 +1107,18 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   updatedAt: true,
 });
 
+export const insertClientOnboardingSessionSchema = createInsertSchema(clientOnboardingSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+
+export const insertOnboardingMessageSchema = createInsertSchema(onboardingMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTagSchema = createInsertSchema(tags).omit({
   id: true,
   organizationId: true,
@@ -1193,6 +1233,10 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+export type InsertClientOnboardingSession = z.infer<typeof insertClientOnboardingSessionSchema>;
+export type ClientOnboardingSession = typeof clientOnboardingSessions.$inferSelect;
+export type InsertOnboardingMessage = z.infer<typeof insertOnboardingMessageSchema>;
+export type OnboardingMessage = typeof onboardingMessages.$inferSelect;
 export type InsertTag = z.infer<typeof insertTagSchema>;
 export type Tag = typeof tags.$inferSelect;
 export type InsertTaggable = z.infer<typeof insertTaggableSchema>;

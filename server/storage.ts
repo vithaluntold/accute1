@@ -32,6 +32,10 @@ import type {
   InsertClient,
   Contact,
   InsertContact,
+  ClientOnboardingSession,
+  InsertClientOnboardingSession,
+  OnboardingMessage,
+  InsertOnboardingMessage,
   Tag,
   InsertTag,
   Taggable,
@@ -193,6 +197,14 @@ export interface IStorage {
   deleteContact(id: string): Promise<void>;
   getContactsByClient(clientId: string): Promise<Contact[]>;
   getContactsByOrganization(organizationId: string): Promise<Contact[]>;
+  
+  // Client Onboarding Sessions
+  getOnboardingSession(id: string): Promise<ClientOnboardingSession | undefined>;
+  createOnboardingSession(session: InsertClientOnboardingSession): Promise<ClientOnboardingSession>;
+  updateOnboardingSession(id: string, session: Partial<InsertClientOnboardingSession>): Promise<ClientOnboardingSession>;
+  getOnboardingSessionsByOrganization(organizationId: string): Promise<ClientOnboardingSession[]>;
+  getOnboardingMessages(sessionId: string): Promise<OnboardingMessage[]>;
+  createOnboardingMessage(message: InsertOnboardingMessage): Promise<OnboardingMessage>;
   
   // Tags
   getTag(id: string): Promise<Tag | undefined>;
@@ -1477,6 +1489,43 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.contacts)
       .where(eq(schema.contacts.organizationId, organizationId))
       .orderBy(schema.contacts.lastName, schema.contacts.firstName);
+  }
+
+  // Client Onboarding Sessions
+  async getOnboardingSession(id: string): Promise<ClientOnboardingSession | undefined> {
+    const results = await db.select().from(schema.clientOnboardingSessions)
+      .where(eq(schema.clientOnboardingSessions.id, id));
+    return results[0];
+  }
+
+  async createOnboardingSession(session: InsertClientOnboardingSession): Promise<ClientOnboardingSession> {
+    const result = await db.insert(schema.clientOnboardingSessions).values(session).returning();
+    return result[0];
+  }
+
+  async updateOnboardingSession(id: string, session: Partial<InsertClientOnboardingSession>): Promise<ClientOnboardingSession> {
+    const result = await db.update(schema.clientOnboardingSessions)
+      .set({ ...session, updatedAt: new Date() })
+      .where(eq(schema.clientOnboardingSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getOnboardingSessionsByOrganization(organizationId: string): Promise<ClientOnboardingSession[]> {
+    return await db.select().from(schema.clientOnboardingSessions)
+      .where(eq(schema.clientOnboardingSessions.organizationId, organizationId))
+      .orderBy(desc(schema.clientOnboardingSessions.createdAt));
+  }
+
+  async getOnboardingMessages(sessionId: string): Promise<OnboardingMessage[]> {
+    return await db.select().from(schema.onboardingMessages)
+      .where(eq(schema.onboardingMessages.sessionId, sessionId))
+      .orderBy(schema.onboardingMessages.createdAt);
+  }
+
+  async createOnboardingMessage(message: InsertOnboardingMessage): Promise<OnboardingMessage> {
+    const result = await db.insert(schema.onboardingMessages).values(message).returning();
+    return result[0];
   }
 
   // Tags

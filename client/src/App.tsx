@@ -40,6 +40,7 @@ import Marketplace from "@/pages/marketplace";
 import Assignments from "@/pages/assignments";
 import AssignmentDetail from "@/pages/assignment-detail";
 import AssignmentBot from "@/pages/assignment-bot";
+import ClientOnboarding from "@/pages/client-onboarding";
 import Kanban from "@/pages/kanban";
 import Team from "@/pages/team";
 import Roles from "@/pages/roles";
@@ -244,6 +245,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <AssignmentBot />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-onboarding">
+        <ProtectedRoute>
+          <AppLayout>
+            <ClientOnboarding />
           </AppLayout>
         </ProtectedRoute>
       </Route>
