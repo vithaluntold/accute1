@@ -2406,8 +2406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get default LLM configuration with decrypted credentials
-      const llmConfig = await storage.getDefaultLlmConfigurationWithDecryption(req.user!.organizationId);
+      // Get default LLM configuration
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId);
       if (!llmConfig) {
         return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
       }
