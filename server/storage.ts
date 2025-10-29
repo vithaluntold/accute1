@@ -418,6 +418,17 @@ export interface IStorage {
   getDefaultLlmConfiguration(organizationId: string): Promise<schema.LlmConfiguration | undefined>;
   updateLlmConfiguration(id: string, config: Partial<schema.InsertLlmConfiguration>): Promise<schema.LlmConfiguration | undefined>;
   deleteLlmConfiguration(id: string): Promise<void>;
+
+  // Support Tickets
+  createSupportTicket(ticket: schema.InsertSupportTicket): Promise<schema.SupportTicket>;
+  getSupportTicket(id: string): Promise<schema.SupportTicket | undefined>;
+  getSupportTickets(organizationId: string): Promise<schema.SupportTicket[]>;
+  updateSupportTicket(id: string, ticket: Partial<schema.InsertSupportTicket>): Promise<schema.SupportTicket | undefined>;
+  deleteSupportTicket(id: string): Promise<void>;
+
+  // Support Ticket Comments
+  createSupportTicketComment(comment: schema.InsertSupportTicketComment): Promise<schema.SupportTicketComment>;
+  getTicketComments(ticketId: string): Promise<schema.SupportTicketComment[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -2822,6 +2833,53 @@ export class DbStorage implements IStorage {
 
   async deleteLlmConfiguration(id: string): Promise<void> {
     await db.delete(schema.llmConfigurations).where(eq(schema.llmConfigurations.id, id));
+  }
+
+  // ========================================
+  // SUPPORT TICKETS
+  // ========================================
+
+  async createSupportTicket(ticket: schema.InsertSupportTicket): Promise<schema.SupportTicket> {
+    const result = await db.insert(schema.supportTickets).values(ticket).returning();
+    return result[0];
+  }
+
+  async getSupportTicket(id: string): Promise<schema.SupportTicket | undefined> {
+    const result = await db.select().from(schema.supportTickets).where(eq(schema.supportTickets.id, id));
+    return result[0];
+  }
+
+  async getSupportTickets(organizationId: string): Promise<schema.SupportTicket[]> {
+    return await db.select().from(schema.supportTickets)
+      .where(eq(schema.supportTickets.organizationId, organizationId))
+      .orderBy(desc(schema.supportTickets.createdAt));
+  }
+
+  async updateSupportTicket(id: string, ticket: Partial<schema.InsertSupportTicket>): Promise<schema.SupportTicket | undefined> {
+    const result = await db.update(schema.supportTickets)
+      .set({ ...ticket, updatedAt: new Date() })
+      .where(eq(schema.supportTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSupportTicket(id: string): Promise<void> {
+    await db.delete(schema.supportTickets).where(eq(schema.supportTickets.id, id));
+  }
+
+  // ========================================
+  // SUPPORT TICKET COMMENTS
+  // ========================================
+
+  async createSupportTicketComment(comment: schema.InsertSupportTicketComment): Promise<schema.SupportTicketComment> {
+    const result = await db.insert(schema.supportTicketComments).values(comment).returning();
+    return result[0];
+  }
+
+  async getTicketComments(ticketId: string): Promise<schema.SupportTicketComment[]> {
+    return await db.select().from(schema.supportTicketComments)
+      .where(eq(schema.supportTicketComments.ticketId, ticketId))
+      .orderBy(schema.supportTicketComments.createdAt);
   }
 }
 

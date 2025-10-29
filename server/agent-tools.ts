@@ -286,6 +286,123 @@ export const parityTools: ToolDefinition[] = [
 ];
 
 /**
+ * Available tools for Luca agent (Accounting/Finance/Taxation expert + Support Tickets)
+ */
+export const lucaTools: ToolDefinition[] = [
+  {
+    name: "create_support_ticket",
+    description: "Create a customer support ticket for accounting, finance, or taxation questions",
+    parameters: {
+      type: "object",
+      properties: {
+        subject: {
+          type: "string",
+          description: "Ticket subject/title"
+        },
+        description: {
+          type: "string",
+          description: "Detailed description of the issue or question"
+        },
+        category: {
+          type: "string",
+          description: "Category of the ticket",
+          enum: ["accounting", "taxation", "finance", "technical", "billing", "other"]
+        },
+        priority: {
+          type: "string",
+          description: "Priority level",
+          enum: ["low", "medium", "high", "urgent"]
+        },
+        contextType: {
+          type: "string",
+          description: "Type of related resource (optional)",
+          enum: ["workflow", "client", "document", "form"]
+        },
+        contextId: {
+          type: "string",
+          description: "ID of the related resource (optional)"
+        }
+      },
+      required: ["subject", "description", "category"]
+    }
+  },
+  {
+    name: "list_support_tickets",
+    description: "List support tickets with optional filters",
+    parameters: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          description: "Filter by ticket status",
+          enum: ["open", "in_progress", "waiting_response", "resolved", "closed"]
+        },
+        category: {
+          type: "string",
+          description: "Filter by category",
+          enum: ["accounting", "taxation", "finance", "technical", "billing", "other"]
+        },
+        priority: {
+          type: "string",
+          description: "Filter by priority",
+          enum: ["low", "medium", "high", "urgent"]
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of tickets to return"
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "add_ticket_comment",
+    description: "Add a comment or update to an existing support ticket",
+    parameters: {
+      type: "object",
+      properties: {
+        ticketId: {
+          type: "string",
+          description: "The support ticket ID"
+        },
+        content: {
+          type: "string",
+          description: "Comment content"
+        },
+        isInternal: {
+          type: "boolean",
+          description: "Whether this is an internal note (not visible to customer)"
+        }
+      },
+      required: ["ticketId", "content"]
+    }
+  },
+  {
+    name: "update_ticket_status",
+    description: "Update the status of a support ticket",
+    parameters: {
+      type: "object",
+      properties: {
+        ticketId: {
+          type: "string",
+          description: "The support ticket ID"
+        },
+        status: {
+          type: "string",
+          description: "New status",
+          enum: ["open", "in_progress", "waiting_response", "resolved", "closed"]
+        },
+        resolution: {
+          type: "string",
+          description: "Resolution notes (required when marking as resolved)"
+        }
+      },
+      required: ["ticketId", "status"]
+    }
+  }
+];
+
+/**
  * Tool executors - Map tool names to their execution functions
  */
 export const toolExecutors: Record<string, (args: any, context: ToolExecutionContext) => Promise<ToolExecutionResult>> = {
@@ -562,6 +679,157 @@ export const toolExecutors: Record<string, (args: any, context: ToolExecutionCon
         error: error.message
       };
     }
+  },
+
+  // Luca tools - Support Tickets
+  async create_support_ticket(args: any, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+    try {
+      const { subject, description, category, priority, contextType, contextId } = args;
+      
+      const ticket = await storage.createSupportTicket({
+        organizationId: context.organizationId,
+        subject,
+        description,
+        category,
+        priority: priority || "medium",
+        status: "open",
+        createdBy: context.userId,
+        contextType: contextType || null,
+        contextId: contextId || null,
+        tags: [],
+        metadata: {}
+      });
+
+      return {
+        success: true,
+        data: {
+          ticketId: ticket.id,
+          subject: ticket.subject,
+          category: ticket.category,
+          priority: ticket.priority,
+          status: ticket.status,
+          message: `Support ticket "${subject}" created successfully`
+        }
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async list_support_tickets(args: any, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+    try {
+      const { status, category, priority, limit } = args;
+      
+      let tickets = await storage.getSupportTickets(context.organizationId);
+
+      // Apply filters
+      if (status) {
+        tickets = tickets.filter(t => t.status === status);
+      }
+      if (category) {
+        tickets = tickets.filter(t => t.category === category);
+      }
+      if (priority) {
+        tickets = tickets.filter(t => t.priority === priority);
+      }
+
+      // Limit results
+      if (limit && limit > 0) {
+        tickets = tickets.slice(0, limit);
+      }
+
+      return {
+        success: true,
+        data: {
+          tickets: tickets.map(t => ({
+            id: t.id,
+            subject: t.subject,
+            category: t.category,
+            priority: t.priority,
+            status: t.status,
+            createdAt: t.createdAt
+          })),
+          count: tickets.length,
+          message: `Found ${tickets.length} support tickets`
+        }
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async add_ticket_comment(args: any, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+    try {
+      const { ticketId, content, isInternal } = args;
+      
+      const comment = await storage.createSupportTicketComment({
+        ticketId,
+        content,
+        createdBy: context.userId,
+        isInternal: isInternal || false,
+        attachments: []
+      });
+
+      return {
+        success: true,
+        data: {
+          commentId: comment.id,
+          ticketId: comment.ticketId,
+          message: `Comment added to ticket successfully`
+        }
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async update_ticket_status(args: any, context: ToolExecutionContext): Promise<ToolExecutionResult> {
+    try {
+      const { ticketId, status, resolution } = args;
+      
+      const updateData: any = { status };
+      
+      if (status === "resolved" || status === "closed") {
+        updateData.resolvedAt = new Date();
+        updateData.resolvedBy = context.userId;
+        if (resolution) {
+          updateData.resolution = resolution;
+        }
+      }
+      
+      const ticket = await storage.updateSupportTicket(ticketId, updateData);
+      
+      if (!ticket) {
+        return {
+          success: false,
+          error: "Support ticket not found"
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          ticketId: ticket.id,
+          subject: ticket.subject,
+          newStatus: ticket.status,
+          message: `Ticket status updated to "${status}"`
+        }
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 };
 
@@ -596,6 +864,8 @@ export function getAgentTools(agentName: string): ToolDefinition[] {
       return formaTools;
     case "parity":
       return parityTools;
+    case "luca":
+      return lucaTools;
     default:
       return [];
   }

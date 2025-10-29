@@ -1621,6 +1621,64 @@ export const folders = pgTable("folders", {
   orgArchivedIdx: index("folders_org_archived_idx").on(table.organizationId, table.isArchived),
 }));
 
+// Support Tickets - Customer support and help desk system
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Ticket details
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  status: text("status").notNull().default("open"), // 'open', 'in_progress', 'waiting_response', 'resolved', 'closed'
+  category: text("category").notNull(), // 'accounting', 'taxation', 'finance', 'technical', 'billing', 'other'
+  
+  // User relationships
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  
+  // Context linking - What is this ticket about?
+  contextType: text("context_type"), // 'workflow', 'client', 'document', 'form', null
+  contextId: varchar("context_id"), // ID of the related resource
+  
+  // Resolution tracking
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+  resolution: text("resolution"),
+  
+  // Metadata
+  tags: jsonb("tags").default(sql`'[]'::jsonb`),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  orgStatusIdx: index("support_tickets_org_status_idx").on(table.organizationId, table.status),
+  orgPriorityIdx: index("support_tickets_org_priority_idx").on(table.organizationId, table.priority),
+  assignedIdx: index("support_tickets_assigned_idx").on(table.assignedTo),
+  createdByIdx: index("support_tickets_created_by_idx").on(table.createdBy),
+}));
+
+// Support Ticket Comments - Thread of messages for a ticket
+export const supportTicketComments = pgTable("support_ticket_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  
+  // Comment details
+  content: text("content").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  
+  // Metadata
+  isInternal: boolean("is_internal").notNull().default(false), // Internal notes vs customer-facing
+  attachments: jsonb("attachments").default(sql`'[]'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  ticketIdx: index("support_ticket_comments_ticket_idx").on(table.ticketId),
+}));
+
 // Zod Schemas and Types
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
@@ -1645,6 +1703,8 @@ export const insertMarketplaceItemSchema = createInsertSchema(marketplaceItems).
 export const insertMarketplaceInstallationSchema = createInsertSchema(marketplaceInstallations).omit({ id: true, installedAt: true, updatedAt: true });
 export const insertWorkflowAssignmentSchema = createInsertSchema(workflowAssignments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFolderSchema = createInsertSchema(folders).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSupportTicketCommentSchema = createInsertSchema(supportTicketComments).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1692,3 +1752,7 @@ export type InsertWorkflowAssignment = z.infer<typeof insertWorkflowAssignmentSc
 export type WorkflowAssignment = typeof workflowAssignments.$inferSelect;
 export type InsertFolder = z.infer<typeof insertFolderSchema>;
 export type Folder = typeof folders.$inferSelect;
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicketComment = z.infer<typeof insertSupportTicketCommentSchema>;
+export type SupportTicketComment = typeof supportTicketComments.$inferSelect;
