@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -358,9 +359,9 @@ export default function Assignments() {
             <Card key={assignment.id} className="hover-elevate" data-testid={`assignment-card-${assignment.id}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/assignments/${assignment.id}`} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <CardTitle className="text-lg truncate" data-testid={`assignment-name-${assignment.id}`}>
+                      <CardTitle className="text-lg truncate cursor-pointer hover:underline" data-testid={`assignment-name-${assignment.id}`}>
                         {assignment.name}
                       </CardTitle>
                       {getStatusBadge(assignment.status, assignment.id)}
@@ -371,7 +372,7 @@ export default function Assignments() {
                         {assignment.description}
                       </CardDescription>
                     )}
-                  </div>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="icon"

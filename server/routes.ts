@@ -1720,6 +1720,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single assignment with full details (stages, steps, tasks, client, workflow)
+  app.get("/api/assignments/:id", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const assignment = await storage.getWorkflowAssignment(req.params.id);
+      if (!assignment || assignment.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      // Fetch related data
+      const [client, workflow, assignee] = await Promise.all([
+        storage.getClient(assignment.clientId),
+        storage.getWorkflow(assignment.workflowId),
+        assignment.assignedTo ? storage.getUser(assignment.assignedTo) : null,
+      ]);
+
+      // Fetch workflow structure with stages, steps, and tasks
+      const stages = await storage.getStagesByWorkflow(assignment.workflowId);
+      const stagesWithStepsAndTasks = await Promise.all(
+        stages.map(async (stage) => {
+          const steps = await storage.getStepsByStage(stage.id);
+          const stepsWithTasks = await Promise.all(
+            steps.map(async (step) => {
+              const tasks = await storage.getTasksByStep(step.id);
+              return { ...step, tasks };
+            })
+          );
+          return { ...stage, steps: stepsWithTasks };
+        })
+      );
+
+      res.json({
+        ...assignment,
+        client,
+        workflow,
+        assignee,
+        stages: stagesWithStepsAndTasks,
+      });
+    } catch (error: any) {
+      console.error('Failed to fetch assignment details:', error);
+      res.status(500).json({ error: "Failed to fetch assignment details" });
+    }
+  });
+
   // Create workflow assignment (Client + Workflow = Assignment)
   app.post("/api/assignments", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
     try {

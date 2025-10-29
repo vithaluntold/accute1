@@ -38,6 +38,7 @@ import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
 import Marketplace from "@/pages/marketplace";
 import Assignments from "@/pages/assignments";
+import AssignmentDetail from "@/pages/assignment-detail";
 import Team from "@/pages/team";
 import Roles from "@/pages/roles";
 import Documents from "@/pages/documents";
@@ -283,6 +284,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Marketplace />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/assignments/:id">
+        <ProtectedRoute>
+          <AppLayout>
+            <AssignmentDetail />
           </AppLayout>
         </ProtectedRoute>
       </Route>
