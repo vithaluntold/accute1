@@ -1,0 +1,101 @@
+/* Cross-browser and cross-device compatibility styles for Luca Chat Widget */
+
+/* Prevent iOS zoom on input focus */
+@supports (-webkit-touch-callout: none) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Smooth scrolling for all browsers */
+* {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Fix for iOS Safari fixed positioning */
+@supports (-webkit-touch-callout: none) {
+  .luca-chat-button {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+}
+
+/* Disable text selection on button */
+.luca-chat-button,
+.luca-chat-button * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure proper stacking for dialog overlay */
+[data-radix-dialog-overlay] {
+  z-index: 9998 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 9999 !important;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  /* Prevent background scroll when dialog is open */
+  body.luca-dialog-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+  }
+
+  /* Full screen dialog on mobile */
+  [data-radix-dialog-content] {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
+/* Firefox-specific fixes */
+@-moz-document url-prefix() {
+  .luca-chat-button {
+    -moz-appearance: none;
+  }
+}
+
+/* Edge/IE11 fixes */
+@supports (-ms-ime-align: auto) {
+  .luca-chat-button {
+    position: fixed;
+  }
+}
+
+/* Safari-specific fixes for safe area */
+@supports (padding: max(0px)) {
+  .luca-input-area {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  
+  .luca-chat-button {
+    bottom: max(16px, calc(16px + env(safe-area-inset-bottom)));
+    right: max(16px, calc(16px + env(safe-area-inset-right)));
+  }
+}
+
+/* Prevent bounce scrolling on iOS */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Fix for Android Chrome address bar */
+@media (max-width: 768px) {
+  .luca-dialog-content {
+    height: 100dvh; /* Dynamic viewport height */
+  }
+}

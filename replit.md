@@ -22,7 +22,18 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Multi-tenant Architecture**: Isolated data and distinct SaaS/tenant-level roles.
 - **Role-Based Access Control**: Granular permission management.
 - **AI Agent Chat Interface**: Real-time WebSocket streaming for interactive AI agents (Parity, Cadence, Forma, Luca).
-- **Luca AI Chatbot Widget**: TaxDome-style floating chat assistant in bottom-right corner, persists across all authenticated pages with real-time AI responses.
+- **Luca AI Chatbot Widget**: TaxDome-style floating chat assistant in bottom-right corner with custom Luca logo branding. Features cross-browser and cross-device compatibility including:
+  - Responsive design with mobile-first approach (full-screen on mobile, dialog on desktop)
+  - iOS Safari safe area support for notched devices
+  - WebKit-specific fixes for iOS/Safari positioning and scrolling
+  - Android Chrome dynamic viewport height support
+  - Touch-optimized interactions with no blue tap highlights
+  - Prevents iOS zoom on input focus (16px font size)
+  - Keyboard-aware input handling (Enter to send on desktop, normal on mobile)
+  - Body scroll prevention when dialog is open on mobile
+  - Smooth scrolling with -webkit-overflow-scrolling for iOS
+  - High z-index (9999) to float above all page elements
+  - Custom CSS compatibility layer in client/src/styles/luca-widget.css
 - **Unified Workflows System**: Visual automation with hierarchical project management (Stages → Steps → Tasks), supporting hybrid execution, triggers, conditions, and automated actions.
 - **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage.
 - **LLM Configuration Management**: CRUD operations for AI provider credentials with AES-256-GCM encryption.

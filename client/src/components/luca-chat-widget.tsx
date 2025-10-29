@@ -37,16 +37,40 @@ export function LucaChatWidget() {
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>("");
   const { toast } = useToast();
 
-  // Debug logging
+  // Detect mobile devices and screen size changes
   useEffect(() => {
-    console.log('[Luca Widget] Component mounted and rendered');
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Prevent body scroll when dialog is open on mobile
+  useEffect(() => {
+    if (isOpen && isMobile) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [isOpen, isMobile]);
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -200,33 +224,52 @@ export function LucaChatWidget() {
 
   return (
     <>
-      {/* Floating Chat Button - Fixed positioning, high z-index */}
+      {/* Floating Chat Button - Fixed positioning, cross-browser compatible */}
       <Button
         size="lg"
-        className="!fixed !bottom-6 !right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-105 transition-all duration-200 !p-2"
+        className="!fixed !bottom-4 !right-4 sm:!bottom-6 sm:!right-6 !h-14 !w-14 !rounded-full !shadow-2xl !z-[9999] hover:scale-105 active:scale-95 transition-all duration-200 !p-2 touch-none"
         onClick={() => {
-          console.log('[Luca Widget] Button clicked');
           setIsOpen(true);
         }}
         data-testid="button-open-luca-chat"
         style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
+          bottom: isMobile ? 'calc(16px + env(safe-area-inset-bottom))' : '24px',
+          right: isMobile ? 'calc(16px + env(safe-area-inset-right))' : '24px',
           zIndex: 9999,
+          WebkitTapHighlightColor: 'transparent',
+          WebkitTouchCallout: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
       >
         <img 
           src={lucaLogoUrl} 
           alt="Luca" 
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain pointer-events-none"
+          draggable={false}
         />
         <span className="sr-only">Open Luca AI Assistant</span>
       </Button>
 
-      {/* Chat Dialog */}
+      {/* Chat Dialog - Responsive for mobile and desktop */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl h-[600px] p-0 flex flex-col" data-testid="dialog-chat-luca">
+        <DialogContent 
+          className={`p-0 flex flex-col ${
+            isMobile 
+              ? 'w-full h-full max-w-full max-h-full rounded-none m-0' 
+              : 'max-w-2xl h-[600px] max-h-[85vh]'
+          }`}
+          data-testid="dialog-chat-luca"
+          style={isMobile ? {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            transform: 'none',
+          } : {}}
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>Chat with Luca</DialogTitle>
             <DialogDescription>Your accounting, finance & taxation expert</DialogDescription>
@@ -234,7 +277,7 @@ export function LucaChatWidget() {
 
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="border-b p-4">
+            <div className={`border-b ${isMobile ? 'p-3' : 'p-4'}`}>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 rounded-lg bg-primary/10">
                   <img 
@@ -295,7 +338,13 @@ export function LucaChatWidget() {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <ScrollArea 
+              className={`flex-1 ${isMobile ? 'p-3' : 'p-4'}`} 
+              ref={scrollRef}
+              style={{
+                WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+              }}
+            >
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center p-8">
                   <div className="p-4 rounded-full bg-primary/10 mb-4">
@@ -332,7 +381,9 @@ export function LucaChatWidget() {
                         </Avatar>
                       )}
                       <div
-                        className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                        className={`rounded-lg px-3 py-2 ${
+                          isMobile ? 'max-w-[85%]' : 'max-w-[80%]'
+                        } ${
                           message.role === "user"
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted"
@@ -356,31 +407,43 @@ export function LucaChatWidget() {
               )}
             </ScrollArea>
 
-            {/* Input */}
-            <div className="border-t p-4">
+            {/* Input - Mobile optimized with keyboard handling */}
+            <div 
+              className={`border-t ${isMobile ? 'p-3' : 'p-4'}`}
+              style={isMobile ? {
+                paddingBottom: 'calc(12px + env(safe-area-inset-bottom))'
+              } : {}}
+            >
               <div className="flex gap-2">
                 <Textarea
-                  placeholder="Ask Luca about accounting, finance, or taxation..."
+                  placeholder={isMobile ? "Ask Luca..." : "Ask Luca about accounting, finance, or taxation..."}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
                       e.preventDefault();
                       handleSend();
                     }
                   }}
-                  className="min-h-[60px] resize-none"
+                  className={`${isMobile ? 'min-h-[50px] text-base' : 'min-h-[60px]'} resize-none`}
                   disabled={isStreaming}
                   data-testid="input-chat-message"
+                  style={{
+                    fontSize: isMobile ? '16px' : undefined, // Prevents zoom on iOS
+                  }}
                 />
                 <Button
                   onClick={handleSend}
                   disabled={!input.trim() || isStreaming}
                   size="icon"
-                  className="h-[60px] w-[60px]"
+                  className={isMobile ? 'h-[50px] w-[50px] flex-shrink-0' : 'h-[60px] w-[60px]'}
                   data-testid="button-send-message"
                 >
-                  <Send className="h-4 w-4" />
+                  {isStreaming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>

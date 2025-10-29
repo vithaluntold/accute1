@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./styles/luca-widget.css";
 
 // Register service worker for PWA support
 if ('serviceWorker' in navigator) {
