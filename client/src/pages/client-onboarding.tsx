@@ -59,6 +59,20 @@ export default function ClientOnboarding() {
     gstRegistered?: boolean;
     vatRegistered?: boolean;
     requiredFields?: string[];
+    phoneCode?: {
+      code: string; // e.g., "+91", "+1", "+44"
+      placeholder?: string;
+      pattern?: string;
+      format?: string;
+      rules?: string[];
+    };
+    postalCode?: {
+      label: string; // e.g., "ZIP Code", "PIN Code", "Postcode"
+      placeholder?: string;
+      pattern?: string;
+      format?: string;
+      rules?: string[];
+    };
     validations?: Record<string, {
       placeholder?: string;
       format?: string;
@@ -298,6 +312,43 @@ export default function ClientOnboarding() {
 
   // Validate a field based on AI-provided validation rules
   const validateField = (fieldName: string, value: string): string | null => {
+    // Check if this is a phone field
+    if (fieldName === "contactPhone" && aiContext.phoneCode) {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) return null;
+      
+      if (aiContext.phoneCode.pattern) {
+        try {
+          const regex = new RegExp(aiContext.phoneCode.pattern);
+          if (!regex.test(trimmedValue)) {
+            return `Invalid format. Expected: ${aiContext.phoneCode.format || aiContext.phoneCode.placeholder}`;
+          }
+        } catch (e) {
+          console.error("Invalid regex pattern:", aiContext.phoneCode.pattern);
+        }
+      }
+      return null;
+    }
+
+    // Check if this is a postal code field
+    if (fieldName === "zipCode" && aiContext.postalCode) {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) return null;
+      
+      if (aiContext.postalCode.pattern) {
+        try {
+          const regex = new RegExp(aiContext.postalCode.pattern);
+          if (!regex.test(trimmedValue)) {
+            return `Invalid format. Expected: ${aiContext.postalCode.format || aiContext.postalCode.placeholder}`;
+          }
+        } catch (e) {
+          console.error("Invalid regex pattern:", aiContext.postalCode.pattern);
+        }
+      }
+      return null;
+    }
+
+    // Check tax ID fields
     const validation = aiContext.validations?.[fieldName];
     if (!validation) return null; // No validation rules for this field
 
@@ -782,14 +833,36 @@ export default function ClientOnboarding() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="contactPhone">Contact Phone</Label>
-                    <Input
-                      id="contactPhone"
-                      value={sensitiveData.contactPhone}
-                      onChange={(e) => setSensitiveData({ ...sensitiveData, contactPhone: e.target.value })}
-                      placeholder="+1 (555) 123-4567"
-                      data-testid="input-contact-phone"
-                    />
+                    <Label htmlFor="contactPhone">
+                      Contact Phone 
+                      {aiContext.phoneCode && (
+                        <span className="text-xs text-muted-foreground ml-1">({aiContext.phoneCode.code})</span>
+                      )}
+                    </Label>
+                    <div className="flex gap-2">
+                      {aiContext.phoneCode && (
+                        <Input
+                          value={aiContext.phoneCode.code}
+                          disabled
+                          className="w-20 bg-muted"
+                          data-testid="input-phone-code"
+                        />
+                      )}
+                      <Input
+                        id="contactPhone"
+                        value={sensitiveData.contactPhone}
+                        onChange={(e) => handleFieldChange("contactPhone", e.target.value)}
+                        placeholder={aiContext.phoneCode?.placeholder || "+1 (555) 123-4567"}
+                        data-testid="input-contact-phone"
+                        className={validationErrors.contactPhone ? "border-destructive flex-1" : "flex-1"}
+                      />
+                    </div>
+                    {validationErrors.contactPhone && (
+                      <p className="text-xs text-destructive mt-1">{validationErrors.contactPhone}</p>
+                    )}
+                    {aiContext.phoneCode?.format && !validationErrors.contactPhone && (
+                      <p className="text-xs text-muted-foreground mt-1">{aiContext.phoneCode.format}</p>
+                    )}
                   </div>
                 </div>
 
@@ -827,14 +900,21 @@ export default function ClientOnboarding() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="zipCode">ZIP Code</Label>
+                    <Label htmlFor="zipCode">{aiContext.postalCode?.label || "ZIP Code"}</Label>
                     <Input
                       id="zipCode"
                       value={sensitiveData.zipCode}
-                      onChange={(e) => setSensitiveData({ ...sensitiveData, zipCode: e.target.value })}
-                      placeholder="10001"
+                      onChange={(e) => handleFieldChange("zipCode", e.target.value)}
+                      placeholder={aiContext.postalCode?.placeholder || "10001"}
                       data-testid="input-zip"
+                      className={validationErrors.zipCode ? "border-destructive" : ""}
                     />
+                    {validationErrors.zipCode && (
+                      <p className="text-xs text-destructive mt-1">{validationErrors.zipCode}</p>
+                    )}
+                    {aiContext.postalCode?.format && !validationErrors.zipCode && (
+                      <p className="text-xs text-muted-foreground mt-1">{aiContext.postalCode.format}</p>
+                    )}
                   </div>
                 </div>
 
