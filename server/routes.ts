@@ -2651,7 +2651,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   // Complete onboarding and create client
   app.post("/api/client-onboarding/complete", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const { sessionId } = req.body;
+      const { sessionId, sensitiveData: requestSensitiveData } = req.body;
       
       if (!sessionId) {
         return res.status(400).json({ error: "Session ID is required" });
@@ -2667,9 +2667,24 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(400).json({ error: "Session already completed" });
       }
 
-      // Extract data from session
+      // Extract data from session and merge with request data
       const collectedData = (session.collectedData as Record<string, any>) || {};
-      const sensitiveData = (session.sensitiveData as Record<string, any>) || {};
+      const sessionSensitiveData = (session.sensitiveData as Record<string, any>) || {};
+      // Prioritize request data over session data (request is more current)
+      const sensitiveData = { ...sessionSensitiveData, ...(requestSensitiveData || {}) };
+
+      console.log("📊 Onboarding completion data:");
+      console.log("  - Collected (from AI):", Object.keys(collectedData));
+      console.log("  - Sensitive (from form):", Object.keys(sensitiveData));
+      console.log("  - Company Name:", sensitiveData.companyName);
+      console.log("  - Contact:", sensitiveData.contactFirstName, sensitiveData.contactLastName);
+
+      // Save the final sensitive data to session for audit trail
+      if (requestSensitiveData && Object.keys(requestSensitiveData).length > 0) {
+        await storage.updateOnboardingSession(sessionId, {
+          sensitiveData: sensitiveData as any,
+        });
+      }
 
       // Create client
       const client = await storage.createClient({
