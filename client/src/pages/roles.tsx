@@ -438,60 +438,103 @@ export default function Roles() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[600px]">
-                    <div className="space-y-6">
-                      {sortedModules.map((module) => {
-                        const modulePerms = groupedPermissions[module];
-                        const sortedPerms = modulePerms.sort((a, b) => {
-                          const order = ["view", "create", "edit", "update", "delete", "manage"];
-                          const aIndex = order.indexOf(a.action);
-                          const bIndex = order.indexOf(b.action);
-                          if (aIndex === -1) return 1;
-                          if (bIndex === -1) return -1;
-                          return aIndex - bIndex;
-                        });
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[250px]">Module / Resource</TableHead>
+                          <TableHead className="text-center">View</TableHead>
+                          <TableHead className="text-center">Create</TableHead>
+                          <TableHead className="text-center">Edit</TableHead>
+                          <TableHead className="text-center">Delete</TableHead>
+                          <TableHead className="text-center">Manage</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedModules.map((module) => {
+                          const modulePerms = groupedPermissions[module];
+                          
+                          // Find permissions by action type
+                          const viewPerm = modulePerms.find(p => p.action === "view");
+                          const createPerm = modulePerms.find(p => p.action === "create");
+                          const editPerm = modulePerms.find(p => p.action === "edit" || p.action === "update");
+                          const deletePerm = modulePerms.find(p => p.action === "delete");
+                          const managePerm = modulePerms.find(p => p.action === "manage" || p.action === "configure");
 
-                        return (
-                          <div key={module} className="border rounded-md p-4">
-                            <h3 className="font-semibold text-base mb-3 flex items-center gap-2">
-                              {getModuleName(module)}
-                              <Badge variant="outline" className="text-xs">
-                                {modulePerms.length} permissions
-                              </Badge>
-                            </h3>
-                            <div className="grid grid-cols-2 gap-3">
-                              {sortedPerms.map((perm) => (
-                                <div
-                                  key={perm.id}
-                                  className="flex items-start space-x-3 p-2 rounded-md hover-elevate"
-                                  data-testid={`permission-item-${perm.id}`}
-                                >
+                          return (
+                            <TableRow key={module} data-testid={`permission-row-${module}`}>
+                              <TableCell className="font-medium">
+                                {getModuleName(module)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {viewPerm && (
                                   <Checkbox
-                                    id={perm.id}
-                                    checked={hasPermission(perm.id)}
+                                    id={viewPerm.id}
+                                    checked={hasPermission(viewPerm.id)}
                                     disabled={currentRole?.isSystemRole}
                                     onCheckedChange={(checked) =>
-                                      handlePermissionToggle(perm.id, checked as boolean)
+                                      handlePermissionToggle(viewPerm.id, checked as boolean)
                                     }
-                                    data-testid={`checkbox-permission-${perm.id}`}
+                                    data-testid={`checkbox-permission-${viewPerm.id}`}
                                   />
-                                  <div className="flex-1">
-                                    <Label
-                                      htmlFor={perm.id}
-                                      className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
-                                    >
-                                      {getActionBadge(perm.action)}
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {perm.description}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {createPerm && (
+                                  <Checkbox
+                                    id={createPerm.id}
+                                    checked={hasPermission(createPerm.id)}
+                                    disabled={currentRole?.isSystemRole}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionToggle(createPerm.id, checked as boolean)
+                                    }
+                                    data-testid={`checkbox-permission-${createPerm.id}`}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {editPerm && (
+                                  <Checkbox
+                                    id={editPerm.id}
+                                    checked={hasPermission(editPerm.id)}
+                                    disabled={currentRole?.isSystemRole}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionToggle(editPerm.id, checked as boolean)
+                                    }
+                                    data-testid={`checkbox-permission-${editPerm.id}`}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {deletePerm && (
+                                  <Checkbox
+                                    id={deletePerm.id}
+                                    checked={hasPermission(deletePerm.id)}
+                                    disabled={currentRole?.isSystemRole}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionToggle(deletePerm.id, checked as boolean)
+                                    }
+                                    data-testid={`checkbox-permission-${deletePerm.id}`}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {managePerm && (
+                                  <Checkbox
+                                    id={managePerm.id}
+                                    checked={hasPermission(managePerm.id)}
+                                    disabled={currentRole?.isSystemRole}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionToggle(managePerm.id, checked as boolean)
+                                    }
+                                    data-testid={`checkbox-permission-${managePerm.id}`}
+                                  />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </ScrollArea>
                 </CardContent>
               </Card>

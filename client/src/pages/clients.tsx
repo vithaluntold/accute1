@@ -46,6 +46,21 @@ const clientFormSchema = insertClientSchema.omit({
 }).extend({
   companyName: z.string().min(1, "Company name is required"),
   email: z.string().email("Invalid email address"),
+  // Contact fields for new clients only (conditionally validated)
+  primaryContactFirstName: z.string().optional(),
+  primaryContactLastName: z.string().optional(),
+  primaryContactEmail: z.string().optional(),
+  primaryContactPhone: z.string().optional(),
+  isCreating: z.boolean().optional(), // Flag to determine if creating or editing
+}).refine((data) => {
+  // Only require primary contact fields when creating a new client
+  if (data.isCreating) {
+    return !!(data.primaryContactFirstName && data.primaryContactLastName && data.primaryContactEmail);
+  }
+  return true;
+}, {
+  message: "Primary contact information is required for new clients",
+  path: ["primaryContactFirstName"],
 });
 
 export default function Clients() {
@@ -77,18 +92,60 @@ export default function Clients() {
       notes: "",
       assignedTo: undefined,
       metadata: {},
+      primaryContactFirstName: "",
+      primaryContactLastName: "",
+      primaryContactEmail: "",
+      primaryContactPhone: "",
+      isCreating: false, // Will be set to true when creating
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: InsertClient) => {
-      return apiRequest("POST", "/api/clients", data);
+    mutationFn: async (data: any) => {
+      let createdClient: any = null;
+      
+      try {
+        // Strip auxiliary form-only fields and create clean client data
+        const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...cleanClientData } = data;
+        
+        createdClient = await apiRequest("POST", "/api/clients", cleanClientData);
+        
+        // Only create primary contact if we're creating a new client
+        if (data.isCreating && data.primaryContactFirstName) {
+          const contactData = {
+            clientId: createdClient.id,
+            firstName: data.primaryContactFirstName,
+            lastName: data.primaryContactLastName,
+            email: data.primaryContactEmail,
+            phone: data.primaryContactPhone || "",
+            title: "Primary Contact",
+            isPrimary: true,
+          };
+          
+          try {
+            await apiRequest("POST", "/api/contacts", contactData);
+          } catch (contactError: any) {
+            // If contact creation fails, delete the created client to maintain consistency
+            try {
+              await apiRequest("DELETE", `/api/clients/${createdClient.id}`);
+            } catch (rollbackError) {
+              console.error("Failed to rollback client creation:", rollbackError);
+            }
+            throw new Error(`Client created but contact creation failed: ${contactError.message}`);
+          }
+        }
+        
+        return createdClient;
+      } catch (error) {
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
       toast({
         title: "Success",
-        description: "Client created successfully",
+        description: "Client and primary contact created successfully",
       });
       setDialogOpen(false);
       form.reset();
@@ -174,15 +231,19 @@ export default function Clients() {
       notes: client.notes || "",
       assignedTo: client.assignedTo || null,
       metadata: client.metadata || {},
+      isCreating: false, // Editing existing client
     });
     setDialogOpen(true);
   };
 
   const onSubmit = (data: z.infer<typeof clientFormSchema>) => {
+    // Strip auxiliary fields that don't belong in the backend schema
+    const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...clientData } = data;
+    
     if (editingClient) {
-      updateMutation.mutate({ id: editingClient.id, data });
+      updateMutation.mutate({ id: editingClient.id, data: clientData });
     } else {
-      createMutation.mutate(data as InsertClient);
+      createMutation.mutate(data); // Pass full data for contact creation
     }
   };
 
@@ -202,7 +263,28 @@ export default function Clients() {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setEditingClient(null);
-              form.reset();
+              form.reset({
+                companyName: "",
+                contactName: "",
+                email: "",
+                phone: "",
+                address: "",
+                city: "",
+                state: "",
+                zipCode: "",
+                country: "US",
+                taxId: "",
+                status: "active" as const,
+                industry: "",
+                notes: "",
+                assignedTo: undefined,
+                metadata: {},
+                primaryContactFirstName: "",
+                primaryContactLastName: "",
+                primaryContactEmail: "",
+                primaryContactPhone: "",
+                isCreating: true, // Creating new client
+              });
             }} data-testid="button-add-client">
               <Plus className="h-4 w-4 mr-2" />
               Add Client
@@ -362,6 +444,74 @@ export default function Clients() {
                     )}
                   />
                 </div>
+
+                {/* Primary Contact Section - Required */}
+                {!editingClient && (
+                  <>
+                    <div className="border-t pt-4 mt-4">
+                      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Primary Contact *
+                        <span className="text-xs font-normal text-muted-foreground">(Required for client setup)</span>
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="primaryContactFirstName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>First Name *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="John" data-testid="input-contact-first-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="primaryContactLastName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Last Name *</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="Doe" data-testid="input-contact-last-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="primaryContactEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contact Email *</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="email" placeholder="john.doe@example.com" data-testid="input-contact-email" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="primaryContactPhone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Contact Phone</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="(555) 123-4567" data-testid="input-contact-phone" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancel

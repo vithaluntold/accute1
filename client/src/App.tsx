@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Bell, User, Building2, ChevronDown } from "lucide-react";
+import { FinACEverseFooter } from "@/components/finaceverse-footer";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -177,6 +178,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
+        <FinACEverseFooter />
       </div>
     </SidebarProvider>
   );

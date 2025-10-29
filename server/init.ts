@@ -218,8 +218,8 @@ export async function initializeSystem() {
 
     if (roles.admin) {
       const adminPermissions = createdPermissions.filter(p => 
-        !p.name.startsWith("organizations.") &&
-        !p.name.includes("delete")
+        // Exclude only organization management permissions
+        !p.name.startsWith("organizations.")
       );
       for (const perm of adminPermissions) {
         try {
