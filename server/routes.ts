@@ -2487,6 +2487,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
      "gstRegistered": boolean (optional),
      "vatRegistered": boolean (optional),
      "requiredFields": ["field1", "field2"], // Tax ID field names only (contact fields always shown)
+     "phoneCode": {
+       "code": "+91", // Country calling code
+       "placeholder": "9876543210",
+       "pattern": "^[0-9]{10}$", // Pattern for phone number (after country code)
+       "format": "10 digit mobile number",
+       "rules": ["Must be 10 digits", "No leading zero"]
+     },
+     "postalCode": {
+       "label": "PIN Code", // "ZIP Code", "Postal Code", "PIN Code", etc.
+       "placeholder": "110001",
+       "pattern": "^[0-9]{6}$",
+       "format": "6 digits",
+       "rules": ["Must be exactly 6 digits"]
+     },
      "validations": {
        "fieldName": {
          "placeholder": "Example format",
@@ -2505,26 +2519,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
    \`\`\`
    
    **Example for India Business (GST Registered):**
-   \`METADATA: {"country": "India", "clientType": "business", "gstRegistered": true, "requiredFields": ["pan", "gstin"], "validations": {"pan": {"placeholder": "AAAPL1234C", "format": "10 alphanumeric characters", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "length": 10, "rules": ["First 5 characters: Alphabetic uppercase", "Next 4 digits: Numeric", "4th character must be 'C' for company (or 'P' for individual)", "5th character matches first letter of entity name", "Last character: Alphabetic check digit"]}, "gstin": {"placeholder": "27AAAPL1234C1Z5", "format": "15 characters", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", "length": 15, "rules": ["First 2 digits: State code (e.g., 27 for Maharashtra)", "Characters 3-12: Must match the PAN number exactly", "13th character: Entity number (1-9, A-Z)", "14th character: Always 'Z'", "15th character: Check digit"], "crossFieldValidation": {"contains": "pan", "expectedPrefix": "27", "derivedFrom": "state", "message": "GSTIN must contain the PAN and start with state code (e.g., 27 for Maharashtra)"}}}}\`
+   \`METADATA: {"country": "India", "clientType": "business", "gstRegistered": true, "requiredFields": ["pan", "gstin"], "phoneCode": {"code": "+91", "placeholder": "9876543210", "pattern": "^[6-9][0-9]{9}$", "format": "10 digit mobile number", "rules": ["Must be 10 digits", "Must start with 6, 7, 8, or 9"]}, "postalCode": {"label": "PIN Code", "placeholder": "110001", "pattern": "^[0-9]{6}$", "format": "6 digits", "rules": ["Must be exactly 6 digits"]}, "validations": {"pan": {"placeholder": "AAAPL1234C", "format": "10 alphanumeric characters", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "length": 10, "rules": ["First 5 characters: Alphabetic uppercase", "Next 4 digits: Numeric", "4th character must be 'C' for company (or 'P' for individual)", "5th character matches first letter of entity name", "Last character: Alphabetic check digit"]}, "gstin": {"placeholder": "27AAAPL1234C1Z5", "format": "15 characters", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", "length": 15, "rules": ["First 2 digits: State code (e.g., 27 for Maharashtra)", "Characters 3-12: Must match the PAN number exactly", "13th character: Entity number (1-9, A-Z)", "14th character: Always 'Z'", "15th character: Check digit"], "crossFieldValidation": {"contains": "pan", "expectedPrefix": "27", "derivedFrom": "state", "message": "GSTIN must contain the PAN and start with state code (e.g., 27 for Maharashtra)"}}}}\`
    
    **Example for India Business (NOT GST Registered - Unregistered):**
-   \`METADATA: {"country": "India", "clientType": "business", "gstRegistered": false, "requiredFields": ["pan"], "validations": {"pan": {"placeholder": "AAAPL1234C", "format": "10 alphanumeric characters", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "length": 10, "rules": ["First 5 characters: Alphabetic uppercase", "Next 4 digits: Numeric", "4th character must be 'C' for company", "Last character: Alphabetic check digit"]}}}\`
+   \`METADATA: {"country": "India", "clientType": "business", "gstRegistered": false, "requiredFields": ["pan"], "phoneCode": {"code": "+91", "placeholder": "9876543210", "pattern": "^[6-9][0-9]{9}$", "format": "10 digit mobile number", "rules": ["Must be 10 digits", "Must start with 6, 7, 8, or 9"]}, "postalCode": {"label": "PIN Code", "placeholder": "110001", "pattern": "^[0-9]{6}$", "format": "6 digits", "rules": ["Must be exactly 6 digits"]}, "validations": {"pan": {"placeholder": "AAAPL1234C", "format": "10 alphanumeric characters", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "length": 10, "rules": ["First 5 characters: Alphabetic uppercase", "Next 4 digits: Numeric", "4th character must be 'C' for company", "Last character: Alphabetic check digit"]}}}\`
    
    **IMPORTANT**: When user provides their state/address, calculate the state code and include \`expectedPrefix\` in the validation. For India states:
    - Maharashtra = 27, Gujarat = 24, Karnataka = 29, Tamil Nadu = 33, Delhi = 07, etc.
    - Include the calculated prefix in the validation metadata so the system can enforce it
    
    **Example for USA Business (with EIN):**
-   \`METADATA: {"country": "USA", "clientType": "business", "requiredFields": ["ein"], "validations": {"ein": {"placeholder": "12-3456789", "format": "9 digits in XX-XXXXXXX format", "pattern": "^[0-9]{2}-[0-9]{7}$", "length": 10, "rules": ["2 digits, hyphen, 7 digits", "Format: XX-XXXXXXX"]}}}\`
+   \`METADATA: {"country": "USA", "clientType": "business", "requiredFields": ["ein"], "phoneCode": {"code": "+1", "placeholder": "2025551234", "pattern": "^[2-9][0-9]{9}$", "format": "10 digit number", "rules": ["Must be 10 digits", "Area code cannot start with 0 or 1"]}, "postalCode": {"label": "ZIP Code", "placeholder": "12345", "pattern": "^[0-9]{5}(-[0-9]{4})?$", "format": "5 digits or 5+4 format", "rules": ["Must be 5 digits", "Optional: dash and 4 more digits (ZIP+4)"]}, "validations": {"ein": {"placeholder": "12-3456789", "format": "9 digits in XX-XXXXXXX format", "pattern": "^[0-9]{2}-[0-9]{7}$", "length": 10, "rules": ["2 digits, hyphen, 7 digits", "Format: XX-XXXXXXX"]}}}\`
    
    **Example for USA Individual (SSN only - no business registration):**
-   \`METADATA: {"country": "USA", "clientType": "individual", "requiredFields": ["ssn"], "validations": {"ssn": {"placeholder": "123-45-6789", "format": "9 digits in XXX-XX-XXXX format", "pattern": "^[0-9]{3}-[0-9]{2}-[0-9]{4}$", "length": 11, "rules": ["3 digits, hyphen, 2 digits, hyphen, 4 digits", "Format: XXX-XX-XXXX"]}}}\`
+   \`METADATA: {"country": "USA", "clientType": "individual", "requiredFields": ["ssn"], "phoneCode": {"code": "+1", "placeholder": "2025551234", "pattern": "^[2-9][0-9]{9}$", "format": "10 digit number", "rules": ["Must be 10 digits", "Area code cannot start with 0 or 1"]}, "postalCode": {"label": "ZIP Code", "placeholder": "12345", "pattern": "^[0-9]{5}(-[0-9]{4})?$", "format": "5 digits or 5+4 format", "rules": ["Must be 5 digits", "Optional: dash and 4 more digits (ZIP+4)"]}, "validations": {"ssn": {"placeholder": "123-45-6789", "format": "9 digits in XXX-XX-XXXX format", "pattern": "^[0-9]{3}-[0-9]{2}-[0-9]{4}$", "length": 11, "rules": ["3 digits, hyphen, 2 digits, hyphen, 4 digits", "Format: XXX-XX-XXXX"]}}}\`
    
    **Example for UK Business (VAT Registered):**
-   \`METADATA: {"country": "UK", "clientType": "business", "vatRegistered": true, "requiredFields": ["utr", "vat"], "validations": {"utr": {"placeholder": "1234567890", "format": "10 digits", "pattern": "^[0-9]{10}$", "length": 10, "rules": ["Exactly 10 numeric digits"]}, "vat": {"placeholder": "GB123456789", "format": "GB followed by 9 digits", "pattern": "^GB[0-9]{9}$", "length": 12, "rules": ["Starts with 'GB'", "Followed by 9 numeric digits"]}}}\`
+   \`METADATA: {"country": "UK", "clientType": "business", "vatRegistered": true, "requiredFields": ["utr", "vat"], "phoneCode": {"code": "+44", "placeholder": "7911123456", "pattern": "^[1-9][0-9]{9}$", "format": "10 digit number", "rules": ["Must be 10 digits", "Cannot start with 0"]}, "postalCode": {"label": "Postcode", "placeholder": "SW1A 1AA", "pattern": "^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\\s?[0-9][A-Z]{2}$", "format": "UK postcode format", "rules": ["1-2 letters, 1-2 numbers, optional letter, space, 1 number, 2 letters"]}, "validations": {"utr": {"placeholder": "1234567890", "format": "10 digits", "pattern": "^[0-9]{10}$", "length": 10, "rules": ["Exactly 10 numeric digits"]}, "vat": {"placeholder": "GB123456789", "format": "GB followed by 9 digits", "pattern": "^GB[0-9]{9}$", "length": 12, "rules": ["Starts with 'GB'", "Followed by 9 numeric digits"]}}}\`
    
    **Example for UK Business (NOT VAT Registered - Unregistered):**
-   \`METADATA: {"country": "UK", "clientType": "business", "vatRegistered": false, "requiredFields": ["utr"], "validations": {"utr": {"placeholder": "1234567890", "format": "10 digits", "pattern": "^[0-9]{10}$", "length": 10, "rules": ["Exactly 10 numeric digits"]}}}\`
+   \`METADATA: {"country": "UK", "clientType": "business", "vatRegistered": false, "requiredFields": ["utr"], "phoneCode": {"code": "+44", "placeholder": "7911123456", "pattern": "^[1-9][0-9]{9}$", "format": "10 digit number", "rules": ["Must be 10 digits", "Cannot start with 0"]}, "postalCode": {"label": "Postcode", "placeholder": "SW1A 1AA", "pattern": "^[A-Z]{1,2}[0-9]{1,2}[A-Z]?\\s?[0-9][A-Z]{2}$", "format": "UK postcode format", "rules": ["1-2 letters, 1-2 numbers, optional letter, space, 1 number, 2 letters"]}, "validations": {"utr": {"placeholder": "1234567890", "format": "10 digits", "pattern": "^[0-9]{10}$", "length": 10, "rules": ["Exactly 10 numeric digits"]}}}\`
 
 5. **Keep it conversational** - Be helpful, friendly, and progressive. Ask 1-2 questions at a time.
 
