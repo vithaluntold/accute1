@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
@@ -5995,6 +5996,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(comment);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // ==================== Email Account Routes ====================
+
+  // Get all email accounts for organization
+  app.get("/api/email-accounts", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const accounts = await storage.getEmailAccountsByOrganization(req.user!.organizationId);
+      res.json(accounts);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email accounts" });
+    }
+  });
+
+  // Get single email account
+  app.get("/api/email-accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const account = await storage.getEmailAccount(req.params.id);
+      if (!account || account.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      res.json(account);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email account" });
+    }
+  });
+
+  // Create email account
+  app.post("/api/email-accounts", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // Schema without server-controlled fields
+      const clientSchema = schema.insertEmailAccountSchema.omit({
+        organizationId: true,
+        userId: true,
+      });
+      
+      const validatedData = clientSchema.parse(req.body);
+      
+      const account = await storage.createEmailAccount({
+        ...validatedData,
+        organizationId: req.user!.organizationId!,
+        userId: req.userId!
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "email_account", account.id, { email: account.email }, req);
+      res.status(201).json(account);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid email account data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create email account" });
+    }
+  });
+
+  // Update email account
+  app.patch("/api/email-accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailAccount(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      
+      // Whitelist of fields allowed to be updated
+      const updateSchema = z.object({
+        displayName: z.string().optional(),
+        encryptedCredentials: z.string().optional(),
+        imapHost: z.string().optional(),
+        imapPort: z.number().optional(),
+        smtpHost: z.string().optional(),
+        smtpPort: z.number().optional(),
+        useSsl: z.boolean().optional(),
+        status: z.enum(["active", "error", "disconnected"]).optional(),
+        lastSyncAt: z.coerce.date().optional(),
+        lastSyncError: z.string().optional(),
+        syncInterval: z.number().optional(),
+        autoCreateTasks: z.boolean().optional(),
+        defaultWorkflowId: z.string().optional(),
+      });
+      
+      const validatedUpdates = updateSchema.parse(req.body);
+      
+      const account = await storage.updateEmailAccount(req.params.id, validatedUpdates);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "email_account", req.params.id, {}, req);
+      res.json(account);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update email account" });
+    }
+  });
+
+  // Delete email account
+  app.delete("/api/email-accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailAccount(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      
+      await storage.deleteEmailAccount(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "email_account", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete email account" });
+    }
+  });
+
+  // ==================== Email Messages Routes ====================
+
+  // Get all email messages for organization
+  app.get("/api/email-messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const messages = await storage.getEmailMessagesByOrganization(req.user!.organizationId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email messages" });
+    }
+  });
+
+  // Get email messages for specific account
+  app.get("/api/email-accounts/:accountId/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const account = await storage.getEmailAccount(req.params.accountId);
+      if (!account || account.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+      
+      const messages = await storage.getEmailMessagesByAccount(req.params.accountId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email messages" });
+    }
+  });
+
+  // Get single email message
+  app.get("/api/email-messages/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const message = await storage.getEmailMessage(req.params.id);
+      if (!message || message.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email message not found" });
+      }
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email message" });
+    }
+  });
+
+  // Update email message (mark as read, starred, processed, etc.)
+  app.patch("/api/email-messages/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailMessage(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email message not found" });
+      }
+      
+      // Whitelist of fields allowed to be updated (user-facing updates only)
+      const updateSchema = z.object({
+        isRead: z.boolean().optional(),
+        isStarred: z.boolean().optional(),
+        labels: z.array(z.string()).optional(),
+        aiProcessed: z.boolean().optional(),
+        aiProcessedAt: z.coerce.date().optional(),
+        aiExtractedData: z.record(z.any()).optional(),
+        createdTaskId: z.string().optional(),
+      });
+      
+      const validatedUpdates = updateSchema.parse(req.body);
+      
+      const message = await storage.updateEmailMessage(req.params.id, validatedUpdates);
+      res.json(message);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update email message" });
+    }
+  });
+
+  // Delete email message
+  app.delete("/api/email-messages/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailMessage(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email message not found" });
+      }
+      
+      await storage.deleteEmailMessage(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete email message" });
     }
   });
 

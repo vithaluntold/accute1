@@ -1679,6 +1679,97 @@ export const supportTicketComments = pgTable("support_ticket_comments", {
   ticketIdx: index("support_ticket_comments_ticket_idx").on(table.ticketId),
 }));
 
+// Email Accounts - For inbox integration (OAuth/IMAP)
+export const emailAccounts = pgTable("email_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Account details
+  provider: text("provider").notNull(), // 'gmail', 'outlook', 'imap', 'exchange'
+  email: text("email").notNull(),
+  displayName: text("display_name"),
+  
+  // Authentication - encrypted credentials
+  authType: text("auth_type").notNull(), // 'oauth', 'password'
+  encryptedCredentials: text("encrypted_credentials").notNull(), // Encrypted OAuth tokens or IMAP password
+  
+  // IMAP/SMTP Configuration (for non-OAuth providers)
+  imapHost: text("imap_host"),
+  imapPort: integer("imap_port"),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port"),
+  useSsl: boolean("use_ssl").default(true),
+  
+  // Sync status
+  status: text("status").notNull().default("active"), // 'active', 'error', 'disconnected'
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncError: text("last_sync_error"),
+  syncInterval: integer("sync_interval").default(300000), // milliseconds (default 5 min)
+  
+  // Settings
+  autoCreateTasks: boolean("auto_create_tasks").default(false), // Enable AI email processor
+  defaultWorkflowId: varchar("default_workflow_id").references(() => workflows.id),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("email_accounts_org_idx").on(table.organizationId),
+  userIdx: index("email_accounts_user_idx").on(table.userId),
+  statusIdx: index("email_accounts_status_idx").on(table.status),
+}));
+
+// Email Messages - Fetched emails from inbox
+export const emailMessages = pgTable("email_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  emailAccountId: varchar("email_account_id").notNull().references(() => emailAccounts.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Email metadata
+  messageId: text("message_id").notNull(), // External message ID from provider
+  threadId: text("thread_id"), // For threading conversations
+  
+  // Email details
+  from: text("from").notNull(),
+  to: text("to").array().notNull(),
+  cc: text("cc").array(),
+  bcc: text("bcc").array(),
+  replyTo: text("reply_to"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  bodyHtml: text("body_html"),
+  
+  // Timestamps
+  sentAt: timestamp("sent_at").notNull(),
+  receivedAt: timestamp("received_at").notNull().defaultNow(),
+  
+  // Flags and status
+  isRead: boolean("is_read").default(false),
+  isStarred: boolean("is_starred").default(false),
+  hasAttachments: boolean("has_attachments").default(false),
+  labels: text("labels").array(),
+  
+  // AI Processing
+  aiProcessed: boolean("ai_processed").default(false),
+  aiProcessedAt: timestamp("ai_processed_at"),
+  aiExtractedData: jsonb("ai_extracted_data").default(sql`'{}'::jsonb`),
+  createdTaskId: varchar("created_task_id").references(() => workflowTasks.id),
+  
+  // Attachments metadata
+  attachments: jsonb("attachments").default(sql`'[]'::jsonb`),
+  
+  // Metadata
+  rawHeaders: jsonb("raw_headers").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  accountIdx: index("email_messages_account_idx").on(table.emailAccountId),
+  orgIdx: index("email_messages_org_idx").on(table.organizationId),
+  messageIdIdx: index("email_messages_message_id_idx").on(table.messageId),
+  threadIdx: index("email_messages_thread_idx").on(table.threadId),
+  processedIdx: index("email_messages_processed_idx").on(table.aiProcessed),
+}));
+
 // Zod Schemas and Types
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
@@ -1705,6 +1796,8 @@ export const insertWorkflowAssignmentSchema = createInsertSchema(workflowAssignm
 export const insertFolderSchema = createInsertSchema(folders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSupportTicketCommentSchema = createInsertSchema(supportTicketComments).omit({ id: true, createdAt: true });
+export const insertEmailAccountSchema = createInsertSchema(emailAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1756,3 +1849,7 @@ export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicketComment = z.infer<typeof insertSupportTicketCommentSchema>;
 export type SupportTicketComment = typeof supportTicketComments.$inferSelect;
+export type InsertEmailAccount = z.infer<typeof insertEmailAccountSchema>;
+export type EmailAccount = typeof emailAccounts.$inferSelect;
+export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
+export type EmailMessage = typeof emailMessages.$inferSelect;

@@ -439,6 +439,23 @@ export interface IStorage {
   getWorkflowAssignmentsByClient(clientId: string): Promise<schema.WorkflowAssignment[]>;
   getWorkflowAssignmentsByWorkflow(workflowId: string): Promise<schema.WorkflowAssignment[]>;
   getWorkflowAssignmentsByEmployee(userId: string): Promise<schema.WorkflowAssignment[]>;
+
+  // Email Accounts
+  createEmailAccount(account: schema.InsertEmailAccount): Promise<schema.EmailAccount>;
+  getEmailAccount(id: string): Promise<schema.EmailAccount | undefined>;
+  getEmailAccountsByOrganization(organizationId: string): Promise<schema.EmailAccount[]>;
+  getEmailAccountsByUser(userId: string): Promise<schema.EmailAccount[]>;
+  updateEmailAccount(id: string, account: Partial<schema.InsertEmailAccount>): Promise<schema.EmailAccount | undefined>;
+  deleteEmailAccount(id: string): Promise<void>;
+
+  // Email Messages
+  createEmailMessage(message: schema.InsertEmailMessage): Promise<schema.EmailMessage>;
+  getEmailMessage(id: string): Promise<schema.EmailMessage | undefined>;
+  getEmailMessagesByAccount(emailAccountId: string): Promise<schema.EmailMessage[]>;
+  getEmailMessagesByOrganization(organizationId: string): Promise<schema.EmailMessage[]>;
+  updateEmailMessage(id: string, message: Partial<schema.InsertEmailMessage>): Promise<schema.EmailMessage | undefined>;
+  deleteEmailMessage(id: string): Promise<void>;
+  getUnprocessedEmails(organizationId: string): Promise<schema.EmailMessage[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1129,6 +1146,87 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.workflowAssignments)
       .where(eq(schema.workflowAssignments.assignedTo, userId))
       .orderBy(desc(schema.workflowAssignments.dueDate));
+  }
+
+  // Email Accounts
+  async createEmailAccount(account: schema.InsertEmailAccount): Promise<schema.EmailAccount> {
+    const result = await db.insert(schema.emailAccounts).values(account).returning();
+    return result[0];
+  }
+
+  async getEmailAccount(id: string): Promise<schema.EmailAccount | undefined> {
+    const result = await db.select().from(schema.emailAccounts).where(eq(schema.emailAccounts.id, id));
+    return result[0];
+  }
+
+  async getEmailAccountsByOrganization(organizationId: string): Promise<schema.EmailAccount[]> {
+    return await db.select().from(schema.emailAccounts)
+      .where(eq(schema.emailAccounts.organizationId, organizationId))
+      .orderBy(desc(schema.emailAccounts.createdAt));
+  }
+
+  async getEmailAccountsByUser(userId: string): Promise<schema.EmailAccount[]> {
+    return await db.select().from(schema.emailAccounts)
+      .where(eq(schema.emailAccounts.userId, userId))
+      .orderBy(desc(schema.emailAccounts.createdAt));
+  }
+
+  async updateEmailAccount(id: string, account: Partial<schema.InsertEmailAccount>): Promise<schema.EmailAccount | undefined> {
+    const result = await db.update(schema.emailAccounts)
+      .set({ ...account, updatedAt: new Date() })
+      .where(eq(schema.emailAccounts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteEmailAccount(id: string): Promise<void> {
+    await db.delete(schema.emailAccounts).where(eq(schema.emailAccounts.id, id));
+  }
+
+  // Email Messages
+  async createEmailMessage(message: schema.InsertEmailMessage): Promise<schema.EmailMessage> {
+    const result = await db.insert(schema.emailMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getEmailMessage(id: string): Promise<schema.EmailMessage | undefined> {
+    const result = await db.select().from(schema.emailMessages).where(eq(schema.emailMessages.id, id));
+    return result[0];
+  }
+
+  async getEmailMessagesByAccount(emailAccountId: string): Promise<schema.EmailMessage[]> {
+    return await db.select().from(schema.emailMessages)
+      .where(eq(schema.emailMessages.emailAccountId, emailAccountId))
+      .orderBy(desc(schema.emailMessages.receivedAt));
+  }
+
+  async getEmailMessagesByOrganization(organizationId: string): Promise<schema.EmailMessage[]> {
+    return await db.select().from(schema.emailMessages)
+      .where(eq(schema.emailMessages.organizationId, organizationId))
+      .orderBy(desc(schema.emailMessages.receivedAt));
+  }
+
+  async updateEmailMessage(id: string, message: Partial<schema.InsertEmailMessage>): Promise<schema.EmailMessage | undefined> {
+    const result = await db.update(schema.emailMessages)
+      .set(message)
+      .where(eq(schema.emailMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteEmailMessage(id: string): Promise<void> {
+    await db.delete(schema.emailMessages).where(eq(schema.emailMessages.id, id));
+  }
+
+  async getUnprocessedEmails(organizationId: string): Promise<schema.EmailMessage[]> {
+    return await db.select().from(schema.emailMessages)
+      .where(
+        and(
+          eq(schema.emailMessages.organizationId, organizationId),
+          eq(schema.emailMessages.aiProcessed, false)
+        )
+      )
+      .orderBy(desc(schema.emailMessages.receivedAt));
   }
 
   // Folders

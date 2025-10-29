@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -74,6 +74,8 @@ const menuCategories = [
       { title: "Messages", url: "/messages", icon: MessageSquare, permission: "messaging.send" },
       { title: "Team Chat", url: "/team-chat", icon: MessagesSquare, permission: null },
       { title: "Calendar", url: "/calendar", icon: Calendar, permission: "appointments.view" },
+      { title: "Inbox", url: "/inbox", icon: InboxIcon, permission: null },
+      { title: "Email Accounts", url: "/email-accounts", icon: Mail, permission: null },
       { title: "Email Templates", url: "/email-templates", icon: Mail, permission: "templates.view" },
     ]
   },
