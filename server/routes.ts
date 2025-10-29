@@ -2372,6 +2372,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get session details (for fetching AI metadata)
+  app.get("/api/client-onboarding/session/:sessionId", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getOnboardingSession(req.params.sessionId);
+      if (!session || session.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch session" });
+    }
+  });
+
   // Send message to AI and get response with privacy filtering
   app.post("/api/client-onboarding/chat", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
     try {

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Bot, Send, Loader2, CheckCircle, UserPlus, Building2 } from "lucide-react";
+import { Bot, Send, Loader2, CheckCircle, UserPlus, Building2, ShieldCheck } from "lucide-react";
 import type { ClientOnboardingSession, OnboardingMessage } from "@shared/schema";
 
 interface ConversationMessage {
@@ -24,7 +24,7 @@ export default function ClientOnboarding() {
   const [showSensitiveForm, setShowSensitiveForm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Sensitive data collected via form (never sent to AI)
+  // Sensitive data collected via form (never sent to AI) - includes tax IDs now
   const [sensitiveData, setSensitiveData] = useState({
     companyName: "",
     email: "",
@@ -37,16 +37,29 @@ export default function ClientOnboarding() {
     contactLastName: "",
     contactEmail: "",
     contactPhone: "",
+    // Tax IDs - dynamically shown based on country
+    pan: "", // India
+    gstin: "", // India
+    ein: "", // USA business
+    ssn: "", // USA individual
+    vat: "", // UK/EU
+    utr: "", // UK
+    trn: "", // UAE
+    abn: "", // Australia
+    gst: "", // Australia/New Zealand
+    sin: "", // Canada individual
+    bn: "", // Canada business
   });
 
-  // Non-sensitive data that can be sent to AI
-  const [collectedData, setCollectedData] = useState({
-    country: "",
-    clientType: "",
-    industry: "",
-    primaryTaxId: "",
-    taxIds: {} as Record<string, string>,
-  });
+  // Metadata from AI (determines which fields to show)
+  const [aiContext, setAiContext] = useState<{
+    country?: string;
+    clientType?: string;
+    industry?: string;
+    gstRegistered?: boolean;
+    vatRegistered?: boolean;
+    requiredFields?: string[];
+  }>({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,6 +68,20 @@ export default function ClientOnboarding() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Fetch session details to get AI metadata
+  const { data: sessionData } = useQuery<ClientOnboardingSession>({
+    queryKey: ["/api/client-onboarding/session", sessionId],
+    enabled: !!sessionId,
+    refetchInterval: 2000, // Poll for metadata updates from AI
+  });
+
+  // Update AI context when session data changes
+  useEffect(() => {
+    if (sessionData?.collectedData) {
+      setAiContext(sessionData.collectedData as any);
+    }
+  }, [sessionData]);
 
   // Start onboarding session
   const startMutation = useMutation({
@@ -128,43 +155,29 @@ export default function ClientOnboarding() {
       const response = await apiRequest(
         "POST",
         "/api/client-onboarding/complete",
-        { sessionId }
+        { sessionId, sensitiveData }
       );
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to complete onboarding");
       }
-      return await response.json() as { client: any; success: boolean };
+      return await response.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Client Created!",
-        description: `Successfully created client: ${data.client.companyName}`,
-      });
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      toast({
+        title: "Success!",
+        description: "Client onboarding completed successfully",
+      });
       // Reset state
       setSessionId(null);
       setMessages([]);
       setSensitiveData({
-        companyName: "",
-        email: "",
-        phone: "",
-        address: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        contactFirstName: "",
-        contactLastName: "",
-        contactEmail: "",
-        contactPhone: "",
+        companyName: "", email: "", phone: "", address: "", city: "", state: "", zipCode: "",
+        contactFirstName: "", contactLastName: "", contactEmail: "", contactPhone: "",
+        pan: "", gstin: "", ein: "", ssn: "", vat: "", utr: "", trn: "", abn: "", gst: "", sin: "", bn: "",
       });
-      setCollectedData({
-        country: "",
-        clientType: "",
-        industry: "",
-        primaryTaxId: "",
-        taxIds: {},
-      });
+      setAiContext({});
       setShowSensitiveForm(false);
     },
     onError: (error: any) => {
@@ -185,30 +198,67 @@ export default function ClientOnboarding() {
     chatMutation.mutate({
       sessionId,
       message: question,
-      collectedData,
-    });
-  };
-
-  const handleSaveSensitiveData = () => {
-    if (!sessionId) return;
-
-    // Send sensitive data to backend (stored in session, never sent to AI)
-    chatMutation.mutate({
-      sessionId,
-      message: "[User provided sensitive contact and company information]",
-      sensitiveData,
-    });
-
-    setShowSensitiveForm(false);
-    toast({
-      title: "Information Saved",
-      description: "Your sensitive information has been securely stored.",
     });
   };
 
   const handleCompleteOnboarding = () => {
     if (!sessionId) return;
+    
+    // Validate required fields
+    if (!sensitiveData.companyName && !sensitiveData.contactFirstName) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill out the contact information form before completing onboarding",
+        variant: "destructive",
+      });
+      setShowSensitiveForm(true);
+      return;
+    }
+
     completeMutation.mutate(sessionId);
+  };
+
+  // Determine which fields to show based on AI context
+  const shouldShowField = (fieldName: string): boolean => {
+    const { country, clientType, gstRegistered, vatRegistered, requiredFields } = aiContext;
+    
+    // If AI provided explicit required fields, use those
+    if (requiredFields && requiredFields.length > 0) {
+      return requiredFields.includes(fieldName);
+    }
+
+    // Otherwise, use country-based logic
+    if (!country) return false; // Don't show tax fields until we know the country
+
+    const countryLower = country.toLowerCase();
+
+    switch (fieldName) {
+      case "pan":
+        return countryLower === "india";
+      case "gstin":
+        return countryLower === "india" && (gstRegistered || clientType === "business");
+      case "ein":
+        return countryLower === "usa" && clientType === "business";
+      case "ssn":
+        return countryLower === "usa" && clientType === "individual";
+      case "vat":
+        return (countryLower === "uk" || countryLower.includes("united kingdom") || 
+                countryLower.includes("europe")) && vatRegistered;
+      case "utr":
+        return countryLower === "uk" || countryLower.includes("united kingdom");
+      case "trn":
+        return countryLower === "uae" || countryLower.includes("emirates");
+      case "abn":
+        return countryLower === "australia";
+      case "gst":
+        return countryLower === "australia" || countryLower === "new zealand";
+      case "sin":
+        return countryLower === "canada" && clientType === "individual";
+      case "bn":
+        return countryLower === "canada" && clientType === "business";
+      default:
+        return true; // Show all contact fields by default
+    }
   };
 
   if (!sessionId) {
@@ -237,23 +287,23 @@ export default function ClientOnboarding() {
           <CardContent>
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">What makes this special?</h3>
+                <h3 className="font-semibold mb-2">Privacy-First Design</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 mt-0.5 text-green-500" />
-                    <span><strong>Country-aware:</strong> Automatically asks for the correct tax IDs based on your client's country</span>
+                    <ShieldCheck className="h-4 w-4 mt-0.5 text-green-500" />
+                    <span><strong>Zero AI Exposure:</strong> The AI NEVER sees sensitive data (names, emails, tax IDs)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 mt-0.5 text-green-500" />
-                    <span><strong>Privacy-first:</strong> Sensitive data like names and emails are collected via secure forms, not AI chat</span>
+                    <span><strong>AI as Guide:</strong> Ask questions to determine requirements (country, business type)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 mt-0.5 text-green-500" />
-                    <span><strong>Smart validation:</strong> AI knows tax ID formats for 100+ countries and provides helpful feedback</span>
+                    <span><strong>Dynamic Forms:</strong> Form fields appear based on AI's guidance (India → PAN/GST, USA → EIN/SSN)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 mt-0.5 text-green-500" />
-                    <span><strong>Conversational:</strong> Natural chat experience that adapts to your responses</span>
+                    <span><strong>Secure Collection:</strong> All sensitive information entered via encrypted forms</span>
                   </li>
                 </ul>
               </div>
@@ -407,20 +457,24 @@ export default function ClientOnboarding() {
           </CardContent>
         </Card>
 
-        {/* Sensitive Data Form */}
+        {/* Sensitive Data Form - Now includes tax fields */}
         {showSensitiveForm && (
           <Card>
             <CardHeader>
-              <CardTitle>Contact & Company Information</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                Contact & Company Information
+              </CardTitle>
               <CardDescription>
-                This information is securely stored and never sent to the AI
+                This information is securely stored and NEVER sent to the AI. Tax IDs are protected with encryption.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
+                {/* Company Info */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="companyName">Company Name</Label>
+                    <Label htmlFor="companyName">Company Name *</Label>
                     <Input
                       id="companyName"
                       value={sensitiveData.companyName}
@@ -430,7 +484,7 @@ export default function ClientOnboarding() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Company Email</Label>
+                    <Label htmlFor="email">Company Email *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -442,6 +496,7 @@ export default function ClientOnboarding() {
                   </div>
                 </div>
 
+                {/* Contact Person */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="contactFirstName">Contact First Name</Label>
@@ -489,6 +544,7 @@ export default function ClientOnboarding() {
                   </div>
                 </div>
 
+                {/* Address */}
                 <div>
                   <Label htmlFor="address">Address</Label>
                   <Input
@@ -533,9 +589,192 @@ export default function ClientOnboarding() {
                   </div>
                 </div>
 
-                <Button onClick={handleSaveSensitiveData} data-testid="button-save-sensitive">
-                  Save Information
-                </Button>
+                {/* Tax IDs - Dynamically shown based on AI context */}
+                {aiContext.country && (
+                  <div className="border-t pt-4 mt-4">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4" />
+                      Tax Identification Numbers
+                      <span className="text-xs text-muted-foreground font-normal">
+                        (for {aiContext.country})
+                      </span>
+                    </h3>
+                    
+                    <div className="grid gap-4">
+                      {/* India */}
+                      {shouldShowField("pan") && (
+                        <div>
+                          <Label htmlFor="pan">PAN (Permanent Account Number) *</Label>
+                          <Input
+                            id="pan"
+                            value={sensitiveData.pan}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, pan: e.target.value.toUpperCase() })}
+                            placeholder="AAAPL1234C"
+                            maxLength={10}
+                            data-testid="input-pan"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">10 characters (e.g., AAAPL1234C)</p>
+                        </div>
+                      )}
+
+                      {shouldShowField("gstin") && (
+                        <div>
+                          <Label htmlFor="gstin">GSTIN (GST Identification Number)</Label>
+                          <Input
+                            id="gstin"
+                            value={sensitiveData.gstin}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, gstin: e.target.value.toUpperCase() })}
+                            placeholder="22AAAAA0000A1Z5"
+                            maxLength={15}
+                            data-testid="input-gstin"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">15 characters</p>
+                        </div>
+                      )}
+
+                      {/* USA */}
+                      {shouldShowField("ein") && (
+                        <div>
+                          <Label htmlFor="ein">EIN (Employer Identification Number) *</Label>
+                          <Input
+                            id="ein"
+                            value={sensitiveData.ein}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, ein: e.target.value })}
+                            placeholder="12-3456789"
+                            data-testid="input-ein"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Format: XX-XXXXXXX</p>
+                        </div>
+                      )}
+
+                      {shouldShowField("ssn") && (
+                        <div>
+                          <Label htmlFor="ssn">SSN (Social Security Number) *</Label>
+                          <Input
+                            id="ssn"
+                            type="password"
+                            value={sensitiveData.ssn}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, ssn: e.target.value })}
+                            placeholder="***-**-****"
+                            data-testid="input-ssn"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Format: XXX-XX-XXXX</p>
+                        </div>
+                      )}
+
+                      {/* UK */}
+                      {shouldShowField("utr") && (
+                        <div>
+                          <Label htmlFor="utr">UTR (Unique Taxpayer Reference) *</Label>
+                          <Input
+                            id="utr"
+                            value={sensitiveData.utr}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, utr: e.target.value })}
+                            placeholder="1234567890"
+                            maxLength={10}
+                            data-testid="input-utr"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">10 digits</p>
+                        </div>
+                      )}
+
+                      {shouldShowField("vat") && (
+                        <div>
+                          <Label htmlFor="vat">VAT Number</Label>
+                          <Input
+                            id="vat"
+                            value={sensitiveData.vat}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, vat: e.target.value.toUpperCase() })}
+                            placeholder="GB123456789"
+                            data-testid="input-vat"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">If VAT registered</p>
+                        </div>
+                      )}
+
+                      {/* UAE */}
+                      {shouldShowField("trn") && (
+                        <div>
+                          <Label htmlFor="trn">TRN (Tax Registration Number) *</Label>
+                          <Input
+                            id="trn"
+                            value={sensitiveData.trn}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, trn: e.target.value })}
+                            placeholder="100123456700003"
+                            maxLength={15}
+                            data-testid="input-trn"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">15 digits</p>
+                        </div>
+                      )}
+
+                      {/* Australia */}
+                      {shouldShowField("abn") && (
+                        <div>
+                          <Label htmlFor="abn">ABN (Australian Business Number) *</Label>
+                          <Input
+                            id="abn"
+                            value={sensitiveData.abn}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, abn: e.target.value })}
+                            placeholder="12 345 678 901"
+                            data-testid="input-abn"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">11 digits</p>
+                        </div>
+                      )}
+
+                      {shouldShowField("gst") && (
+                        <div>
+                          <Label htmlFor="gst">GST Number (Australia/NZ)</Label>
+                          <Input
+                            id="gst"
+                            value={sensitiveData.gst}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, gst: e.target.value })}
+                            placeholder="GST Registration"
+                            data-testid="input-gst"
+                          />
+                        </div>
+                      )}
+
+                      {/* Canada */}
+                      {shouldShowField("sin") && (
+                        <div>
+                          <Label htmlFor="sin">SIN (Social Insurance Number) *</Label>
+                          <Input
+                            id="sin"
+                            type="password"
+                            value={sensitiveData.sin}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, sin: e.target.value })}
+                            placeholder="***-***-***"
+                            data-testid="input-sin"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">9 digits</p>
+                        </div>
+                      )}
+
+                      {shouldShowField("bn") && (
+                        <div>
+                          <Label htmlFor="bn">BN (Business Number) *</Label>
+                          <Input
+                            id="bn"
+                            value={sensitiveData.bn}
+                            onChange={(e) => setSensitiveData({ ...sensitiveData, bn: e.target.value })}
+                            placeholder="123456789"
+                            maxLength={9}
+                            data-testid="input-bn"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">9 digits</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!aiContext.country && (
+                  <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
+                    Continue the conversation with the AI to determine which tax identification numbers are needed for your client.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
