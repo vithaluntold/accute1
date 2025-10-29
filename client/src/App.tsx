@@ -23,6 +23,7 @@ import { Search, Bell, User, Building2, ChevronDown } from "lucide-react";
 import { FinACEverseFooter } from "@/components/finaceverse-footer";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { LucaChatWidget } from "@/components/luca-chat-widget";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
@@ -186,6 +187,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <FinACEverseFooter />
         {isMobile && <MobileBottomNav />}
         <PWAInstallPrompt />
+        <LucaChatWidget />
       </div>
     </SidebarProvider>
   );

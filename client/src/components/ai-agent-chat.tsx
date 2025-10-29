@@ -37,7 +37,7 @@ interface Message {
 }
 
 interface AIAgentChatProps {
-  agentName: "Parity" | "Cadence" | "Forma" | "Kanban View";
+  agentName: "Parity" | "Cadence" | "Forma" | "Kanban View" | "luca";
   trigger?: React.ReactNode;
   mode?: "dialog" | "popover";
   contextData?: any;
@@ -309,6 +309,8 @@ export function AIAgentChat({
         return "Document formatting and validation specialist";
       case "Kanban View":
         return "Task organization and visualization helper";
+      case "luca":
+        return "Your accounting, finance & taxation expert";
       default:
         return "AI Assistant";
     }
