@@ -2961,7 +2961,14 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       });
 
       // Handle contact - either link to existing or create new
-      let portalInvitation = null;
+      let portalInvitation: {
+        invitationToken: string;
+        invitationUrl: string;
+        contactEmail: string;
+        tempPassword?: string;
+        expiresAt: Date;
+        welcomeEmail?: { subject: string; body: string; recipientEmail: string };
+      } | null = null;
       if (existingContactId) {
         // Link existing contact to this client
         const existingContact = await storage.getContact(existingContactId);
@@ -3079,11 +3086,58 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
               contactEmail: sensitiveData.contactEmail,
               tempPassword,
               expiresAt,
+              // welcomeEmail will be populated after transaction
             };
 
             console.log("✅ Created portal invitation for contact:", contact.id);
           }
         });
+      }
+
+      // If portal invitation was created, prepare the welcome email
+      if (portalInvitation && portalInvitation.invitationToken) {
+        try {
+          // Get the organization
+          const organization = await storage.getOrganization(req.user!.organizationId!);
+          if (organization) {
+            // Get the welcome email template (organization-specific or default)
+            const template = await storage.getEmailTemplateByCategory(req.user!.organizationId!, 'welcome');
+            
+            if (template) {
+              const { preparePortalWelcomeEmail } = await import('./services/portalInvitationService');
+              
+              // Get the contact that was just created
+              const contacts = await storage.getContactsByClient(client.id);
+              const primaryContact = contacts.find(c => c.isPrimary);
+              
+              if (primaryContact) {
+                // Prepare the welcome email
+                const welcomeEmail = preparePortalWelcomeEmail(template, {
+                  contact: primaryContact,
+                  organization,
+                  client: {
+                    id: client.id,
+                    companyName: client.companyName,
+                  },
+                  invitationToken: portalInvitation.invitationToken,
+                  invitationUrl: portalInvitation.invitationUrl,
+                  tempPassword: portalInvitation.tempPassword,
+                });
+                
+                // Add the rendered email to the portal invitation response
+                portalInvitation.welcomeEmail = welcomeEmail;
+                
+                console.log("✅ Prepared welcome email for:", primaryContact.email);
+                console.log("📧 Email subject:", welcomeEmail.subject);
+              }
+            } else {
+              console.log("⚠️ No welcome email template found");
+            }
+          }
+        } catch (emailError: any) {
+          console.error("Failed to prepare welcome email:", emailError);
+          // Don't fail the whole request if email preparation fails
+        }
       }
 
       // Mark session as completed

@@ -369,13 +369,6 @@ export interface IStorage {
   updateAppointment(id: string, appointment: Partial<schema.InsertAppointment>): Promise<schema.Appointment | undefined>;
   deleteAppointment(id: string): Promise<void>;
 
-  // TaxDome Features - Email Templates
-  createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate>;
-  getEmailTemplate(id: string): Promise<schema.EmailTemplate | undefined>;
-  getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]>;
-  updateEmailTemplate(id: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined>;
-  deleteEmailTemplate(id: string): Promise<void>;
-
   // TaxDome Features - PDF Annotations
   createDocumentAnnotation(annotation: schema.InsertDocumentAnnotation): Promise<schema.DocumentAnnotation>;
   getDocumentAnnotation(id: string): Promise<schema.DocumentAnnotation | undefined>;
@@ -1835,17 +1828,9 @@ export class DbStorage implements IStorage {
       throw new Error('Template not found');
     }
 
-    let subject = template[0].subject;
-    let body = template[0].body;
-
-    // Replace placeholders in subject and body
-    Object.entries(placeholders).forEach(([key, value]) => {
-      const placeholder = `{{${key}}}`;
-      subject = subject.replace(new RegExp(placeholder, 'g'), value);
-      body = body.replace(new RegExp(placeholder, 'g'), value);
-    });
-
-    return { subject, body };
+    // Use the email template service for secure placeholder replacement
+    const { renderEmailTemplate } = await import('./services/emailTemplateService');
+    return renderEmailTemplate(template[0], placeholders);
   }
 
   // Folders
@@ -3037,35 +3022,6 @@ export class DbStorage implements IStorage {
 
   async deleteAppointment(id: string): Promise<void> {
     await db.delete(schema.appointments).where(eq(schema.appointments.id, id));
-  }
-
-  // Email Templates
-  async createEmailTemplate(template: schema.InsertEmailTemplate): Promise<schema.EmailTemplate> {
-    const result = await db.insert(schema.emailTemplates).values(template).returning();
-    return result[0];
-  }
-
-  async getEmailTemplate(id: string): Promise<schema.EmailTemplate | undefined> {
-    const result = await db.select().from(schema.emailTemplates).where(eq(schema.emailTemplates.id, id));
-    return result[0];
-  }
-
-  async getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]> {
-    return await db.select().from(schema.emailTemplates)
-      .where(eq(schema.emailTemplates.organizationId, organizationId))
-      .orderBy(schema.emailTemplates.name);
-  }
-
-  async updateEmailTemplate(id: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined> {
-    const result = await db.update(schema.emailTemplates)
-      .set({ ...template, updatedAt: new Date() })
-      .where(eq(schema.emailTemplates.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async deleteEmailTemplate(id: string): Promise<void> {
-    await db.delete(schema.emailTemplates).where(eq(schema.emailTemplates.id, id));
   }
 
   // PDF Annotations
