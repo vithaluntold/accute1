@@ -502,6 +502,11 @@ export interface IStorage {
   updateClientPortalTask(id: string, task: Partial<schema.InsertClientPortalTask>): Promise<schema.ClientPortalTask | undefined>;
   deleteClientPortalTask(id: string): Promise<void>;
   
+  // Task Ingestion
+  createTaskFromWorkflowTask(assignmentTaskId: string, organizationId: string, createdBy: string): Promise<schema.ClientPortalTask | null>;
+  createTaskFromMessage(conversationId: string, messageId: string, title: string, description: string, organizationId: string, clientId: string, assignedTo: string | undefined, createdBy: string, dueDate?: Date): Promise<schema.ClientPortalTask>;
+  createTaskFromFormRequest(formTemplateId: string, title: string, description: string, organizationId: string, clientId: string, assignmentId: string | undefined, assignedTo: string | undefined, createdBy: string, dueDate?: Date): Promise<schema.ClientPortalTask>;
+  
   // Task Followups
   createTaskFollowup(followup: schema.InsertTaskFollowup): Promise<schema.TaskFollowup>;
   getTaskFollowup(id: string): Promise<schema.TaskFollowup | undefined>;
@@ -1511,6 +1516,166 @@ export class DbStorage implements IStorage {
 
   async deleteClientPortalTask(id: string): Promise<void> {
     await db.delete(schema.clientPortalTasks).where(eq(schema.clientPortalTasks.id, id));
+  }
+
+  // Task Ingestion - Create tasks from different sources
+  async createTaskFromWorkflowTask(
+    assignmentTaskId: string,
+    organizationId: string,
+    createdBy: string
+  ): Promise<schema.ClientPortalTask | null> {
+    // Fetch assignment task with related data
+    const assignmentTask = await db.select({
+      task: schema.assignmentWorkflowTasks,
+      step: schema.assignmentWorkflowSteps,
+      stage: schema.assignmentWorkflowStages,
+      assignment: schema.workflowAssignments,
+      client: schema.clients,
+    })
+      .from(schema.assignmentWorkflowTasks)
+      .innerJoin(schema.assignmentWorkflowSteps, eq(schema.assignmentWorkflowTasks.assignmentStepId, schema.assignmentWorkflowSteps.id))
+      .innerJoin(schema.assignmentWorkflowStages, eq(schema.assignmentWorkflowSteps.assignmentStageId, schema.assignmentWorkflowStages.id))
+      .innerJoin(schema.workflowAssignments, eq(schema.assignmentWorkflowStages.assignmentId, schema.workflowAssignments.id))
+      .innerJoin(schema.clients, eq(schema.workflowAssignments.clientId, schema.clients.id))
+      .where(
+        and(
+          eq(schema.assignmentWorkflowTasks.id, assignmentTaskId),
+          eq(schema.assignmentWorkflowTasks.organizationId, organizationId)
+        )
+      );
+
+    if (!assignmentTask[0]) {
+      return null;
+    }
+
+    const { task, assignment, client } = assignmentTask[0];
+
+    // Only create portal task if the workflow task is assigned to client
+    if (!task.assigneeType || task.assigneeType !== 'client') {
+      return null;
+    }
+
+    // Create client portal task
+    const portalTask = await this.createClientPortalTask({
+      organizationId,
+      clientId: client.id,
+      assignmentId: assignment.id,
+      title: task.name,
+      description: task.description || '',
+      type: 'workflow_task',
+      priority: task.priority || 'medium',
+      status: 'pending',
+      sourceType: 'workflow_task',
+      sourceId: assignmentTaskId,
+      assignedTo: client.primaryContactId || undefined,
+      createdBy,
+      dueDate: task.dueDate || undefined,
+      requiresFollowup: false,
+    });
+
+    return portalTask;
+  }
+
+  async createTaskFromMessage(
+    conversationId: string,
+    messageId: string,
+    title: string,
+    description: string,
+    organizationId: string,
+    clientId: string,
+    assignedTo: string | undefined,
+    createdBy: string,
+    dueDate?: Date
+  ): Promise<schema.ClientPortalTask> {
+    // Verify client ownership before creating task
+    const client = await db.select().from(schema.clients)
+      .where(
+        and(
+          eq(schema.clients.id, clientId),
+          eq(schema.clients.organizationId, organizationId)
+        )
+      );
+
+    if (client.length === 0) {
+      throw new Error('Client not found or does not belong to this organization');
+    }
+
+    // Create client portal task from employee message
+    return await this.createClientPortalTask({
+      organizationId,
+      clientId,
+      assignmentId: undefined,
+      title,
+      description,
+      type: 'information_request',
+      priority: 'medium',
+      status: 'pending',
+      sourceType: 'conversation',
+      sourceId: conversationId,
+      assignedTo,
+      createdBy,
+      dueDate,
+      requiresFollowup: false,
+      metadata: { messageId },
+    });
+  }
+
+  async createTaskFromFormRequest(
+    formTemplateId: string,
+    title: string,
+    description: string,
+    organizationId: string,
+    clientId: string,
+    assignmentId: string | undefined,
+    assignedTo: string | undefined,
+    createdBy: string,
+    dueDate?: Date
+  ): Promise<schema.ClientPortalTask> {
+    // Verify client ownership before creating task
+    const client = await db.select().from(schema.clients)
+      .where(
+        and(
+          eq(schema.clients.id, clientId),
+          eq(schema.clients.organizationId, organizationId)
+        )
+      );
+
+    if (client.length === 0) {
+      throw new Error('Client not found or does not belong to this organization');
+    }
+
+    // Verify assignment ownership if provided
+    if (assignmentId) {
+      const assignment = await db.select().from(schema.workflowAssignments)
+        .where(
+          and(
+            eq(schema.workflowAssignments.id, assignmentId),
+            eq(schema.workflowAssignments.organizationId, organizationId)
+          )
+        );
+
+      if (assignment.length === 0) {
+        throw new Error('Assignment not found or does not belong to this organization');
+      }
+    }
+
+    // Create client portal task from form/document request
+    return await this.createClientPortalTask({
+      organizationId,
+      clientId,
+      assignmentId,
+      title,
+      description,
+      type: 'document_upload',
+      priority: 'high',
+      status: 'pending',
+      sourceType: 'form_request',
+      sourceId: formTemplateId,
+      assignedTo,
+      createdBy,
+      dueDate,
+      requiresFollowup: false,
+    });
   }
 
   // Task Followups

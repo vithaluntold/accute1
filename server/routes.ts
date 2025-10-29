@@ -1831,6 +1831,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Client Portal Task Routes ====================
+
+  // Get all tasks for a client
+  app.get("/api/client-portal-tasks/client/:clientId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const tasks = await storage.getClientPortalTasksByClient(
+        req.params.clientId,
+        req.user!.organizationId!
+      );
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch client tasks" });
+    }
+  });
+
+  // Get all tasks for an assignment
+  app.get("/api/client-portal-tasks/assignment/:assignmentId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const tasks = await storage.getClientPortalTasksByAssignment(
+        req.params.assignmentId,
+        req.user!.organizationId!
+      );
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch assignment tasks" });
+    }
+  });
+
+  // Get all tasks assigned to a contact
+  app.get("/api/client-portal-tasks/contact/:contactId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const tasks = await storage.getClientPortalTasksByContact(
+        req.params.contactId,
+        req.user!.organizationId!
+      );
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch contact tasks" });
+    }
+  });
+
+  // Get single task
+  app.get("/api/client-portal-tasks/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const task = await storage.getClientPortalTask(req.params.id, req.user!.organizationId!);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch task" });
+    }
+  });
+
+  // Create task from workflow task
+  app.post("/api/client-portal-tasks/from-workflow-task", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { assignmentTaskId } = req.body;
+      if (!assignmentTaskId) {
+        return res.status(400).json({ error: "assignmentTaskId is required" });
+      }
+
+      const task = await storage.createTaskFromWorkflowTask(
+        assignmentTaskId,
+        req.user!.organizationId!,
+        req.userId!
+      );
+
+      if (!task) {
+        return res.status(400).json({ error: "Task not created - workflow task may not be assigned to client" });
+      }
+
+      await logActivity(req.userId, req.user!.organizationId, "create", "client_portal_task", task.id, { source: "workflow_task" }, req);
+      res.json(task);
+    } catch (error: any) {
+      console.error("Failed to create task from workflow task:", error);
+      res.status(500).json({ error: "Failed to create task from workflow task" });
+    }
+  });
+
+  // Create task from message
+  app.post("/api/client-portal-tasks/from-message", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { conversationId, messageId, title, description, clientId, assignedTo, dueDate } = req.body;
+      
+      if (!conversationId || !messageId || !title || !clientId) {
+        return res.status(400).json({ error: "conversationId, messageId, title, and clientId are required" });
+      }
+
+      const task = await storage.createTaskFromMessage(
+        conversationId,
+        messageId,
+        title,
+        description || "",
+        req.user!.organizationId!,
+        clientId,
+        assignedTo,
+        req.userId!,
+        dueDate ? new Date(dueDate) : undefined
+      );
+
+      await logActivity(req.userId, req.user!.organizationId, "create", "client_portal_task", task.id, { source: "message" }, req);
+      res.json(task);
+    } catch (error: any) {
+      console.error("Failed to create task from message:", error);
+      res.status(500).json({ error: "Failed to create task from message" });
+    }
+  });
+
+  // Create task from form request
+  app.post("/api/client-portal-tasks/from-form-request", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { formTemplateId, title, description, clientId, assignmentId, assignedTo, dueDate } = req.body;
+      
+      if (!formTemplateId || !title || !clientId) {
+        return res.status(400).json({ error: "formTemplateId, title, and clientId are required" });
+      }
+
+      const task = await storage.createTaskFromFormRequest(
+        formTemplateId,
+        title,
+        description || "",
+        req.user!.organizationId!,
+        clientId,
+        assignmentId,
+        assignedTo,
+        req.userId!,
+        dueDate ? new Date(dueDate) : undefined
+      );
+
+      await logActivity(req.userId, req.user!.organizationId, "create", "client_portal_task", task.id, { source: "form_request" }, req);
+      res.json(task);
+    } catch (error: any) {
+      console.error("Failed to create task from form request:", error);
+      res.status(500).json({ error: "Failed to create task from form request" });
+    }
+  });
+
+  // Update task status
+  app.patch("/api/client-portal-tasks/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getClientPortalTask(req.params.id, req.user!.organizationId!);
+      if (!existing) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const updates: Partial<schema.InsertClientPortalTask> = {};
+      
+      if (req.body.status) {
+        updates.status = req.body.status;
+        if (req.body.status === 'in_progress' && !existing.startedAt) {
+          updates.startedAt = new Date();
+        } else if (req.body.status === 'completed' && !existing.completedAt) {
+          updates.completedAt = new Date();
+          updates.completedBy = req.userId!;
+        }
+      }
+
+      if (req.body.priority) updates.priority = req.body.priority;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.metadata) updates.metadata = req.body.metadata;
+
+      const task = await storage.updateClientPortalTask(req.params.id, updates);
+      await logActivity(req.userId, req.user!.organizationId, "update", "client_portal_task", req.params.id, updates, req);
+      res.json(task);
+    } catch (error: any) {
+      console.error("Failed to update task:", error);
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  // Delete task
+  app.delete("/api/client-portal-tasks/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getClientPortalTask(req.params.id, req.user!.organizationId!);
+      if (!existing) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      await storage.deleteClientPortalTask(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId, "delete", "client_portal_task", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
   // ==================== Folder Routes ====================
   
   // Get all folders for organization
