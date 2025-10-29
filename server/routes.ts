@@ -2537,11 +2537,11 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const { decryptedCredentials } = llmConfig;
       let answer;
 
-      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure_openai') {
+      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure') {
         const OpenAI = (await import('openai')).default;
         const openai = new OpenAI({
-          apiKey: llmConfig.provider === 'azure_openai' ? decryptedCredentials.apiKey : decryptedCredentials.apiKey,
-          ...(llmConfig.provider === 'azure_openai' && {
+          apiKey: decryptedCredentials.apiKey,
+          ...(llmConfig.provider === 'azure' && {
             baseURL: `${decryptedCredentials.endpoint}/openai/deployments/${decryptedCredentials.deploymentName}`,
             defaultQuery: { 'api-version': decryptedCredentials.apiVersion || '2024-02-15-preview' },
             defaultHeaders: { 'api-key': decryptedCredentials.apiKey },
@@ -2549,7 +2549,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         });
 
         const completion = await openai.chat.completions.create({
-          model: llmConfig.provider === 'azure_openai' ? decryptedCredentials.deploymentName : (llmConfig.modelName || 'gpt-4'),
+          model: llmConfig.provider === 'azure' ? decryptedCredentials.deploymentName : (llmConfig.model || 'gpt-4'),
           messages: [
             { role: 'system', content: systemPrompt },
             ...conversationHistory
@@ -2572,7 +2572,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
         answer = message.content[0].type === 'text' ? message.content[0].text : "I couldn't generate a response.";
       } else {
-        return res.status(400).json({ error: "Unsupported LLM provider" });
+        return res.status(400).json({ error: `Unsupported LLM provider: ${llmConfig.provider}. Supported providers: openai, azure, anthropic` });
       }
 
       // Extract metadata from AI response (if present)
