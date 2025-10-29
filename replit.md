@@ -13,7 +13,16 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 ## System Architecture
 
 ### UI/UX Decisions
-The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron and Exo 2 fonts, a collapsible sidebar, top navigation, card-based dashboards, and data tables with sorting and pagination. The platform is also implemented as a Progressive Web App (PWA) for a native-like experience across mobile and desktop, featuring a manifest, service worker for offline support, install prompts, and mobile-optimized navigation and installation guides.
+The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron and Exo 2 fonts, a collapsible sidebar with organized navigation categories (Overview, Workflow Management, AI & Automation, Documents, Financial, Communication, Client Management, Administration), top navigation, card-based dashboards, and data tables with sorting and pagination. The platform is fully cross-browser and cross-device compatible with:
+- Responsive design across all screen sizes (mobile, tablet, desktop)
+- iOS Safari safe area support for notched devices
+- Android Chrome dynamic viewport handling
+- Touch-optimized UI with 44px minimum tap targets on mobile
+- Prevented zoom on input focus (16px font size)
+- Smooth scrolling with -webkit-overflow-scrolling
+- Global responsive CSS in client/src/styles/global-responsive.css
+
+The platform is implemented as a Progressive Web App (PWA) for a native-like experience across mobile and desktop, featuring a manifest, service worker for offline support, install prompts, and mobile-optimized navigation and installation guides.
 
 ### Technical Implementations
 The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript. Data persistence is managed by PostgreSQL (Neon) with Drizzle ORM. Authentication incorporates JWT and bcrypt, complemented by AES-256 encryption for sensitive data, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
