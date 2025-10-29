@@ -5329,6 +5329,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Support Ticket Routes ====================
+
+  // Get all support tickets for organization
+  app.get("/api/support-tickets", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      const tickets = await storage.getSupportTickets(req.user!.organizationId);
+      res.json(tickets);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch support tickets" });
+    }
+  });
+
+  // Get single support ticket
+  app.get("/api/support-tickets/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket || ticket.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch support ticket" });
+    }
+  });
+
+  // Create support ticket
+  app.post("/api/support-tickets", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const ticket = await storage.createSupportTicket({
+        ...req.body,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "support_ticket", ticket.id, { subject: ticket.subject }, req);
+      res.status(201).json(ticket);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create support ticket" });
+    }
+  });
+
+  // Update support ticket
+  app.patch("/api/support-tickets/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      const ticket = await storage.updateSupportTicket(req.params.id, req.body);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "support_ticket", req.params.id, {}, req);
+      res.json(ticket);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update support ticket" });
+    }
+  });
+
+  // Delete support ticket
+  app.delete("/api/support-tickets/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getSupportTicket(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      await storage.deleteSupportTicket(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "support_ticket", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete support ticket" });
+    }
+  });
+
+  // Get comments for a support ticket
+  app.get("/api/support-tickets/:id/comments", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket || ticket.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      const comments = await storage.getTicketComments(req.params.id);
+      res.json(comments);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch ticket comments" });
+    }
+  });
+
+  // Add comment to support ticket
+  app.post("/api/support-tickets/:id/comments", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const ticket = await storage.getSupportTicket(req.params.id);
+      if (!ticket || ticket.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      const comment = await storage.createSupportTicketComment({
+        ticketId: req.params.id,
+        content: req.body.content,
+        createdBy: req.userId!,
+        isInternal: req.body.isInternal || false,
+        attachments: req.body.attachments || []
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "comment", "support_ticket", req.params.id, {}, req);
+      res.status(201).json(comment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

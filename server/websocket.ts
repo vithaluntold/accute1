@@ -258,6 +258,36 @@ async function handleAgentExecution(
         ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
         break;
       }
+      case 'luca': {
+        const { LucaAgent } = await import('./agents/luca/index');
+        const agent = new LucaAgent(llmConfig);
+        console.log('[WebSocket] Starting Luca agent with LLM-based intent detection...');
+        
+        // Create execution context for tool calls
+        const executionContext = {
+          organizationId: ws.organizationId!,
+          userId: ws.userId!,
+          req: { user: { organizationId: ws.organizationId, id: ws.userId } } as any
+        };
+        
+        // Check if tool execution is needed
+        const toolResult = await agent.executeWithTools(input, executionContext);
+        
+        if (toolResult.usedTool) {
+          // Tool was executed - send instant response
+          fullResponse = toolResult.response;
+          ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
+        } else {
+          // No tool needed - use streaming mode for conversational response
+          fullResponse = await agent.executeStream(input, (chunk: string) => {
+            console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
+            ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
+          });
+        }
+        
+        console.log('[WebSocket] Luca agent completed. Response length:', fullResponse.length);
+        break;
+      }
       default:
         throw new Error(`Unknown agent: ${agentName}`);
     }

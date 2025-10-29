@@ -320,6 +320,18 @@ export async function initializeSystem() {
         tags: ["forms", "data-collection", "ai-assistant", "tax-organizers"],
         isPublic: true,
       },
+      {
+        name: "Luca",
+        description: "Expert AI assistant specializing in accounting, finance, and taxation. Luca provides comprehensive guidance on financial statements, tax planning, compliance, audit preparation, and can create support tickets for complex issues requiring human expertise. Think of Luca as your AI accounting consultant available 24/7.",
+        provider: "accute",
+        category: "accounting",
+        capabilities: ["accounting_guidance", "tax_planning", "financial_analysis", "compliance_support", "support_tickets", "audit_preparation"],
+        configuration: { modelProvider: "openai", model: "gpt-4" },
+        pricingModel: "free",
+        version: "1.0.0",
+        tags: ["accounting", "taxation", "finance", "ai-assistant", "support"],
+        isPublic: true,
+      },
     ];
 
     for (const copilot of aiCopilots) {
