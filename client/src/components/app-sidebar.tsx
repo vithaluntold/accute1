@@ -39,7 +39,8 @@ const menuCategories = [
     items: [
       { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
       { title: "Assignments", url: "/assignments", icon: ListTodo, permission: "workflows.view" },
-      { title: "Projects", url: "/projects", icon: Kanban, permission: "projects.view" },
+      { title: "Kanban Board", url: "/kanban", icon: Kanban, permission: "workflows.view" },
+      { title: "Projects", url: "/projects", icon: Network, permission: "projects.view" },
     ]
   },
   {
