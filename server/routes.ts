@@ -2459,18 +2459,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
    - Tell them: "Please fill out the Contact & Company Information form below with the company name, contact details, and tax identification numbers."
    - Never ask them to tell you these values in chat
 
-4. **Track requirements** - As you learn about their situation, respond with JSON metadata:
+4. **Track requirements with DETAILED VALIDATION** - As you learn about their situation, respond with JSON metadata including:
+   - Required fields for their geography/type
+   - Validation rules (format, pattern, length, cross-field dependencies)
+   - Helpful placeholders showing the exact format
+   - Human-readable validation descriptions
+   
    At the end of each response, include on a new line: \`METADATA: {...}\`
    
-   Example metadata:
-   \`METADATA: {"country": "India", "clientType": "business", "industry": "manufacturing", "gstRegistered": true, "requiredFields": ["companyName", "contactName", "email", "phone", "address", "pan", "gstin"]}\`
+   **Metadata Structure:**
+   \`\`\`json
+   {
+     "country": "string",
+     "clientType": "individual|business",
+     "industry": "string (optional)",
+     "gstRegistered": boolean (optional),
+     "vatRegistered": boolean (optional),
+     "requiredFields": ["field1", "field2"], // Tax ID field names only (contact fields always shown)
+     "validations": {
+       "fieldName": {
+         "placeholder": "Example format",
+         "format": "Human-readable format description",
+         "pattern": "regex pattern (optional)",
+         "length": number or "min-max",
+         "rules": ["Rule 1", "Rule 2"],
+         "crossFieldValidation": {
+           "contains": "otherField", // This field should contain another field's value
+           "derivedFrom": "otherField", // This field is derived from another field
+           "message": "Validation hint"
+         }
+       }
+     }
+   }
+   \`\`\`
+   
+   **Example for India Business:**
+   \`METADATA: {"country": "India", "clientType": "business", "gstRegistered": true, "requiredFields": ["pan", "gstin"], "validations": {"pan": {"placeholder": "AAAPL1234C", "format": "10 alphanumeric characters", "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$", "length": 10, "rules": ["First 5 characters: Alphabetic uppercase", "Next 4 digits: Numeric", "4th character must be 'C' for company (or 'P' for individual)", "5th character matches first letter of entity name", "Last character: Alphabetic check digit"]}, "gstin": {"placeholder": "22AAAPL1234C1Z5", "format": "15 characters", "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$", "length": 15, "rules": ["First 2 digits: State code (based on company address)", "Characters 3-12: Must match the PAN number exactly", "13th character: Entity number (1-9, A-Z)", "14th character: Always 'Z'", "15th character: Check digit"], "crossFieldValidation": {"contains": "pan", "derivedFrom": "address.state", "message": "GSTIN must contain the PAN and start with the state code from your address"}}}}\`
+   
+   **Example for USA Business:**
+   \`METADATA: {"country": "USA", "clientType": "business", "requiredFields": ["ein"], "validations": {"ein": {"placeholder": "12-3456789", "format": "9 digits in XX-XXXXXXX format", "pattern": "^[0-9]{2}-[0-9]{7}$", "length": 10, "rules": ["2 digits, hyphen, 7 digits", "Format: XX-XXXXXXX"]}}}\`
+   
+   **Example for UK Business:**
+   \`METADATA: {"country": "UK", "clientType": "business", "vatRegistered": true, "requiredFields": ["utr", "vat"], "validations": {"utr": {"placeholder": "1234567890", "format": "10 digits", "pattern": "^[0-9]{10}$", "length": 10, "rules": ["Exactly 10 numeric digits"]}, "vat": {"placeholder": "GB123456789", "format": "GB followed by 9 digits", "pattern": "^GB[0-9]{9}$", "length": 12, "rules": ["Starts with 'GB'", "Followed by 9 numeric digits"]}}}\`
 
 5. **Keep it conversational** - Be helpful, friendly, and progressive. Ask 1-2 questions at a time.
 
 Current session context:
 ${JSON.stringify((session.collectedData as Record<string, any>) || {}, null, 2)}
 
-Remember: You are a guide, not a data collector. All sensitive information goes into the secure form, never into our chat.`;
+Remember: You are a guide, not a data collector. All sensitive information goes into the secure form, never into our chat. Use your deep knowledge of global tax systems to provide accurate, country-specific validation rules.`;
 
       // Call LLM
       const { decryptedCredentials } = llmConfig;

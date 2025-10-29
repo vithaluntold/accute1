@@ -51,7 +51,7 @@ export default function ClientOnboarding() {
     bn: "", // Canada business
   });
 
-  // Metadata from AI (determines which fields to show)
+  // Metadata from AI (determines which fields to show and how to validate them)
   const [aiContext, setAiContext] = useState<{
     country?: string;
     clientType?: string;
@@ -59,7 +59,22 @@ export default function ClientOnboarding() {
     gstRegistered?: boolean;
     vatRegistered?: boolean;
     requiredFields?: string[];
+    validations?: Record<string, {
+      placeholder?: string;
+      format?: string;
+      pattern?: string;
+      length?: number | string;
+      rules?: string[];
+      crossFieldValidation?: {
+        contains?: string;
+        derivedFrom?: string;
+        message?: string;
+      };
+    }>;
   }>({});
+
+  // Validation errors for real-time feedback
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -204,6 +219,23 @@ export default function ClientOnboarding() {
   const handleCompleteOnboarding = () => {
     if (!sessionId) return;
     
+    // Check for validation errors
+    const hasValidationErrors = Object.values(validationErrors).some(error => error && error.trim() !== "");
+    if (hasValidationErrors) {
+      const errorFields = Object.entries(validationErrors)
+        .filter(([_, error]) => error && error.trim() !== "")
+        .map(([field]) => field.toUpperCase())
+        .join(", ");
+      
+      toast({
+        title: "Validation Errors",
+        description: `Please fix validation errors in: ${errorFields}`,
+        variant: "destructive",
+      });
+      setShowSensitiveForm(true);
+      return;
+    }
+
     // Validate required fields
     if (!sensitiveData.companyName && !sensitiveData.contactFirstName) {
       toast({
@@ -215,7 +247,205 @@ export default function ClientOnboarding() {
       return;
     }
 
+    // Re-validate all required tax fields before submission
+    const taxFieldsToValidate = aiContext.requiredFields || [];
+    const newErrors: Record<string, string> = {};
+    let hasErrors = false;
+
+    taxFieldsToValidate.forEach(fieldName => {
+      const value = (sensitiveData as any)[fieldName];
+      
+      // Check if required field is empty
+      if (!value || value.trim() === "") {
+        newErrors[fieldName] = `${fieldName.toUpperCase()} is required for ${aiContext.country || "this country"}`;
+        hasErrors = true;
+      } else {
+        // Validate the format/pattern if value is provided
+        const error = validateField(fieldName, value);
+        if (error) {
+          newErrors[fieldName] = error;
+          hasErrors = true;
+        }
+      }
+    });
+
+    if (hasErrors) {
+      setValidationErrors(prev => ({ ...prev, ...newErrors }));
+      const errorFieldsList = Object.entries(newErrors)
+        .map(([field]) => field.toUpperCase())
+        .join(", ");
+      toast({
+        title: "Validation Failed",
+        description: `Please complete and correct these fields: ${errorFieldsList}`,
+        variant: "destructive",
+      });
+      setShowSensitiveForm(true);
+      return;
+    }
+
     completeMutation.mutate(sessionId);
+  };
+
+  // Validate a field based on AI-provided validation rules
+  const validateField = (fieldName: string, value: string): string | null => {
+    const validation = aiContext.validations?.[fieldName];
+    if (!validation) return null; // No validation rules for this field
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return null; // Don't validate empty fields
+
+    // Pattern validation (regex)
+    if (validation.pattern) {
+      try {
+        const regex = new RegExp(validation.pattern);
+        if (!regex.test(trimmedValue)) {
+          return `Invalid format. Expected: ${validation.format || validation.placeholder || "correct format"}`;
+        }
+      } catch (e) {
+        console.error("Invalid regex pattern:", validation.pattern);
+      }
+    }
+
+    // Length validation
+    if (validation.length) {
+      const expectedLength = typeof validation.length === 'number' 
+        ? validation.length 
+        : parseInt(validation.length.toString());
+      if (trimmedValue.length !== expectedLength) {
+        return `Must be exactly ${expectedLength} characters`;
+      }
+    }
+
+    // Cross-field validation
+    if (validation.crossFieldValidation) {
+      const { contains, derivedFrom, message } = validation.crossFieldValidation;
+      
+      // Check if this field should contain another field's value
+      if (contains) {
+        const otherFieldValue = (sensitiveData as any)[contains];
+        if (otherFieldValue && !trimmedValue.includes(otherFieldValue)) {
+          return message || `Must contain ${contains.toUpperCase()}`;
+        }
+      }
+
+      // Check if this field should be derived from another field (e.g., state code from address)
+      if (derivedFrom && message) {
+        // This is a hint/warning, not a hard validation error
+        return null; // We can't validate derived fields without complex logic
+      }
+    }
+
+    return null; // No errors
+  };
+
+  // Get list of fields that depend on this field (for cross-field validation)
+  const getDependentFields = (changedFieldName: string): string[] => {
+    if (!aiContext.validations) return [];
+    
+    const dependents: string[] = [];
+    Object.entries(aiContext.validations).forEach(([fieldName, validation]) => {
+      const cfv = validation.crossFieldValidation;
+      if (!cfv) return;
+
+      // Check direct field name matches
+      if (cfv.contains === changedFieldName) {
+        dependents.push(fieldName);
+      }
+
+      // Check derivedFrom with dot-path support (e.g., "address.state" matches "state")
+      if (cfv.derivedFrom) {
+        const derivedPath = cfv.derivedFrom;
+        // Handle both "state" and "address.state" formats
+        const lastSegment = derivedPath.includes('.') ? derivedPath.split('.').pop() : derivedPath;
+        if (lastSegment === changedFieldName || derivedPath === changedFieldName) {
+          dependents.push(fieldName);
+        }
+      }
+    });
+    return dependents;
+  };
+
+  // Handle field changes with real-time validation
+  const handleFieldChange = (fieldName: string, value: string) => {
+    // Update the field value
+    const newData = { ...sensitiveData, [fieldName]: value };
+    setSensitiveData(newData);
+
+    // Run validation if AI provided validation rules
+    const error = validateField(fieldName, value);
+    const newErrors = {
+      ...validationErrors,
+      [fieldName]: error || ""
+    };
+
+    // Revalidate dependent fields (cross-field validation)
+    const dependents = getDependentFields(fieldName);
+    dependents.forEach(depField => {
+      const depValue = (newData as any)[depField];
+      if (depValue) {
+        // Create a temporary state to validate against
+        const tempData = { ...newData };
+        const depError = validateFieldWithData(depField, depValue, tempData);
+        newErrors[depField] = depError || "";
+      }
+    });
+
+    setValidationErrors(newErrors);
+  };
+
+  // Validate field with custom data (for dependent field validation)
+  const validateFieldWithData = (fieldName: string, value: string, data: typeof sensitiveData): string | null => {
+    const validation = aiContext.validations?.[fieldName];
+    if (!validation) return null;
+
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return null;
+
+    // Pattern validation (regex)
+    if (validation.pattern) {
+      try {
+        const regex = new RegExp(validation.pattern);
+        if (!regex.test(trimmedValue)) {
+          return `Invalid format. Expected: ${validation.format || validation.placeholder || "correct format"}`;
+        }
+      } catch (e) {
+        console.error("Invalid regex pattern:", validation.pattern);
+      }
+    }
+
+    // Length validation
+    if (validation.length) {
+      const expectedLength = typeof validation.length === 'number' 
+        ? validation.length 
+        : parseInt(validation.length.toString());
+      if (trimmedValue.length !== expectedLength) {
+        return `Must be exactly ${expectedLength} characters`;
+      }
+    }
+
+    // Cross-field validation
+    if (validation.crossFieldValidation) {
+      const { contains, message } = validation.crossFieldValidation;
+      
+      if (contains) {
+        const otherFieldValue = (data as any)[contains];
+        if (otherFieldValue && !trimmedValue.includes(otherFieldValue)) {
+          return message || `Must contain ${contains.toUpperCase()}`;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // Get placeholder for a field from AI metadata
+  const getFieldPlaceholder = (fieldName: string): string | undefined => {
+    return aiContext.validations?.[fieldName]?.placeholder;
+  };
+
+  // Get validation hints/rules for a field
+  const getFieldHints = (fieldName: string): string[] => {
+    return aiContext.validations?.[fieldName]?.rules || [];
   };
 
   // Determine which fields to show based on AI context
@@ -619,12 +849,27 @@ export default function ClientOnboarding() {
                           <Input
                             id="pan"
                             value={sensitiveData.pan}
-                            onChange={(e) => setSensitiveData({ ...sensitiveData, pan: e.target.value.toUpperCase() })}
-                            placeholder="AAAPL1234C"
-                            maxLength={10}
+                            onChange={(e) => handleFieldChange("pan", e.target.value.toUpperCase())}
+                            placeholder={getFieldPlaceholder("pan") || "AAAPL1234C"}
+                            maxLength={aiContext.validations?.pan?.length as number || 10}
                             data-testid="input-pan"
+                            className={validationErrors.pan ? "border-destructive" : ""}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">10 characters (e.g., AAAPL1234C)</p>
+                          {validationErrors.pan && (
+                            <p className="text-xs text-destructive mt-1">{validationErrors.pan}</p>
+                          )}
+                          {getFieldHints("pan").length > 0 && !validationErrors.pan && (
+                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {getFieldHints("pan").map((hint, i) => (
+                                <div key={i}>• {hint}</div>
+                              ))}
+                            </div>
+                          )}
+                          {!getFieldHints("pan").length && !validationErrors.pan && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {aiContext.validations?.pan?.format || "10 characters (e.g., AAAPL1234C)"}
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -634,12 +879,27 @@ export default function ClientOnboarding() {
                           <Input
                             id="gstin"
                             value={sensitiveData.gstin}
-                            onChange={(e) => setSensitiveData({ ...sensitiveData, gstin: e.target.value.toUpperCase() })}
-                            placeholder="22AAAAA0000A1Z5"
-                            maxLength={15}
+                            onChange={(e) => handleFieldChange("gstin", e.target.value.toUpperCase())}
+                            placeholder={getFieldPlaceholder("gstin") || "22AAAAA0000A1Z5"}
+                            maxLength={aiContext.validations?.gstin?.length as number || 15}
                             data-testid="input-gstin"
+                            className={validationErrors.gstin ? "border-destructive" : ""}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">15 characters</p>
+                          {validationErrors.gstin && (
+                            <p className="text-xs text-destructive mt-1">{validationErrors.gstin}</p>
+                          )}
+                          {getFieldHints("gstin").length > 0 && !validationErrors.gstin && (
+                            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {getFieldHints("gstin").map((hint, i) => (
+                                <div key={i}>• {hint}</div>
+                              ))}
+                            </div>
+                          )}
+                          {!getFieldHints("gstin").length && !validationErrors.gstin && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {aiContext.validations?.gstin?.format || "15 characters"}
+                            </p>
+                          )}
                         </div>
                       )}
 
