@@ -242,9 +242,8 @@ export default function Clients() {
     
     if (editingClient) {
       updateMutation.mutate({ id: editingClient.id, data: clientData });
-    } else {
-      createMutation.mutate(data); // Pass full data for contact creation
     }
+    // Note: Client creation now happens via AI Client Onboarding page
   };
 
   return (
@@ -260,41 +259,11 @@ export default function Clients() {
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => {
-              setEditingClient(null);
-              form.reset({
-                companyName: "",
-                contactName: "",
-                email: "",
-                phone: "",
-                address: "",
-                city: "",
-                state: "",
-                zipCode: "",
-                country: "US",
-                taxId: "",
-                status: "active" as const,
-                industry: "",
-                notes: "",
-                assignedTo: undefined,
-                metadata: {},
-                primaryContactFirstName: "",
-                primaryContactLastName: "",
-                primaryContactEmail: "",
-                primaryContactPhone: "",
-                isCreating: true, // Creating new client
-              });
-            }} data-testid="button-add-client">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingClient ? "Edit Client" : "Add New Client"}</DialogTitle>
+              <DialogTitle>Edit Client</DialogTitle>
               <DialogDescription>
-                {editingClient ? "Update client information" : "Add a new client to your organization"}
+                Update client information
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
