@@ -1532,6 +1532,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create workflow from installed template
+  app.post("/api/marketplace/create-from-template/:itemId", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    let workflowId: string | null = null;
+    
+    try {
+      // Verify user has installed the template
+      const installation = await storage.getMarketplaceInstallationByItemAndOrg(req.params.itemId, req.user!.organizationId!);
+      if (!installation) {
+        return res.status(403).json({ error: "Template not installed. Please install it from the marketplace first." });
+      }
+
+      // Get the marketplace item
+      const item = await storage.getMarketplaceItem(req.params.itemId);
+      if (!item || item.category !== 'pipeline_template') {
+        return res.status(400).json({ error: "This item is not a pipeline template" });
+      }
+
+      // Extract template content
+      const templateContent = item.content as any;
+      if (!templateContent || !templateContent.name) {
+        return res.status(400).json({ error: "Invalid template structure" });
+      }
+
+      // Create workflow from template
+      const workflow = await storage.createWorkflow({
+        name: req.body.name || `${templateContent.name} (from template)`,
+        description: req.body.description || templateContent.description || `Created from marketplace template: ${item.name}`,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.userId!,
+        category: templateContent.category || 'general',
+        status: 'draft',
+        tags: templateContent.tags || [],
+        nodes: [],  // Don't copy nodes/edges yet - they need ID remapping
+        edges: [],
+      });
+      
+      workflowId = workflow.id;
+
+      // Map old IDs to new IDs for remapping nodes/edges later
+      const stageIdMap = new Map<string, string>();
+      const stepIdMap = new Map<string, string>();
+      const taskIdMap = new Map<string, string>();
+
+      // Create stages from template
+      if (templateContent.stages && Array.isArray(templateContent.stages)) {
+        for (const stageData of templateContent.stages) {
+          const stage = await storage.createStage({
+            workflowId: workflow.id,
+            name: stageData.name,
+            description: stageData.description,
+            order: stageData.order || 0,
+            autoProgress: stageData.autoProgress !== undefined ? stageData.autoProgress : true,
+          });
+          
+          if (stageData.id) {
+            stageIdMap.set(stageData.id, stage.id);
+          }
+
+          // Create steps for this stage
+          if (stageData.steps && Array.isArray(stageData.steps)) {
+            for (const stepData of stageData.steps) {
+              const step = await storage.createStep({
+                stageId: stage.id,
+                name: stepData.name,
+                description: stepData.description,
+                order: stepData.order || 0,
+                autoProgress: stepData.autoProgress !== undefined ? stepData.autoProgress : true,
+              });
+              
+              if (stepData.id) {
+                stepIdMap.set(stepData.id, step.id);
+              }
+
+              // Create tasks for this step
+              if (stepData.tasks && Array.isArray(stepData.tasks)) {
+                for (const taskData of stepData.tasks) {
+                  const task = await storage.createTask({
+                    stepId: step.id,
+                    name: taskData.name,
+                    description: taskData.description,
+                    order: taskData.order || 0,
+                    type: taskData.type || taskData.taskType || 'manual',  // Fixed: use 'type' instead of 'taskType'
+                    assigneeId: null, // Not assigned yet
+                    autoProgress: taskData.autoProgress !== undefined ? taskData.autoProgress : false,
+                    onCompleteAction: taskData.onCompleteAction || null,
+                  });
+                  
+                  if (taskData.id) {
+                    taskIdMap.set(taskData.id, task.id);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Remap nodes and edges with new IDs
+      let remappedNodes = [];
+      let remappedEdges = [];
+      
+      if (templateContent.nodes && Array.isArray(templateContent.nodes)) {
+        remappedNodes = templateContent.nodes.map((node: any) => {
+          const newNode = { ...node };
+          
+          // Remap node ID if it references a stage/step/task
+          if (node.data?.stageId && stageIdMap.has(node.data.stageId)) {
+            newNode.data = { ...newNode.data, stageId: stageIdMap.get(node.data.stageId) };
+          }
+          if (node.data?.stepId && stepIdMap.has(node.data.stepId)) {
+            newNode.data = { ...newNode.data, stepId: stepIdMap.get(node.data.stepId) };
+          }
+          if (node.data?.taskId && taskIdMap.has(node.data.taskId)) {
+            newNode.data = { ...newNode.data, taskId: taskIdMap.get(node.data.taskId) };
+          }
+          
+          return newNode;
+        });
+      }
+      
+      if (templateContent.edges && Array.isArray(templateContent.edges)) {
+        remappedEdges = templateContent.edges;
+      }
+
+      // Update workflow with remapped nodes/edges
+      await storage.updateWorkflow(workflow.id, {
+        nodes: remappedNodes,
+        edges: remappedEdges,
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow", workflow.id, { name: workflow.name, fromTemplate: item.name }, req);
+      
+      // Fetch updated workflow with all data
+      const updatedWorkflow = await storage.getWorkflow(workflow.id);
+      res.json(updatedWorkflow);
+    } catch (error: any) {
+      console.error('Failed to create workflow from template:', error);
+      
+      // Cleanup: Delete the workflow if it was created
+      if (workflowId) {
+        try {
+          await storage.deleteWorkflow(workflowId);
+          console.log(`Cleaned up orphaned workflow ${workflowId} after template creation failure`);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup workflow:', cleanupError);
+        }
+      }
+      
+      res.status(500).json({ error: "Failed to create workflow from template: " + error.message });
+    }
+  });
+
   // ==================== Workflow Assignment Routes ====================
   
   // Get all assignments for organization
