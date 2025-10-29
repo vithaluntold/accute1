@@ -62,6 +62,7 @@ import TeamChat from "@/pages/team-chat";
 import Calendar from "@/pages/calendar";
 import EmailTemplates from "@/pages/email-templates";
 import NotFound from "@/pages/not-found";
+import MobileApps from "@/pages/mobile-apps";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -211,6 +212,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Settings />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile-apps">
+        <ProtectedRoute>
+          <AppLayout>
+            <MobileApps />
           </AppLayout>
         </ProtectedRoute>
       </Route>

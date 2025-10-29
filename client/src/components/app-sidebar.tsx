@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -173,6 +173,12 @@ const menuItems = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
+    permission: null,
+  },
+  {
+    title: "Mobile Apps",
+    url: "/mobile-apps",
+    icon: Smartphone,
     permission: null,
   },
 ];

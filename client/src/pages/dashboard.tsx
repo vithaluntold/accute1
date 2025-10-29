@@ -3,9 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2 } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2, Smartphone, Download, X } from "lucide-react";
 import { format } from "date-fns";
 import { getUser } from "@/lib/auth";
+import { useIsPWA } from "@/hooks/use-mobile-detect";
+import { Link } from "wouter";
+import { useState, useEffect } from "react";
 import type { WorkflowTask } from "@shared/schema";
 
 interface TaskStats {
@@ -45,9 +48,24 @@ interface PracticeStats {
 export default function Dashboard() {
   const user = getUser();
   const userPermissions = user?.permissions || [];
+  const isPWA = useIsPWA();
+  const [showMobileAppBanner, setShowMobileAppBanner] = useState(true);
   
   const hasReportsView = userPermissions.includes('reports.view');
   const hasWorkflowsView = userPermissions.includes('workflows.view');
+
+  // Check if banner was dismissed
+  useEffect(() => {
+    const dismissed = localStorage.getItem('mobile-app-banner-dismissed');
+    if (dismissed) {
+      setShowMobileAppBanner(false);
+    }
+  }, []);
+
+  const dismissBanner = () => {
+    localStorage.setItem('mobile-app-banner-dismissed', 'true');
+    setShowMobileAppBanner(false);
+  };
 
   const { data: myStats, isLoading: myStatsLoading } = useQuery<TaskStats>({
     queryKey: ['/api/dashboard/my-stats'],
@@ -91,6 +109,51 @@ export default function Dashboard() {
         </h1>
         <p className="text-muted-foreground">Track your tasks and stay on top of deadlines</p>
       </div>
+
+      {/* Mobile App Download Banner */}
+      {!isPWA && showMobileAppBanner && (
+        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-accent/5" data-testid="card-mobile-app-banner">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Smartphone className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="text-lg mb-1">Get the Mobile App</CardTitle>
+                  <CardDescription className="text-sm">
+                    Install Accute on your phone for faster access, offline support, and a native app experience
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={dismissBanner}
+                className="h-6 w-6 -mt-1"
+                data-testid="button-dismiss-banner"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              <Link href="/mobile-apps">
+                <Button size="sm" data-testid="button-install-mobile-app">
+                  <Download className="h-4 w-4 mr-2" />
+                  Install Now
+                </Button>
+              </Link>
+              <Link href="/mobile-apps">
+                <Button variant="outline" size="sm" data-testid="button-learn-more-mobile">
+                  Learn More
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* My Task Statistics */}
       <div>
