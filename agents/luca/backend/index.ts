@@ -5,9 +5,9 @@
  * Provides comprehensive guidance and can create support tickets for complex issues.
  */
 
-import type { LlmConfiguration } from "@shared/schema";
-import { LLMService } from "../../llm-service";
-import { getAgentTools, executeTool, type ToolExecutionContext } from "../../agent-tools";
+import type { LlmConfiguration } from "../../../shared/schema";
+import { LLMService } from "../../../server/llm-service";
+import { getAgentTools, executeTool, type ToolExecutionContext } from "../../../server/agent-tools";
 
 export interface LucaInput {
   query: string;

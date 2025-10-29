@@ -2,10 +2,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { parse } from 'cookie';
 import { storage } from './storage';
-import { ParityAgent } from '../agents/parity/backend/index';
-import { CadenceAgent } from '../agents/cadence/backend/index';
-import { FormaAgent } from '../agents/forma/backend/index';
-import { KanbanAgent } from '../agents/kanban/backend/index';
+// Import dynamic agent loader
+import { createAgentInstance, agentRequiresToolExecution, agentSupportsStreaming } from './agent-loader';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
@@ -216,81 +214,68 @@ async function handleAgentExecution(
       conversationId: conversation.id 
     }));
 
-    // Execute agent with streaming
+    // Execute agent dynamically using agent loader
     const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');
     let fullResponse = '';
 
     console.log(`[WebSocket] Executing agent: ${normalizedAgentName}, input length: ${input.length}`);
 
-    switch (normalizedAgentName) {
-      case 'parity': {
-        const agent = new ParityAgent(llmConfig);
-        console.log('[WebSocket] Starting Parity agent streaming...');
+    // Load agent dynamically
+    const agent = await createAgentInstance(normalizedAgentName, llmConfig) as any;
+    
+    // Handle agent execution based on capabilities
+    if (agentRequiresToolExecution(normalizedAgentName)) {
+      // Agent with tool execution (e.g., Luca)
+      console.log(`[WebSocket] Starting ${normalizedAgentName} with tool execution support...`);
+      
+      const executionContext = {
+        organizationId: ws.organizationId!,
+        userId: ws.userId!,
+        req: { user: { organizationId: ws.organizationId, id: ws.userId } } as any
+      };
+      
+      const toolResult = await agent.executeWithTools(input, executionContext);
+      
+      if (toolResult.usedTool) {
+        // Tool was executed - send instant response
+        fullResponse = toolResult.response;
+        ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
+      } else {
+        // No tool needed - use streaming mode
         fullResponse = await agent.executeStream(input, (chunk: string) => {
           console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
           ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
         });
-        console.log('[WebSocket] Parity agent completed. Response length:', fullResponse.length);
-        break;
       }
-      case 'cadence': {
-        const agent = new CadenceAgent(llmConfig);
-        // For structured agents, execute normally since they return JSON
-        const result = await agent.execute({ type: 'workflow', data: input } as any);
-        fullResponse = JSON.stringify(result, null, 2);
-        ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
-        break;
+    } else if (agentSupportsStreaming(normalizedAgentName) && normalizedAgentName === 'parity') {
+      // Streaming agents (e.g., Parity)
+      console.log(`[WebSocket] Starting ${normalizedAgentName} streaming...`);
+      fullResponse = await agent.executeStream(input, (chunk: string) => {
+        console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
+        ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
+      });
+    } else {
+      // Structured response agents (e.g., Cadence, Forma, Kanban)
+      console.log(`[WebSocket] Starting ${normalizedAgentName} execution...`);
+      
+      // Prepare input based on agent type
+      let agentInput: any;
+      if (normalizedAgentName === 'cadence') {
+        agentInput = { type: 'workflow', data: input };
+      } else if (normalizedAgentName === 'forma') {
+        agentInput = { data: input, targetFormat: 'json' };
+      } else if (normalizedAgentName === 'kanban' || normalizedAgentName === 'kanbanview') {
+        agentInput = { type: 'workflow', data: input, organizationId: ws.organizationId! };
+      } else {
+        agentInput = input;
       }
-      case 'forma': {
-        const agent = new FormaAgent(llmConfig);
-        // For structured agents, execute normally since they return JSON
-        const result = await agent.execute({ data: input, targetFormat: 'json' } as any);
-        fullResponse = JSON.stringify(result, null, 2);
-        ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
-        break;
-      }
-      case 'kanban':
-      case 'kanbanview': {
-        const agent = new KanbanAgent(llmConfig);
-        // For structured agents, execute normally since they return JSON
-        const result = await agent.execute({ type: 'workflow', data: input, organizationId: ws.organizationId! } as any);
-        fullResponse = JSON.stringify(result, null, 2);
-        ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
-        break;
-      }
-      case 'luca': {
-        const { LucaAgent } = await import('./agents/luca/index');
-        const agent = new LucaAgent(llmConfig);
-        console.log('[WebSocket] Starting Luca agent with LLM-based intent detection...');
-        
-        // Create execution context for tool calls
-        const executionContext = {
-          organizationId: ws.organizationId!,
-          userId: ws.userId!,
-          req: { user: { organizationId: ws.organizationId, id: ws.userId } } as any
-        };
-        
-        // Check if tool execution is needed
-        const toolResult = await agent.executeWithTools(input, executionContext);
-        
-        if (toolResult.usedTool) {
-          // Tool was executed - send instant response
-          fullResponse = toolResult.response;
-          ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
-        } else {
-          // No tool needed - use streaming mode for conversational response
-          fullResponse = await agent.executeStream(input, (chunk: string) => {
-            console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
-            ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
-          });
-        }
-        
-        console.log('[WebSocket] Luca agent completed. Response length:', fullResponse.length);
-        break;
-      }
-      default:
-        throw new Error(`Unknown agent: ${agentName}`);
+      
+      const result = await agent.execute(agentInput);
+      fullResponse = JSON.stringify(result, null, 2);
+      ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
     }
+    
+    console.log(`[WebSocket] ${normalizedAgentName} agent completed. Response length: ${fullResponse.length}`);
 
     const executionTime = Date.now() - startTime;
 

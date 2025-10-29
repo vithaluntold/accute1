@@ -48,3 +48,55 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Anthropic Claude API**: AI model integration.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation in conditional logic.
+### Agent Management System - Configurable Dynamic Loading
+Implemented centralized agent registry and dynamic loading system to eliminate hardcoded agent imports and enable flexible agent management.
+
+**1. Agent Registry (`server/agent-registry.ts`)**
+- **Centralized Configuration**: Single source of truth for all AI agents with metadata (name, display name, category, capabilities, path)
+- **Agent Metadata**: Each agent configured with:
+  - `path`: Relative path from project root for dynamic importing
+  - `className`: Name of the exported agent class
+  - `capabilities`: Array of agent capabilities
+  - `requiresToolExecution`: Flag for agents needing tool execution context (e.g., Luca)
+  - `supportsStreaming`: Flag for agents supporting streaming responses
+- **Helper Functions**: `getAgentConfig()`, `getAllAgents()`, `getAgentsByCategory()`, `isAgentRegistered()`
+
+**2. Dynamic Agent Loader (`server/agent-loader.ts`)**
+- **Dynamic Module Loading**: `loadAgentModule()` function uses dynamic imports to load agent modules based on registry paths
+- **Module Caching**: Prevents redundant imports with in-memory module cache
+- **Instance Creation**: `createAgentInstance()` dynamically instantiates agents with LLM configuration
+- **Capability Queries**: Helper functions to check agent capabilities (`agentRequiresToolExecution()`, `agentSupportsStreaming()`)
+- **Error Handling**: Robust error handling with descriptive messages for missing agents or failed imports
+
+**3. Standardized Agent Directory Structure**
+- **Unified Location**: All agents now in `agents/{agentname}/backend/index.ts` pattern
+- **Consistency**: Luca moved from `server/agents/luca/` to `agents/luca/backend/` to match other agents
+- **Agent Locations**:
+  - Parity: `agents/parity/backend/index.ts`
+  - Cadence: `agents/cadence/backend/index.ts`
+  - Forma: `agents/forma/backend/index.ts`
+  - Kanban: `agents/kanban/backend/index.ts`
+  - Luca: `agents/luca/backend/index.ts`
+
+**4. WebSocket Handler Refactoring (`server/websocket.ts`)**
+- **Eliminated Hardcoded Imports**: Removed all static agent imports (`import { ParityAgent } from ...`)
+- **Dynamic Agent Loading**: Uses `createAgentInstance()` to load agents at runtime based on agent name
+- **Intelligent Routing**: Automatically determines execution mode based on agent capabilities:
+  - Tool execution mode for agents with `requiresToolExecution: true` (Luca)
+  - Streaming mode for conversational agents (Parity)
+  - Structured response mode for analytical agents (Cadence, Forma, Kanban)
+- **Agent-Specific Input Formatting**: Dynamically prepares input based on agent type (workflow data for Cadence, form data for Forma, etc.)
+
+**Benefits:**
+- **Scalability**: Adding new agents requires only updating the registry, no code changes needed
+- **Maintainability**: Single configuration file instead of scattered imports and hardcoded paths
+- **Flexibility**: Agents can be moved, renamed, or reorganized by updating registry paths
+- **Consistency**: Enforces standardized agent structure and interface across the platform
+- **Type Safety**: Full TypeScript support with type checking for agent interfaces
+- **Performance**: Module caching reduces import overhead for frequently used agents
+
+**Files Modified:**
+- `server/agent-registry.ts` - NEW: Central agent configuration registry
+- `server/agent-loader.ts` - NEW: Dynamic agent loading utilities
+- `agents/luca/backend/index.ts` - Moved from `server/agents/luca/index.ts`, updated imports
+- `server/websocket.ts` - Replaced hardcoded switch statement with dynamic loader
