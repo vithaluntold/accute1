@@ -77,25 +77,26 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-4 px-4 py-3 border-b bg-background">
-            <div className="flex items-center gap-4 flex-1">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              
-              <div className="relative max-w-md flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search workflows, clients, documents..."
-                  className="pl-9"
-                  data-testid="input-global-search"
-                />
+    <>
+      <SidebarProvider>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <header className="flex items-center justify-between gap-4 px-4 py-3 border-b bg-background">
+              <div className="flex items-center gap-4 flex-1">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                
+                <div className="relative max-w-md flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search workflows, clients, documents..."
+                    className="pl-9"
+                    data-testid="input-global-search"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" data-testid="button-workspace-switcher" className="gap-2">
@@ -187,9 +188,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
         <FinACEverseFooter />
         {isMobile && <MobileBottomNav />}
         <PWAInstallPrompt />
-        <LucaChatWidget />
       </div>
     </SidebarProvider>
+    
+    {/* Luca Chat Widget - Outside SidebarProvider for true fixed positioning */}
+    <LucaChatWidget />
+  </>
   );
 }
 
