@@ -566,6 +566,200 @@ export const onboardingMessages = pgTable("onboarding_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ==================== CLIENT PORTAL TASK SYSTEM ====================
+
+// Client Portal Tasks - Unified task system visible to clients in their portal
+// Tasks can originate from: employee messages, workflow assignments, form requests, ad-hoc creation
+export const clientPortalTasks = pgTable("client_portal_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  assignmentId: varchar("assignment_id").references(() => workflowAssignments.id, { onDelete: "cascade" }),
+  
+  // Task details
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // 'message_response', 'workflow_task', 'form_request', 'document_request', 'ad_hoc'
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'waiting_response', 'completed', 'cancelled'
+  
+  // Source tracking - what created this task?
+  sourceType: text("source_type"), // 'conversation', 'workflow_task', 'form_template', 'document_request', 'manual'
+  sourceId: varchar("source_id"), // ID of the source (messageId, workflowTaskId, formTemplateId, etc.)
+  
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => contacts.id), // Which contact should handle this
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id), // Employee who created/assigned the task
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  
+  // Timeline
+  dueDate: timestamp("due_date"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id), // Who marked it complete
+  
+  // Follow-up tracking
+  requiresFollowup: boolean("requires_followup").notNull().default(false),
+  lastFollowupSent: timestamp("last_followup_sent"),
+  followupCount: integer("followup_count").notNull().default(0),
+  
+  // Additional data
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Flexible storage for task-specific data
+  attachments: jsonb("attachments").default(sql`'[]'::jsonb`), // File attachments
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for performance
+  orgClientIdx: index("client_portal_tasks_org_client_idx").on(table.organizationId, table.clientId),
+  assignmentIdx: index("client_portal_tasks_assignment_idx").on(table.assignmentId),
+  statusIdx: index("client_portal_tasks_status_idx").on(table.status),
+  dueDateIdx: index("client_portal_tasks_due_date_idx").on(table.dueDate),
+}));
+
+// Task Follow-ups - Schedule automatic reminders and follow-ups for client portal tasks
+export const taskFollowups = pgTable("task_followups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => clientPortalTasks.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Follow-up configuration
+  frequency: text("frequency").notNull(), // 'once', 'daily', 'every_2_days', 'weekly', 'biweekly', 'monthly'
+  urgency: text("urgency").notNull().default("normal"), // 'low', 'normal', 'high', 'critical'
+  
+  // Scheduling
+  nextRunAt: timestamp("next_run_at").notNull(), // When to send next follow-up
+  lastRunAt: timestamp("last_run_at"), // When last follow-up was sent
+  expiresAt: timestamp("expires_at"), // Optional: stop following up after this date
+  
+  // Status
+  status: text("status").notNull().default("active"), // 'active', 'paused', 'completed', 'cancelled'
+  runCount: integer("run_count").notNull().default(0), // How many times this follow-up has run
+  maxRuns: integer("max_runs"), // Optional: max number of follow-ups to send
+  
+  // Notification channels
+  notifyEmail: boolean("notify_email").notNull().default(true),
+  notifySMS: boolean("notify_sms").notNull().default(false),
+  notifyInApp: boolean("notify_in_app").notNull().default(true),
+  
+  // Escalation rules
+  escalateAfterRuns: integer("escalate_after_runs"), // Escalate to manager after N reminders
+  escalateToUserId: varchar("escalate_to_user_id").references(() => users.id),
+  escalated: boolean("escalated").notNull().default(false),
+  escalatedAt: timestamp("escalated_at"),
+  
+  // Message customization
+  customMessage: text("custom_message"), // Optional custom reminder message
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Indexes for scheduler performance
+  nextRunIdx: index("task_followups_next_run_idx").on(table.nextRunAt, table.status),
+  taskStatusIdx: index("task_followups_task_status_idx").on(table.taskId, table.status),
+}));
+
+// Assignment-Specific Workflow Stages - Cloned from workflow templates for per-assignment customization
+export const assignmentWorkflowStages = pgTable("assignment_workflow_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").notNull().references(() => workflowAssignments.id, { onDelete: "cascade" }),
+  templateStageId: varchar("template_stage_id").references(() => workflowStages.id), // Link back to original template
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  order: integer("order").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed', 'skipped'
+  color: text("color").default("#6b7280"),
+  
+  // Auto-progression
+  autoProgress: boolean("auto_progress").notNull().default(false),
+  
+  // Timeline
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  assignmentOrderIdx: index("assignment_stages_assignment_order_idx").on(table.assignmentId, table.order),
+}));
+
+// Assignment-Specific Workflow Steps - Cloned from workflow templates
+export const assignmentWorkflowSteps = pgTable("assignment_workflow_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentStageId: varchar("assignment_stage_id").notNull().references(() => assignmentWorkflowStages.id, { onDelete: "cascade" }),
+  templateStepId: varchar("template_step_id").references(() => workflowSteps.id), // Link back to original template
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  order: integer("order").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed', 'skipped'
+  type: text("type").notNull().default("manual"), // 'manual', 'automated', 'approval'
+  
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  
+  // Auto-progression
+  autoProgress: boolean("auto_progress").notNull().default(false),
+  
+  // Timeline
+  dueDate: timestamp("due_date"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stageOrderIdx: index("assignment_steps_stage_order_idx").on(table.assignmentStageId, table.order),
+}));
+
+// Assignment-Specific Workflow Tasks - Cloned from workflow templates with full customization
+export const assignmentWorkflowTasks = pgTable("assignment_workflow_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentStepId: varchar("assignment_step_id").notNull().references(() => assignmentWorkflowSteps.id, { onDelete: "cascade" }),
+  templateTaskId: varchar("template_task_id").references(() => workflowTasks.id), // Link back to original template
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("manual"), // 'manual', 'automated'
+  order: integer("order").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'completed', 'skipped'
+  
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  assignedToContact: varchar("assigned_to_contact").references(() => contacts.id), // For client-facing tasks
+  
+  // AI and automation
+  aiAgentId: varchar("ai_agent_id").references(() => aiAgents.id),
+  automationInput: jsonb("automation_input").default(sql`'{}'::jsonb`),
+  automationOutput: jsonb("automation_output").default(sql`'{}'::jsonb`),
+  
+  // Priority and timeline
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
+  dueDate: timestamp("due_date"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  
+  // Client visibility
+  visibleToClient: boolean("visible_to_client").notNull().default(false),
+  clientPortalTaskId: varchar("client_portal_task_id").references(() => clientPortalTasks.id), // Link to client-facing task
+  
+  // Auto-progression
+  autoProgress: boolean("auto_progress").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  stepOrderIdx: index("assignment_tasks_step_order_idx").on(table.assignmentStepId, table.order),
+  assignedToIdx: index("assignment_tasks_assigned_to_idx").on(table.assignedTo),
+}));
+
 // Tags for organizing resources
 export const tags = pgTable("tags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1857,6 +2051,11 @@ export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit
 export const insertSupportTicketCommentSchema = createInsertSchema(supportTicketComments).omit({ id: true, createdAt: true });
 export const insertEmailAccountSchema = createInsertSchema(emailAccounts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({ id: true, createdAt: true });
+export const insertClientPortalTaskSchema = createInsertSchema(clientPortalTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTaskFollowupSchema = createInsertSchema(taskFollowups).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAssignmentWorkflowStageSchema = createInsertSchema(assignmentWorkflowStages).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAssignmentWorkflowStepSchema = createInsertSchema(assignmentWorkflowSteps).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAssignmentWorkflowTaskSchema = createInsertSchema(assignmentWorkflowTasks).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -1912,3 +2111,13 @@ export type InsertEmailAccount = z.infer<typeof insertEmailAccountSchema>;
 export type EmailAccount = typeof emailAccounts.$inferSelect;
 export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
 export type EmailMessage = typeof emailMessages.$inferSelect;
+export type InsertClientPortalTask = z.infer<typeof insertClientPortalTaskSchema>;
+export type ClientPortalTask = typeof clientPortalTasks.$inferSelect;
+export type InsertTaskFollowup = z.infer<typeof insertTaskFollowupSchema>;
+export type TaskFollowup = typeof taskFollowups.$inferSelect;
+export type InsertAssignmentWorkflowStage = z.infer<typeof insertAssignmentWorkflowStageSchema>;
+export type AssignmentWorkflowStage = typeof assignmentWorkflowStages.$inferSelect;
+export type InsertAssignmentWorkflowStep = z.infer<typeof insertAssignmentWorkflowStepSchema>;
+export type AssignmentWorkflowStep = typeof assignmentWorkflowSteps.$inferSelect;
+export type InsertAssignmentWorkflowTask = z.infer<typeof insertAssignmentWorkflowTaskSchema>;
+export type AssignmentWorkflowTask = typeof assignmentWorkflowTasks.$inferSelect;
