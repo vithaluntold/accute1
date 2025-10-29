@@ -3,6 +3,20 @@
 ## Overview
 Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It offers multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to provide a comprehensive, secure, and intelligent "AI-first" solution that enhances efficiency and ensures compliance for modern accounting practices.
 
+## Recent Updates (October 2025)
+### New Features Implemented:
+1. **Automation Configuration UI** - Visual workflow task automation with 10 action types
+2. **Email Inbox Integration** - OAuth/IMAP email account management with AI processing
+3. **AI Email Processor** - Convert emails to tasks using LLM analysis
+4. **Assignment Detail Page** - Hierarchical workflow progress tracking (Stages → Steps → Tasks)
+5. **Kanban Board** - Drag-and-drop assignment management across workflow stages
+6. **Analytics Dashboard** - Comprehensive metrics with role-based filtering (All/User/Admin/Team Manager)
+7. **Assignment Status Bot** - AI-powered conversational assistant for assignment queries at /assignment-bot
+8. **E2E Test Coverage** - Playwright-based testing for core features
+
+### Configuration Requirements:
+- **LLM Provider Setup Required**: Assignment Status Bot and AI Email Processor require LLM configuration (OpenAI/Azure OpenAI/Anthropic) in Settings → LLM Configurations. Create a default LLM config to enable these features.
+
 ## User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
