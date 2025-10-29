@@ -39,6 +39,7 @@ import AIAgents from "@/pages/ai-agents";
 import Marketplace from "@/pages/marketplace";
 import Assignments from "@/pages/assignments";
 import AssignmentDetail from "@/pages/assignment-detail";
+import AssignmentBot from "@/pages/assignment-bot";
 import Kanban from "@/pages/kanban";
 import Team from "@/pages/team";
 import Roles from "@/pages/roles";
@@ -236,6 +237,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Analytics />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/assignment-bot">
+        <ProtectedRoute>
+          <AppLayout>
+            <AssignmentBot />
           </AppLayout>
         </ProtectedRoute>
       </Route>

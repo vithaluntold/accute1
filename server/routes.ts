@@ -5820,11 +5820,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const invoices = await db.select().from(schema.invoices)
+      const { userId, role } = req.query;
+      let invoices = await db.select().from(schema.invoices)
         .where(eq(schema.invoices.organizationId, req.user!.organizationId));
       
-      const payments = await db.select().from(schema.payments)
+      let payments = await db.select().from(schema.payments)
         .where(eq(schema.payments.organizationId, req.user!.organizationId));
+      
+      // Apply filters
+      if (userId) {
+        invoices = invoices.filter((i: any) => i.createdBy === userId);
+        payments = payments.filter((p: any) => p.createdBy === userId);
+      } else if (role) {
+        const users = await storage.getUsersByOrganization(req.user!.organizationId);
+        const roleUserIds = users.filter((u: any) => u.role === role).map((u: any) => u.id);
+        invoices = invoices.filter((i: any) => roleUserIds.includes(i.createdBy));
+        payments = payments.filter((p: any) => p.createdBy && roleUserIds.includes(p.createdBy));
+      }
 
       // Group by month
       const monthlyData = new Map<string, { month: string; invoiced: number; paid: number; }>();
@@ -5992,6 +6004,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch time tracking metrics" });
+    }
+  });
+
+  // ==================== Assignment Status Bot Routes ====================
+
+  // Query assignment status bot with natural language
+  app.post("/api/assignment-bot/query", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const { question } = req.body;
+      if (!question) {
+        return res.status(400).json({ error: "Question is required" });
+      }
+
+      // Get default LLM configuration
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId);
+      if (!llmConfig) {
+        return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
+      }
+
+      // Gather assignment data for context
+      const [assignments, workflows, users, clients] = await Promise.all([
+        storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId),
+        storage.getWorkflowsByOrganization(req.user!.organizationId),
+        storage.getUsersByOrganization(req.user!.organizationId),
+        storage.getClientsByOrganization(req.user!.organizationId)
+      ]);
+
+      // Build context data
+      const contextData = {
+        totalAssignments: assignments.length,
+        activeAssignments: assignments.filter(a => a.status === 'active').length,
+        completedAssignments: assignments.filter(a => a.status === 'completed').length,
+        overdueAssignments: assignments.filter(a => {
+          if (!a.dueDate || a.status === 'completed') return false;
+          return new Date(a.dueDate) < new Date();
+        }).length,
+        workflows: workflows.map(w => ({ id: w.id, name: w.name, status: w.status })),
+        users: users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, role: u.role })),
+        clients: clients.map(c => ({ id: c.id, name: c.name, status: c.status, type: c.type })),
+        assignments: assignments.map(a => ({
+          id: a.id,
+          workflowId: a.workflowId,
+          clientId: a.clientId,
+          assignedToId: a.assignedToId,
+          status: a.status,
+          currentStage: a.currentStage,
+          dueDate: a.dueDate,
+          completedAt: a.completedAt,
+          createdAt: a.createdAt
+        }))
+      };
+
+      // Prepare LLM prompt
+      const systemPrompt = `You are an AI assistant that helps answer questions about workflow assignments and project progress. 
+You have access to the following data about the organization:
+- Total assignments: ${contextData.totalAssignments}
+- Active assignments: ${contextData.activeAssignments}
+- Completed assignments: ${contextData.completedAssignments}
+- Overdue assignments: ${contextData.overdueAssignments}
+- ${contextData.workflows.length} workflows
+- ${contextData.users.length} team members
+- ${contextData.clients.length} clients
+
+Context Data:
+${JSON.stringify(contextData, null, 2)}
+
+Answer the user's question about assignments, progress, bottlenecks, team performance, or client-specific information based on this data. Be concise and helpful. If you cannot answer based on the available data, say so.`;
+
+      // Call LLM
+      const { decryptedCredentials } = llmConfig;
+      let answer;
+
+      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure_openai') {
+        const OpenAI = (await import('openai')).default;
+        const openai = new OpenAI({
+          apiKey: llmConfig.provider === 'azure_openai' ? decryptedCredentials.apiKey : decryptedCredentials.apiKey,
+          ...(llmConfig.provider === 'azure_openai' && {
+            baseURL: `${decryptedCredentials.endpoint}/openai/deployments/${decryptedCredentials.deploymentName}`,
+            defaultQuery: { 'api-version': decryptedCredentials.apiVersion || '2024-02-15-preview' },
+            defaultHeaders: { 'api-key': decryptedCredentials.apiKey },
+          })
+        });
+
+        const completion = await openai.chat.completions.create({
+          model: llmConfig.provider === 'azure_openai' ? decryptedCredentials.deploymentName : (llmConfig.modelName || 'gpt-4'),
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000
+        });
+
+        answer = completion.choices[0]?.message?.content || "I couldn't generate a response.";
+      } else if (llmConfig.provider === 'anthropic') {
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: decryptedCredentials.apiKey });
+
+        const message = await anthropic.messages.create({
+          model: llmConfig.modelName || 'claude-3-5-sonnet-20241022',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: question }]
+        });
+
+        const firstContent = message.content[0];
+        answer = firstContent.type === 'text' ? firstContent.text : "I couldn't generate a response.";
+      } else {
+        return res.status(400).json({ error: "Unsupported LLM provider" });
+      }
+
+      res.json({ answer, question });
+    } catch (error: any) {
+      console.error('Assignment bot error:', error);
+      res.status(500).json({ error: "Failed to process query" });
     }
   });
 

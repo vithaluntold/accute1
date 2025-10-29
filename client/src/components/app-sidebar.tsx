@@ -47,6 +47,7 @@ const menuCategories = [
     title: "AI & Automation",
     items: [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
+      { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
       { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
     ]
   },
