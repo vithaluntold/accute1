@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Bot, Send, Loader2, CheckCircle, UserPlus, Building2, ShieldCheck } from "lucide-react";
-import type { ClientOnboardingSession, OnboardingMessage } from "@shared/schema";
+import type { ClientOnboardingSession, OnboardingMessage, Contact } from "@shared/schema";
 
 interface ConversationMessage {
   role: "user" | "assistant";
@@ -22,6 +24,8 @@ export default function ClientOnboarding() {
   const [question, setQuestion] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showSensitiveForm, setShowSensitiveForm] = useState(false);
+  const [useExistingContact, setUseExistingContact] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Sensitive data collected via form (never sent to AI) - includes tax IDs now
@@ -105,6 +109,27 @@ export default function ClientOnboarding() {
     enabled: !!sessionId,
     refetchInterval: 2000, // Poll for metadata updates from AI
   });
+
+  // Fetch contacts for selection
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ["/api/contacts"],
+    enabled: useExistingContact,
+  });
+
+  // Handle contact selection
+  const handleContactSelect = (contactId: string) => {
+    setSelectedContactId(contactId);
+    const contact = contacts.find(c => c.id === contactId);
+    if (contact) {
+      setSensitiveData(prev => ({
+        ...prev,
+        contactFirstName: contact.firstName,
+        contactLastName: contact.lastName,
+        contactEmail: contact.email,
+        contactPhone: contact.phone || "",
+      }));
+    }
+  };
 
   // Update AI context when session data changes
   useEffect(() => {
@@ -194,7 +219,11 @@ export default function ClientOnboarding() {
       const response = await apiRequest(
         "POST",
         "/api/client-onboarding/complete",
-        { sessionId, sensitiveData }
+        { 
+          sessionId, 
+          sensitiveData,
+          existingContactId: useExistingContact ? selectedContactId : null
+        }
       );
       if (!response.ok) {
         const error = await response.json();
@@ -265,6 +294,17 @@ export default function ClientOnboarding() {
       toast({
         title: "Missing Information",
         description: "Please fill out the contact information form before completing onboarding",
+        variant: "destructive",
+      });
+      setShowSensitiveForm(true);
+      return;
+    }
+
+    // Validate existing contact selection
+    if (useExistingContact && !selectedContactId) {
+      toast({
+        title: "Contact Required",
+        description: "Please select a contact from the dropdown or uncheck 'If contact exists'",
         variant: "destructive",
       });
       setShowSensitiveForm(true);
@@ -796,6 +836,45 @@ export default function ClientOnboarding() {
                   </div>
                 </div>
 
+                {/* Existing Contact Selection */}
+                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+                  <Checkbox 
+                    id="useExistingContact" 
+                    checked={useExistingContact}
+                    onCheckedChange={(checked) => {
+                      setUseExistingContact(!!checked);
+                      if (!checked) {
+                        setSelectedContactId(null);
+                        setSensitiveData(prev => ({
+                          ...prev,
+                          contactFirstName: "",
+                          contactLastName: "",
+                          contactEmail: "",
+                          contactPhone: "",
+                        }));
+                      }
+                    }}
+                    data-testid="checkbox-use-existing-contact"
+                  />
+                  <Label htmlFor="useExistingContact" className="cursor-pointer">
+                    If contact exists
+                  </Label>
+                  {useExistingContact && (
+                    <Select value={selectedContactId || ""} onValueChange={handleContactSelect}>
+                      <SelectTrigger className="ml-4 flex-1" data-testid="select-contact">
+                        <SelectValue placeholder="Select existing contact..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contacts.map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            {contact.firstName} {contact.lastName} ({contact.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
                 {/* Contact Person */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -805,6 +884,7 @@ export default function ClientOnboarding() {
                       value={sensitiveData.contactFirstName}
                       onChange={(e) => setSensitiveData({ ...sensitiveData, contactFirstName: e.target.value })}
                       placeholder="John"
+                      disabled={useExistingContact && !!selectedContactId}
                       data-testid="input-first-name"
                     />
                   </div>
@@ -815,6 +895,7 @@ export default function ClientOnboarding() {
                       value={sensitiveData.contactLastName}
                       onChange={(e) => setSensitiveData({ ...sensitiveData, contactLastName: e.target.value })}
                       placeholder="Doe"
+                      disabled={useExistingContact && !!selectedContactId}
                       data-testid="input-last-name"
                     />
                   </div>
@@ -829,6 +910,7 @@ export default function ClientOnboarding() {
                       value={sensitiveData.contactEmail}
                       onChange={(e) => setSensitiveData({ ...sensitiveData, contactEmail: e.target.value })}
                       placeholder="john@acme.com"
+                      disabled={useExistingContact && !!selectedContactId}
                       data-testid="input-contact-email"
                     />
                   </div>
@@ -853,6 +935,7 @@ export default function ClientOnboarding() {
                         value={sensitiveData.contactPhone}
                         onChange={(e) => handleFieldChange("contactPhone", e.target.value)}
                         placeholder={aiContext.phoneCode?.placeholder || "+1 (555) 123-4567"}
+                        disabled={useExistingContact && !!selectedContactId}
                         data-testid="input-contact-phone"
                         className={validationErrors.contactPhone ? "border-destructive flex-1" : "flex-1"}
                       />

@@ -1440,6 +1440,28 @@ export class DbStorage implements IStorage {
   }
 
   async deleteClient(id: string): Promise<void> {
+    // Delete related records first to avoid foreign key constraint violations
+    // Delete in order: child records → parent records
+    
+    // Delete onboarding sessions and messages
+    const sessions = await db.select({ id: schema.clientOnboardingSessions.id })
+      .from(schema.clientOnboardingSessions)
+      .where(eq(schema.clientOnboardingSessions.clientId, id));
+    if (sessions.length > 0) {
+      const sessionIds = sessions.map(s => s.id);
+      for (const sessionId of sessionIds) {
+        await db.delete(schema.onboardingMessages)
+          .where(eq(schema.onboardingMessages.sessionId, sessionId));
+      }
+      await db.delete(schema.clientOnboardingSessions)
+        .where(eq(schema.clientOnboardingSessions.clientId, id));
+    }
+    
+    // Delete contacts (has cascade delete configured)
+    await db.delete(schema.contacts)
+      .where(eq(schema.contacts.clientId, id));
+    
+    // Finally, delete the client
     await db.delete(schema.clients)
       .where(eq(schema.clients.id, id));
   }

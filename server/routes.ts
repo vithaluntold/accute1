@@ -2254,7 +2254,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "client", req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to delete client" });
+      console.error("❌ Failed to delete client:", error);
+      console.error("  Client ID:", req.params.id);
+      console.error("  Error message:", error.message);
+      console.error("  Error code:", error.code);
+      res.status(500).json({ error: error.message || "Failed to delete client" });
     }
   });
 
@@ -2651,7 +2655,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   // Complete onboarding and create client
   app.post("/api/client-onboarding/complete", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
     try {
-      const { sessionId, sensitiveData: requestSensitiveData } = req.body;
+      const { sessionId, sensitiveData: requestSensitiveData, existingContactId } = req.body;
       
       if (!sessionId) {
         return res.status(400).json({ error: "Session ID is required" });
@@ -2678,6 +2682,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       console.log("  - Sensitive (from form):", Object.keys(sensitiveData));
       console.log("  - Company Name:", sensitiveData.companyName);
       console.log("  - Contact:", sensitiveData.contactFirstName, sensitiveData.contactLastName);
+      console.log("  - Existing Contact ID:", existingContactId);
 
       // Save the final sensitive data to session for audit trail
       if (requestSensitiveData && Object.keys(requestSensitiveData).length > 0) {
@@ -2709,8 +2714,21 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         createdBy: req.userId!,
       });
 
-      // Create primary contact if provided
-      if (sensitiveData.contactFirstName && sensitiveData.contactLastName && sensitiveData.contactEmail) {
+      // Handle contact - either link to existing or create new
+      if (existingContactId) {
+        // Link existing contact to this client
+        const existingContact = await storage.getContact(existingContactId);
+        if (existingContact && existingContact.organizationId === req.user!.organizationId) {
+          await storage.updateContact(existingContactId, {
+            clientId: client.id,
+            isPrimary: true,
+          });
+          console.log("✅ Linked existing contact", existingContactId, "to client", client.id);
+        } else {
+          console.warn("⚠️ Existing contact not found or unauthorized:", existingContactId);
+        }
+      } else if (sensitiveData.contactFirstName && sensitiveData.contactLastName && sensitiveData.contactEmail) {
+        // Create new contact
         await storage.createContact({
           clientId: client.id,
           firstName: sensitiveData.contactFirstName,
@@ -2722,6 +2740,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
           organizationId: req.user!.organizationId!,
           createdBy: req.userId!,
         });
+        console.log("✅ Created new contact for client", client.id);
       }
 
       // Mark session as completed
