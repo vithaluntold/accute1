@@ -468,6 +468,47 @@ export interface IStorage {
   updateEmailMessage(id: string, message: Partial<schema.InsertEmailMessage>): Promise<schema.EmailMessage | undefined>;
   deleteEmailMessage(id: string): Promise<void>;
   getUnprocessedEmails(organizationId: string): Promise<schema.EmailMessage[]>;
+
+  // Assignment Workflow Cloning
+  cloneWorkflowToAssignment(assignmentId: string, workflowId: string, organizationId: string): Promise<void>;
+  
+  // Assignment Workflow Stages
+  createAssignmentWorkflowStage(stage: schema.InsertAssignmentWorkflowStage): Promise<schema.AssignmentWorkflowStage>;
+  getAssignmentWorkflowStage(id: string): Promise<schema.AssignmentWorkflowStage | undefined>;
+  getAssignmentStagesByAssignment(assignmentId: string): Promise<schema.AssignmentWorkflowStage[]>;
+  updateAssignmentWorkflowStage(id: string, stage: Partial<schema.InsertAssignmentWorkflowStage>): Promise<schema.AssignmentWorkflowStage | undefined>;
+  deleteAssignmentWorkflowStage(id: string): Promise<void>;
+  
+  // Assignment Workflow Steps
+  createAssignmentWorkflowStep(step: schema.InsertAssignmentWorkflowStep): Promise<schema.AssignmentWorkflowStep>;
+  getAssignmentWorkflowStep(id: string): Promise<schema.AssignmentWorkflowStep | undefined>;
+  getAssignmentStepsByStage(stageId: string): Promise<schema.AssignmentWorkflowStep[]>;
+  updateAssignmentWorkflowStep(id: string, step: Partial<schema.InsertAssignmentWorkflowStep>): Promise<schema.AssignmentWorkflowStep | undefined>;
+  deleteAssignmentWorkflowStep(id: string): Promise<void>;
+  
+  // Assignment Workflow Tasks
+  createAssignmentWorkflowTask(task: schema.InsertAssignmentWorkflowTask): Promise<schema.AssignmentWorkflowTask>;
+  getAssignmentWorkflowTask(id: string): Promise<schema.AssignmentWorkflowTask | undefined>;
+  getAssignmentTasksByStep(stepId: string): Promise<schema.AssignmentWorkflowTask[]>;
+  updateAssignmentWorkflowTask(id: string, task: Partial<schema.InsertAssignmentWorkflowTask>): Promise<schema.AssignmentWorkflowTask | undefined>;
+  deleteAssignmentWorkflowTask(id: string): Promise<void>;
+  
+  // Client Portal Tasks
+  createClientPortalTask(task: schema.InsertClientPortalTask): Promise<schema.ClientPortalTask>;
+  getClientPortalTask(id: string, organizationId: string): Promise<schema.ClientPortalTask | undefined>;
+  getClientPortalTasksByClient(clientId: string, organizationId: string): Promise<schema.ClientPortalTask[]>;
+  getClientPortalTasksByAssignment(assignmentId: string, organizationId: string): Promise<schema.ClientPortalTask[]>;
+  getClientPortalTasksByContact(contactId: string, organizationId: string): Promise<schema.ClientPortalTask[]>;
+  updateClientPortalTask(id: string, task: Partial<schema.InsertClientPortalTask>): Promise<schema.ClientPortalTask | undefined>;
+  deleteClientPortalTask(id: string): Promise<void>;
+  
+  // Task Followups
+  createTaskFollowup(followup: schema.InsertTaskFollowup): Promise<schema.TaskFollowup>;
+  getTaskFollowup(id: string): Promise<schema.TaskFollowup | undefined>;
+  getFollowupsByTask(taskId: string): Promise<schema.TaskFollowup[]>;
+  getPendingFollowups(): Promise<schema.TaskFollowup[]>;
+  updateTaskFollowup(id: string, followup: Partial<schema.InsertTaskFollowup>): Promise<schema.TaskFollowup | undefined>;
+  deleteTaskFollowup(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -1239,6 +1280,277 @@ export class DbStorage implements IStorage {
         )
       )
       .orderBy(desc(schema.emailMessages.receivedAt));
+  }
+
+  // Assignment Workflow Cloning
+  async cloneWorkflowToAssignment(assignmentId: string, workflowId: string, organizationId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Verify assignment belongs to the organization (security check)
+      const assignmentResult = await tx.select().from(schema.workflowAssignments)
+        .where(eq(schema.workflowAssignments.id, assignmentId));
+      
+      if (assignmentResult.length === 0 || assignmentResult[0].organizationId !== organizationId) {
+        throw new Error('Assignment not found or does not belong to this organization');
+      }
+
+      // Verify workflow belongs to the same organization (security check)
+      const workflowResult = await tx.select().from(schema.workflows)
+        .where(eq(schema.workflows.id, workflowId));
+      
+      if (workflowResult.length === 0 || workflowResult[0].organizationId !== organizationId) {
+        throw new Error('Workflow not found or does not belong to this organization');
+      }
+
+      const stages = await tx.select().from(schema.workflowStages)
+        .where(eq(schema.workflowStages.workflowId, workflowId))
+        .orderBy(schema.workflowStages.order);
+
+      for (const stage of stages) {
+        const assignmentStage = await tx.insert(schema.assignmentWorkflowStages).values({
+          assignmentId,
+          organizationId,
+          templateStageId: stage.id,
+          name: stage.name,
+          description: stage.description,
+          order: stage.order,
+          status: 'not_started',
+          autoProgress: stage.autoProgress,
+        }).returning();
+
+        const steps = await tx.select().from(schema.workflowSteps)
+          .where(eq(schema.workflowSteps.stageId, stage.id))
+          .orderBy(schema.workflowSteps.order);
+
+        for (const step of steps) {
+          const assignmentStep = await tx.insert(schema.assignmentWorkflowSteps).values({
+            assignmentStageId: assignmentStage[0].id,
+            organizationId,
+            templateStepId: step.id,
+            name: step.name,
+            description: step.description,
+            order: step.order,
+            status: 'pending',
+            autoProgress: step.autoProgress,
+          }).returning();
+
+          const tasks = await tx.select().from(schema.workflowTasks)
+            .where(eq(schema.workflowTasks.stepId, step.id))
+            .orderBy(schema.workflowTasks.order);
+
+          for (const task of tasks) {
+            await tx.insert(schema.assignmentWorkflowTasks).values({
+              assignmentStepId: assignmentStep[0].id,
+              organizationId,
+              templateTaskId: task.id,
+              name: task.name,
+              description: task.description,
+              type: task.type,
+              order: task.order,
+              status: 'pending',
+              priority: task.priority,
+              assignedTo: task.assignedTo,
+              dueDate: task.dueDate,
+              aiAgentId: task.aiAgentId,
+              automationInput: task.automationInput,
+              automationOutput: task.automationOutput,
+              autoProgress: task.autoProgress,
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Assignment Workflow Stages
+  async createAssignmentWorkflowStage(stage: schema.InsertAssignmentWorkflowStage): Promise<schema.AssignmentWorkflowStage> {
+    const result = await db.insert(schema.assignmentWorkflowStages).values(stage).returning();
+    return result[0];
+  }
+
+  async getAssignmentWorkflowStage(id: string): Promise<schema.AssignmentWorkflowStage | undefined> {
+    const result = await db.select().from(schema.assignmentWorkflowStages).where(eq(schema.assignmentWorkflowStages.id, id));
+    return result[0];
+  }
+
+  async getAssignmentStagesByAssignment(assignmentId: string): Promise<schema.AssignmentWorkflowStage[]> {
+    return await db.select().from(schema.assignmentWorkflowStages)
+      .where(eq(schema.assignmentWorkflowStages.assignmentId, assignmentId))
+      .orderBy(schema.assignmentWorkflowStages.order);
+  }
+
+  async updateAssignmentWorkflowStage(id: string, stage: Partial<schema.InsertAssignmentWorkflowStage>): Promise<schema.AssignmentWorkflowStage | undefined> {
+    const result = await db.update(schema.assignmentWorkflowStages)
+      .set({ ...stage, updatedAt: new Date() })
+      .where(eq(schema.assignmentWorkflowStages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAssignmentWorkflowStage(id: string): Promise<void> {
+    await db.delete(schema.assignmentWorkflowStages).where(eq(schema.assignmentWorkflowStages.id, id));
+  }
+
+  // Assignment Workflow Steps
+  async createAssignmentWorkflowStep(step: schema.InsertAssignmentWorkflowStep): Promise<schema.AssignmentWorkflowStep> {
+    const result = await db.insert(schema.assignmentWorkflowSteps).values(step).returning();
+    return result[0];
+  }
+
+  async getAssignmentWorkflowStep(id: string): Promise<schema.AssignmentWorkflowStep | undefined> {
+    const result = await db.select().from(schema.assignmentWorkflowSteps).where(eq(schema.assignmentWorkflowSteps.id, id));
+    return result[0];
+  }
+
+  async getAssignmentStepsByStage(stageId: string): Promise<schema.AssignmentWorkflowStep[]> {
+    return await db.select().from(schema.assignmentWorkflowSteps)
+      .where(eq(schema.assignmentWorkflowSteps.assignmentStageId, stageId))
+      .orderBy(schema.assignmentWorkflowSteps.order);
+  }
+
+  async updateAssignmentWorkflowStep(id: string, step: Partial<schema.InsertAssignmentWorkflowStep>): Promise<schema.AssignmentWorkflowStep | undefined> {
+    const result = await db.update(schema.assignmentWorkflowSteps)
+      .set({ ...step, updatedAt: new Date() })
+      .where(eq(schema.assignmentWorkflowSteps.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAssignmentWorkflowStep(id: string): Promise<void> {
+    await db.delete(schema.assignmentWorkflowSteps).where(eq(schema.assignmentWorkflowSteps.id, id));
+  }
+
+  // Assignment Workflow Tasks
+  async createAssignmentWorkflowTask(task: schema.InsertAssignmentWorkflowTask): Promise<schema.AssignmentWorkflowTask> {
+    const result = await db.insert(schema.assignmentWorkflowTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getAssignmentWorkflowTask(id: string): Promise<schema.AssignmentWorkflowTask | undefined> {
+    const result = await db.select().from(schema.assignmentWorkflowTasks).where(eq(schema.assignmentWorkflowTasks.id, id));
+    return result[0];
+  }
+
+  async getAssignmentTasksByStep(stepId: string): Promise<schema.AssignmentWorkflowTask[]> {
+    return await db.select().from(schema.assignmentWorkflowTasks)
+      .where(eq(schema.assignmentWorkflowTasks.assignmentStepId, stepId))
+      .orderBy(schema.assignmentWorkflowTasks.order);
+  }
+
+  async updateAssignmentWorkflowTask(id: string, task: Partial<schema.InsertAssignmentWorkflowTask>): Promise<schema.AssignmentWorkflowTask | undefined> {
+    const result = await db.update(schema.assignmentWorkflowTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(schema.assignmentWorkflowTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAssignmentWorkflowTask(id: string): Promise<void> {
+    await db.delete(schema.assignmentWorkflowTasks).where(eq(schema.assignmentWorkflowTasks.id, id));
+  }
+
+  // Client Portal Tasks
+  async createClientPortalTask(task: schema.InsertClientPortalTask): Promise<schema.ClientPortalTask> {
+    const result = await db.insert(schema.clientPortalTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getClientPortalTask(id: string, organizationId: string): Promise<schema.ClientPortalTask | undefined> {
+    const result = await db.select().from(schema.clientPortalTasks)
+      .where(
+        and(
+          eq(schema.clientPortalTasks.id, id),
+          eq(schema.clientPortalTasks.organizationId, organizationId)
+        )
+      );
+    return result[0];
+  }
+
+  async getClientPortalTasksByClient(clientId: string, organizationId: string): Promise<schema.ClientPortalTask[]> {
+    // Filter by organizationId on base table first to enforce tenant boundary
+    return await db.select().from(schema.clientPortalTasks)
+      .where(
+        and(
+          eq(schema.clientPortalTasks.clientId, clientId),
+          eq(schema.clientPortalTasks.organizationId, organizationId)
+        )
+      )
+      .orderBy(desc(schema.clientPortalTasks.createdAt));
+  }
+
+  async getClientPortalTasksByAssignment(assignmentId: string, organizationId: string): Promise<schema.ClientPortalTask[]> {
+    // Filter by organizationId on base table first to enforce tenant boundary
+    return await db.select().from(schema.clientPortalTasks)
+      .where(
+        and(
+          eq(schema.clientPortalTasks.assignmentId, assignmentId),
+          eq(schema.clientPortalTasks.organizationId, organizationId)
+        )
+      )
+      .orderBy(desc(schema.clientPortalTasks.createdAt));
+  }
+
+  async getClientPortalTasksByContact(contactId: string, organizationId: string): Promise<schema.ClientPortalTask[]> {
+    // Filter by organizationId on base table first to enforce tenant boundary
+    return await db.select().from(schema.clientPortalTasks)
+      .where(
+        and(
+          eq(schema.clientPortalTasks.assignedTo, contactId),
+          eq(schema.clientPortalTasks.organizationId, organizationId)
+        )
+      )
+      .orderBy(desc(schema.clientPortalTasks.createdAt));
+  }
+
+  async updateClientPortalTask(id: string, task: Partial<schema.InsertClientPortalTask>): Promise<schema.ClientPortalTask | undefined> {
+    const result = await db.update(schema.clientPortalTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(schema.clientPortalTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClientPortalTask(id: string): Promise<void> {
+    await db.delete(schema.clientPortalTasks).where(eq(schema.clientPortalTasks.id, id));
+  }
+
+  // Task Followups
+  async createTaskFollowup(followup: schema.InsertTaskFollowup): Promise<schema.TaskFollowup> {
+    const result = await db.insert(schema.taskFollowups).values(followup).returning();
+    return result[0];
+  }
+
+  async getTaskFollowup(id: string): Promise<schema.TaskFollowup | undefined> {
+    const result = await db.select().from(schema.taskFollowups).where(eq(schema.taskFollowups.id, id));
+    return result[0];
+  }
+
+  async getFollowupsByTask(taskId: string): Promise<schema.TaskFollowup[]> {
+    return await db.select().from(schema.taskFollowups)
+      .where(eq(schema.taskFollowups.taskId, taskId))
+      .orderBy(desc(schema.taskFollowups.createdAt));
+  }
+
+  async getPendingFollowups(): Promise<schema.TaskFollowup[]> {
+    return await db.select().from(schema.taskFollowups)
+      .where(
+        and(
+          eq(schema.taskFollowups.status, 'active'),
+          sql`${schema.taskFollowups.nextRunAt} <= NOW()`
+        )
+      )
+      .orderBy(schema.taskFollowups.nextRunAt);
+  }
+
+  async updateTaskFollowup(id: string, followup: Partial<schema.InsertTaskFollowup>): Promise<schema.TaskFollowup | undefined> {
+    const result = await db.update(schema.taskFollowups)
+      .set({ ...followup, updatedAt: new Date() })
+      .where(eq(schema.taskFollowups.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTaskFollowup(id: string): Promise<void> {
+    await db.delete(schema.taskFollowups).where(eq(schema.taskFollowups.id, id));
   }
 
   // Folders
