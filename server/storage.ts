@@ -429,6 +429,16 @@ export interface IStorage {
   // Support Ticket Comments
   createSupportTicketComment(comment: schema.InsertSupportTicketComment): Promise<schema.SupportTicketComment>;
   getTicketComments(ticketId: string): Promise<schema.SupportTicketComment[]>;
+
+  // Workflow Assignments
+  getWorkflowAssignment(id: string): Promise<schema.WorkflowAssignment | undefined>;
+  createWorkflowAssignment(assignment: schema.InsertWorkflowAssignment): Promise<schema.WorkflowAssignment>;
+  updateWorkflowAssignment(id: string, assignment: Partial<schema.InsertWorkflowAssignment>): Promise<schema.WorkflowAssignment | undefined>;
+  deleteWorkflowAssignment(id: string): Promise<void>;
+  getWorkflowAssignmentsByOrganization(organizationId: string): Promise<schema.WorkflowAssignment[]>;
+  getWorkflowAssignmentsByClient(clientId: string): Promise<schema.WorkflowAssignment[]>;
+  getWorkflowAssignmentsByWorkflow(workflowId: string): Promise<schema.WorkflowAssignment[]>;
+  getWorkflowAssignmentsByEmployee(userId: string): Promise<schema.WorkflowAssignment[]>;
 }
 
 export class DbStorage implements IStorage {
