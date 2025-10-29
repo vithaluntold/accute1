@@ -23,12 +23,14 @@ import {
   Archive,
   Clock,
   User,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import type { EmailMessage, EmailAccount } from "@shared/schema";
 
 export default function Inbox() {
   const { toast } = useToast();
-  const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -39,6 +41,9 @@ export default function Inbox() {
   const { data: messages = [], isLoading } = useQuery<EmailMessage[]>({
     queryKey: ["/api/email-messages"],
   });
+
+  // Derive selectedMessage from messages query to keep it fresh
+  const selectedMessage = messages.find(m => m.id === selectedMessageId) || null;
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<EmailMessage> }) => {
@@ -62,7 +67,7 @@ export default function Inbox() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
-      setSelectedMessage(null);
+      setSelectedMessageId(null);
       toast({
         title: "Success",
         description: "Message deleted",
@@ -72,6 +77,51 @@ export default function Inbox() {
       toast({
         title: "Error",
         description: "Failed to delete message",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const processWithAiMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("POST", `/api/email-messages/${id}/process-with-ai`);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
+      
+      toast({
+        title: "AI Processing Complete",
+        description: data.taskCreated 
+          ? `Task created successfully! ID: ${data.taskId}`
+          : "Email analyzed by AI. No task created.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "AI Processing Failed",
+        description: error.message || "Failed to process email with AI",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const batchProcessMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/email-messages/batch-process-with-ai", {
+        limit: 10,
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
+      toast({
+        title: "Batch Processing Complete",
+        description: `Processed ${data.processed} of ${data.total} emails`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Batch Processing Failed",
+        description: error.message || "Failed to batch process emails",
         variant: "destructive",
       });
     },
@@ -88,7 +138,7 @@ export default function Inbox() {
     if (!message.isRead) {
       updateMutation.mutate({ id: message.id, updates: { isRead: true } });
     }
-    setSelectedMessage(message);
+    setSelectedMessageId(message.id);
   };
 
   const toggleStar = (message: EmailMessage, e: React.MouseEvent) => {
@@ -108,20 +158,31 @@ export default function Inbox() {
             View and manage your email messages
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            toast({
-              title: "Syncing",
-              description: "Checking for new messages...",
-            });
-            queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
-          }}
-          data-testid="button-sync-inbox"
-        >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Sync
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="default"
+            onClick={() => batchProcessMutation.mutate()}
+            disabled={batchProcessMutation.isPending || messages.filter(m => !m.aiProcessed).length === 0}
+            data-testid="button-batch-process"
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            {batchProcessMutation.isPending ? "Processing..." : "Process All with AI"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              toast({
+                title: "Syncing",
+                description: "Checking for new messages...",
+              });
+              queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
+            }}
+            data-testid="button-sync-inbox"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Sync
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -273,6 +334,18 @@ export default function Inbox() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
+                    {!selectedMessage.aiProcessed && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => processWithAiMutation.mutate(selectedMessage.id)}
+                        disabled={processWithAiMutation.isPending}
+                        data-testid="button-process-ai"
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        {processWithAiMutation.isPending ? "Processing..." : "Process with AI"}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

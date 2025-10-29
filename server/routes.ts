@@ -6193,9 +6193,385 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteEmailMessage(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "email_message", req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete email message" });
+    }
+  });
+
+  // AI Email Processor - Process single email with AI to create tasks
+  app.post("/api/email-messages/:id/process-with-ai", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const message = await storage.getEmailMessage(req.params.id);
+      if (!message || message.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email message not found" });
+      }
+
+      if (message.aiProcessed) {
+        return res.status(400).json({ error: "Email already processed" });
+      }
+
+      // Get default LLM configuration
+      const llmConfigs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
+      const defaultConfig = llmConfigs.find(c => c.isDefault && c.isActive);
+      
+      if (!defaultConfig) {
+        return res.status(400).json({ error: "No default LLM configuration found. Please configure AI settings first." });
+      }
+
+      // Decrypt the API key
+      const { decrypt } = await import('./llm-service');
+      const apiKey = decrypt(defaultConfig.apiKeyEncrypted);
+
+      // Prepare email content for AI
+      const emailContent = `
+Subject: ${message.subject}
+From: ${message.fromEmail} (${message.fromName || 'Unknown'})
+Date: ${message.receivedAt}
+
+${message.bodyText || message.bodyHtml || ''}
+`.trim();
+
+      let extractedData: any = {};
+      let taskSummary = '';
+
+      // Call LLM based on provider
+      if (defaultConfig.provider === 'openai' || defaultConfig.provider === 'azure_openai') {
+        const { OpenAI } = await import('openai');
+        
+        const clientConfig: any = { apiKey };
+        if (defaultConfig.provider === 'azure_openai' && defaultConfig.azureEndpoint) {
+          const cleanEndpoint = defaultConfig.azureEndpoint.endsWith('/') 
+            ? defaultConfig.azureEndpoint.slice(0, -1) 
+            : defaultConfig.azureEndpoint;
+          clientConfig.baseURL = `${cleanEndpoint}/openai/deployments/${defaultConfig.model}`;
+          clientConfig.defaultQuery = { 'api-version': '2025-01-01-preview' };
+          clientConfig.defaultHeaders = { 'api-key': apiKey };
+        }
+        
+        const client = new OpenAI(clientConfig);
+
+        const prompt = `Analyze this email and extract task information in JSON format:
+
+${emailContent}
+
+Extract:
+1. task_title: Brief title for the task (50 chars max)
+2. task_description: Detailed description of what needs to be done
+3. priority: low, medium, high, or urgent
+4. category: accounting, tax, audit, advisory, compliance, or general
+5. due_date: If mentioned, in ISO format, otherwise null
+6. action_required: What specific action is needed
+
+Return ONLY valid JSON, no additional text.`;
+
+        const response = await client.chat.completions.create({
+          model: defaultConfig.model, // Use model/deployment name for both OpenAI and Azure
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 500,
+        });
+
+        const content = response.choices[0]?.message?.content || '{}';
+        try {
+          extractedData = JSON.parse(content);
+        } catch (e) {
+          // Try to extract JSON from markdown code blocks
+          const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          if (jsonMatch) {
+            extractedData = JSON.parse(jsonMatch[1]);
+          } else {
+            extractedData = { task_title: message.subject, task_description: 'Failed to parse AI response' };
+          }
+        }
+        taskSummary = extractedData.task_title || message.subject;
+
+      } else if (defaultConfig.provider === 'anthropic') {
+        const { Anthropic } = await import('@anthropic-ai/sdk');
+        const client = new Anthropic({ apiKey });
+
+        const prompt = `Analyze this email and extract task information in JSON format:
+
+${emailContent}
+
+Extract:
+1. task_title: Brief title for the task (50 chars max)
+2. task_description: Detailed description of what needs to be done
+3. priority: low, medium, high, or urgent
+4. category: accounting, tax, audit, advisory, compliance, or general
+5. due_date: If mentioned, in ISO format, otherwise null
+6. action_required: What specific action is needed
+
+Return ONLY valid JSON, no additional text.`;
+
+        const response = await client.messages.create({
+          model: defaultConfig.model,
+          max_tokens: 500,
+          temperature: 0.3,
+          messages: [{ role: 'user', content: prompt }],
+        });
+
+        const content = response.content[0];
+        const textContent = content.type === 'text' ? content.text : '{}';
+        
+        try {
+          extractedData = JSON.parse(textContent);
+        } catch (e) {
+          // Try to extract JSON from markdown code blocks
+          const jsonMatch = textContent.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          if (jsonMatch) {
+            extractedData = JSON.parse(jsonMatch[1]);
+          } else {
+            extractedData = { task_title: message.subject, task_description: 'Failed to parse AI response' };
+          }
+        }
+        taskSummary = extractedData.task_title || message.subject;
+      }
+
+      // Get email account to check if autoCreateTasks is enabled
+      const emailAccount = await storage.getEmailAccount(message.emailAccountId);
+      let createdTaskId: string | undefined;
+
+      // Auto-create task if enabled and workflow is configured
+      if (emailAccount?.autoCreateTasks && emailAccount.defaultWorkflowId) {
+        // Get the workflow to find the first step
+        const workflow = await storage.getWorkflow(emailAccount.defaultWorkflowId);
+        if (workflow) {
+          const stages = await storage.getStagesByWorkflow(workflow.id);
+          if (stages.length > 0) {
+            const firstStage = stages[0];
+            const steps = await storage.getStepsByStage(firstStage.id);
+            if (steps.length > 0) {
+              const firstStep = steps[0];
+              
+              // Create task
+              const task = await storage.createWorkflowTask({
+                stepId: firstStep.id,
+                name: taskSummary,
+                description: extractedData.task_description || message.bodyText?.substring(0, 500) || '',
+                type: 'manual',
+                order: (await storage.getTasksByStep(firstStep.id)).length + 1,
+                status: 'pending',
+                priority: extractedData.priority || 'medium',
+                dueDate: extractedData.due_date ? new Date(extractedData.due_date) : null,
+                assignedTo: emailAccount.userId,
+                automationInput: { fromEmail: true, emailId: message.id },
+              });
+              
+              createdTaskId = task.id;
+              
+              await logActivity(req.userId, req.user!.organizationId || undefined, "create", "task", task.id, 
+                { source: "email_ai_processor", emailId: message.id }, req);
+            }
+          }
+        }
+      }
+
+      // Update email with processing results
+      const updatedMessage = await storage.updateEmailMessage(message.id, {
+        aiProcessed: true,
+        aiProcessedAt: new Date(),
+        aiExtractedData: extractedData,
+        createdTaskId: createdTaskId || null,
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "email_message", message.id, 
+        { action: "ai_processed", taskCreated: !!createdTaskId }, req);
+
+      res.json({
+        success: true,
+        extractedData,
+        taskCreated: !!createdTaskId,
+        taskId: createdTaskId,
+        message: updatedMessage,
+      });
+
+    } catch (error: any) {
+      console.error('AI email processing error:', error);
+      res.status(500).json({ error: "Failed to process email with AI", details: error.message });
+    }
+  });
+
+  // AI Email Batch Processor - Process multiple unprocessed emails
+  app.post("/api/email-messages/batch-process-with-ai", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { emailAccountId, limit = 10 } = req.body;
+
+      // Get unprocessed emails
+      let messages: schema.EmailMessage[];
+      if (emailAccountId) {
+        const account = await storage.getEmailAccount(emailAccountId);
+        if (!account || account.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "Email account not found" });
+        }
+        messages = await storage.getEmailMessagesByAccount(emailAccountId);
+      } else {
+        messages = await storage.getEmailMessagesByOrganization(req.user!.organizationId!);
+      }
+
+      // Filter to unprocessed messages
+      const unprocessed = messages
+        .filter(m => !m.aiProcessed)
+        .slice(0, limit);
+
+      if (unprocessed.length === 0) {
+        return res.json({ success: true, processed: 0, message: "No unprocessed emails found" });
+      }
+
+      const results = [];
+      
+      for (const msg of unprocessed) {
+        try {
+          // Get default LLM configuration (reuse logic from single processor)
+          const llmConfigs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
+          const defaultConfig = llmConfigs.find(c => c.isDefault && c.isActive);
+          
+          if (!defaultConfig) {
+            results.push({ emailId: msg.id, success: false, error: "No default LLM configuration" });
+            continue;
+          }
+
+          // Decrypt API key
+          const { decrypt } = await import('./llm-service');
+          const apiKey = decrypt(defaultConfig.apiKeyEncrypted);
+
+          // Prepare email content
+          const emailContent = `
+Subject: ${msg.subject}
+From: ${msg.fromEmail} (${msg.fromName || 'Unknown'})
+Date: ${msg.receivedAt}
+
+${msg.bodyText || msg.bodyHtml || ''}
+`.trim();
+
+          let extractedData: any = {};
+          let taskSummary = '';
+
+          // Call LLM
+          if (defaultConfig.provider === 'openai' || defaultConfig.provider === 'azure_openai') {
+            const { OpenAI } = await import('openai');
+            const clientConfig: any = { apiKey };
+            if (defaultConfig.provider === 'azure_openai' && defaultConfig.azureEndpoint) {
+              const cleanEndpoint = defaultConfig.azureEndpoint.endsWith('/') 
+                ? defaultConfig.azureEndpoint.slice(0, -1) 
+                : defaultConfig.azureEndpoint;
+              clientConfig.baseURL = `${cleanEndpoint}/openai/deployments/${defaultConfig.model}`;
+              clientConfig.defaultQuery = { 'api-version': '2025-01-01-preview' };
+              clientConfig.defaultHeaders = { 'api-key': apiKey };
+            }
+            
+            const client = new OpenAI(clientConfig);
+            const response = await client.chat.completions.create({
+              model: defaultConfig.model, // Use model/deployment name for both OpenAI and Azure
+              messages: [{
+                role: 'user',
+                content: `Analyze this email and extract task information in JSON format:\n\n${emailContent}\n\nExtract:\n1. task_title: Brief title for the task (50 chars max)\n2. task_description: Detailed description\n3. priority: low, medium, high, or urgent\n4. category: accounting, tax, audit, advisory, compliance, or general\n5. due_date: If mentioned, in ISO format, otherwise null\n6. action_required: What specific action is needed\n\nReturn ONLY valid JSON.`
+              }],
+              temperature: 0.3,
+              max_tokens: 500,
+            });
+
+            const content = response.choices[0]?.message?.content || '{}';
+            try {
+              extractedData = JSON.parse(content);
+            } catch (e) {
+              const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+              if (jsonMatch) {
+                extractedData = JSON.parse(jsonMatch[1]);
+              } else {
+                extractedData = { task_title: msg.subject, task_description: 'Failed to parse' };
+              }
+            }
+            taskSummary = extractedData.task_title || msg.subject;
+
+          } else if (defaultConfig.provider === 'anthropic') {
+            const { Anthropic } = await import('@anthropic-ai/sdk');
+            const client = new Anthropic({ apiKey });
+            const response = await client.messages.create({
+              model: defaultConfig.model,
+              max_tokens: 500,
+              temperature: 0.3,
+              messages: [{
+                role: 'user',
+                content: `Analyze this email and extract task information in JSON format:\n\n${emailContent}\n\nExtract:\n1. task_title: Brief title for the task (50 chars max)\n2. task_description: Detailed description\n3. priority: low, medium, high, or urgent\n4. category: accounting, tax, audit, advisory, compliance, or general\n5. due_date: If mentioned, in ISO format, otherwise null\n6. action_required: What specific action is needed\n\nReturn ONLY valid JSON.`
+              }],
+            });
+
+            const content = response.content[0];
+            const textContent = content.type === 'text' ? content.text : '{}';
+            try {
+              extractedData = JSON.parse(textContent);
+            } catch (e) {
+              const jsonMatch = textContent.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+              if (jsonMatch) {
+                extractedData = JSON.parse(jsonMatch[1]);
+              } else {
+                extractedData = { task_title: msg.subject, task_description: 'Failed to parse' };
+              }
+            }
+            taskSummary = extractedData.task_title || msg.subject;
+          }
+
+          // Auto-create task if configured
+          const emailAccount = await storage.getEmailAccount(msg.emailAccountId);
+          let createdTaskId: string | undefined;
+
+          if (emailAccount?.autoCreateTasks && emailAccount.defaultWorkflowId) {
+            const workflow = await storage.getWorkflow(emailAccount.defaultWorkflowId);
+            if (workflow) {
+              const stages = await storage.getStagesByWorkflow(workflow.id);
+              if (stages.length > 0) {
+                const steps = await storage.getStepsByStage(stages[0].id);
+                if (steps.length > 0) {
+                  const task = await storage.createWorkflowTask({
+                    stepId: steps[0].id,
+                    name: taskSummary,
+                    description: extractedData.task_description || msg.bodyText?.substring(0, 500) || '',
+                    type: 'manual',
+                    order: (await storage.getTasksByStep(steps[0].id)).length + 1,
+                    status: 'pending',
+                    priority: extractedData.priority || 'medium',
+                    dueDate: extractedData.due_date ? new Date(extractedData.due_date) : null,
+                    assignedTo: emailAccount.userId,
+                    automationInput: { fromEmail: true, emailId: msg.id },
+                  });
+                  createdTaskId = task.id;
+                }
+              }
+            }
+          }
+
+          // Update email
+          await storage.updateEmailMessage(msg.id, {
+            aiProcessed: true,
+            aiProcessedAt: new Date(),
+            aiExtractedData: extractedData,
+            createdTaskId: createdTaskId || null,
+          });
+
+          results.push({ emailId: msg.id, success: true, taskId: createdTaskId });
+
+        } catch (error: any) {
+          results.push({ emailId: msg.id, success: false, error: error.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "batch_process", "email_messages", 
+        '', { processed: successCount, total: unprocessed.length }, req);
+
+      res.json({
+        success: true,
+        processed: successCount,
+        total: unprocessed.length,
+        results,
+      });
+
+    } catch (error: any) {
+      console.error('Batch AI email processing error:', error);
+      res.status(500).json({ error: "Failed to batch process emails", details: error.message });
     }
   });
 
