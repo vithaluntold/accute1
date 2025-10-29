@@ -14,6 +14,12 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 7. **Assignment Status Bot** - AI-powered conversational assistant for assignment queries at /assignment-bot
 8. **AI Client Onboarding** - Privacy-first conversational client onboarding with dynamic country-specific tax field collection
 9. **E2E Test Coverage** - Playwright-based testing for core features
+10. **Task Ingestion System** - Multi-source task creation with organization-scoped security:
+    - **Workflow Task Ingestion**: Automatically creates client portal tasks from assignment workflow tasks when assigneeType='client', validates tenant ownership, links to assignment and client's primary contact
+    - **Message-Based Tasks**: Creates tasks from employee conversation messages with source tracking to conversation/message IDs, validates client ownership before creation
+    - **Form Request Tasks**: Generates document upload tasks from form/document requests with high priority, validates both client and assignment ownership
+    - **Security**: All ingestion methods enforce tenant boundaries by validating client and assignment ownership against organizationId before task creation, preventing cross-tenant data injection
+    - **API Endpoints**: Comprehensive CRUD operations at /api/client-portal-tasks with authentication, organization-scoped queries, and automatic status timestamp management
 
 ### Configuration Requirements:
 - **LLM Provider Setup Required**: Assignment Status Bot, AI Email Processor, and AI Client Onboarding require LLM configuration (OpenAI/Azure OpenAI/Anthropic) in Settings → LLM Configurations. Create a default LLM config to enable these features.
