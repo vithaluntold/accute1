@@ -2546,7 +2546,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
           apiKey: apiKey,
           ...(llmConfig.provider === 'azure' && llmConfig.azureEndpoint && {
             baseURL: `${llmConfig.azureEndpoint}/openai/deployments/${llmConfig.model}`,
-            defaultQuery: { 'api-version': llmConfig.modelVersion || '2024-02-15-preview' },
+            defaultQuery: { 'api-version': llmConfig.modelVersion || '2024-12-01-preview' },
             defaultHeaders: { 'api-key': apiKey },
           })
         });
