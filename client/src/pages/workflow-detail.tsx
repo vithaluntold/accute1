@@ -341,6 +341,18 @@ function StageKanbanCard({ stage, workflowId }: { stage: WorkflowStage; workflow
   
   const steps = stage.steps || [];
 
+  // Delete stage mutation
+  const deleteStage = useMutation({
+    mutationFn: (stageId: string) => apiRequest("DELETE", `/api/stages/${stageId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      toast({ title: "Stage deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete stage", variant: "destructive" });
+    },
+  });
+
   return (
     <AccordionItem value={stage.id} className="border rounded-lg overflow-hidden" data-testid={`stage-${stage.id}`}>
       <Card className="border-0">
@@ -372,11 +384,25 @@ function StageKanbanCard({ stage, workflowId }: { stage: WorkflowStage; workflow
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem data-testid={`stage-edit-${stage.id}`}>
+                  <DropdownMenuItem
+                    data-testid={`stage-edit-${stage.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingStage(stage);
+                      setStageDialogOpen(true);
+                    }}
+                  >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Stage
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" data-testid={`stage-delete-${stage.id}`}>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    data-testid={`stage-delete-${stage.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteStage.mutate(stage.id);
+                    }}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Stage
                   </DropdownMenuItem>
@@ -410,7 +436,14 @@ function StageKanbanCard({ stage, workflowId }: { stage: WorkflowStage; workflow
                 {steps
                   .sort((a, b) => a.order - b.order)
                   .map((step) => (
-                    <StepColumn key={step.id} step={step} stageId={stage.id} workflowId={workflowId} />
+                    <StepColumn
+                      key={step.id}
+                      step={step}
+                      stageId={stage.id}
+                      workflowId={workflowId}
+                      setEditingStep={setEditingStep}
+                      setStepDialogOpen={setStepDialogOpen}
+                    />
                   ))}
                 
                 {/* Add Step Column */}
@@ -445,7 +478,19 @@ function StageKanbanCard({ stage, workflowId }: { stage: WorkflowStage; workflow
 }
 
 // Step Column - Kanban column for tasks
-function StepColumn({ step, stageId, workflowId }: { step: WorkflowStep; stageId: string; workflowId: string }) {
+function StepColumn({
+  step,
+  stageId,
+  workflowId,
+  setEditingStep,
+  setStepDialogOpen,
+}: {
+  step: WorkflowStep;
+  stageId: string;
+  workflowId: string;
+  setEditingStep: (step: WorkflowStep | undefined) => void;
+  setStepDialogOpen: (open: boolean) => void;
+}) {
   const { toast } = useToast();
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<WorkflowTask | undefined>();
@@ -453,6 +498,18 @@ function StepColumn({ step, stageId, workflowId }: { step: WorkflowStep; stageId
   const tasks = step.tasks || [];
   const completedTasks = tasks.filter(t => t.status === 'completed').length;
   const totalTasks = tasks.length;
+
+  // Delete step mutation
+  const deleteStep = useMutation({
+    mutationFn: (stepId: string) => apiRequest("DELETE", `/api/steps/${stepId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows", workflowId, "stages"] });
+      toast({ title: "Step deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete step", variant: "destructive" });
+    },
+  });
 
   const { setNodeRef } = useSortable({
     id: step.id,
@@ -496,11 +553,25 @@ function StepColumn({ step, stageId, workflowId }: { step: WorkflowStep; stageId
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem data-testid={`step-edit-${step.id}`}>
+                <DropdownMenuItem
+                  data-testid={`step-edit-${step.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingStep(step);
+                    setStepDialogOpen(true);
+                  }}
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Step
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive" data-testid={`step-delete-${step.id}`}>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  data-testid={`step-delete-${step.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteStep.mutate(step.id);
+                  }}
+                >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Step
                 </DropdownMenuItem>
