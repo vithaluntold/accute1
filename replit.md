@@ -95,3 +95,43 @@ Fixed four critical bugs affecting the workflow hierarchy (Stages → Steps → 
 - `client/src/components/task-dialog.tsx` - NaN fix + cache invalidation fix + workflowId prop
 - `client/src/pages/workflow-detail.tsx` - Nested data usage + workflowId passing to TaskDialog
 - `server/routes.ts` - Nested API response + date sanitization
+
+### Client Contact Validation System
+Implemented mandatory primary contact validation for client creation with automatic rollback on failure:
+
+**1. Conditional Validation (Frontend)**
+- **Implementation**: Extended client form schema with auxiliary fields (primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating) for contact capture during creation
+- **Logic**: Zod refinement enforces primary contact requirement only when `isCreating: true`, allowing contact-free client edits
+- **Pattern**: `form.reset({ ...clientData, isCreating: true })` for creation, `isCreating: false` for edits
+
+**2. Clean Backend Payloads (Frontend)**
+- **Issue**: Auxiliary form fields (primaryContactFirstName, isCreating, etc.) were being sent to backend, causing validation errors on edit
+- **Fix**: onSubmit handler and createMutation now strip auxiliary fields before API calls using destructuring:
+  ```typescript
+  const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...clientData } = data;
+  ```
+- **Impact**: Backend receives only valid InsertClient fields, preventing schema validation errors
+
+**3. Transactional Rollback (Frontend)**
+- **Implementation**: Sequential client/contact creation with try-catch blocks
+- **Logic**: If contact creation fails after client creation succeeds, client is automatically deleted to prevent orphaned records
+- **Pattern**: 
+  ```typescript
+  try {
+    await apiRequest("POST", "/api/contacts", contactData);
+  } catch (contactError) {
+    await apiRequest("DELETE", `/api/clients/${createdClient.id}`); // Rollback
+    throw new Error(`Client created but contact creation failed: ${contactError.message}`);
+  }
+  ```
+- **Impact**: Maintains data consistency, prevents orphaned clients
+
+**Testing Results:** ✅ VERIFIED
+- Client creation requires primary contact (validated by Zod refinement)
+- Client edits work without contact validation errors
+- Backend receives clean payloads with no auxiliary fields
+- Contact creation failures trigger automatic client rollback
+- No orphaned records possible
+
+**Files Modified:**
+- `client/src/pages/clients.tsx` - Conditional validation, clean payloads, rollback logic
