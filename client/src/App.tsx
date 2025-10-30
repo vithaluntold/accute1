@@ -78,6 +78,7 @@ import AllUsersPage from "@/pages/admin/users";
 import AdminTicketsPage from "@/pages/admin/tickets";
 import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
 import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
+import AdminDashboard from "@/pages/admin/admin-dashboard";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -243,6 +244,13 @@ function Router() {
         </ProtectedRoute>
       </Route>
       {/* Super Admin Routes */}
+      <Route path="/admin/dashboard">
+        <ProtectedRoute>
+          <AppLayout>
+            <AdminDashboard />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin/organizations">
         <ProtectedRoute>
           <AppLayout>

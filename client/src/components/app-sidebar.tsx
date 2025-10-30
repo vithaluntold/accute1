@@ -31,7 +31,7 @@ const platformMenuCategories = [
   {
     title: "Platform Overview",
     items: [
-      { title: "Dashboard", url: "/dashboard", icon: Home, permission: null },
+      { title: "Dashboard", url: "/admin/dashboard", icon: Home, permission: null },
     ]
   },
   {
