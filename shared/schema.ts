@@ -1780,6 +1780,25 @@ export const emailTemplates = pgTable("email_templates", {
   orgCategoryIdx: index("email_templates_org_category_idx").on(table.organizationId, table.category),
 }));
 
+// Message Templates - Quick message templates for client communication
+export const messageTemplates = pgTable("message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => organizations.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // follow_up, status_update, request_info, greeting, custom
+  content: text("content").notNull(), // Message content with merge fields {{client_name}}, {{firm_name}}, etc.
+  variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`),
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  usageCount: integer("usage_count").notNull().default(0),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgCategoryIdx: index("message_templates_org_category_idx").on(table.organizationId, table.category),
+}));
+
 // PDF Annotations
 export const documentAnnotations = pgTable("document_annotations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2119,6 +2138,7 @@ export const insertChatMemberSchema = createInsertSchema(chatMembers).omit({ id:
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertDocumentAnnotationSchema = createInsertSchema(documentAnnotations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLlmConfigurationSchema = createInsertSchema(llmConfigurations).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2167,6 +2187,8 @@ export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
 export type InsertDocumentAnnotation = z.infer<typeof insertDocumentAnnotationSchema>;
 export type DocumentAnnotation = typeof documentAnnotations.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
