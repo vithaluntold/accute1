@@ -39,18 +39,27 @@ export default function Workflows() {
     category: "tax_preparation",
   });
   
-  // Check for marketplace template ID in URL
+  // Check for marketplace template ID and metadata in URL
   const params = new URLSearchParams(location.split('?')[1]);
   const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  const marketplaceName = params.get('name');
+  const marketplaceDescription = params.get('description');
+  const marketplaceCategory = params.get('category');
   
   // Open create dialog if coming from marketplace (only once)
   useEffect(() => {
     if (marketplaceTemplateId && !createDialogOpen) {
       setCreateDialogOpen(true);
+      // Pre-fill with marketplace metadata
+      setNewWorkflow({
+        name: marketplaceName || "",
+        description: marketplaceDescription || "",
+        category: marketplaceCategory || "tax_preparation",
+      });
       // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
       setLocation('/workflows', { replace: true });
     }
-  }, [marketplaceTemplateId, createDialogOpen, setLocation]);
+  }, [marketplaceTemplateId, createDialogOpen, marketplaceName, marketplaceDescription, marketplaceCategory, setLocation]);
   
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],

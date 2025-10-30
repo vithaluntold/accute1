@@ -58,9 +58,12 @@ export default function MessageTemplatesPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<MessageTemplate | null>(null);
 
-  // Check for marketplace template ID in URL
+  // Check for marketplace template ID and metadata in URL
   const params = new URLSearchParams(location.split('?')[1]);
   const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  const marketplaceName = params.get('name');
+  const marketplaceDescription = params.get('description');
+  const marketplaceCategory = params.get('category');
 
   const form = useForm<TemplateFormData>({
     defaultValues: {
@@ -75,10 +78,17 @@ export default function MessageTemplatesPage() {
   useEffect(() => {
     if (marketplaceTemplateId && !dialogOpen) {
       setDialogOpen(true);
+      // Pre-fill with marketplace metadata
+      form.reset({
+        name: marketplaceName || "",
+        category: marketplaceCategory || "",
+        content: marketplaceDescription || "",
+        isActive: true,
+      });
       // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
       setLocation('/message-templates', { replace: true });
     }
-  }, [marketplaceTemplateId, dialogOpen, setLocation]);
+  }, [marketplaceTemplateId, dialogOpen, marketplaceName, marketplaceDescription, marketplaceCategory, form, setLocation]);
 
   const { data: templates, isLoading } = useQuery<MessageTemplate[]>({
     queryKey: ["/api/message-templates"],

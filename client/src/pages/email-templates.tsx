@@ -82,19 +82,13 @@ export default function EmailTemplatesPage() {
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
   
-  // Check for marketplace template ID in URL
+  // Check for marketplace template ID and metadata in URL
   const params = new URLSearchParams(location.split('?')[1]);
   const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  const marketplaceName = params.get('name');
+  const marketplaceDescription = params.get('description');
+  const marketplaceCategory = params.get('category');
   
-  // Open dialog if coming from marketplace (only once)
-  useEffect(() => {
-    if (marketplaceTemplateId && !dialogOpen) {
-      setDialogOpen(true);
-      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
-      setLocation('/email-templates', { replace: true });
-    }
-  }, [marketplaceTemplateId, dialogOpen, setLocation]);
-
   const form = useForm<TemplateFormData>({
     defaultValues: {
       name: "",
@@ -113,6 +107,32 @@ export default function EmailTemplatesPage() {
       isActive: true,
     },
   });
+  
+  // Open dialog if coming from marketplace (only once)
+  useEffect(() => {
+    if (marketplaceTemplateId && !dialogOpen) {
+      setDialogOpen(true);
+      // Pre-fill with marketplace metadata
+      form.reset({
+        name: marketplaceName || "",
+        category: marketplaceCategory || "",
+        subject: "",
+        body: marketplaceDescription || "",
+        logoUrl: "",
+        footerText: "",
+        facebook: "",
+        twitter: "",
+        linkedin: "",
+        instagram: "",
+        primaryColor: "#2563eb",
+        secondaryColor: "#10b981",
+        accentColor: "#f59e0b",
+        isActive: true,
+      });
+      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
+      setLocation('/email-templates', { replace: true });
+    }
+  }, [marketplaceTemplateId, dialogOpen, marketplaceName, marketplaceDescription, marketplaceCategory, form, setLocation]);
 
   const { data: templates, isLoading } = useQuery<EmailTemplate[]>({
     queryKey: ["/api/email-templates"],
