@@ -45,6 +45,7 @@ import {
   insertWorkflowAssignmentSchema,
   insertFolderSchema,
   insertEmailTemplateSchema,
+  insertMessageTemplateSchema,
   insertPlatformSubscriptionSchema,
   insertSupportTicketSchema,
 } from "@shared/schema";
@@ -5150,6 +5151,102 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       res.json({ success: true, message: "Email template deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete email template" });
+    }
+  });
+
+  // Message Templates
+  app.get("/api/message-templates", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        const allTemplates = await db.select().from(schema.messageTemplates).orderBy(schema.messageTemplates.category, schema.messageTemplates.name);
+        return res.json(allTemplates);
+      }
+      const templates = await storage.getMessageTemplatesByOrganization(req.user!.organizationId);
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch message templates" });
+    }
+  });
+
+  app.get("/api/message-templates/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const template = await storage.getMessageTemplate(req.params.id, req.user!.organizationId!);
+      if (!template) {
+        return res.status(404).json({ error: "Message template not found" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch message template" });
+    }
+  });
+
+  app.post("/api/message-templates", requireAuth, requirePermission("templates.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const dataToValidate = {
+        ...req.body,
+        variables: req.body.variables || [],
+        isDefault: false,
+        usageCount: 0,
+        organizationId: req.user!.organizationId || null,
+        createdBy: req.user!.id,
+      };
+      
+      const validatedData = insertMessageTemplateSchema.parse(dataToValidate);
+      
+      const template = await storage.createMessageTemplate(validatedData);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "create", "message_template", template.id, template, req);
+      res.status(201).json(template);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        console.error("Message template validation error:", error.errors);
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      console.error("Message template creation error:", error);
+      res.status(500).json({ error: "Failed to create message template" });
+    }
+  });
+
+  app.patch("/api/message-templates/:id", requireAuth, requirePermission("templates.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getMessageTemplate(req.params.id, req.user!.organizationId!);
+      
+      if (!existing) {
+        return res.status(404).json({ error: "Message template not found" });
+      }
+      
+      if (existing.organizationId === null) {
+        return res.status(403).json({ error: "Cannot modify system templates" });
+      }
+
+      const validatedData = insertMessageTemplateSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateMessageTemplate(req.params.id, req.user!.organizationId!, validatedData);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "message_template", req.params.id, validatedData, req);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update message template" });
+    }
+  });
+
+  app.delete("/api/message-templates/:id", requireAuth, requirePermission("templates.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getMessageTemplate(req.params.id, req.user!.organizationId!);
+      if (!existing) {
+        return res.status(404).json({ error: "Message template not found" });
+      }
+      
+      if (existing.organizationId === null) {
+        return res.status(403).json({ error: "Cannot delete system templates" });
+      }
+
+      await storage.deleteMessageTemplate(req.params.id, req.user!.organizationId!);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "message_template", req.params.id, {}, req);
+      res.json({ success: true, message: "Message template deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete message template" });
     }
   });
 
