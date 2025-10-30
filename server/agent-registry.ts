@@ -27,6 +27,9 @@ export interface AgentManifest {
   pricingModel?: string;
   priceMonthly?: number;
   priceYearly?: number;
+  pricePerInstance?: number;
+  pricePerToken?: number;
+  oneTimeFee?: number;
   version?: string;
   tags?: string[];
   configuration?: Record<string, any>;
@@ -87,6 +90,15 @@ class AgentRegistry {
         .where(eq(aiAgents.slug, manifest.slug))
         .limit(1);
 
+      // Support both nested pricing object and top-level pricing fields for backward compatibility
+      const pricing = (manifest as any).pricing || {};
+      const pricingModel = manifest.pricingModel || pricing.model || "free";
+      const priceMonthly = manifest.priceMonthly ?? pricing.priceMonthly ?? null;
+      const priceYearly = manifest.priceYearly ?? pricing.priceYearly ?? null;
+      const pricePerInstance = manifest.pricePerInstance ?? pricing.pricePerInstance ?? null;
+      const pricePerToken = manifest.pricePerToken ?? pricing.pricePerToken ?? null;
+      const oneTimeFee = manifest.oneTimeFee ?? pricing.oneTimeFee ?? null;
+
       const agentData = {
         slug: manifest.slug,
         name: manifest.name,
@@ -99,9 +111,12 @@ class AgentRegistry {
         manifestJson: JSON.stringify(manifest),
         subscriptionMinPlan: manifest.subscriptionMinPlan || "free",
         defaultScope: manifest.defaultScope || "admin",
-        pricingModel: manifest.pricingModel || "free",
-        priceMonthly: manifest.priceMonthly || null,
-        priceYearly: manifest.priceYearly || null,
+        pricingModel,
+        priceMonthly: priceMonthly !== null ? priceMonthly.toString() : null,
+        priceYearly: priceYearly !== null ? priceYearly.toString() : null,
+        pricePerInstance: pricePerInstance !== null ? pricePerInstance.toString() : null,
+        pricePerToken: pricePerToken !== null ? pricePerToken.toString() : null,
+        oneTimeFee: oneTimeFee !== null ? oneTimeFee.toString() : null,
       };
 
       if (existing.length > 0) {

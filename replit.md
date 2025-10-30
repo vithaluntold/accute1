@@ -13,7 +13,7 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 ## System Architecture
 
 ### UI/UX Decisions
-The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron and Exo 2 fonts, a collapsible sidebar with organized navigation, top navigation, card-based dashboards, and data tables with sorting and pagination. The platform is fully cross-browser and cross-device compatible, implemented as a Progressive Web App (PWA) for a native-like experience with responsive design, offline support, and mobile-optimized navigation.
+The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron (display headers), Inter (body text, labels, UI elements), and Fira Code (monospace) fonts, a collapsible sidebar with organized navigation, top navigation, card-based dashboards, and data tables with sorting and pagination. The platform is fully cross-browser and cross-device compatible, implemented as a Progressive Web App (PWA) for a native-like experience with responsive design, offline support, and mobile-optimized navigation.
 
 ### Technical Implementations
 The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript. Data persistence is managed by PostgreSQL (Neon) with Drizzle ORM. Authentication incorporates JWT and bcrypt, complemented by AES-256 encryption for sensitive data, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
@@ -70,7 +70,7 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
   - **Use Cases**: One-off consulting projects, custom client requests, internal initiatives, engagements without predefined workflows
 - **AI Agent Foundry**: Comprehensive agent onboarding system enabling dynamic registration and deployment of custom AI agents with manifest-driven architecture. Features include:
   - **Purpose**: Create a "foundry" where new AI agents can be onboarded by uploading frontend/backend code files and registering via manifest
-  - **Manifest System**: Each agent has a `manifest.json` defining slug, name, paths, capabilities, subscription requirements, and default permissions
+  - **Manifest System**: Each agent has a `manifest.json` defining slug, name, paths, capabilities, subscription requirements, pricing model, and default permissions
   - **Folder Structure**: Agents stored in `/agents/{slug}/` with frontend, backend, and manifest files
   - **Dynamic Loading**: Backend AgentRegistry validates and lazy-loads agent handlers; frontend lazy-loads React components
   - **Access Control**:
@@ -78,10 +78,20 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
     - **Users**: Access only if explicitly granted by admin
     - **Clients**: No access (blocked by role scope)
   - **Subscription-Aware**: Agents require minimum subscription plan level (free, starter, professional, enterprise)
+  - **Comprehensive Pricing Model**: Each agent can have flexible, granular pricing:
+    - **Free**: No cost to organizations
+    - **Per Month**: Monthly subscription fee (e.g., $29.99/month)
+    - **Per Year**: Annual subscription fee (e.g., $299.99/year)
+    - **Per Instance**: Usage-based pricing per execution (e.g., $0.50 per invocation)
+    - **Per Token**: LLM token consumption pricing (e.g., $0.000001 per token)
+    - **One-Time**: Lifetime access fee (e.g., $99.99 once)
+    - **Hybrid**: Combine multiple models (e.g., $10/month + $0.10/instance)
+  - **Usage Tracking**: `ai_agent_usage` table tracks instance counts, token consumption, and costs for per-instance and per-token billing
   - **Multi-Tenant**: Organizations can independently enable/disable agents via `organization_agents` table
   - **User Permissions**: Granular user-level access control via `user_agent_access` table
   - **Database Schema**:
-    - `ai_agents`: Enhanced registry with slug, paths, manifest, subscription requirements, and publishing status
+    - `ai_agents`: Enhanced registry with slug, paths, manifest, comprehensive pricing fields (priceMonthly, priceYearly, pricePerInstance, pricePerToken, oneTimeFee, pricingModel), subscription requirements, and publishing status
+    - `ai_agent_usage`: Tracks usage metrics (instance count, token count, execution time) and calculated costs per billing period for organizations
     - `organization_agents`: Tracks which organizations have which agents enabled
     - `user_agent_access`: User-specific agent permissions within organizations
   - **API Pattern**: Agents expose functionality via `/api/agents/:slug/...` with standardized interfaces
