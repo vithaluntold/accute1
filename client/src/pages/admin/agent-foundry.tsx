@@ -66,6 +66,7 @@ export default function AgentFoundryPage() {
   // Fetch all agents
   const { data: agents = [], isLoading } = useQuery<AIAgent[]>({
     queryKey: ["/api/admin/agents"],
+    select: (data: any) => data.agents || [],
   });
 
   // Create agent mutation
