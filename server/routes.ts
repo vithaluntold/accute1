@@ -45,6 +45,8 @@ import {
   insertWorkflowAssignmentSchema,
   insertFolderSchema,
   insertEmailTemplateSchema,
+  insertPlatformSubscriptionSchema,
+  insertSupportTicketSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -7746,13 +7748,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
 
   // Get all organizations with subscription details
-  app.get("/api/admin/organizations", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/admin/organizations", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      // Only allow platform-scoped users (Super Admins with no organizationId)
-      if (req.user!.organizationId !== null) {
-        return res.status(403).json({ error: "Access denied. Platform admin access required." });
-      }
-
       const orgs = await storage.getAllOrganizations();
       const orgsWithDetails = await Promise.all(
         orgs.map(async (org) => {
@@ -7772,12 +7769,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Get all subscriptions
-  app.get("/api/admin/subscriptions", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/admin/subscriptions", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      if (req.user!.organizationId !== null) {
-        return res.status(403).json({ error: "Access denied. Platform admin access required." });
-      }
-
       const subscriptions = await storage.getAllPlatformSubscriptions();
       const subscriptionsWithOrgs = await Promise.all(
         subscriptions.map(async (sub) => {
@@ -7797,12 +7790,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Get all platform users
-  app.get("/api/admin/users", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/admin/users", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      if (req.user!.organizationId !== null) {
-        return res.status(403).json({ error: "Access denied. Platform admin access required." });
-      }
-
       const users = await storage.getAllUsers();
       const usersWithDetails = await Promise.all(
         users.map(async (user) => {
@@ -7830,12 +7819,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Get all support tickets (across all organizations)
-  app.get("/api/admin/tickets", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/admin/tickets", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      if (req.user!.organizationId !== null) {
-        return res.status(403).json({ error: "Access denied. Platform admin access required." });
-      }
-
       const tickets = await storage.getAllSupportTickets();
       const ticketsWithDetails = await Promise.all(
         tickets.map(async (ticket) => {
@@ -7845,12 +7830,12 @@ ${msg.bodyText || msg.bodyHtml || ''}
           return {
             ...ticket,
             organization: org,
-            createdBy: {
+            createdBy: createdBy ? {
               id: createdBy.id,
               firstName: createdBy.firstName,
               lastName: createdBy.lastName,
               email: createdBy.email,
-            },
+            } : null,
             assignedTo: assignedTo ? {
               id: assignedTo.id,
               firstName: assignedTo.firstName,
@@ -7864,6 +7849,99 @@ ${msg.bodyText || msg.bodyHtml || ''}
     } catch (error: any) {
       console.error('Get tickets error:', error);
       res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  // Create platform subscription
+  app.post("/api/admin/subscriptions", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const subscriptionData = insertPlatformSubscriptionSchema.parse(req.body);
+      const subscription = await storage.createPlatformSubscription(subscriptionData);
+      res.status(201).json(subscription);
+    } catch (error: any) {
+      console.error('Create subscription error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid subscription data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create subscription" });
+    }
+  });
+
+  // Update platform subscription
+  app.patch("/api/admin/subscriptions/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = insertPlatformSubscriptionSchema.partial().parse(req.body);
+      const subscription = await storage.updatePlatformSubscription(id, updates);
+      
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      
+      res.json(subscription);
+    } catch (error: any) {
+      console.error('Update subscription error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid subscription data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update subscription" });
+    }
+  });
+
+  // Update support ticket
+  app.patch("/api/admin/tickets/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = insertSupportTicketSchema.partial().parse(req.body);
+      const ticket = await storage.updateSupportTicket(id, updates);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      
+      res.json(ticket);
+    } catch (error: any) {
+      console.error('Update ticket error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid ticket data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update ticket" });
+    }
+  });
+
+  // Create organization
+  app.post("/api/admin/organizations", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const orgData = insertOrganizationSchema.parse(req.body);
+      const organization = await storage.createOrganization(orgData);
+      res.status(201).json(organization);
+    } catch (error: any) {
+      console.error('Create organization error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid organization data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create organization" });
+    }
+  });
+
+  // Update organization
+  app.patch("/api/admin/organizations/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = insertOrganizationSchema.partial().parse(req.body);
+      const organization = await storage.updateOrganization(id, updates);
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      res.json(organization);
+    } catch (error: any) {
+      console.error('Update organization error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid organization data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update organization" });
     }
   });
 
