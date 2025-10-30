@@ -60,6 +60,12 @@ export default function AgentFoundryPage() {
     category: "accounting",
     version: "1.0.0",
     subscriptionMinPlan: "free" as "free" | "starter" | "professional" | "enterprise",
+    pricingModel: "free" as "free" | "per_month" | "per_year" | "per_instance" | "per_token" | "one_time" | "hybrid",
+    priceMonthly: "",
+    priceYearly: "",
+    pricePerInstance: "",
+    pricePerToken: "",
+    oneTimeFee: "",
     manifestJson: "",
   });
 
@@ -161,6 +167,12 @@ export default function AgentFoundryPage() {
       category: formData.category,
       version: formData.version,
       subscriptionMinPlan: formData.subscriptionMinPlan,
+      pricingModel: formData.pricingModel,
+      priceMonthly: formData.priceMonthly ? parseFloat(formData.priceMonthly) : 0,
+      priceYearly: formData.priceYearly ? parseFloat(formData.priceYearly) : 0,
+      pricePerInstance: formData.pricePerInstance ? parseFloat(formData.pricePerInstance) : 0,
+      pricePerToken: formData.pricePerToken ? parseFloat(formData.pricePerToken) : 0,
+      oneTimeFee: formData.oneTimeFee ? parseFloat(formData.oneTimeFee) : 0,
       manifestJson: formData.manifestJson,
     };
 
@@ -176,6 +188,12 @@ export default function AgentFoundryPage() {
       category: "accounting",
       version: "1.0.0",
       subscriptionMinPlan: "free",
+      pricingModel: "free",
+      priceMonthly: "",
+      priceYearly: "",
+      pricePerInstance: "",
+      pricePerToken: "",
+      oneTimeFee: "",
       manifestJson: "",
     });
   };
@@ -191,6 +209,14 @@ export default function AgentFoundryPage() {
       capabilities: ["chat", "analysis"],
       subscriptionMinPlan: formData.subscriptionMinPlan || "free",
       defaultScope: "admin",
+      pricing: {
+        model: formData.pricingModel || "free",
+        priceMonthly: formData.priceMonthly ? parseFloat(formData.priceMonthly) : 0,
+        priceYearly: formData.priceYearly ? parseFloat(formData.priceYearly) : 0,
+        pricePerInstance: formData.pricePerInstance ? parseFloat(formData.pricePerInstance) : 0,
+        pricePerToken: formData.pricePerToken ? parseFloat(formData.pricePerToken) : 0,
+        oneTimeFee: formData.oneTimeFee ? parseFloat(formData.oneTimeFee) : 0,
+      },
       paths: {
         backend: `/agents/${formData.slug || "example-agent"}/backend.ts`,
         frontend: `/agents/${formData.slug || "example-agent"}/frontend.tsx`,
@@ -335,6 +361,117 @@ export default function AgentFoundryPage() {
                     <SelectItem value="enterprise">Enterprise</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Comprehensive Pricing Section */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="font-secondary font-semibold text-sm">Agent Pricing</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="pricing-model" data-testid="label-pricing-model">Pricing Model</Label>
+                  <Select
+                    value={formData.pricingModel}
+                    onValueChange={(value: any) => setFormData({ ...formData, pricingModel: value })}
+                  >
+                    <SelectTrigger id="pricing-model" data-testid="select-pricing-model">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="free">Free</SelectItem>
+                      <SelectItem value="per_month">Per Month</SelectItem>
+                      <SelectItem value="per_year">Per Year</SelectItem>
+                      <SelectItem value="per_instance">Per Instance (Usage-Based)</SelectItem>
+                      <SelectItem value="per_token">Per Token Consumed</SelectItem>
+                      <SelectItem value="one_time">One-Time Fee</SelectItem>
+                      <SelectItem value="hybrid">Hybrid (Multiple Models)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Choose how organizations will be billed for this agent</p>
+                </div>
+
+                {/* Conditional pricing inputs based on model */}
+                {(formData.pricingModel === 'per_month' || formData.pricingModel === 'hybrid') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="price-monthly" data-testid="label-price-monthly">Monthly Price ($)</Label>
+                    <Input
+                      id="price-monthly"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.priceMonthly}
+                      onChange={(e) => setFormData({ ...formData, priceMonthly: e.target.value })}
+                      placeholder="29.99"
+                      data-testid="input-price-monthly"
+                    />
+                  </div>
+                )}
+
+                {(formData.pricingModel === 'per_year' || formData.pricingModel === 'hybrid') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="price-yearly" data-testid="label-price-yearly">Yearly Price ($)</Label>
+                    <Input
+                      id="price-yearly"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.priceYearly}
+                      onChange={(e) => setFormData({ ...formData, priceYearly: e.target.value })}
+                      placeholder="299.99"
+                      data-testid="input-price-yearly"
+                    />
+                  </div>
+                )}
+
+                {(formData.pricingModel === 'per_instance' || formData.pricingModel === 'hybrid') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="price-per-instance" data-testid="label-price-per-instance">Price Per Instance ($)</Label>
+                    <Input
+                      id="price-per-instance"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={formData.pricePerInstance}
+                      onChange={(e) => setFormData({ ...formData, pricePerInstance: e.target.value })}
+                      placeholder="0.50"
+                      data-testid="input-price-per-instance"
+                    />
+                    <p className="text-xs text-muted-foreground">Cost each time the agent is invoked</p>
+                  </div>
+                )}
+
+                {(formData.pricingModel === 'per_token' || formData.pricingModel === 'hybrid') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="price-per-token" data-testid="label-price-per-token">Price Per Token ($)</Label>
+                    <Input
+                      id="price-per-token"
+                      type="number"
+                      step="0.000001"
+                      min="0"
+                      value={formData.pricePerToken}
+                      onChange={(e) => setFormData({ ...formData, pricePerToken: e.target.value })}
+                      placeholder="0.000001"
+                      data-testid="input-price-per-token"
+                    />
+                    <p className="text-xs text-muted-foreground">Cost per AI token consumed</p>
+                  </div>
+                )}
+
+                {(formData.pricingModel === 'one_time' || formData.pricingModel === 'hybrid') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="one-time-fee" data-testid="label-one-time-fee">One-Time Fee ($)</Label>
+                    <Input
+                      id="one-time-fee"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.oneTimeFee}
+                      onChange={(e) => setFormData({ ...formData, oneTimeFee: e.target.value })}
+                      placeholder="99.99"
+                      data-testid="input-one-time-fee"
+                    />
+                    <p className="text-xs text-muted-foreground">One-time purchase price for lifetime access</p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

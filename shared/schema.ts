@@ -322,10 +322,13 @@ export const aiAgents = pgTable("ai_agents", {
   iconPath: text("icon_path"), // Path to agent icon
   manifestJson: text("manifest_json"), // Full manifest JSON for validation
   
-  // Subscription and pricing
-  pricingModel: text("pricing_model").notNull().default("free"),
-  priceMonthly: integer("price_monthly").default(0),
-  priceYearly: integer("price_yearly").default(0),
+  // Subscription and pricing - Comprehensive model
+  pricingModel: text("pricing_model").notNull().default("free"), // 'free', 'per_month', 'per_year', 'per_instance', 'per_token', 'one_time', 'hybrid'
+  priceMonthly: numeric("price_monthly", { precision: 10, scale: 2 }).default(sql`0`),
+  priceYearly: numeric("price_yearly", { precision: 10, scale: 2 }).default(sql`0`),
+  pricePerInstance: numeric("price_per_instance", { precision: 10, scale: 4 }).default(sql`0`), // Per-use pricing (e.g., $0.50 per execution)
+  pricePerToken: numeric("price_per_token", { precision: 10, scale: 6 }).default(sql`0`), // Per-token pricing (e.g., $0.000001 per token)
+  oneTimeFee: numeric("one_time_fee", { precision: 10, scale: 2 }).default(sql`0`), // One-time purchase fee
   subscriptionMinPlan: text("subscription_min_plan").notNull().default("free"), // Minimum subscription plan required
   
   // Access control (Foundry feature)
@@ -357,6 +360,32 @@ export const aiAgentInstallations = pgTable("ai_agent_installations", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// AI Agent Usage Tracking - For per-instance and per-token billing
+export const aiAgentUsage = pgTable("ai_agent_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").notNull().references(() => aiAgents.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Usage metrics
+  instanceCount: integer("instance_count").notNull().default(1), // Number of times agent was invoked
+  tokenCount: integer("token_count").notNull().default(0), // Number of tokens consumed
+  executionTimeMs: integer("execution_time_ms"), // Execution time
+  
+  // Billing
+  cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default(sql`0`), // Calculated cost for this usage
+  billingPeriod: text("billing_period"), // e.g., '2025-01' for monthly billing
+  
+  // Context
+  conversationId: varchar("conversation_id").references(() => aiAgentConversations.id),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orgBillingIdx: index("ai_agent_usage_org_billing_idx").on(table.organizationId, table.billingPeriod),
+  agentBillingIdx: index("ai_agent_usage_agent_billing_idx").on(table.agentId, table.billingPeriod),
+}));
 
 // AI Provider Configurations
 export const aiProviderConfigs = pgTable("ai_provider_configs", {
