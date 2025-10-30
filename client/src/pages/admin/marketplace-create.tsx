@@ -9,21 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, ArrowLeft, Save, Loader2, FileText, Workflow, LayoutTemplate } from "lucide-react";
+import { Plus, ArrowLeft, Save, Loader2, FileText, Workflow, LayoutTemplate, Mail, MessageSquare } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface TemplateSource {
   id: string;
   name: string;
   description?: string | null;
-  type: string;
+  type?: string;
+  subject?: string;
+  content?: string;
 }
 
 export default function MarketplaceCreatePage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
-  const [templateType, setTemplateType] = useState<'document_template' | 'form_template' | 'pipeline_template'>('document_template');
+  const [templateType, setTemplateType] = useState<'document_template' | 'form_template' | 'pipeline_template' | 'email_template' | 'message_template'>('document_template');
   const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
@@ -48,6 +50,16 @@ export default function MarketplaceCreatePage() {
   const { data: sourceDocuments = [] } = useQuery<TemplateSource[]>({
     queryKey: ['/api/documents'],
     enabled: templateType === 'document_template',
+  });
+
+  const { data: sourceEmailTemplates = [] } = useQuery<TemplateSource[]>({
+    queryKey: ['/api/email-templates'],
+    enabled: templateType === 'email_template',
+  });
+
+  const { data: sourceMessageTemplates = [] } = useQuery<TemplateSource[]>({
+    queryKey: ['/api/message-templates'],
+    enabled: templateType === 'message_template',
   });
 
   const createMutation = useMutation({
@@ -108,6 +120,10 @@ export default function MarketplaceCreatePage() {
         return sourceWorkflows;
       case 'document_template':
         return sourceDocuments;
+      case 'email_template':
+        return sourceEmailTemplates;
+      case 'message_template':
+        return sourceMessageTemplates;
       default:
         return [];
     }
@@ -121,6 +137,10 @@ export default function MarketplaceCreatePage() {
         return <Workflow className="w-5 h-5" />;
       case 'document_template':
         return <FileText className="w-5 h-5" />;
+      case 'email_template':
+        return <Mail className="w-5 h-5" />;
+      case 'message_template':
+        return <MessageSquare className="w-5 h-5" />;
     }
   };
 
@@ -171,6 +191,8 @@ export default function MarketplaceCreatePage() {
                   <SelectItem value="document_template" data-testid="option-document">Document Template</SelectItem>
                   <SelectItem value="form_template" data-testid="option-form">Form Template</SelectItem>
                   <SelectItem value="pipeline_template" data-testid="option-workflow">Workflow Template</SelectItem>
+                  <SelectItem value="email_template" data-testid="option-email">Email Template</SelectItem>
+                  <SelectItem value="message_template" data-testid="option-message">Message Template</SelectItem>
                 </SelectContent>
               </Select>
             </div>
