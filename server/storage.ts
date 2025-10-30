@@ -1,4 +1,4 @@
-import { eq, and, or, desc, sql, lt, lte, gt, gte, ne } from "drizzle-orm";
+import { eq, and, or, desc, sql, lt, lte, gt, gte, ne, isNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {
@@ -1786,7 +1786,10 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(schema.emailTemplates.id, id),
-          eq(schema.emailTemplates.organizationId, organizationId)
+          or(
+            eq(schema.emailTemplates.organizationId, organizationId),
+            isNull(schema.emailTemplates.organizationId)
+          )
         )
       );
     return result[0];
@@ -1794,7 +1797,12 @@ export class DbStorage implements IStorage {
 
   async getEmailTemplatesByOrganization(organizationId: string): Promise<schema.EmailTemplate[]> {
     return await db.select().from(schema.emailTemplates)
-      .where(eq(schema.emailTemplates.organizationId, organizationId))
+      .where(
+        or(
+          eq(schema.emailTemplates.organizationId, organizationId),
+          isNull(schema.emailTemplates.organizationId)
+        )
+      )
       .orderBy(schema.emailTemplates.category, schema.emailTemplates.name);
   }
 
@@ -1898,7 +1906,10 @@ export class DbStorage implements IStorage {
       .where(
         and(
           eq(schema.messageTemplates.id, id),
-          eq(schema.messageTemplates.organizationId, organizationId)
+          or(
+            eq(schema.messageTemplates.organizationId, organizationId),
+            isNull(schema.messageTemplates.organizationId)
+          )
         )
       );
     return result[0];
@@ -1906,7 +1917,12 @@ export class DbStorage implements IStorage {
 
   async getMessageTemplatesByOrganization(organizationId: string): Promise<schema.MessageTemplate[]> {
     return await db.select().from(schema.messageTemplates)
-      .where(eq(schema.messageTemplates.organizationId, organizationId))
+      .where(
+        or(
+          eq(schema.messageTemplates.organizationId, organizationId),
+          isNull(schema.messageTemplates.organizationId)
+        )
+      )
       .orderBy(schema.messageTemplates.category, schema.messageTemplates.name);
   }
 

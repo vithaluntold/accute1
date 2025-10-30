@@ -1783,7 +1783,7 @@ export const emailTemplates = pgTable("email_templates", {
 // Message Templates - Quick message templates for client communication
 export const messageTemplates = pgTable("message_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   name: text("name").notNull(),
   category: text("category").notNull(), // follow_up, status_update, request_info, greeting, custom
   content: text("content").notNull(), // Message content with merge fields {{client_name}}, {{firm_name}}, etc.
