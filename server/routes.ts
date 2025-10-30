@@ -44,6 +44,7 @@ import {
   insertMarketplaceInstallationSchema,
   insertWorkflowAssignmentSchema,
   insertFolderSchema,
+  insertEmailTemplateSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -5019,31 +5020,85 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  app.get("/api/email-templates/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const template = await storage.getEmailTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      // Organization scoping - allow access to both org templates and system templates
+      if (template.organizationId !== null && template.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch email template" });
+    }
+  });
+
   app.post("/api/email-templates", requireAuth, requirePermission("templates.create"), async (req: AuthRequest, res: Response) => {
     try {
+      // Validate request body
+      const validatedData = insertEmailTemplateSchema.parse(req.body);
+      
       const template = await storage.createEmailTemplate({
-        ...req.body,
+        ...validatedData,
         organizationId: req.user!.organizationId!,
         createdBy: req.user!.id
       });
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "email_template", template.id, template, req);
       res.status(201).json(template);
     } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to create email template" });
     }
   });
 
-  app.put("/api/email-templates/:id", requireAuth, requirePermission("templates.update"), async (req: AuthRequest, res: Response) => {
+  app.patch("/api/email-templates/:id", requireAuth, requirePermission("templates.update"), async (req: AuthRequest, res: Response) => {
     try {
       const existing = await storage.getEmailTemplate(req.params.id);
       if (!existing || existing.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "Email template not found" });
       }
-      const updated = await storage.updateEmailTemplate(req.params.id, req.body);
-      await logActivity(req.user!.id, req.user!.organizationId!, "update", "email_template", req.params.id, req.body, req);
+      
+      // System templates cannot be updated by users
+      if (existing.organizationId === null) {
+        return res.status(403).json({ error: "Cannot modify system templates" });
+      }
+
+      // Validate partial update
+      const validatedData = insertEmailTemplateSchema.partial().parse(req.body);
+      
+      const updated = await storage.updateEmailTemplate(req.params.id, validatedData);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "email_template", req.params.id, validatedData, req);
       res.json(updated);
     } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid template data", details: error.errors });
+      }
       res.status(500).json({ error: "Failed to update email template" });
+    }
+  });
+
+  app.delete("/api/email-templates/:id", requireAuth, requirePermission("templates.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getEmailTemplate(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email template not found" });
+      }
+      
+      // System templates cannot be deleted
+      if (existing.organizationId === null) {
+        return res.status(403).json({ error: "Cannot delete system templates" });
+      }
+
+      await storage.deleteEmailTemplate(req.params.id, req.user!.organizationId!);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "email_template", req.params.id, {}, req);
+      res.json({ success: true, message: "Email template deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete email template" });
     }
   });
 
