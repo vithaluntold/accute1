@@ -55,7 +55,7 @@ const iconMap: Record<string, any> = {
 };
 
 export default function FormsPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [templateGalleryOpen, setTemplateGalleryOpen] = useState(false);
@@ -73,6 +73,19 @@ export default function FormsPage() {
     notes: "",
   });
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Check for marketplace template ID in URL
+  const params = new URLSearchParams(location.split('?')[1]);
+  const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  
+  // Open create dialog if coming from marketplace (only once)
+  useEffect(() => {
+    if (marketplaceTemplateId && !createDialogOpen) {
+      setCreateDialogOpen(true);
+      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
+      setLocation('/forms', { replace: true });
+    }
+  }, [marketplaceTemplateId, createDialogOpen, setLocation]);
   const { toast } = useToast();
 
   const { data: forms = [], isLoading } = useQuery<FormTemplate[]>({
@@ -96,11 +109,35 @@ export default function FormsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormValues) => apiRequest("POST", "/api/forms", data),
-    onSuccess: () => {
+    mutationFn: async (data: FormValues) => {
+      const res = await apiRequest("POST", "/api/forms", data);
+      return res.json();
+    },
+    onSuccess: async (createdForm) => {
       queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      
+      // Link to marketplace template if ID provided
+      if (marketplaceTemplateId) {
+        try {
+          await apiRequest("PATCH", `/api/marketplace/items/${marketplaceTemplateId}`, {
+            sourceId: createdForm.id
+          });
+          toast({ 
+            title: "Success", 
+            description: "Form created and linked to marketplace" 
+          });
+        } catch (error: any) {
+          toast({ 
+            title: "Warning", 
+            description: "Form created but failed to link to marketplace",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({ title: "Form created successfully" });
+      }
+      
       setCreateDialogOpen(false);
-      toast({ title: "Form created successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create form", description: error.message, variant: "destructive" });

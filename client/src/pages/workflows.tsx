@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Workflows() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newWorkflow, setNewWorkflow] = useState({
@@ -38,6 +38,19 @@ export default function Workflows() {
     description: "",
     category: "tax_preparation",
   });
+  
+  // Check for marketplace template ID in URL
+  const params = new URLSearchParams(location.split('?')[1]);
+  const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  
+  // Open create dialog if coming from marketplace (only once)
+  useEffect(() => {
+    if (marketplaceTemplateId && !createDialogOpen) {
+      setCreateDialogOpen(true);
+      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
+      setLocation('/workflows', { replace: true });
+    }
+  }, [marketplaceTemplateId, createDialogOpen, setLocation]);
   
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],
@@ -53,19 +66,41 @@ export default function Workflows() {
   // Create workflow mutation
   const createWorkflow = useMutation({
     mutationFn: async (data: { name: string; description: string; category: string }) => {
-      return apiRequest('POST', '/api/workflows', data);
+      const res = await apiRequest('POST', '/api/workflows', data);
+      return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (createdWorkflow: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
-      toast({
-        title: 'Success',
-        description: 'Workflow created successfully',
-      });
+      
+      // Link to marketplace template if ID provided
+      if (marketplaceTemplateId) {
+        try {
+          await apiRequest("PATCH", `/api/marketplace/items/${marketplaceTemplateId}`, {
+            sourceId: createdWorkflow.id
+          });
+          toast({
+            title: 'Success',
+            description: 'Workflow created and linked to marketplace',
+          });
+        } catch (error: any) {
+          toast({
+            title: 'Warning',
+            description: 'Workflow created but failed to link to marketplace',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Workflow created successfully',
+        });
+      }
+      
       setCreateDialogOpen(false);
       setNewWorkflow({ name: "", description: "", category: "tax_preparation" });
       // Navigate to the workflow builder for the newly created workflow if ID exists
-      if (data && data.id) {
-        setLocation(`/workflows/${data.id}`);
+      if (createdWorkflow && createdWorkflow.id) {
+        setLocation(`/workflows/${createdWorkflow.id}`);
       }
     },
     onError: (error: any) => {

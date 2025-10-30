@@ -67,6 +67,7 @@ import ProjectDetail from "@/pages/project-detail";
 import TeamChat from "@/pages/team-chat";
 import Calendar from "@/pages/calendar";
 import EmailTemplates from "@/pages/email-templates";
+import MessageTemplates from "@/pages/message-templates";
 import EmailAccounts from "@/pages/email-accounts";
 import Inbox from "@/pages/inbox";
 import NotFound from "@/pages/not-found";
@@ -547,6 +548,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <EmailTemplates />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/message-templates">
+        <ProtectedRoute>
+          <AppLayout>
+            <MessageTemplates />
           </AppLayout>
         </ProtectedRoute>
       </Route>

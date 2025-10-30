@@ -1,32 +1,21 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, ArrowLeft, Save, Loader2, FileText, Workflow, LayoutTemplate, Mail, MessageSquare } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { ArrowLeft, ArrowRight, Loader2, FileText, Workflow, LayoutTemplate, Mail, MessageSquare } from "lucide-react";
 import { useLocation } from "wouter";
-
-interface TemplateSource {
-  id: string;
-  name: string;
-  description?: string | null;
-  type?: string;
-  subject?: string;
-  content?: string;
-}
 
 export default function MarketplaceCreatePage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
   const [templateType, setTemplateType] = useState<'document_template' | 'form_template' | 'pipeline_template' | 'email_template' | 'message_template'>('document_template');
-  const [selectedSourceId, setSelectedSourceId] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -37,42 +26,32 @@ export default function MarketplaceCreatePage() {
     tags: "",
   });
 
-  const { data: sourceForms = [] } = useQuery<TemplateSource[]>({
-    queryKey: ['/api/forms'],
-    enabled: templateType === 'form_template',
-  });
-
-  const { data: sourceWorkflows = [] } = useQuery<TemplateSource[]>({
-    queryKey: ['/api/workflows'],
-    enabled: templateType === 'pipeline_template',
-  });
-
-  const { data: sourceDocuments = [] } = useQuery<TemplateSource[]>({
-    queryKey: ['/api/documents'],
-    enabled: templateType === 'document_template',
-  });
-
-  const { data: sourceEmailTemplates = [] } = useQuery<TemplateSource[]>({
-    queryKey: ['/api/email-templates'],
-    enabled: templateType === 'email_template',
-  });
-
-  const { data: sourceMessageTemplates = [] } = useQuery<TemplateSource[]>({
-    queryKey: ['/api/message-templates'],
-    enabled: templateType === 'message_template',
-  });
-
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest('POST', '/api/marketplace/items', data);
+      const res = await apiRequest('POST', '/api/marketplace/items', data);
+      return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/marketplace/items'] });
-      toast({
-        title: 'Success',
-        description: 'Marketplace template created successfully',
-      });
-      navigate('/admin/marketplace/published');
+    onSuccess: (data) => {
+      const marketplaceTemplateId = data.id;
+      
+      // Redirect to appropriate page with marketplaceTemplateId to trigger creation
+      switch (templateType) {
+        case 'form_template':
+          navigate(`/forms?marketplaceTemplateId=${marketplaceTemplateId}`);
+          break;
+        case 'pipeline_template':
+          navigate(`/workflows?marketplaceTemplateId=${marketplaceTemplateId}`);
+          break;
+        case 'document_template':
+          navigate(`/documents?marketplaceTemplateId=${marketplaceTemplateId}`);
+          break;
+        case 'email_template':
+          navigate(`/email-templates?marketplaceTemplateId=${marketplaceTemplateId}`);
+          break;
+        case 'message_template':
+          navigate(`/message-templates?marketplaceTemplateId=${marketplaceTemplateId}`);
+          break;
+      }
     },
     onError: (error: any) => {
       toast({
@@ -85,15 +64,6 @@ export default function MarketplaceCreatePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedSourceId) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select a source template',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     const payload = {
       name: formData.name,
@@ -104,29 +74,12 @@ export default function MarketplaceCreatePage() {
       price: formData.price,
       priceYearly: formData.pricingModel === 'subscription' ? formData.priceYearly : null,
       tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
-      sourceId: selectedSourceId,
+      sourceId: null, // Will be linked later from the builder
       isFeatured: false,
       status: 'active',
     };
 
     createMutation.mutate(payload);
-  };
-
-  const getSourceTemplates = () => {
-    switch (templateType) {
-      case 'form_template':
-        return sourceForms;
-      case 'pipeline_template':
-        return sourceWorkflows;
-      case 'document_template':
-        return sourceDocuments;
-      case 'email_template':
-        return sourceEmailTemplates;
-      case 'message_template':
-        return sourceMessageTemplates;
-      default:
-        return [];
-    }
   };
 
   const getTypeIcon = () => {
@@ -158,7 +111,7 @@ export default function MarketplaceCreatePage() {
         <div>
           <h1 className="text-3xl font-display font-bold">Create Marketplace Template</h1>
           <p className="text-muted-foreground mt-1">
-            Publish a template to the marketplace for all organizations
+            Step 1: Fill in marketplace details. Step 2: Create template content in the dedicated builder.
           </p>
         </div>
       </div>
@@ -168,21 +121,18 @@ export default function MarketplaceCreatePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {getTypeIcon()}
-              Template Details
+              Marketplace Template Information
             </CardTitle>
             <CardDescription>
-              Fill in the template information and select a source to publish
+              Provide basic template information. You'll be redirected to create the actual template content next.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="template-type" data-testid="label-template-type">Template Type</Label>
+              <Label htmlFor="template-type" data-testid="label-template-type">Template Type *</Label>
               <Select
                 value={templateType}
-                onValueChange={(value: any) => {
-                  setTemplateType(value);
-                  setSelectedSourceId("");
-                }}
+                onValueChange={(value: any) => setTemplateType(value)}
               >
                 <SelectTrigger id="template-type" data-testid="select-template-type">
                   <SelectValue />
@@ -195,24 +145,8 @@ export default function MarketplaceCreatePage() {
                   <SelectItem value="message_template" data-testid="option-message">Message Template</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="source-template" data-testid="label-source-template">Source Template</Label>
-              <Select value={selectedSourceId} onValueChange={setSelectedSourceId}>
-                <SelectTrigger id="source-template" data-testid="select-source-template">
-                  <SelectValue placeholder="Select a template to publish" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getSourceTemplates().map((template) => (
-                    <SelectItem key={template.id} value={template.id} data-testid={`option-source-${template.id}`}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <p className="text-sm text-muted-foreground">
-                Choose an existing {templateType.replace('_', ' ')} to publish
+                You'll be redirected to the appropriate builder to create the {templateType.replace('_template', '').replace('pipeline', 'workflow')} content
               </p>
             </div>
 
@@ -323,17 +257,17 @@ export default function MarketplaceCreatePage() {
               <Button
                 type="submit"
                 disabled={createMutation.isPending}
-                data-testid="button-publish"
+                data-testid="button-continue"
               >
                 {createMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Publishing...
+                    Creating...
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Publish Template
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Continue to Builder
                   </>
                 )}
               </Button>

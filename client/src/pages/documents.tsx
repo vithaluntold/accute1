@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +32,26 @@ import { AIAgentChat } from "@/components/ai-agent-chat";
 import type { InstalledAgentView } from "@shared/schema";
 
 export default function Documents() {
-  const { toast } = useToast();
+  const [location, setLocation] = useLocation();
+  const { toast} = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Check for marketplace template ID in URL
+  const params = new URLSearchParams(location.split('?')[1]);
+  const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  
+  // Open upload dialog if coming from marketplace (only once)
+  useEffect(() => {
+    if (marketplaceTemplateId && !uploadDialogOpen) {
+      setUploadDialogOpen(true);
+      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
+      setLocation('/documents', { replace: true });
+    }
+  }, [marketplaceTemplateId, uploadDialogOpen, setLocation]);
 
   const { data: documents = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/documents"],
@@ -104,11 +119,33 @@ export default function Documents() {
         throw new Error("Upload failed");
       }
 
+      const uploadedDocument = await response.json();
+      
+      // Link to marketplace template if ID provided
+      if (marketplaceTemplateId) {
+        try {
+          await apiRequest("PATCH", `/api/marketplace/items/${marketplaceTemplateId}`, {
+            sourceId: uploadedDocument.id
+          });
+          toast({
+            title: "Success",
+            description: "Document uploaded and linked to marketplace",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Warning",
+            description: "Document uploaded but failed to link to marketplace",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Success",
+          description: "Document uploaded successfully",
+        });
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
-      toast({
-        title: "Success",
-        description: "Document uploaded successfully",
-      });
       setSelectedFile(null);
       setUploadDialogOpen(false);
     } catch (error: any) {

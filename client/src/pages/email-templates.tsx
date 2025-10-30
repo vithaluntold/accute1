@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,11 +75,25 @@ type TemplateFormData = {
 };
 
 export default function EmailTemplatesPage() {
+  const [location, setLocation] = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
+  
+  // Check for marketplace template ID in URL
+  const params = new URLSearchParams(location.split('?')[1]);
+  const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  
+  // Open dialog if coming from marketplace (only once)
+  useEffect(() => {
+    if (marketplaceTemplateId && !dialogOpen) {
+      setDialogOpen(true);
+      // Clear query param immediately to prevent reopening (replace history to avoid Back button loop)
+      setLocation('/email-templates', { replace: true });
+    }
+  }, [marketplaceTemplateId, dialogOpen, setLocation]);
 
   const form = useForm<TemplateFormData>({
     defaultValues: {
@@ -104,13 +119,37 @@ export default function EmailTemplatesPage() {
   });
 
   const createTemplateMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/email-templates", data),
-    onSuccess: () => {
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/email-templates", data);
+      return res.json();
+    },
+    onSuccess: async (createdTemplate) => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-templates"] });
+      
+      // Link to marketplace template if ID provided
+      if (marketplaceTemplateId) {
+        try {
+          await apiRequest("PATCH", `/api/marketplace/items/${marketplaceTemplateId}`, {
+            sourceId: createdTemplate.id
+          });
+          toast({ 
+            title: "Success", 
+            description: "Email template created and linked to marketplace" 
+          });
+        } catch (error: any) {
+          toast({ 
+            title: "Warning", 
+            description: "Template created but failed to link to marketplace",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({ title: "Email template created successfully" });
+      }
+      
       setDialogOpen(false);
       form.reset();
       setSelectedTemplate(null);
-      toast({ title: "Email template created successfully" });
     },
     onError: (error: any) => {
       toast({ 
