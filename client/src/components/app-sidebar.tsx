@@ -26,8 +26,33 @@ import {
 import { clearAuth, getUser } from "@/lib/auth";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
-// Organized menu structure with categories
-const menuCategories = [
+// Platform-scoped menu (Super Admin) - only platform-level features
+const platformMenuCategories = [
+  {
+    title: "Platform Management",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: Home, permission: null },
+      { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
+    ]
+  },
+  {
+    title: "System Templates",
+    items: [
+      { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
+      { title: "Forms", url: "/forms", icon: ClipboardList, permission: "forms.view" },
+      { title: "Email Templates", url: "/email-templates", icon: Mail, permission: "templates.view" },
+    ]
+  },
+  {
+    title: "Platform Settings",
+    items: [
+      { title: "Settings", url: "/settings", icon: Settings, permission: null },
+    ]
+  }
+];
+
+// Organization-scoped menu (regular users) - full feature set
+const organizationMenuCategories = [
   {
     title: "Overview",
     items: [
@@ -105,6 +130,10 @@ const menuCategories = [
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const user = getUser();
+
+  // Determine which menu to show based on user scope
+  const isPlatformScoped = !user?.organizationId;
+  const menuCategories = isPlatformScoped ? platformMenuCategories : organizationMenuCategories;
 
   const handleLogout = () => {
     clearAuth();
