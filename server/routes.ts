@@ -7,12 +7,13 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
   generateToken,
   requireAuth,
+  requireAdmin,
   requirePermission,
   requirePlatform,
   rateLimit,
@@ -53,6 +54,9 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import * as cryptoUtils from "./crypto-utils";
 import { autoProgressionEngine } from "./auto-progression";
+
+// Import foundry tables
+const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -8296,7 +8300,46 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(403).json({ error: "Platform admins cannot enable agents for organizations" });
       }
       
+      // Validate agent exists and is published
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      if (!agent[0].isPublished) {
+        return res.status(403).json({ error: "Agent is not published" });
+      }
+      
+      // Validate manifest exists
       const { agentRegistry } = await import("./agent-registry");
+      const manifest = agentRegistry.getAgent(slug);
+      if (!manifest) {
+        return res.status(404).json({ error: "Agent manifest not found" });
+      }
+      
+      // Check subscription requirement
+      const subscription = await db
+        .select()
+        .from(platformSubscriptions)
+        .where(eq(platformSubscriptions.organizationId, organizationId))
+        .limit(1);
+      
+      const currentPlan = subscription.length > 0 ? subscription[0].plan : "free";
+      const planHierarchy = ["free", "starter", "professional", "enterprise"];
+      const userLevel = planHierarchy.indexOf(currentPlan);
+      const requiredLevel = planHierarchy.indexOf(agent[0].subscriptionMinPlan || "free");
+      
+      if (userLevel < requiredLevel) {
+        return res.status(403).json({ 
+          error: `Agent requires ${agent[0].subscriptionMinPlan} plan or higher. Your organization has ${currentPlan} plan.` 
+        });
+      }
+      
       await agentRegistry.enableAgentForOrganization(slug, organizationId, req.user!.id);
       
       res.json({ success: true, message: "Agent enabled for organization" });
@@ -8358,13 +8401,56 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(403).json({ error: "Platform admins cannot grant user agent access" });
       }
       
+      // Validate agent exists and is published
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      if (!agent[0].isPublished) {
+        return res.status(403).json({ error: "Agent is not published" });
+      }
+      
+      // Validate manifest exists
+      const { agentRegistry } = await import("./agent-registry");
+      const manifest = agentRegistry.getAgent(slug);
+      if (!manifest) {
+        return res.status(404).json({ error: "Agent manifest not found" });
+      }
+      
+      // Check if organization has agent enabled
+      const orgAgent = await db
+        .select()
+        .from(organizationAgents)
+        .where(
+          and(
+            eq(organizationAgents.organizationId, organizationId),
+            eq(organizationAgents.agentId, agent[0].id),
+            eq(organizationAgents.status, "enabled")
+          )
+        )
+        .limit(1);
+      
+      if (orgAgent.length === 0) {
+        return res.status(403).json({ error: "Agent not enabled for your organization. Please enable it first." });
+      }
+      
       // Verify user belongs to same organization
-      const user = await storage.getUserById(userId);
-      if (!user || user.organizationId !== organizationId) {
+      const userRecord = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .limit(1);
+      
+      if (userRecord.length === 0 || userRecord[0].organizationId !== organizationId) {
         return res.status(403).json({ error: "User not in your organization" });
       }
       
-      const { agentRegistry } = await import("./agent-registry");
       await agentRegistry.grantUserAccess(slug, userId, organizationId, req.user!.id, accessLevel);
       
       res.json({ success: true, message: "User access granted" });

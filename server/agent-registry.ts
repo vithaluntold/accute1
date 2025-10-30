@@ -163,10 +163,6 @@ class AgentRegistry {
     userRole: string
   ): Promise<boolean> {
     try {
-      if (organizationId === null && userRole === "admin") {
-        return true;
-      }
-
       const agent = await db
         .select()
         .from(aiAgents)
@@ -177,8 +173,19 @@ class AgentRegistry {
         return false;
       }
 
+      // Agent must be published
+      if (!agent[0].isPublished) {
+        return false;
+      }
+
       const agentId = agent[0].id;
 
+      // Platform admins (Super Admin with organizationId === null) have access to all published agents
+      if (organizationId === null && (userRole.toLowerCase() === "super admin" || userRole.toLowerCase() === "admin")) {
+        return true;
+      }
+
+      // For organization users, check if organization has agent enabled
       if (organizationId) {
         const orgAgent = await db
           .select()
@@ -197,23 +204,29 @@ class AgentRegistry {
         }
       }
 
-      if (userRole === "admin") {
+      // Organization admins have access if organization has agent enabled
+      if (userRole.toLowerCase() === "admin") {
         return true;
       }
 
-      const userAccess = await db
-        .select()
-        .from(userAgentAccess)
-        .where(
-          and(
-            eq(userAgentAccess.userId, userId),
-            eq(userAgentAccess.agentId, agentId),
-            eq(userAgentAccess.organizationId, organizationId!)
+      // Regular users need explicit permission
+      if (organizationId) {
+        const userAccess = await db
+          .select()
+          .from(userAgentAccess)
+          .where(
+            and(
+              eq(userAgentAccess.userId, userId),
+              eq(userAgentAccess.agentId, agentId),
+              eq(userAgentAccess.organizationId, organizationId)
+            )
           )
-        )
-        .limit(1);
+          .limit(1);
 
-      return userAccess.length > 0 && userAccess[0].revokedAt === null;
+        return userAccess.length > 0 && userAccess[0].revokedAt === null;
+      }
+
+      return false;
     } catch (error) {
       console.error("Error checking user access:", error);
       return false;

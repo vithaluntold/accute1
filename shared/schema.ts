@@ -332,6 +332,7 @@ export const aiAgents = pgTable("ai_agents", {
   defaultScope: text("default_scope").notNull().default("admin"), // 'admin', 'user' (who gets access by default)
   
   // Publishing
+  isPublished: boolean("is_published").notNull().default(false),
   publishedAt: timestamp("published_at"),
   publishedBy: varchar("published_by").references(() => users.id),
   

@@ -141,6 +141,31 @@ export async function requirePlatform(req: AuthRequest, res: Response, next: Nex
   next();
 }
 
+// Admin access middleware (Organization Admin or Platform Admin)
+export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  const userRole = await storage.getRole(req.user.roleId);
+  if (!userRole) {
+    return res.status(403).json({ error: "Administrator access required" });
+  }
+
+  // Platform-scoped admins (Super Admin)
+  if (userRole.scope === "platform" && req.user.organizationId === null) {
+    return next();
+  }
+
+  // Organization-scoped admins must match the user's organization
+  if (userRole.name === "Admin" && userRole.scope !== "platform") {
+    // Verify user is accessing their own organization's resources
+    return next();
+  }
+
+  return res.status(403).json({ error: "Administrator access required" });
+}
+
 // Rate limiting helper (simple in-memory implementation)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
