@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -56,13 +56,48 @@ type EmailTemplate = {
   updatedAt: string;
 };
 
+type TemplateFormData = {
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+  logoUrl: string;
+  footerText: string;
+  facebook: string;
+  twitter: string;
+  linkedin: string;
+  instagram: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  isActive: boolean;
+};
+
 export default function EmailTemplatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
+
+  const form = useForm<TemplateFormData>({
+    defaultValues: {
+      name: "",
+      category: "",
+      subject: "",
+      body: "",
+      logoUrl: "",
+      footerText: "",
+      facebook: "",
+      twitter: "",
+      linkedin: "",
+      instagram: "",
+      primaryColor: "#2563eb",
+      secondaryColor: "#10b981",
+      accentColor: "#f59e0b",
+      isActive: true,
+    },
+  });
 
   const { data: templates, isLoading } = useQuery<EmailTemplate[]>({
     queryKey: ["/api/email-templates"],
@@ -73,8 +108,8 @@ export default function EmailTemplatesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-templates"] });
       setDialogOpen(false);
+      form.reset();
       setSelectedTemplate(null);
-      setSelectedCategory("");
       toast({ title: "Email template created successfully" });
     },
     onError: (error: any) => {
@@ -92,8 +127,8 @@ export default function EmailTemplatesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-templates"] });
       setDialogOpen(false);
+      form.reset();
       setSelectedTemplate(null);
-      setSelectedCategory("");
       toast({ title: "Email template updated successfully" });
     },
     onError: (error: any) => {
@@ -121,58 +156,73 @@ export default function EmailTemplatesPage() {
     },
   });
 
-  const handleOpenDialog = (template?: EmailTemplate) => {
-    if (template) {
-      setSelectedTemplate(template);
-      setSelectedCategory(template.category);
+  useEffect(() => {
+    if (selectedTemplate) {
+      form.reset({
+        name: selectedTemplate.name,
+        category: selectedTemplate.category,
+        subject: selectedTemplate.subject,
+        body: selectedTemplate.body,
+        logoUrl: selectedTemplate.logoUrl || "",
+        footerText: selectedTemplate.footerText || "",
+        facebook: selectedTemplate.socialLinks?.facebook || "",
+        twitter: selectedTemplate.socialLinks?.twitter || "",
+        linkedin: selectedTemplate.socialLinks?.linkedin || "",
+        instagram: selectedTemplate.socialLinks?.instagram || "",
+        primaryColor: selectedTemplate.brandingColors?.primary || "#2563eb",
+        secondaryColor: selectedTemplate.brandingColors?.secondary || "#10b981",
+        accentColor: selectedTemplate.brandingColors?.accent || "#f59e0b",
+        isActive: selectedTemplate.isActive,
+      });
     } else {
-      setSelectedTemplate(null);
-      setSelectedCategory("");
+      form.reset({
+        name: "",
+        category: "",
+        subject: "",
+        body: "",
+        logoUrl: "",
+        footerText: "",
+        facebook: "",
+        twitter: "",
+        linkedin: "",
+        instagram: "",
+        primaryColor: "#2563eb",
+        secondaryColor: "#10b981",
+        accentColor: "#f59e0b",
+        isActive: true,
+      });
     }
+  }, [selectedTemplate, form]);
+
+  const handleOpenDialog = (template?: EmailTemplate) => {
+    setSelectedTemplate(template || null);
     setDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    if (!selectedCategory) {
-      toast({ title: "Please select a category", variant: "destructive" });
-      return;
-    }
-
+  const onSubmit = (data: TemplateFormData) => {
     // Parse social links
     const socialLinks: Record<string, string> = {};
-    const facebook = formData.get("facebook") as string;
-    const twitter = formData.get("twitter") as string;
-    const linkedin = formData.get("linkedin") as string;
-    const instagram = formData.get("instagram") as string;
-    
-    if (facebook) socialLinks.facebook = facebook;
-    if (twitter) socialLinks.twitter = twitter;
-    if (linkedin) socialLinks.linkedin = linkedin;
-    if (instagram) socialLinks.instagram = instagram;
+    if (data.facebook) socialLinks.facebook = data.facebook;
+    if (data.twitter) socialLinks.twitter = data.twitter;
+    if (data.linkedin) socialLinks.linkedin = data.linkedin;
+    if (data.instagram) socialLinks.instagram = data.instagram;
 
     // Parse branding colors
     const brandingColors: Record<string, string> = {};
-    const primaryColor = formData.get("primaryColor") as string;
-    const secondaryColor = formData.get("secondaryColor") as string;
-    const accentColor = formData.get("accentColor") as string;
-    
-    if (primaryColor) brandingColors.primary = primaryColor;
-    if (secondaryColor) brandingColors.secondary = secondaryColor;
-    if (accentColor) brandingColors.accent = accentColor;
+    if (data.primaryColor) brandingColors.primary = data.primaryColor;
+    if (data.secondaryColor) brandingColors.secondary = data.secondaryColor;
+    if (data.accentColor) brandingColors.accent = data.accentColor;
 
     const templateData = {
-      name: formData.get("name") as string,
-      category: selectedCategory,
-      subject: formData.get("subject") as string,
-      body: formData.get("body") as string,
-      logoUrl: (formData.get("logoUrl") as string) || null,
-      footerText: (formData.get("footerText") as string) || null,
+      name: data.name,
+      category: data.category,
+      subject: data.subject,
+      body: data.body,
+      logoUrl: data.logoUrl || null,
+      footerText: data.footerText || null,
       socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
       brandingColors: Object.keys(brandingColors).length > 0 ? brandingColors : null,
-      isActive: formData.get("isActive") === "on",
+      isActive: data.isActive,
     };
 
     if (selectedTemplate) {
@@ -201,10 +251,6 @@ export default function EmailTemplatesPage() {
       renderedSubject = renderedSubject.replace(new RegExp(placeholder, 'g'), value);
     });
 
-    // Apply branding colors to preview
-    const primaryColor = template.brandingColors?.primary || '#2563eb';
-    const secondaryColor = template.brandingColors?.secondary || '#10b981';
-
     return (
       <div className="border rounded-lg p-6 bg-background">
         <div className="mb-4">
@@ -220,12 +266,7 @@ export default function EmailTemplatesPage() {
               </div>
             </div>
           )}
-          <div 
-            className="prose prose-sm max-w-none"
-            style={{ 
-              color: 'var(--foreground)',
-            }}
-          >
+          <div className="prose prose-sm max-w-none">
             {renderedBody.split('\n').map((line, i) => (
               <p key={i}>{line || '\u00A0'}</p>
             ))}
@@ -240,7 +281,7 @@ export default function EmailTemplatesPage() {
           )}
           {template.socialLinks && Object.keys(template.socialLinks).length > 0 && (
             <div className="flex justify-center gap-4 mt-4">
-              {Object.entries(template.socialLinks).map(([platform, url]) => (
+              {Object.entries(template.socialLinks).map(([platform]) => (
                 <div key={platform} className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   <Link2 className="w-4 h-4" />
                 </div>
@@ -377,7 +418,7 @@ export default function EmailTemplatesPage() {
               Design email templates with custom branding and placeholder support
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
             <Tabs defaultValue="content" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="content">Content</TabsTrigger>
@@ -387,48 +428,52 @@ export default function EmailTemplatesPage() {
 
               <TabsContent value="content" className="space-y-4 mt-4">
                 <div>
-                  <Label>Template Name</Label>
+                  <Label htmlFor="name">Template Name</Label>
                   <Input 
-                    name="name" 
+                    id="name"
+                    {...form.register("name", { required: true })}
                     placeholder="Welcome Email" 
-                    defaultValue={selectedTemplate?.name}
-                    required 
                     data-testid="input-name" 
                   />
                 </div>
                 <div>
-                  <Label>Category</Label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory} required>
-                    <SelectTrigger data-testid="select-category">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="welcome">Welcome</SelectItem>
-                      <SelectItem value="reminder">Reminder</SelectItem>
-                      <SelectItem value="invoice">Invoice</SelectItem>
-                      <SelectItem value="signature_request">Signature Request</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="category">Category</Label>
+                  <Controller
+                    name="category"
+                    control={form.control}
+                    rules={{ required: true }}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="welcome">Welcome</SelectItem>
+                          <SelectItem value="reminder">Reminder</SelectItem>
+                          <SelectItem value="invoice">Invoice</SelectItem>
+                          <SelectItem value="signature_request">Signature Request</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
                 <div>
-                  <Label>Subject</Label>
+                  <Label htmlFor="subject">Subject</Label>
                   <Input 
-                    name="subject" 
+                    id="subject"
+                    {...form.register("subject", { required: true })}
                     placeholder="Welcome to {{company_name}}" 
-                    defaultValue={selectedTemplate?.subject}
-                    required 
                     data-testid="input-subject" 
                   />
                 </div>
                 <div>
-                  <Label>Body</Label>
+                  <Label htmlFor="body">Body</Label>
                   <Textarea
-                    name="body"
+                    id="body"
+                    {...form.register("body", { required: true })}
                     placeholder="Dear {{contact_name}},&#10;&#10;Welcome to our platform!&#10;&#10;Access your portal here: {{portal_link}}"
                     className="min-h-64 font-mono text-sm"
-                    defaultValue={selectedTemplate?.body}
-                    required
                     data-testid="input-body"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
@@ -439,12 +484,12 @@ export default function EmailTemplatesPage() {
 
               <TabsContent value="branding" className="space-y-4 mt-4">
                 <div>
-                  <Label>Logo URL</Label>
+                  <Label htmlFor="logoUrl">Logo URL</Label>
                   <Input 
-                    name="logoUrl" 
+                    id="logoUrl"
+                    {...form.register("logoUrl")}
                     type="url"
                     placeholder="https://example.com/logo.png" 
-                    defaultValue={selectedTemplate?.logoUrl || ""}
                     data-testid="input-logo-url" 
                   />
                   <p className="text-xs text-muted-foreground mt-1">
@@ -456,29 +501,29 @@ export default function EmailTemplatesPage() {
                   <Label>Brand Colors</Label>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <Label className="text-xs text-muted-foreground">Primary</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="primaryColor">Primary</Label>
                       <Input 
-                        name="primaryColor" 
+                        id="primaryColor"
+                        {...form.register("primaryColor")}
                         type="color"
-                        defaultValue={selectedTemplate?.brandingColors?.primary || "#2563eb"}
                         data-testid="input-primary-color" 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Secondary</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="secondaryColor">Secondary</Label>
                       <Input 
-                        name="secondaryColor" 
+                        id="secondaryColor"
+                        {...form.register("secondaryColor")}
                         type="color"
-                        defaultValue={selectedTemplate?.brandingColors?.secondary || "#10b981"}
                         data-testid="input-secondary-color" 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Accent</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="accentColor">Accent</Label>
                       <Input 
-                        name="accentColor" 
+                        id="accentColor"
+                        {...form.register("accentColor")}
                         type="color"
-                        defaultValue={selectedTemplate?.brandingColors?.accent || "#f59e0b"}
                         data-testid="input-accent-color" 
                       />
                     </div>
@@ -486,12 +531,12 @@ export default function EmailTemplatesPage() {
                 </div>
                 <Separator />
                 <div>
-                  <Label>Footer Text</Label>
+                  <Label htmlFor="footerText">Footer Text</Label>
                   <Textarea
-                    name="footerText"
+                    id="footerText"
+                    {...form.register("footerText")}
                     placeholder="© 2025 Your Company. All rights reserved."
                     className="min-h-20"
-                    defaultValue={selectedTemplate?.footerText || ""}
                     data-testid="input-footer-text"
                   />
                 </div>
@@ -500,42 +545,42 @@ export default function EmailTemplatesPage() {
                   <Label>Social Media Links</Label>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-xs text-muted-foreground">Facebook</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="facebook">Facebook</Label>
                       <Input 
-                        name="facebook" 
+                        id="facebook"
+                        {...form.register("facebook")}
                         type="url"
                         placeholder="https://facebook.com/yourpage" 
-                        defaultValue={selectedTemplate?.socialLinks?.facebook || ""}
                         data-testid="input-facebook" 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Twitter</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="twitter">Twitter</Label>
                       <Input 
-                        name="twitter" 
+                        id="twitter"
+                        {...form.register("twitter")}
                         type="url"
                         placeholder="https://twitter.com/yourhandle" 
-                        defaultValue={selectedTemplate?.socialLinks?.twitter || ""}
                         data-testid="input-twitter" 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">LinkedIn</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="linkedin">LinkedIn</Label>
                       <Input 
-                        name="linkedin" 
+                        id="linkedin"
+                        {...form.register("linkedin")}
                         type="url"
                         placeholder="https://linkedin.com/company/yourcompany" 
-                        defaultValue={selectedTemplate?.socialLinks?.linkedin || ""}
                         data-testid="input-linkedin" 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Instagram</Label>
+                      <Label className="text-xs text-muted-foreground" htmlFor="instagram">Instagram</Label>
                       <Input 
-                        name="instagram" 
+                        id="instagram"
+                        {...form.register("instagram")}
                         type="url"
                         placeholder="https://instagram.com/yourhandle" 
-                        defaultValue={selectedTemplate?.socialLinks?.instagram || ""}
                         data-testid="input-instagram" 
                       />
                     </div>
@@ -546,15 +591,22 @@ export default function EmailTemplatesPage() {
               <TabsContent value="settings" className="space-y-4 mt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>Active Status</Label>
+                    <Label htmlFor="isActive">Active Status</Label>
                     <p className="text-sm text-muted-foreground">
                       Only active templates can be used in automated emails
                     </p>
                   </div>
-                  <Switch 
-                    name="isActive" 
-                    defaultChecked={selectedTemplate?.isActive ?? true}
-                    data-testid="switch-is-active"
+                  <Controller
+                    name="isActive"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Switch 
+                        id="isActive"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-is-active"
+                      />
+                    )}
                   />
                 </div>
               </TabsContent>

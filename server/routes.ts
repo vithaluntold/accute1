@@ -5022,12 +5022,8 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   app.get("/api/email-templates/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const template = await storage.getEmailTemplate(req.params.id);
+      const template = await storage.getEmailTemplate(req.params.id, req.user!.organizationId!);
       if (!template) {
-        return res.status(404).json({ error: "Email template not found" });
-      }
-      // Organization scoping - allow access to both org templates and system templates
-      if (template.organizationId !== null && template.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "Email template not found" });
       }
       res.json(template);
@@ -5038,28 +5034,37 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   app.post("/api/email-templates", requireAuth, requirePermission("templates.create"), async (req: AuthRequest, res: Response) => {
     try {
-      // Validate request body
-      const validatedData = insertEmailTemplateSchema.parse(req.body);
-      
-      const template = await storage.createEmailTemplate({
-        ...validatedData,
+      // Prepare data with defaults and user context for validation
+      const dataToValidate = {
+        ...req.body,
+        variables: req.body.variables || [],
+        isDefault: false,
+        usageCount: 0,
         organizationId: req.user!.organizationId!,
-        createdBy: req.user!.id
-      });
+        createdBy: req.user!.id,
+      };
+      
+      // Validate request body
+      const validatedData = insertEmailTemplateSchema.parse(dataToValidate);
+      
+      const template = await storage.createEmailTemplate(validatedData);
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "email_template", template.id, template, req);
       res.status(201).json(template);
     } catch (error: any) {
       if (error.name === 'ZodError') {
+        console.error("Email template validation error:", error.errors);
         return res.status(400).json({ error: "Invalid template data", details: error.errors });
       }
+      console.error("Email template creation error:", error);
       res.status(500).json({ error: "Failed to create email template" });
     }
   });
 
   app.patch("/api/email-templates/:id", requireAuth, requirePermission("templates.update"), async (req: AuthRequest, res: Response) => {
     try {
-      const existing = await storage.getEmailTemplate(req.params.id);
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
+      const existing = await storage.getEmailTemplate(req.params.id, req.user!.organizationId!);
+      
+      if (!existing) {
         return res.status(404).json({ error: "Email template not found" });
       }
       
@@ -5071,7 +5076,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       // Validate partial update
       const validatedData = insertEmailTemplateSchema.partial().parse(req.body);
       
-      const updated = await storage.updateEmailTemplate(req.params.id, validatedData);
+      const updated = await storage.updateEmailTemplate(req.params.id, req.user!.organizationId!, validatedData);
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "email_template", req.params.id, validatedData, req);
       res.json(updated);
     } catch (error: any) {
@@ -5084,8 +5089,8 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   app.delete("/api/email-templates/:id", requireAuth, requirePermission("templates.delete"), async (req: AuthRequest, res: Response) => {
     try {
-      const existing = await storage.getEmailTemplate(req.params.id);
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
+      const existing = await storage.getEmailTemplate(req.params.id, req.user!.organizationId!);
+      if (!existing) {
         return res.status(404).json({ error: "Email template not found" });
       }
       
