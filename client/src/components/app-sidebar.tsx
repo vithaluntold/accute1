@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -26,13 +26,28 @@ import {
 import { clearAuth, getUser } from "@/lib/auth";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
-// Platform-scoped menu (Super Admin) - only platform-level features
+// Platform-scoped menu (Super Admin) - SaaS provider features
 const platformMenuCategories = [
   {
-    title: "Platform Management",
+    title: "Platform Overview",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: Home, permission: null },
-      { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
+    ]
+  },
+  {
+    title: "User Management",
+    items: [
+      { title: "Organizations", url: "/admin/organizations", icon: Building2, permission: null },
+      { title: "Subscriptions", url: "/admin/subscriptions", icon: CreditCard, permission: null },
+      { title: "All Users", url: "/admin/users", icon: Users, permission: null },
+    ]
+  },
+  {
+    title: "Marketplace Management",
+    items: [
+      { title: "Browse Marketplace", url: "/marketplace", icon: Store, permission: null },
+      { title: "Create Template", url: "/admin/marketplace/create", icon: Plus, permission: null },
+      { title: "My Published Items", url: "/admin/marketplace/published", icon: Package, permission: null },
     ]
   },
   {
@@ -41,6 +56,12 @@ const platformMenuCategories = [
       { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
       { title: "Forms", url: "/forms", icon: ClipboardList, permission: "forms.view" },
       { title: "Email Templates", url: "/email-templates", icon: Mail, permission: "templates.view" },
+    ]
+  },
+  {
+    title: "Support",
+    items: [
+      { title: "Support Tickets", url: "/admin/tickets", icon: HelpCircle, permission: null },
     ]
   },
   {

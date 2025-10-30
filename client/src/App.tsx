@@ -71,6 +71,10 @@ import EmailAccounts from "@/pages/email-accounts";
 import Inbox from "@/pages/inbox";
 import NotFound from "@/pages/not-found";
 import MobileApps from "@/pages/mobile-apps";
+import OrganizationsPage from "@/pages/admin/organizations";
+import SubscriptionsPage from "@/pages/admin/subscriptions";
+import AllUsersPage from "@/pages/admin/users";
+import AdminTicketsPage from "@/pages/admin/tickets";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -232,6 +236,35 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <MobileApps />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      {/* Super Admin Routes */}
+      <Route path="/admin/organizations">
+        <ProtectedRoute>
+          <AppLayout>
+            <OrganizationsPage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/subscriptions">
+        <ProtectedRoute>
+          <AppLayout>
+            <SubscriptionsPage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute>
+          <AppLayout>
+            <AllUsersPage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/tickets">
+        <ProtectedRoute>
+          <AppLayout>
+            <AdminTicketsPage />
           </AppLayout>
         </ProtectedRoute>
       </Route>

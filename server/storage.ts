@@ -66,6 +66,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
   getUsersByRole(roleId: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>; // Super Admin: get all users across all organizations
 
   // Organizations
   getOrganization(id: string): Promise<Organization | undefined>;
@@ -73,6 +74,12 @@ export interface IStorage {
   createOrganization(org: InsertOrganization): Promise<Organization>;
   updateOrganization(id: string, org: Partial<InsertOrganization>): Promise<Organization | undefined>;
   getAllOrganizations(): Promise<Organization[]>;
+
+  // Platform Subscriptions (Super Admin)
+  getPlatformSubscriptionByOrganization(organizationId: string): Promise<schema.PlatformSubscription | undefined>;
+  getAllPlatformSubscriptions(): Promise<schema.PlatformSubscription[]>;
+  createPlatformSubscription(subscription: schema.InsertPlatformSubscription): Promise<schema.PlatformSubscription>;
+  updatePlatformSubscription(id: string, subscription: Partial<schema.InsertPlatformSubscription>): Promise<schema.PlatformSubscription | undefined>;
 
   // Roles
   getRole(id: string): Promise<Role | undefined>;
@@ -437,6 +444,7 @@ export interface IStorage {
   createSupportTicket(ticket: schema.InsertSupportTicket): Promise<schema.SupportTicket>;
   getSupportTicket(id: string): Promise<schema.SupportTicket | undefined>;
   getSupportTickets(organizationId: string): Promise<schema.SupportTicket[]>;
+  getAllSupportTickets(): Promise<schema.SupportTicket[]>; // Super Admin: get all tickets
   updateSupportTicket(id: string, ticket: Partial<schema.InsertSupportTicket>): Promise<schema.SupportTicket | undefined>;
   deleteSupportTicket(id: string): Promise<void>;
 
@@ -596,6 +604,34 @@ export class DbStorage implements IStorage {
 
   async getAllOrganizations(): Promise<Organization[]> {
     return await db.select().from(schema.organizations);
+  }
+
+  // Platform Subscriptions (Super Admin)
+  async getPlatformSubscriptionByOrganization(organizationId: string): Promise<schema.PlatformSubscription | undefined> {
+    const result = await db.select().from(schema.platformSubscriptions)
+      .where(eq(schema.platformSubscriptions.organizationId, organizationId));
+    return result[0];
+  }
+
+  async getAllPlatformSubscriptions(): Promise<schema.PlatformSubscription[]> {
+    return await db.select().from(schema.platformSubscriptions);
+  }
+
+  async createPlatformSubscription(subscription: schema.InsertPlatformSubscription): Promise<schema.PlatformSubscription> {
+    const result = await db.insert(schema.platformSubscriptions).values(subscription).returning();
+    return result[0];
+  }
+
+  async updatePlatformSubscription(id: string, subscription: Partial<schema.InsertPlatformSubscription>): Promise<schema.PlatformSubscription | undefined> {
+    const result = await db.update(schema.platformSubscriptions)
+      .set({ ...subscription, updatedAt: new Date() })
+      .where(eq(schema.platformSubscriptions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(schema.users);
   }
 
   // Roles
@@ -3721,6 +3757,11 @@ export class DbStorage implements IStorage {
   async getSupportTickets(organizationId: string): Promise<schema.SupportTicket[]> {
     return await db.select().from(schema.supportTickets)
       .where(eq(schema.supportTickets.organizationId, organizationId))
+      .orderBy(desc(schema.supportTickets.createdAt));
+  }
+
+  async getAllSupportTickets(): Promise<schema.SupportTicket[]> {
+    return await db.select().from(schema.supportTickets)
       .orderBy(desc(schema.supportTickets.createdAt));
   }
 

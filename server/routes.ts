@@ -7742,6 +7742,131 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== SUPER ADMIN ROUTES ====================
+  // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
+
+  // Get all organizations with subscription details
+  app.get("/api/admin/organizations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // Only allow platform-scoped users (Super Admins with no organizationId)
+      if (req.user!.organizationId !== null) {
+        return res.status(403).json({ error: "Access denied. Platform admin access required." });
+      }
+
+      const orgs = await storage.getAllOrganizations();
+      const orgsWithDetails = await Promise.all(
+        orgs.map(async (org) => {
+          const subscription = await storage.getPlatformSubscriptionByOrganization(org.id);
+          return {
+            ...org,
+            subscription,
+          };
+        })
+      );
+
+      res.json(orgsWithDetails);
+    } catch (error: any) {
+      console.error('Get organizations error:', error);
+      res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  // Get all subscriptions
+  app.get("/api/admin/subscriptions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user!.organizationId !== null) {
+        return res.status(403).json({ error: "Access denied. Platform admin access required." });
+      }
+
+      const subscriptions = await storage.getAllPlatformSubscriptions();
+      const subscriptionsWithOrgs = await Promise.all(
+        subscriptions.map(async (sub) => {
+          const org = await storage.getOrganization(sub.organizationId);
+          return {
+            ...sub,
+            organization: org,
+          };
+        })
+      );
+
+      res.json(subscriptionsWithOrgs);
+    } catch (error: any) {
+      console.error('Get subscriptions error:', error);
+      res.status(500).json({ error: "Failed to fetch subscriptions" });
+    }
+  });
+
+  // Get all platform users
+  app.get("/api/admin/users", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user!.organizationId !== null) {
+        return res.status(403).json({ error: "Access denied. Platform admin access required." });
+      }
+
+      const users = await storage.getAllUsers();
+      const usersWithDetails = await Promise.all(
+        users.map(async (user) => {
+          const role = await storage.getRole(user.roleId);
+          const org = user.organizationId ? await storage.getOrganization(user.organizationId) : null;
+          return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isActive: user.isActive,
+            roleName: role?.name || "Unknown",
+            organization: org,
+            createdAt: user.createdAt,
+          };
+        })
+      );
+
+      res.json(usersWithDetails);
+    } catch (error: any) {
+      console.error('Get all users error:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get all support tickets (across all organizations)
+  app.get("/api/admin/tickets", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (req.user!.organizationId !== null) {
+        return res.status(403).json({ error: "Access denied. Platform admin access required." });
+      }
+
+      const tickets = await storage.getAllSupportTickets();
+      const ticketsWithDetails = await Promise.all(
+        tickets.map(async (ticket) => {
+          const org = await storage.getOrganization(ticket.organizationId);
+          const createdBy = await storage.getUser(ticket.createdBy);
+          const assignedTo = ticket.assignedTo ? await storage.getUser(ticket.assignedTo) : null;
+          return {
+            ...ticket,
+            organization: org,
+            createdBy: {
+              id: createdBy.id,
+              firstName: createdBy.firstName,
+              lastName: createdBy.lastName,
+              email: createdBy.email,
+            },
+            assignedTo: assignedTo ? {
+              id: assignedTo.id,
+              firstName: assignedTo.firstName,
+              lastName: assignedTo.lastName,
+            } : null,
+          };
+        })
+      );
+
+      res.json(ticketsWithDetails);
+    } catch (error: any) {
+      console.error('Get tickets error:', error);
+      res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

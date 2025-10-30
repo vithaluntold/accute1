@@ -27,6 +27,53 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Platform Subscriptions - Track organization subscriptions to the SaaS platform
+export const platformSubscriptions = pgTable("platform_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Subscription details
+  plan: text("plan").notNull().default("free"), // 'free', 'starter', 'professional', 'enterprise'
+  status: text("status").notNull().default("active"), // 'active', 'cancelled', 'suspended', 'expired'
+  billingCycle: text("billing_cycle").notNull().default("monthly"), // 'monthly', 'yearly'
+  
+  // Pricing
+  monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }),
+  yearlyPrice: numeric("yearly_price", { precision: 10, scale: 2 }),
+  
+  // Limits based on plan
+  maxUsers: integer("max_users").notNull().default(5),
+  maxClients: integer("max_clients").notNull().default(10),
+  maxStorage: integer("max_storage").notNull().default(5), // GB
+  
+  // Billing
+  currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  nextBillingDate: timestamp("next_billing_date"),
+  
+  // Usage tracking
+  currentUsers: integer("current_users").notNull().default(0),
+  currentClients: integer("current_clients").notNull().default(0),
+  currentStorage: numeric("current_storage", { precision: 10, scale: 2 }).notNull().default(sql`0`), // GB
+  
+  // Payment info
+  paymentMethod: text("payment_method"), // 'credit_card', 'invoice', 'free'
+  lastPaymentDate: timestamp("last_payment_date"),
+  lastPaymentAmount: numeric("last_payment_amount", { precision: 10, scale: 2 }),
+  
+  // Trial
+  trialEndsAt: timestamp("trial_ends_at"),
+  isTrialing: boolean("is_trialing").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  cancelledAt: timestamp("cancelled_at"),
+}, (table) => ({
+  orgIdx: index("platform_subscriptions_org_idx").on(table.organizationId),
+  statusIdx: index("platform_subscriptions_status_idx").on(table.status),
+  planIdx: index("platform_subscriptions_plan_idx").on(table.plan),
+}));
+
 // Roles table (Super Admin, Admin, Employee, Client)
 // scope: 'platform' for SaaS-level roles (Super Admin), 'tenant' for organization roles
 export const roles = pgTable("roles", {
@@ -2090,6 +2137,7 @@ export const insertTaskFollowupSchema = createInsertSchema(taskFollowups).omit({
 export const insertAssignmentWorkflowStageSchema = createInsertSchema(assignmentWorkflowStages).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAssignmentWorkflowStepSchema = createInsertSchema(assignmentWorkflowSteps).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAssignmentWorkflowTaskSchema = createInsertSchema(assignmentWorkflowTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlatformSubscriptionSchema = createInsertSchema(platformSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -2135,6 +2183,8 @@ export type InsertMarketplaceInstallation = z.infer<typeof insertMarketplaceInst
 export type MarketplaceInstallation = typeof marketplaceInstallations.$inferSelect;
 export type InsertWorkflowAssignment = z.infer<typeof insertWorkflowAssignmentSchema>;
 export type WorkflowAssignment = typeof workflowAssignments.$inferSelect;
+export type InsertPlatformSubscription = z.infer<typeof insertPlatformSubscriptionSchema>;
+export type PlatformSubscription = typeof platformSubscriptions.$inferSelect;
 export type InsertFolder = z.infer<typeof insertFolderSchema>;
 export type Folder = typeof folders.$inferSelect;
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
