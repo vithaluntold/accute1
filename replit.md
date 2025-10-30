@@ -68,6 +68,24 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
   - **Database Schema**: `projects` table (engagement metadata) and `project_tasks` table (individual deliverables)
   - **Integration**: Complements workflow-based Assignments by handling non-standardized client work
   - **Use Cases**: One-off consulting projects, custom client requests, internal initiatives, engagements without predefined workflows
+- **AI Agent Foundry**: Comprehensive agent onboarding system enabling dynamic registration and deployment of custom AI agents with manifest-driven architecture. Features include:
+  - **Purpose**: Create a "foundry" where new AI agents can be onboarded by uploading frontend/backend code files and registering via manifest
+  - **Manifest System**: Each agent has a `manifest.json` defining slug, name, paths, capabilities, subscription requirements, and default permissions
+  - **Folder Structure**: Agents stored in `/agents/{slug}/` with frontend, backend, and manifest files
+  - **Dynamic Loading**: Backend AgentRegistry validates and lazy-loads agent handlers; frontend lazy-loads React components
+  - **Access Control**:
+    - **Admins**: Full access to all agents by default
+    - **Users**: Access only if explicitly granted by admin
+    - **Clients**: No access (blocked by role scope)
+  - **Subscription-Aware**: Agents require minimum subscription plan level (free, starter, professional, enterprise)
+  - **Multi-Tenant**: Organizations can independently enable/disable agents via `organization_agents` table
+  - **User Permissions**: Granular user-level access control via `user_agent_access` table
+  - **Database Schema**:
+    - `ai_agents`: Enhanced registry with slug, paths, manifest, subscription requirements, and publishing status
+    - `organization_agents`: Tracks which organizations have which agents enabled
+    - `user_agent_access`: User-specific agent permissions within organizations
+  - **API Pattern**: Agents expose functionality via `/api/agents/:slug/...` with standardized interfaces
+  - **Integration**: Works with existing marketplace system; Super Admins create and publish agents platform-wide
 
 ### System Design Choices
 The project is organized into `client/`, `server/`, and `shared/` directories. Security is a foundational principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.

@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Agent Manifest",
+  "description": "Manifest schema for AI Agent Foundry",
+  "type": "object",
+  "required": ["slug", "name", "description", "category", "provider", "frontendEntry", "backendEntry", "capabilities"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique identifier for the agent (lowercase, hyphens allowed)",
+      "examples": ["parity", "cadence", "forma", "luca"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name for the agent",
+      "examples": ["Parity AI Accountant", "Cadence Workflow Assistant"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of agent capabilities"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["accounting", "workflow", "document", "general", "analytics"],
+      "description": "Agent category for marketplace organization"
+    },
+    "provider": {
+      "type": "string",
+      "description": "AI provider (openai, anthropic, azure-openai)"
+    },
+    "frontendEntry": {
+      "type": "string",
+      "description": "Relative path to frontend component entry point",
+      "examples": ["./frontend/index.tsx", "./frontend/ParityAgent.tsx"]
+    },
+    "backendEntry": {
+      "type": "string",
+      "description": "Relative path to backend handler entry point",
+      "examples": ["./backend/index.ts", "./backend/handler.ts"]
+    },
+    "iconPath": {
+      "type": "string",
+      "description": "Path to agent icon (optional)",
+      "examples": ["./icon.png", "./assets/logo.svg"]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["chat", "document-analysis", "workflow-automation", "data-processing", "reporting"]
+      },
+      "description": "List of agent capabilities"
+    },
+    "subscriptionMinPlan": {
+      "type": "string",
+      "enum": ["free", "starter", "professional", "enterprise"],
+      "default": "free",
+      "description": "Minimum subscription plan required to use this agent"
+    },
+    "defaultScope": {
+      "type": "string",
+      "enum": ["admin", "user"],
+      "default": "admin",
+      "description": "Who gets access by default (admin or all users)"
+    },
+    "pricingModel": {
+      "type": "string",
+      "enum": ["free", "one-time", "subscription"],
+      "default": "free",
+      "description": "Agent pricing model"
+    },
+    "priceMonthly": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Monthly price in dollars (if subscription)"
+    },
+    "priceYearly": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Yearly price in dollars (if subscription)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": "1.0.0",
+      "description": "Semantic version"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Search tags for marketplace"
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Default configuration for the agent"
+    }
+  }
+}

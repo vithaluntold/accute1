@@ -1,0 +1,21 @@
+{
+  "slug": "parity-example",
+  "name": "Parity AI Accountant (Example)",
+  "description": "Tax compliance and financial reporting assistant powered by GPT-4. Helps with tax calculations, compliance checks, and financial analysis.",
+  "category": "accounting",
+  "provider": "openai",
+  "frontendEntry": "./frontend/ParityAgent.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "iconPath": "./icon.png",
+  "capabilities": ["chat", "document-analysis", "reporting"],
+  "subscriptionMinPlan": "professional",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["tax", "compliance", "accounting", "financial-reporting"],
+  "configuration": {
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "maxTokens": 2000
+  }
+}
