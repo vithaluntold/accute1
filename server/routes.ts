@@ -883,9 +883,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/workflows", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const workflows = req.user!.organizationId
-        ? await storage.getWorkflowsByOrganization(req.user!.organizationId)
-        : [];
+      // Super admin (platform-scoped) can see all workflows
+      if (!req.user!.organizationId) {
+        const allWorkflows = await db.select().from(schema.workflows).orderBy(schema.workflows.name);
+        return res.json(allWorkflows);
+      }
+      const workflows = await storage.getWorkflowsByOrganization(req.user!.organizationId);
       res.json(workflows);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch workflows" });
@@ -908,7 +911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const workflow = await storage.createWorkflow({
         ...req.body,
-        organizationId: req.user!.organizationId!,
+        organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.userId!,
       });
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow", workflow.id, { name: workflow.name }, req);
@@ -3315,7 +3318,12 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   
   app.get("/api/forms", requireAuth, requirePermission("forms.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const forms = await storage.getFormTemplatesByOrganization(req.user!.organizationId!);
+      // Super admin (platform-scoped) can see all forms
+      if (!req.user!.organizationId) {
+        const allForms = await db.select().from(schema.formTemplates).orderBy(schema.formTemplates.name);
+        return res.json(allForms);
+      }
+      const forms = await storage.getFormTemplatesByOrganization(req.user!.organizationId);
       res.json(forms);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch forms" });
@@ -3342,13 +3350,13 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const parsed = insertFormTemplateSchema.parse(req.body);
       const form = await storage.createFormTemplate({
         ...parsed,
-        organizationId: req.user!.organizationId!,
+        organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.user!.id,
       });
       
       await logActivity(
         req.user!.id,
-        req.user!.organizationId!,
+        req.user!.organizationId || undefined,
         "create",
         "form",
         form.id,
@@ -5040,7 +5048,12 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   // Email Templates
   app.get("/api/email-templates", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const templates = await storage.getEmailTemplatesByOrganization(req.user!.organizationId!);
+      // Super admin (platform-scoped) can see all templates
+      if (!req.user!.organizationId) {
+        const allTemplates = await db.select().from(schema.emailTemplates).orderBy(schema.emailTemplates.category, schema.emailTemplates.name);
+        return res.json(allTemplates);
+      }
+      const templates = await storage.getEmailTemplatesByOrganization(req.user!.organizationId);
       res.json(templates);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch email templates" });
@@ -5067,7 +5080,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         variables: req.body.variables || [],
         isDefault: false,
         usageCount: 0,
-        organizationId: req.user!.organizationId!,
+        organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.user!.id,
       };
       
@@ -5075,7 +5088,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const validatedData = insertEmailTemplateSchema.parse(dataToValidate);
       
       const template = await storage.createEmailTemplate(validatedData);
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "email_template", template.id, template, req);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "create", "email_template", template.id, template, req);
       res.status(201).json(template);
     } catch (error: any) {
       if (error.name === 'ZodError') {

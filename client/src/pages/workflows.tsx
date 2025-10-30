@@ -63,8 +63,10 @@ export default function Workflows() {
       });
       setCreateDialogOpen(false);
       setNewWorkflow({ name: "", description: "", category: "tax_preparation" });
-      // Navigate to the workflow builder for the newly created workflow
-      setLocation(`/workflows/${data.id}`);
+      // Navigate to the workflow builder for the newly created workflow if ID exists
+      if (data && data.id) {
+        setLocation(`/workflows/${data.id}`);
+      }
     },
     onError: (error: any) => {
       toast({

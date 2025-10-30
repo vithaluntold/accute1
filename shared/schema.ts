@@ -74,7 +74,7 @@ export const workflows = pgTable("workflows", {
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   createdBy: varchar("created_by").notNull().references(() => users.id),
   status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
   currentStageId: varchar("current_stage_id"), // Track which stage workflow is currently on
@@ -801,7 +801,7 @@ export const formTemplates = pgTable("form_templates", {
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull().default("custom"), // 'tax', 'audit', 'onboarding', 'custom'
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   createdBy: varchar("created_by").notNull().references(() => users.id),
   // Form structure
   fields: jsonb("fields").notNull().default(sql`'[]'::jsonb`), // Array of form fields
