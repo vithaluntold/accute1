@@ -269,12 +269,14 @@ export default function ProjectDetailPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    const assigneeId = formData.get("assigneeId") as string;
+    
     const data = {
       title: formData.get("title") as string,
       description: formData.get("description") as string || null,
       status: formData.get("status") as string,
       priority: formData.get("priority") as string,
-      assigneeId: formData.get("assigneeId") as string || null,
+      assigneeId: assigneeId === "none" ? null : assigneeId,
       dueDate: formData.get("dueDate") ? new Date(formData.get("dueDate") as string).toISOString() : null,
       estimatedHours: formData.get("estimatedHours") as string || null,
     };
@@ -541,12 +543,12 @@ export default function ProjectDetailPage() {
 
               <div>
                 <Label htmlFor="assigneeId">Assignee</Label>
-                <Select name="assigneeId">
+                <Select name="assigneeId" defaultValue="none">
                   <SelectTrigger id="assigneeId" data-testid="select-task-assignee">
                     <SelectValue placeholder="Select assignee" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="none">Unassigned</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.username}

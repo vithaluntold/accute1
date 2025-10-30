@@ -127,15 +127,18 @@ export default function ProjectsPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    const clientId = formData.get("clientId") as string;
+    const ownerId = formData.get("ownerId") as string;
+    
     const data = {
       name: formData.get("name") as string,
       description: formData.get("description") as string || null,
-      clientId: formData.get("clientId") as string || null,
+      clientId: clientId === "none" ? null : clientId,
       status: formData.get("status") as string,
       priority: formData.get("priority") as string,
       startDate: formData.get("startDate") ? new Date(formData.get("startDate") as string).toISOString() : null,
       dueDate: formData.get("dueDate") ? new Date(formData.get("dueDate") as string).toISOString() : null,
-      ownerId: formData.get("ownerId") as string || null,
+      ownerId: ownerId === "none" ? null : ownerId,
       budget: formData.get("budget") as string || null,
     };
 
@@ -354,12 +357,12 @@ export default function ProjectsPage() {
 
               <div>
                 <Label htmlFor="clientId">Client</Label>
-                <Select name="clientId" defaultValue={editingProject?.clientId || ""}>
+                <Select name="clientId" defaultValue={editingProject?.clientId || "none"}>
                   <SelectTrigger id="clientId" data-testid="select-client">
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Client</SelectItem>
+                    <SelectItem value="none">No Client</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}
@@ -371,12 +374,12 @@ export default function ProjectsPage() {
 
               <div>
                 <Label htmlFor="ownerId">Project Owner</Label>
-                <Select name="ownerId" defaultValue={editingProject?.ownerId || ""}>
+                <Select name="ownerId" defaultValue={editingProject?.ownerId || "none"}>
                   <SelectTrigger id="ownerId" data-testid="select-owner">
                     <SelectValue placeholder="Select owner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="none">Unassigned</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.username}

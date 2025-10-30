@@ -47,6 +47,19 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Kanban Board**: Drag-and-drop assignment management across workflow stages.
 - **Assignment Status Bot**: AI-powered conversational assistant for assignment queries.
 - **Task Ingestion System**: Multi-source task creation with organization-scoped security, including workflow tasks, message-based tasks, and form request tasks.
+- **Projects Management**: Comprehensive client engagement tracking system distinct from workflow-based assignments. Features include:
+  - **Purpose**: Manage ad-hoc client work, consulting engagements, and projects outside standardized workflows
+  - **Client Linkage**: Associate projects with specific clients for centralized engagement tracking
+  - **Budget Tracking**: Set project budgets and track actual costs against estimates with visual progress indicators
+  - **Timeline Management**: Define start dates, due dates, and track project completion
+  - **Priority & Status Management**: Categorize projects (Low/Medium/High/Urgent priority, Active/On Hold/Completed/Cancelled status)
+  - **Team Assignment**: Assign project owners from your team for accountability
+  - **Task Kanban Board**: Visual drag-and-drop task management across four columns (To Do, In Progress, Review, Completed)
+  - **Task Details**: Each task includes title, description, assignee, priority, due date, estimated/actual hours
+  - **Organization Scoping**: All projects and tasks isolated by organizationId for multi-tenant security
+  - **Database Schema**: `projects` table (engagement metadata) and `project_tasks` table (individual deliverables)
+  - **Integration**: Complements workflow-based Assignments by handling non-standardized client work
+  - **Use Cases**: One-off consulting projects, custom client requests, internal initiatives, engagements without predefined workflows
 
 ### System Design Choices
 The project is organized into `client/`, `server/`, and `shared/` directories. Security is a foundational principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
