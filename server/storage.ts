@@ -534,6 +534,15 @@ export interface IStorage {
   updateEmailTemplate(id: string, organizationId: string, template: Partial<schema.InsertEmailTemplate>): Promise<schema.EmailTemplate | undefined>;
   deleteEmailTemplate(id: string, organizationId: string): Promise<void>;
   renderEmailTemplate(templateId: string, placeholders: Record<string, string>): Promise<{subject: string, body: string}>;
+  
+  // Message Templates
+  createMessageTemplate(template: schema.InsertMessageTemplate): Promise<schema.MessageTemplate>;
+  getMessageTemplate(id: string, organizationId: string): Promise<schema.MessageTemplate | undefined>;
+  getMessageTemplatesByOrganization(organizationId: string): Promise<schema.MessageTemplate[]>;
+  getMessageTemplateByCategory(organizationId: string, category: string): Promise<schema.MessageTemplate | undefined>;
+  getDefaultMessageTemplate(category: string): Promise<schema.MessageTemplate | undefined>;
+  updateMessageTemplate(id: string, organizationId: string, template: Partial<schema.InsertMessageTemplate>): Promise<schema.MessageTemplate | undefined>;
+  deleteMessageTemplate(id: string, organizationId: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -1876,6 +1885,93 @@ export class DbStorage implements IStorage {
     // Use the email template service for secure placeholder replacement
     const { renderEmailTemplate } = await import('./services/emailTemplateService');
     return renderEmailTemplate(template[0], placeholders);
+  }
+
+  // Message Templates
+  async createMessageTemplate(template: schema.InsertMessageTemplate): Promise<schema.MessageTemplate> {
+    const result = await db.insert(schema.messageTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async getMessageTemplate(id: string, organizationId: string): Promise<schema.MessageTemplate | undefined> {
+    const result = await db.select().from(schema.messageTemplates)
+      .where(
+        and(
+          eq(schema.messageTemplates.id, id),
+          eq(schema.messageTemplates.organizationId, organizationId)
+        )
+      );
+    return result[0];
+  }
+
+  async getMessageTemplatesByOrganization(organizationId: string): Promise<schema.MessageTemplate[]> {
+    return await db.select().from(schema.messageTemplates)
+      .where(eq(schema.messageTemplates.organizationId, organizationId))
+      .orderBy(schema.messageTemplates.category, schema.messageTemplates.name);
+  }
+
+  async getMessageTemplateByCategory(organizationId: string, category: string): Promise<schema.MessageTemplate | undefined> {
+    const orgTemplate = await db.select().from(schema.messageTemplates)
+      .where(
+        and(
+          eq(schema.messageTemplates.organizationId, organizationId),
+          eq(schema.messageTemplates.category, category),
+          eq(schema.messageTemplates.isActive, true)
+        )
+      )
+      .limit(1);
+
+    if (orgTemplate[0]) {
+      return orgTemplate[0];
+    }
+
+    return await this.getDefaultMessageTemplate(category);
+  }
+
+  async getDefaultMessageTemplate(category: string): Promise<schema.MessageTemplate | undefined> {
+    const result = await db.select().from(schema.messageTemplates)
+      .where(
+        and(
+          eq(schema.messageTemplates.isDefault, true),
+          eq(schema.messageTemplates.category, category),
+          eq(schema.messageTemplates.isActive, true)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async updateMessageTemplate(id: string, organizationId: string, template: Partial<schema.InsertMessageTemplate>): Promise<schema.MessageTemplate | undefined> {
+    const allowedUpdates: Partial<schema.InsertMessageTemplate> = {};
+    
+    if (template.name !== undefined) allowedUpdates.name = template.name;
+    if (template.category !== undefined) allowedUpdates.category = template.category;
+    if (template.content !== undefined) allowedUpdates.content = template.content;
+    if (template.variables !== undefined) allowedUpdates.variables = template.variables;
+    if (template.isActive !== undefined) allowedUpdates.isActive = template.isActive;
+    if (template.usageCount !== undefined) allowedUpdates.usageCount = template.usageCount;
+    if (template.metadata !== undefined) allowedUpdates.metadata = template.metadata;
+    
+    const result = await db.update(schema.messageTemplates)
+      .set({ ...allowedUpdates, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.messageTemplates.id, id),
+          eq(schema.messageTemplates.organizationId, organizationId)
+        )
+      )
+      .returning();
+    return result[0];
+  }
+
+  async deleteMessageTemplate(id: string, organizationId: string): Promise<void> {
+    await db.delete(schema.messageTemplates)
+      .where(
+        and(
+          eq(schema.messageTemplates.id, id),
+          eq(schema.messageTemplates.organizationId, organizationId)
+        )
+      );
   }
 
   // Folders
