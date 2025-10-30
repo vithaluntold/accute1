@@ -34,22 +34,30 @@ export default function MarketplaceCreatePage() {
     onSuccess: (data) => {
       const marketplaceTemplateId = data.id;
       
-      // Redirect to appropriate page with marketplaceTemplateId to trigger creation
+      // Pass metadata as query params to pre-fill create dialog
+      const params = new URLSearchParams({
+        marketplaceTemplateId,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+      });
+      
+      // Redirect to appropriate page with marketplaceTemplateId and metadata to trigger creation
       switch (templateType) {
         case 'form_template':
-          navigate(`/forms?marketplaceTemplateId=${marketplaceTemplateId}`);
+          navigate(`/forms?${params.toString()}`);
           break;
         case 'pipeline_template':
-          navigate(`/workflows?marketplaceTemplateId=${marketplaceTemplateId}`);
+          navigate(`/workflows?${params.toString()}`);
           break;
         case 'document_template':
-          navigate(`/documents?marketplaceTemplateId=${marketplaceTemplateId}`);
+          navigate(`/documents?${params.toString()}`);
           break;
         case 'email_template':
-          navigate(`/email-templates?marketplaceTemplateId=${marketplaceTemplateId}`);
+          navigate(`/email-templates?${params.toString()}`);
           break;
         case 'message_template':
-          navigate(`/message-templates?marketplaceTemplateId=${marketplaceTemplateId}`);
+          navigate(`/message-templates?${params.toString()}`);
           break;
       }
     },

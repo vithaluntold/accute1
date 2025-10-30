@@ -74,9 +74,12 @@ export default function FormsPage() {
   });
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Check for marketplace template ID in URL
+  // Check for marketplace template ID and metadata in URL
   const params = new URLSearchParams(location.split('?')[1]);
   const marketplaceTemplateId = params.get('marketplaceTemplateId');
+  const marketplaceName = params.get('name');
+  const marketplaceDescription = params.get('description');
+  const marketplaceCategory = params.get('category');
   
   // Open create dialog if coming from marketplace (only once)
   useEffect(() => {
@@ -490,6 +493,11 @@ export default function FormsPage() {
           }
         }}
         form={editingForm}
+        marketplaceMetadata={{
+          name: marketplaceName || undefined,
+          description: marketplaceDescription || undefined,
+          category: marketplaceCategory || undefined,
+        }}
         onSubmit={(data) => {
           if (editingForm) {
             updateMutation.mutate({ id: editingForm.id, data });
@@ -983,11 +991,16 @@ interface FormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   form: FormTemplate | null;
+  marketplaceMetadata?: {
+    name?: string;
+    description?: string;
+    category?: string;
+  };
   onSubmit: (data: FormValues) => void;
   isPending: boolean;
 }
 
-function FormDialog({ open, onOpenChange, form, onSubmit, isPending }: FormDialogProps) {
+function FormDialog({ open, onOpenChange, form, marketplaceMetadata, onSubmit, isPending }: FormDialogProps) {
   const formHook = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -1000,14 +1013,24 @@ function FormDialog({ open, onOpenChange, form, onSubmit, isPending }: FormDialo
   // Reset form when dialog opens/closes or form data changes
   useEffect(() => {
     if (open) {
-      formHook.reset({
-        name: form?.name || "",
-        description: form?.description || "",
-        category: form?.category || "custom",
-      });
+      // Pre-fill with marketplace metadata when creating new form
+      if (!form && marketplaceMetadata) {
+        formHook.reset({
+          name: marketplaceMetadata.name || "",
+          description: marketplaceMetadata.description || "",
+          category: (marketplaceMetadata.category as any) || "custom",
+        });
+      } else {
+        // Use existing form data when editing
+        formHook.reset({
+          name: form?.name || "",
+          description: form?.description || "",
+          category: form?.category || "custom",
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, form]);
+  }, [open, form, marketplaceMetadata]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
