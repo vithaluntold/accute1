@@ -4875,6 +4875,20 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  app.delete("/api/projects/:id", requireAuth, requirePermission("projects.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getProject(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      await storage.deleteProject(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "project", req.params.id, {}, req);
+      res.status(200).json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete project" });
+    }
+  });
+
   app.get("/api/projects/:id/tasks", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const project = await storage.getProject(req.params.id);

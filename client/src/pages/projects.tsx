@@ -114,8 +114,8 @@ export default function ProjectsPage() {
 
   const createProjectMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/projects", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       setEditingProject(null);
       form.reset();
@@ -128,8 +128,8 @@ export default function ProjectsPage() {
 
   const updateProjectMutation = useMutation({
     mutationFn: ({ id, ...data }: any) => apiRequest("PUT", `/api/projects/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       setEditingProject(null);
       form.reset();
@@ -142,8 +142,8 @@ export default function ProjectsPage() {
 
   const deleteProjectMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/projects/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/projects"] });
       setDeletingProject(null);
       toast({ title: "Project deleted successfully" });
     },
