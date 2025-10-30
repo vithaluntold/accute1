@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -506,9 +506,10 @@ export const clients = pgTable("clients", {
 });
 
 // Contacts table - individual contacts within client companies
+// Note: clientId kept for backward compatibility but relationships now managed via client_contacts junction table
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "cascade" }), // Nullable for multi-client support
   userId: varchar("user_id").references(() => users.id), // Link to user account for portal access
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
@@ -516,13 +517,27 @@ export const contacts = pgTable("contacts", {
   phone: text("phone"),
   title: text("title"),
   department: text("department"),
-  isPrimary: boolean("is_primary").notNull().default(false),
+  isPrimary: boolean("is_primary").notNull().default(false), // Deprecated - use client_contacts.isPrimary instead
   notes: text("notes"),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Client-Contact Junction Table - Many-to-many relationships between clients and contacts
+// Enables contacts to access multiple clients with same credentials
+export const clientContacts = pgTable("client_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  isPrimary: boolean("is_primary").notNull().default(false), // Primary client designation for this contact
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePair: unique().on(table.clientId, table.contactId),
+}));
 
 // Portal Invitations - Manage client portal access setup
 export const portalInvitations = pgTable("portal_invitations", {
@@ -1316,6 +1331,12 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   updatedAt: true,
 });
 
+export const insertClientContactSchema = createInsertSchema(clientContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertClientOnboardingSessionSchema = createInsertSchema(clientOnboardingSessions).omit({
   id: true,
   createdAt: true,
@@ -1442,6 +1463,8 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+export type InsertClientContact = z.infer<typeof insertClientContactSchema>;
+export type ClientContact = typeof clientContacts.$inferSelect;
 export type InsertClientOnboardingSession = z.infer<typeof insertClientOnboardingSessionSchema>;
 export type ClientOnboardingSession = typeof clientOnboardingSessions.$inferSelect;
 export type InsertOnboardingMessage = z.infer<typeof insertOnboardingMessageSchema>;

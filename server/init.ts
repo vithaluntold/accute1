@@ -1,6 +1,6 @@
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export async function initializeSystem() {
   try {
@@ -458,6 +458,38 @@ export async function initializeSystem() {
       }
     } catch (error) {
       console.log("⚠️  Default welcome template may already exist or failed to create:", error);
+    }
+
+    // Backfill client_contacts junction table from existing contacts.clientId
+    try {
+      const contactsWithClients = await db.select().from(schema.contacts)
+        .where(sql`${schema.contacts.clientId} IS NOT NULL`);
+      
+      if (contactsWithClients.length > 0) {
+        console.log(`📦 Migrating ${contactsWithClients.length} contacts to client_contacts junction table...`);
+        
+        for (const contact of contactsWithClients) {
+          // Check if relationship already exists
+          const existingRelation = await db.select().from(schema.clientContacts)
+            .where(and(
+              eq(schema.clientContacts.contactId, contact.id),
+              eq(schema.clientContacts.clientId, contact.clientId!)
+            ));
+          
+          if (existingRelation.length === 0) {
+            await db.insert(schema.clientContacts).values({
+              contactId: contact.id,
+              clientId: contact.clientId!,
+              isPrimary: contact.isPrimary,
+              organizationId: contact.organizationId,
+            });
+          }
+        }
+        
+        console.log("✓ Client-contact relationships migrated successfully");
+      }
+    } catch (error) {
+      console.log("⚠️  Client-contact migration may have already run or failed:", error);
     }
 
     console.log("✅ System initialized successfully");

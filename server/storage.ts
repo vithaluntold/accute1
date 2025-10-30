@@ -32,6 +32,8 @@ import type {
   InsertClient,
   Contact,
   InsertContact,
+  ClientContact,
+  InsertClientContact,
   ClientOnboardingSession,
   InsertClientOnboardingSession,
   OnboardingMessage,
@@ -197,6 +199,13 @@ export interface IStorage {
   deleteContact(id: string): Promise<void>;
   getContactsByClient(clientId: string): Promise<Contact[]>;
   getContactsByOrganization(organizationId: string): Promise<Contact[]>;
+  
+  // Client-Contact Relationships (Multi-client support)
+  getClientsForContact(contactId: string): Promise<Client[]>;
+  getContactsForClient(clientId: string): Promise<Contact[]>;
+  linkContactToClient(contactId: string, clientId: string, isPrimary: boolean, organizationId: string): Promise<ClientContact>;
+  unlinkContactFromClient(contactId: string, clientId: string): Promise<void>;
+  updateContactClientLink(contactId: string, clientId: string, updates: Partial<InsertClientContact>): Promise<ClientContact | undefined>;
   
   // Client Onboarding Sessions
   getOnboardingSession(id: string): Promise<ClientOnboardingSession | undefined>;
@@ -2103,6 +2112,124 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.contacts)
       .where(eq(schema.contacts.organizationId, organizationId))
       .orderBy(schema.contacts.lastName, schema.contacts.firstName);
+  }
+
+  // Client-Contact Relationships (Multi-client support)
+  async getClientsForContact(contactId: string): Promise<Client[]> {
+    // First, get the contact to verify organizationId for security
+    const contact = await this.getContact(contactId);
+    if (!contact) {
+      return [];
+    }
+
+    const clientContacts = await db.select()
+      .from(schema.clientContacts)
+      .leftJoin(schema.clients, eq(schema.clientContacts.clientId, schema.clients.id))
+      .where(and(
+        eq(schema.clientContacts.contactId, contactId),
+        eq(schema.clientContacts.organizationId, contact.organizationId) // Organization scoping
+      ))
+      .orderBy(desc(schema.clientContacts.isPrimary), schema.clients.companyName);
+    
+    return clientContacts
+      .map(row => row.clients)
+      .filter((client): client is Client => client !== null);
+  }
+
+  async getContactsForClient(clientId: string): Promise<Contact[]> {
+    // First, get the client to verify organizationId for security
+    const client = await this.getClient(clientId);
+    if (!client) {
+      return [];
+    }
+
+    const clientContacts = await db.select()
+      .from(schema.clientContacts)
+      .leftJoin(schema.contacts, eq(schema.clientContacts.contactId, schema.contacts.id))
+      .where(and(
+        eq(schema.clientContacts.clientId, clientId),
+        eq(schema.clientContacts.organizationId, client.organizationId) // Organization scoping
+      ))
+      .orderBy(desc(schema.clientContacts.isPrimary), schema.contacts.lastName, schema.contacts.firstName);
+    
+    return clientContacts
+      .map(row => row.contacts)
+      .filter((contact): contact is Contact => contact !== null);
+  }
+
+  async linkContactToClient(contactId: string, clientId: string, isPrimary: boolean, organizationId: string): Promise<ClientContact> {
+    // Validate that both contact and client belong to the same organization
+    const contact = await this.getContact(contactId);
+    const client = await this.getClient(clientId);
+    
+    if (!contact || !client) {
+      throw new Error("Contact or client not found");
+    }
+    
+    if (contact.organizationId !== client.organizationId) {
+      throw new Error("Contact and client must belong to the same organization");
+    }
+    
+    if (contact.organizationId !== organizationId) {
+      throw new Error("Organization ID mismatch - potential cross-tenant violation");
+    }
+
+    const result = await db.insert(schema.clientContacts).values({
+      contactId,
+      clientId,
+      isPrimary,
+      organizationId: contact.organizationId, // Use verified organizationId from contact
+    }).returning();
+    return result[0];
+  }
+
+  async unlinkContactFromClient(contactId: string, clientId: string): Promise<void> {
+    // Validate organization scoping before deletion
+    const contact = await this.getContact(contactId);
+    const client = await this.getClient(clientId);
+    
+    if (!contact || !client) {
+      throw new Error("Contact or client not found");
+    }
+    
+    if (contact.organizationId !== client.organizationId) {
+      throw new Error("Contact and client must belong to the same organization");
+    }
+
+    await db.delete(schema.clientContacts)
+      .where(and(
+        eq(schema.clientContacts.contactId, contactId),
+        eq(schema.clientContacts.clientId, clientId),
+        eq(schema.clientContacts.organizationId, contact.organizationId) // Organization scoping
+      ));
+  }
+
+  async updateContactClientLink(contactId: string, clientId: string, updates: Partial<InsertClientContact>): Promise<ClientContact | undefined> {
+    // Validate organization scoping before update
+    const contact = await this.getContact(contactId);
+    const client = await this.getClient(clientId);
+    
+    if (!contact || !client) {
+      throw new Error("Contact or client not found");
+    }
+    
+    if (contact.organizationId !== client.organizationId) {
+      throw new Error("Contact and client must belong to the same organization");
+    }
+
+    // Strip relationship fields and organizationId from updates to prevent tampering
+    // Only allow updating isPrimary - if caller wants to change clientId/contactId, they should unlink and re-link
+    const { organizationId: _org, contactId: _contact, clientId: _client, ...safeUpdates } = updates;
+
+    const result = await db.update(schema.clientContacts)
+      .set({ ...safeUpdates, updatedAt: new Date() })
+      .where(and(
+        eq(schema.clientContacts.contactId, contactId),
+        eq(schema.clientContacts.clientId, clientId),
+        eq(schema.clientContacts.organizationId, contact.organizationId) // Organization scoping
+      ))
+      .returning();
+    return result[0];
   }
 
   // Client Onboarding Sessions
