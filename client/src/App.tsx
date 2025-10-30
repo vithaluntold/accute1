@@ -79,6 +79,7 @@ import AdminTicketsPage from "@/pages/admin/tickets";
 import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
 import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
 import AdminDashboard from "@/pages/admin/admin-dashboard";
+import AgentFoundryPage from "@/pages/admin/agent-foundry";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -290,6 +291,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <MarketplacePublishedPage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/agent-foundry">
+        <ProtectedRoute>
+          <AppLayout>
+            <AgentFoundryPage />
           </AppLayout>
         </ProtectedRoute>
       </Route>
