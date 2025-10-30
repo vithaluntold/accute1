@@ -75,6 +75,8 @@ import OrganizationsPage from "@/pages/admin/organizations";
 import SubscriptionsPage from "@/pages/admin/subscriptions";
 import AllUsersPage from "@/pages/admin/users";
 import AdminTicketsPage from "@/pages/admin/tickets";
+import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
+import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -265,6 +267,20 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <AdminTicketsPage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/marketplace/create">
+        <ProtectedRoute>
+          <AppLayout>
+            <MarketplaceCreatePage />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/marketplace/published">
+        <ProtectedRoute>
+          <AppLayout>
+            <MarketplacePublishedPage />
           </AppLayout>
         </ProtectedRoute>
       </Route>
