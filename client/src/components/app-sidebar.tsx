@@ -157,6 +157,30 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          {user && (
+            <SidebarMenuItem>
+              <div className="px-2 py-3 border-t">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <UserCircle className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" data-testid="user-display-name">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate" data-testid="user-role-name">
+                      {user.roleName || 'User'}
+                    </p>
+                    {!user.organizationId && (
+                      <p className="text-xs text-primary font-medium" data-testid="user-scope">
+                        Platform-scoped
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} data-testid="button-logout">
               <LogOut />

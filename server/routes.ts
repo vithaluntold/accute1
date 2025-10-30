@@ -163,6 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           roleId: user.roleId,
+          roleName: role?.name, // Add role name to user object
           organizationId: user.organizationId,
           permissions: permissions.map(p => p.name),
         },
@@ -228,6 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           roleId: user.roleId,
+          roleName: role?.name, // Add role name to user object
           organizationId: user.organizationId,
           permissions: permissions.map(p => p.name),
         },
@@ -386,6 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           roleId: user.roleId,
+          roleName: role?.name, // Add role name to user object
           organizationId: user.organizationId,
           permissions: permissions.map(p => p.name),
         },
@@ -638,6 +641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           roleId: user.roleId,
+          roleName: role?.name, // Add role name to user object
           organizationId: user.organizationId,
           permissions: permissions.map(p => p.name),
         },
