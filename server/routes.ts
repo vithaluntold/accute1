@@ -4881,7 +4881,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       if (!project || project.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "Project not found" });
       }
-      const tasks = await storage.getProjectTasks(req.params.id);
+      const tasks = await storage.getProjectTasksByProject(req.params.id);
       res.json(tasks);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch tasks" });
