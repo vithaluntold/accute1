@@ -8154,6 +8154,273 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ============================================================================
+  // AI Agent Foundry Routes
+  // ============================================================================
+
+  // Get available agents for current user
+  app.get("/api/agents/available", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId;
+      const userRole = req.user!.role?.name?.toLowerCase() || "user";
+      
+      // Get user's organization to check subscription plan
+      let subscriptionPlan = "free";
+      if (organizationId) {
+        const org = await storage.getOrganizationById(organizationId);
+        if (org) {
+          // Get organization's subscription
+          const subscription = await db
+            .select()
+            .from(platformSubscriptions)
+            .where(eq(platformSubscriptions.organizationId, organizationId))
+            .limit(1);
+          
+          if (subscription.length > 0) {
+            subscriptionPlan = subscription[0].plan;
+          }
+        }
+      }
+      
+      const { agentRegistry } = await import("./agent-registry");
+      const agents = await agentRegistry.getAvailableAgents(userId, organizationId, userRole, subscriptionPlan);
+      
+      res.json({ agents });
+    } catch (error: any) {
+      console.error('Get available agents error:', error);
+      res.status(500).json({ error: "Failed to get available agents" });
+    }
+  });
+
+  // Get all agents (Super Admin only)
+  app.get("/api/admin/agents", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const agents = agentRegistry.getAllAgents();
+      
+      // Also get database info for each agent
+      const agentsWithDb = await Promise.all(
+        agents.map(async (agent) => {
+          const dbAgent = await db
+            .select()
+            .from(aiAgents)
+            .where(eq(aiAgents.slug, agent.slug))
+            .limit(1);
+          
+          return {
+            ...agent,
+            isPublished: dbAgent.length > 0 ? dbAgent[0].isPublished : false,
+            publishedAt: dbAgent.length > 0 ? dbAgent[0].publishedAt : null,
+          };
+        })
+      );
+      
+      res.json({ agents: agentsWithDb });
+    } catch (error: any) {
+      console.error('Get all agents error:', error);
+      res.status(500).json({ error: "Failed to get agents" });
+    }
+  });
+
+  // Publish agent (Super Admin only)
+  app.post("/api/admin/agents/:slug/publish", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { slug } = req.params;
+      
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      const updated = await db
+        .update(aiAgents)
+        .set({
+          isPublished: true,
+          publishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(aiAgents.id, agent[0].id))
+        .returning();
+      
+      res.json({ agent: updated[0] });
+    } catch (error: any) {
+      console.error('Publish agent error:', error);
+      res.status(500).json({ error: "Failed to publish agent" });
+    }
+  });
+
+  // Unpublish agent (Super Admin only)
+  app.post("/api/admin/agents/:slug/unpublish", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { slug } = req.params;
+      
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      const updated = await db
+        .update(aiAgents)
+        .set({
+          isPublished: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(aiAgents.id, agent[0].id))
+        .returning();
+      
+      res.json({ agent: updated[0] });
+    } catch (error: any) {
+      console.error('Unpublish agent error:', error);
+      res.status(500).json({ error: "Failed to unpublish agent" });
+    }
+  });
+
+  // Enable agent for organization (Admin only)
+  app.post("/api/agents/:slug/enable", requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const organizationId = req.user!.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Platform admins cannot enable agents for organizations" });
+      }
+      
+      const { agentRegistry } = await import("./agent-registry");
+      await agentRegistry.enableAgentForOrganization(slug, organizationId, req.user!.id);
+      
+      res.json({ success: true, message: "Agent enabled for organization" });
+    } catch (error: any) {
+      console.error('Enable agent error:', error);
+      res.status(500).json({ error: error.message || "Failed to enable agent" });
+    }
+  });
+
+  // Disable agent for organization (Admin only)
+  app.post("/api/agents/:slug/disable", requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const { slug } = req.params;
+      const organizationId = req.user!.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Platform admins cannot disable agents for organizations" });
+      }
+      
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      await db
+        .update(organizationAgents)
+        .set({
+          status: "disabled",
+          disabledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(organizationAgents.organizationId, organizationId),
+            eq(organizationAgents.agentId, agent[0].id)
+          )
+        );
+      
+      res.json({ success: true, message: "Agent disabled for organization" });
+    } catch (error: any) {
+      console.error('Disable agent error:', error);
+      res.status(500).json({ error: "Failed to disable agent" });
+    }
+  });
+
+  // Grant user access to agent (Admin only)
+  app.post("/api/users/:userId/agents/:slug/grant", requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId, slug } = req.params;
+      const { accessLevel = "use" } = req.body;
+      const organizationId = req.user!.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Platform admins cannot grant user agent access" });
+      }
+      
+      // Verify user belongs to same organization
+      const user = await storage.getUserById(userId);
+      if (!user || user.organizationId !== organizationId) {
+        return res.status(403).json({ error: "User not in your organization" });
+      }
+      
+      const { agentRegistry } = await import("./agent-registry");
+      await agentRegistry.grantUserAccess(slug, userId, organizationId, req.user!.id, accessLevel);
+      
+      res.json({ success: true, message: "User access granted" });
+    } catch (error: any) {
+      console.error('Grant user access error:', error);
+      res.status(500).json({ error: error.message || "Failed to grant access" });
+    }
+  });
+
+  // Revoke user access to agent (Admin only)
+  app.post("/api/users/:userId/agents/:slug/revoke", requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId, slug } = req.params;
+      const organizationId = req.user!.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Platform admins cannot revoke user agent access" });
+      }
+      
+      // Verify user belongs to same organization
+      const user = await storage.getUserById(userId);
+      if (!user || user.organizationId !== organizationId) {
+        return res.status(403).json({ error: "User not in your organization" });
+      }
+      
+      const agent = await db
+        .select()
+        .from(aiAgents)
+        .where(eq(aiAgents.slug, slug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      
+      await db
+        .update(userAgentAccess)
+        .set({
+          revokedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(userAgentAccess.userId, userId),
+            eq(userAgentAccess.agentId, agent[0].id),
+            eq(userAgentAccess.organizationId, organizationId)
+          )
+        );
+      
+      res.json({ success: true, message: "User access revoked" });
+    } catch (error: any) {
+      console.error('Revoke user access error:', error);
+      res.status(500).json({ error: "Failed to revoke access" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

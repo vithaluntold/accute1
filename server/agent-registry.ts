@@ -363,3 +363,99 @@ class AgentRegistry {
 }
 
 export const agentRegistry = new AgentRegistry();
+
+// Backward compatibility: Legacy AGENT_REGISTRY for class-based agents
+export interface AgentConfig {
+  name: string;
+  displayName: string;
+  category: string;
+  path: string;
+  className: string;
+  capabilities: string[];
+  requiresToolExecution?: boolean;
+  supportsStreaming?: boolean;
+}
+
+export const AGENT_REGISTRY: Record<string, AgentConfig> = {
+  parity: {
+    name: 'parity',
+    displayName: 'Parity',
+    category: 'legal',
+    path: '../agents/parity/backend/index',
+    className: 'ParityAgent',
+    capabilities: ['document_generation', 'engagement_letters', 'contracts', 'compliance_docs', 'legal_templates'],
+    requiresToolExecution: false,
+    supportsStreaming: true,
+  },
+  cadence: {
+    name: 'cadence',
+    displayName: 'Cadence',
+    category: 'workflow',
+    path: '../agents/cadence/backend/index',
+    className: 'CadenceAgent',
+    capabilities: ['workflow_generation', 'process_automation', 'tax_workflows', 'audit_workflows', 'bookkeeping_automation'],
+    requiresToolExecution: false,
+    supportsStreaming: true,
+  },
+  forma: {
+    name: 'forma',
+    displayName: 'Forma',
+    category: 'forms',
+    path: '../agents/forma/backend/index',
+    className: 'FormaAgent',
+    capabilities: ['form_generation', 'questionnaires', 'organizers', 'conditional_logic', 'validation_rules'],
+    requiresToolExecution: false,
+    supportsStreaming: true,
+  },
+  kanban: {
+    name: 'kanban',
+    displayName: 'Kanban View',
+    category: 'visualization',
+    path: '../agents/kanban/backend/index',
+    className: 'KanbanAgent',
+    capabilities: ['kanban_visualization', 'workflow_analysis', 'task_organization'],
+    requiresToolExecution: false,
+    supportsStreaming: true,
+  },
+  luca: {
+    name: 'luca',
+    displayName: 'Luca',
+    category: 'accounting',
+    path: '../agents/luca/backend/index',
+    className: 'LucaAgent',
+    capabilities: ['accounting_guidance', 'tax_planning', 'financial_analysis', 'compliance_support', 'support_tickets', 'audit_preparation'],
+    requiresToolExecution: true,
+    supportsStreaming: true,
+  },
+};
+
+export function getAgentConfig(agentName: string): AgentConfig | null {
+  const normalizedName = agentName.toLowerCase().replace(/\s+/g, '');
+  
+  if (AGENT_REGISTRY[normalizedName]) {
+    return AGENT_REGISTRY[normalizedName];
+  }
+  
+  for (const [key, config] of Object.entries(AGENT_REGISTRY)) {
+    const normalizedKey = key.toLowerCase().replace(/\s+/g, '');
+    const normalizedDisplayName = config.displayName.toLowerCase().replace(/\s+/g, '');
+    
+    if (normalizedKey === normalizedName || normalizedDisplayName === normalizedName) {
+      return config;
+    }
+  }
+  
+  return null;
+}
+
+export function getAllAgentsLegacy(): AgentConfig[] {
+  return Object.values(AGENT_REGISTRY);
+}
+
+export function getAgentsByCategory(category: string): AgentConfig[] {
+  return getAllAgentsLegacy().filter(agent => agent.category === category);
+}
+
+export function isAgentRegistered(agentName: string): boolean {
+  return getAgentConfig(agentName) !== null;
+}
