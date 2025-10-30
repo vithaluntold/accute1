@@ -1849,9 +1849,13 @@ export const marketplaceItems = pgTable("marketplace_items", {
   price: numeric("price", { precision: 10, scale: 2 }).default(sql`0`), // One-time or monthly price
   priceYearly: numeric("price_yearly", { precision: 10, scale: 2 }), // Optional yearly price for subscriptions
   
-  // Content - stores the actual template data
-  content: jsonb("content").notNull(), // Template structure varies by category
+  // Content - stores the actual template data (optional until linked to source template)
+  content: jsonb("content").default(sql`'{}'::jsonb`), // Template structure varies by category
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Additional configuration
+  
+  // Source template linking
+  sourceId: varchar("source_id"), // ID of the source template (documentId, formId, workflowId, emailTemplateId, messageTemplateId)
+  sourceType: text("source_type"), // 'document', 'form', 'workflow', 'email_template', 'message_template'
   
   // Marketplace metadata
   createdBy: varchar("created_by").references(() => users.id), // Super admin who created it
