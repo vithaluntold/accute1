@@ -41,7 +41,7 @@ interface DashboardMetrics {
 }
 
 export default function AdminDashboard() {
-  const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
+  const { data: metrics, isLoading, error, isError } = useQuery<DashboardMetrics>({
     queryKey: ["/api/admin/dashboard/metrics"],
     refetchInterval: 30000, // Refresh every 30 seconds for real-time data
   });
@@ -68,13 +68,21 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!metrics) {
+  if (isError || !metrics) {
     return (
       <div className="container mx-auto p-6">
         <h1 className="text-3xl font-display font-bold mb-6">Super Admin Dashboard</h1>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground">Failed to load dashboard metrics</p>
+            <div className="flex items-center gap-3 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Failed to load dashboard metrics</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {error instanceof Error ? error.message : "You may not have platform administrator access or your session may have expired."}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
