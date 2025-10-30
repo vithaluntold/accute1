@@ -4875,6 +4875,19 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  app.get("/api/projects/:id/tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const tasks = await storage.getProjectTasks(req.params.id);
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
   app.post("/api/projects/:id/tasks", requireAuth, requirePermission("tasks.create"), async (req: AuthRequest, res: Response) => {
     try {
       const project = await storage.getProject(req.params.id);

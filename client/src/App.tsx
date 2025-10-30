@@ -63,6 +63,7 @@ import Invoices from "@/pages/invoices";
 import Payments from "@/pages/payments";
 import Signatures from "@/pages/signatures";
 import Projects from "@/pages/projects";
+import ProjectDetail from "@/pages/project-detail";
 import TeamChat from "@/pages/team-chat";
 import Calendar from "@/pages/calendar";
 import EmailTemplates from "@/pages/email-templates";
@@ -462,6 +463,13 @@ function Router() {
         <ProtectedRoute>
           <AppLayout>
             <Signatures />
+          </AppLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/projects/:id">
+        <ProtectedRoute>
+          <AppLayout>
+            <ProjectDetail />
           </AppLayout>
         </ProtectedRoute>
       </Route>
