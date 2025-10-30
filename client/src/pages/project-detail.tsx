@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +79,16 @@ type User = {
 type Client = {
   id: string;
   name: string;
+};
+
+type TaskFormData = {
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assigneeId: string;
+  dueDate: string;
+  estimatedHours: string;
 };
 
 function TaskCard({ task, users }: { task: ProjectTask; users: User[] }) {
@@ -186,6 +197,18 @@ export default function ProjectDetailPage() {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const taskForm = useForm<TaskFormData>({
+    defaultValues: {
+      title: "",
+      description: "",
+      status: "todo",
+      priority: "medium",
+      assigneeId: "none",
+      dueDate: "",
+      estimatedHours: "",
+    },
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -227,6 +250,7 @@ export default function ProjectDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "tasks"] });
       setTaskDialogOpen(false);
+      taskForm.reset();
       toast({ title: "Task created successfully" });
     },
     onError: () => {
@@ -265,20 +289,15 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const assigneeId = formData.get("assigneeId") as string;
-    
+  const handleTaskSubmit = (formData: TaskFormData) => {
     const data = {
-      title: formData.get("title") as string,
-      description: formData.get("description") as string || null,
-      status: formData.get("status") as string,
-      priority: formData.get("priority") as string,
-      assigneeId: assigneeId === "none" ? null : assigneeId,
-      dueDate: formData.get("dueDate") ? new Date(formData.get("dueDate") as string).toISOString() : null,
-      estimatedHours: formData.get("estimatedHours") as string || null,
+      title: formData.title,
+      description: formData.description || null,
+      status: formData.status,
+      priority: formData.priority,
+      assigneeId: formData.assigneeId === "none" ? null : formData.assigneeId,
+      dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+      estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : null,
     };
 
     createTaskMutation.mutate(data);
@@ -297,21 +316,20 @@ export default function ProjectDetailPage() {
   };
 
   const calculateBudgetProgress = () => {
-    if (!project?.budget || !project?.actualCost) return 0;
+    if (!project?.budget) return 0;
     const budget = parseFloat(project.budget);
-    const actual = parseFloat(project.actualCost);
+    const actual = parseFloat(project.actualCost || "0");
     return Math.min((actual / budget) * 100, 100);
   };
 
-  const calculateTaskProgress = () => {
-    if (tasks.length === 0) return 0;
-    const completed = tasks.filter(t => t.status === "completed").length;
-    return (completed / tasks.length) * 100;
+  const formatCurrency = (value: string | null) => {
+    if (!value) return "$0";
+    return `$${parseFloat(value).toLocaleString()}`;
   };
 
   if (projectLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-screen">
         <p className="text-muted-foreground">Loading project...</p>
       </div>
     );
@@ -319,25 +337,33 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-muted-foreground mb-4">Project not found</p>
         <Button onClick={() => navigate("/projects")}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Projects
         </Button>
       </div>
     );
   }
 
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.status === "completed").length;
+  const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/projects")} data-testid="button-back">
-          <ArrowLeft className="w-4 h-4" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/projects")}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-display">{project.name}</h1>
-          <p className="text-muted-foreground mt-1">{getClientName(project.clientId)}</p>
+          <h1 className="text-3xl font-display" data-testid="project-name">{project.name}</h1>
+          <p className="text-muted-foreground">{getClientName(project.clientId)}</p>
         </div>
         <Button onClick={() => setTaskDialogOpen(true)} data-testid="button-new-task">
           <Plus className="w-4 h-4 mr-2" />
@@ -345,96 +371,81 @@ export default function ProjectDetailPage() {
         </Button>
       </div>
 
-      {project.description && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm">{project.description}</p>
-          </CardContent>
-        </Card>
-      )}
+      <div className="bg-card rounded-lg border p-6">
+        <p className="text-muted-foreground mb-6">
+          {project.description || "No description provided"}
+        </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
-              Project Owner
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{getOwnerName(project.ownerId)}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              Timeline
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {project.startDate && (
-                <p className="text-sm">Start: {format(new Date(project.startDate), 'MMM d, yyyy')}</p>
-              )}
-              {project.dueDate && (
-                <p className="text-sm">Due: {format(new Date(project.dueDate), 'MMM d, yyyy')}</p>
-              )}
-              {!project.startDate && !project.dueDate && (
-                <p className="text-muted-foreground text-sm">No dates set</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
-              Budget
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-semibold">
-                  ${project.budget ? parseFloat(project.budget).toLocaleString() : '0'}
-                </p>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 opacity-50" />
+                <p className="text-sm font-medium">Project Owner</p>
               </div>
-              {project.actualCost && (
-                <>
-                  <Progress value={calculateBudgetProgress()} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    ${parseFloat(project.actualCost).toLocaleString()} spent
-                  </p>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{getOwnerName(project.ownerId)}</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
-              Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <p className="text-2xl font-semibold">{Math.round(calculateTaskProgress())}%</p>
-              <Progress value={calculateTaskProgress()} className="h-2" />
-              <p className="text-xs text-muted-foreground">
-                {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 opacity-50" />
+                <p className="text-sm font-medium">Timeline</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {project.dueDate 
+                  ? `${project.startDate ? format(new Date(project.startDate), "MMM d") + " - " : ""}${format(new Date(project.dueDate), "MMM d, yyyy")}`
+                  : "No dates set"}
               </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 opacity-50" />
+                <p className="text-sm font-medium">Budget</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{formatCurrency(project.budget)}</p>
+              {project.budget && parseFloat(project.budget) > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Spent: {formatCurrency(project.actualCost)}</span>
+                    <span>{calculateBudgetProgress().toFixed(0)}%</span>
+                  </div>
+                  <Progress value={calculateBudgetProgress()} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 opacity-50" />
+                <p className="text-sm font-medium">Progress</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{progressPercentage.toFixed(0)}%</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {completedTasks} of {totalTasks} tasks
+              </p>
+              <Progress value={progressPercentage} className="mt-2" />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div>
-        <h2 className="text-xl font-semibold mb-4">Tasks</h2>
+        <h2 className="text-2xl font-display mb-4">Tasks</h2>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -447,14 +458,14 @@ export default function ProjectDetailPage() {
               status="todo"
               tasks={tasks}
               users={users}
-              icon={AlertCircle}
+              icon={Clock}
             />
             <KanbanColumn
               title="In Progress"
               status="in_progress"
               tasks={tasks}
               users={users}
-              icon={Clock}
+              icon={AlertCircle}
             />
             <KanbanColumn
               title="Review"
@@ -471,13 +482,6 @@ export default function ProjectDetailPage() {
               icon={CheckCircle2}
             />
           </div>
-          <DragOverlay>
-            {activeId ? (
-              <div className="bg-card rounded-md border p-3 shadow-lg opacity-90">
-                {tasks.find(t => t.id === activeId)?.title}
-              </div>
-            ) : null}
-          </DragOverlay>
         </DndContext>
       </div>
 
@@ -485,107 +489,129 @@ export default function ProjectDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
-            <DialogDescription>Add a new task to this project</DialogDescription>
+            <DialogDescription>
+              Add a new task to this project
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={taskForm.handleSubmit(handleTaskSubmit)} className="space-y-4">
             <div>
               <Label htmlFor="title">Task Title *</Label>
-              <Input 
+              <Input
                 id="title"
-                name="title" 
-                placeholder="Task title" 
-                required 
-                data-testid="input-task-title" 
+                {...taskForm.register("title", { required: true })}
+                placeholder="Review client documents"
+                data-testid="input-task-title"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="description">Description</Label>
-              <Textarea 
+              <Textarea
                 id="description"
-                name="description" 
-                placeholder="Task description" 
+                {...taskForm.register("description")}
+                placeholder="Task description..."
                 rows={3}
-                data-testid="input-task-description" 
+                data-testid="input-task-description"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="status">Status *</Label>
-                <Select name="status" defaultValue="todo">
-                  <SelectTrigger id="status" data-testid="select-task-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="status">Status</Label>
+                <Controller
+                  name="status"
+                  control={taskForm.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-task-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todo">To Do</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="review">Review</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
-                <Label htmlFor="priority">Priority *</Label>
-                <Select name="priority" defaultValue="medium">
-                  <SelectTrigger id="priority" data-testid="select-task-priority">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="priority">Priority</Label>
+                <Controller
+                  name="priority"
+                  control={taskForm.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-task-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
                 <Label htmlFor="assigneeId">Assignee</Label>
-                <Select name="assigneeId" defaultValue="none">
-                  <SelectTrigger id="assigneeId" data-testid="select-task-assignee">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="assigneeId"
+                  control={taskForm.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-task-assignee">
+                        <SelectValue placeholder="Select assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.username}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
                 <Label htmlFor="dueDate">Due Date</Label>
-                <Input 
+                <Input
                   id="dueDate"
-                  name="dueDate" 
-                  type="date" 
-                  data-testid="input-task-due-date" 
+                  type="date"
+                  {...taskForm.register("dueDate")}
+                  data-testid="input-task-due-date"
                 />
               </div>
 
               <div className="col-span-2">
                 <Label htmlFor="estimatedHours">Estimated Hours</Label>
-                <Input 
+                <Input
                   id="estimatedHours"
-                  name="estimatedHours" 
-                  type="number" 
+                  type="number"
                   step="0.5"
-                  placeholder="0.0" 
-                  data-testid="input-task-estimated-hours" 
+                  {...taskForm.register("estimatedHours")}
+                  placeholder="8"
+                  data-testid="input-task-estimated-hours"
                 />
               </div>
             </div>
 
-            <div className="flex gap-2 justify-end pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setTaskDialogOpen(false)}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setTaskDialogOpen(false);
+                  taskForm.reset();
+                }}
                 data-testid="button-cancel-task"
               >
                 Cancel
