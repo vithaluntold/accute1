@@ -20,6 +20,14 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data and distinct SaaS/tenant-level roles.
+- **SaaS Platform Administration (Super Admin)**: Platform-level management interface for the SaaS provider with:
+  - **User & Subscription Management**: View all organizations, manage subscriptions, track billing status, and oversee all platform users across organizations
+  - **Support Ticket System**: Cross-organization support ticket management with priority tracking and resolution workflows
+  - **Marketplace Publishing**: Create and publish system-wide templates (workflows, forms, email templates, documents) available to all organizations
+  - **Platform Analytics**: Monitor platform-wide metrics, subscription health, and usage patterns
+  - **Access Control**: Platform-scoped access via `organizationId === null` check on all `/api/admin/*` endpoints
+  - **Dual Sidebar Navigation**: Context-aware menu showing platform-only sections (Platform Overview, User Management, Marketplace Management, System Templates, Support) for Super Admin vs. full operational menu for organization users
+  - **Database Schema**: `platformSubscriptions` table tracks organization subscription status, billing, and feature access
 - **Role-Based Access Control**: Granular permission management.
 - **Client Portal Task System**: Unified task management system visible in client portal with multi-source task ingestion (employee messages, workflow tasks, form/document requests), source tracking, follow-up scheduling, and escalation rules.
 - **AI Client Onboarding System**: Privacy-first conversational interface for client onboarding, dynamically collecting country-specific tax fields with AI-driven validation, and automatic contact/portal access provisioning.
