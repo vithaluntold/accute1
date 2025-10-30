@@ -7,7 +7,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -7843,6 +7843,118 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ==================== SUPER ADMIN ROUTES ====================
   // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
+
+  // Get dashboard metrics (real-time data)
+  app.get("/api/admin/dashboard/metrics", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      // Organizations metrics
+      const totalOrganizations = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.organizations)
+        .then(r => r[0]?.count || 0);
+
+      // Users metrics
+      const totalUsers = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.users)
+        .then(r => r[0]?.count || 0);
+
+      const activeUsers = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.users)
+        .where(eq(schema.users.isActive, true))
+        .then(r => r[0]?.count || 0);
+
+      // Marketplace metrics
+      const totalMarketplaceItems = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.marketplaceItems)
+        .then(r => r[0]?.count || 0);
+
+      const publishedTemplates = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.marketplaceItems)
+        .where(eq(schema.marketplaceItems.status, 'published'))
+        .then(r => r[0]?.count || 0);
+
+      const totalInstallations = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.marketplaceInstallations)
+        .then(r => r[0]?.count || 0);
+
+      // Support tickets metrics
+      const totalTickets = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.supportTickets)
+        .then(r => r[0]?.count || 0);
+
+      const openTickets = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.supportTickets)
+        .where(eq(schema.supportTickets.status, 'open'))
+        .then(r => r[0]?.count || 0);
+
+      const urgentTickets = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.supportTickets)
+        .where(sql`${schema.supportTickets.priority} = 'urgent' AND ${schema.supportTickets.status} IN ('open', 'in_progress')`)
+        .then(r => r[0]?.count || 0);
+
+      // Subscriptions metrics
+      const totalSubscriptions = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .then(r => r[0]?.count || 0);
+
+      const activeSubscriptions = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'active'))
+        .then(r => r[0]?.count || 0);
+
+      const trialSubscriptions = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'trial'))
+        .then(r => r[0]?.count || 0);
+
+      // Calculate MRR (Monthly Recurring Revenue)
+      const mrrResult = await db
+        .select({ total: sql<string>`COALESCE(SUM(mrr), 0)` })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'active'))
+        .then(r => r[0]?.total || '0');
+
+      res.json({
+        organizations: {
+          total: totalOrganizations,
+        },
+        users: {
+          total: totalUsers,
+          active: activeUsers,
+        },
+        marketplace: {
+          totalItems: totalMarketplaceItems,
+          published: publishedTemplates,
+          installations: totalInstallations,
+        },
+        support: {
+          total: totalTickets,
+          open: openTickets,
+          urgent: urgentTickets,
+        },
+        subscriptions: {
+          total: totalSubscriptions,
+          active: activeSubscriptions,
+          trial: trialSubscriptions,
+          mrr: parseFloat(mrrResult),
+        },
+      });
+    } catch (error: any) {
+      console.error('Get dashboard metrics error:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard metrics" });
+    }
+  });
 
   // Get all organizations with subscription details
   app.get("/api/admin/organizations", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
