@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,12 +67,38 @@ type User = {
   email: string;
 };
 
+type ProjectFormData = {
+  name: string;
+  description: string;
+  clientId: string;
+  status: string;
+  priority: string;
+  startDate: string;
+  dueDate: string;
+  ownerId: string;
+  budget: string;
+};
+
 export default function ProjectsPage() {
   const [, navigate] = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const { toast } = useToast();
+
+  const form = useForm<ProjectFormData>({
+    defaultValues: {
+      name: "",
+      description: "",
+      clientId: "none",
+      status: "active",
+      priority: "medium",
+      startDate: "",
+      dueDate: "",
+      ownerId: "none",
+      budget: "",
+    },
+  });
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -91,6 +118,7 @@ export default function ProjectsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       setEditingProject(null);
+      form.reset();
       toast({ title: "Project created successfully" });
     },
     onError: () => {
@@ -104,6 +132,7 @@ export default function ProjectsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setDialogOpen(false);
       setEditingProject(null);
+      form.reset();
       toast({ title: "Project updated successfully" });
     },
     onError: () => {
@@ -123,23 +152,17 @@ export default function ProjectsPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    const clientId = formData.get("clientId") as string;
-    const ownerId = formData.get("ownerId") as string;
-    
+  const handleSubmit = (formData: ProjectFormData) => {
     const data = {
-      name: formData.get("name") as string,
-      description: formData.get("description") as string || null,
-      clientId: clientId === "none" ? null : clientId,
-      status: formData.get("status") as string,
-      priority: formData.get("priority") as string,
-      startDate: formData.get("startDate") ? new Date(formData.get("startDate") as string).toISOString() : null,
-      dueDate: formData.get("dueDate") ? new Date(formData.get("dueDate") as string).toISOString() : null,
-      ownerId: ownerId === "none" ? null : ownerId,
-      budget: formData.get("budget") as string || null,
+      name: formData.name,
+      description: formData.description || null,
+      clientId: formData.clientId === "none" ? null : formData.clientId,
+      status: formData.status,
+      priority: formData.priority,
+      startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
+      dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
+      ownerId: formData.ownerId === "none" ? null : formData.ownerId,
+      budget: formData.budget ? parseFloat(formData.budget) : null,
     };
 
     if (editingProject) {
@@ -151,11 +174,33 @@ export default function ProjectsPage() {
 
   const openEditDialog = (project: Project) => {
     setEditingProject(project);
+    form.reset({
+      name: project.name,
+      description: project.description || "",
+      clientId: project.clientId || "none",
+      status: project.status,
+      priority: project.priority,
+      startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
+      dueDate: project.dueDate ? format(new Date(project.dueDate), "yyyy-MM-dd") : "",
+      ownerId: project.ownerId || "none",
+      budget: project.budget || "",
+    });
     setDialogOpen(true);
   };
 
   const openCreateDialog = () => {
     setEditingProject(null);
+    form.reset({
+      name: "",
+      description: "",
+      clientId: "none",
+      status: "active",
+      priority: "medium",
+      startDate: "",
+      dueDate: "",
+      ownerId: "none",
+      budget: "",
+    });
     setDialogOpen(true);
   };
 
@@ -230,87 +275,80 @@ export default function ProjectsPage() {
             >
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="truncate">{project.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      {getClientName(project.clientId)}
+                  <div className="flex-1">
+                    <CardTitle className="text-xl mb-2">{project.name}</CardTitle>
+                    <CardDescription className="line-clamp-2">
+                      {project.description || "No description"}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={getStatusColor(project.status)} data-testid={`badge-status-${project.id}`}>
-                      {project.status.replace('_', ' ')}
+                  <div className="flex gap-2">
+                    <Badge variant={getStatusColor(project.status)}>
+                      {project.status.replace("_", " ")}
                     </Badge>
                     <Badge variant={getPriorityColor(project.priority)}>
                       {project.priority}
                     </Badge>
                   </div>
                 </div>
-                {project.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
-                    {project.description}
-                  </p>
-                )}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <User className="w-4 h-4" />
-                    <span>{getOwnerName(project.ownerId)}</span>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 opacity-50" />
+                    <span className="text-muted-foreground">{getClientName(project.clientId)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 opacity-50" />
+                    <span className="text-muted-foreground">{getOwnerName(project.ownerId)}</span>
                   </div>
                   {project.budget && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <DollarSign className="w-4 h-4" />
-                      <span>${parseFloat(project.budget).toLocaleString()}</span>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 opacity-50" />
+                      <span className="text-muted-foreground">${parseFloat(project.budget).toLocaleString()}</span>
                     </div>
                   )}
                   {project.dueDate && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>Due {format(new Date(project.dueDate), 'MMM d, yyyy')}</span>
-                    </div>
-                  )}
-                  {project.actualCost && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <span className="text-xs">Actual: ${parseFloat(project.actualCost).toLocaleString()}</span>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 opacity-50" />
+                      <span className="text-muted-foreground">
+                        Due {format(new Date(project.dueDate), "MMM d, yyyy")}
+                      </span>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t">
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
                       openEditDialog(project);
                     }}
                     data-testid={`button-edit-${project.id}`}
                   >
-                    <Edit className="w-3 h-3 mr-1" />
+                    <Edit className="w-4 h-4 mr-2" />
                     Edit
                   </Button>
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
                     onClick={(e) => {
                       e.stopPropagation();
                       setDeletingProject(project);
                     }}
                     data-testid={`button-delete-${project.id}`}
                   >
-                    <Trash2 className="w-3 h-3 mr-1" />
+                    <Trash2 className="w-4 h-4 mr-2" />
                     Delete
                   </Button>
                   <Button
-                    size="sm"
                     variant="ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/projects/${project.id}`);
-                    }}
+                    size="sm"
+                    onClick={() => navigate(`/projects/${project.id}`)}
                     data-testid={`button-view-${project.id}`}
                   >
                     View
-                    <ChevronRight className="w-4 h-4 ml-1" />
+                    <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardContent>
@@ -320,146 +358,170 @@ export default function ProjectsPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingProject ? "Edit Project" : "Create New Project"}</DialogTitle>
+            <DialogTitle>
+              {editingProject ? "Edit Project" : "Create New Project"}
+            </DialogTitle>
             <DialogDescription>
               {editingProject 
-                ? "Update project details and settings" 
-                : "Create a new client engagement or project"}
+                ? "Update the project details below" 
+                : "Fill in the details to create a new project"}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label htmlFor="name">Project Name *</Label>
-                <Input 
+                <Input
                   id="name"
-                  name="name" 
-                  placeholder="Q4 2025 Tax Filing" 
-                  defaultValue={editingProject?.name}
-                  required 
-                  data-testid="input-project-name" 
+                  {...form.register("name", { required: true })}
+                  placeholder="Q4 2025 Tax Filing"
+                  data-testid="input-project-name"
                 />
               </div>
-              
+
               <div className="col-span-2">
                 <Label htmlFor="description">Description</Label>
-                <Textarea 
+                <Textarea
                   id="description"
-                  name="description" 
-                  placeholder="Project description and objectives" 
-                  defaultValue={editingProject?.description || ""}
+                  {...form.register("description")}
+                  placeholder="Project description..."
                   rows={3}
-                  data-testid="input-project-description" 
+                  data-testid="input-project-description"
                 />
               </div>
 
               <div>
                 <Label htmlFor="clientId">Client</Label>
-                <Select name="clientId" defaultValue={editingProject?.clientId || "none"}>
-                  <SelectTrigger id="clientId" data-testid="select-client">
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Client</SelectItem>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="clientId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-client">
+                        <SelectValue placeholder="Select client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Client</SelectItem>
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
                 <Label htmlFor="ownerId">Project Owner</Label>
-                <Select name="ownerId" defaultValue={editingProject?.ownerId || "none"}>
-                  <SelectTrigger id="ownerId" data-testid="select-owner">
-                    <SelectValue placeholder="Select owner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Unassigned</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="ownerId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-owner">
+                        <SelectValue placeholder="Select owner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.username}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
-                <Label htmlFor="status">Status *</Label>
-                <Select name="status" defaultValue={editingProject?.status || "active"}>
-                  <SelectTrigger id="status" data-testid="select-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="on_hold">On Hold</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="status">Status</Label>
+                <Controller
+                  name="status"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="on_hold">On Hold</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
-                <Label htmlFor="priority">Priority *</Label>
-                <Select name="priority" defaultValue={editingProject?.priority || "medium"}>
-                  <SelectTrigger id="priority" data-testid="select-priority">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="priority">Priority</Label>
+                <Controller
+                  name="priority"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger data-testid="select-priority">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
               <div>
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input 
+                <Input
                   id="startDate"
-                  name="startDate" 
-                  type="date" 
-                  defaultValue={editingProject?.startDate ? format(new Date(editingProject.startDate), 'yyyy-MM-dd') : ""}
-                  data-testid="input-start-date" 
+                  type="date"
+                  {...form.register("startDate")}
+                  data-testid="input-start-date"
                 />
               </div>
 
               <div>
                 <Label htmlFor="dueDate">Due Date</Label>
-                <Input 
+                <Input
                   id="dueDate"
-                  name="dueDate" 
-                  type="date" 
-                  defaultValue={editingProject?.dueDate ? format(new Date(editingProject.dueDate), 'yyyy-MM-dd') : ""}
-                  data-testid="input-due-date" 
+                  type="date"
+                  {...form.register("dueDate")}
+                  data-testid="input-due-date"
                 />
               </div>
 
               <div className="col-span-2">
                 <Label htmlFor="budget">Budget ($)</Label>
-                <Input 
+                <Input
                   id="budget"
-                  name="budget" 
-                  type="number" 
+                  type="number"
                   step="0.01"
-                  placeholder="0.00" 
-                  defaultValue={editingProject?.budget || ""}
-                  data-testid="input-budget" 
+                  {...form.register("budget")}
+                  placeholder="50000"
+                  data-testid="input-budget"
                 />
               </div>
             </div>
 
-            <div className="flex gap-2 justify-end pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setDialogOpen(false)}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDialogOpen(false);
+                  setEditingProject(null);
+                  form.reset();
+                }}
                 data-testid="button-cancel"
               >
                 Cancel
@@ -469,9 +531,7 @@ export default function ProjectsPage() {
                 disabled={createProjectMutation.isPending || updateProjectMutation.isPending}
                 data-testid="button-save-project"
               >
-                {createProjectMutation.isPending || updateProjectMutation.isPending 
-                  ? "Saving..." 
-                  : editingProject ? "Update Project" : "Create Project"}
+                {(createProjectMutation.isPending || updateProjectMutation.isPending) ? "Saving..." : (editingProject ? "Update Project" : "Create Project")}
               </Button>
             </div>
           </form>
@@ -483,7 +543,7 @@ export default function ProjectsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingProject?.name}"? This will also delete all associated tasks. This action cannot be undone.
+              This will permanently delete "{deletingProject?.name}" and all its tasks. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
