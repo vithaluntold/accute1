@@ -225,7 +225,7 @@ export default function MarketplaceCreatePage() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="0.00"
-                    required={formData.pricingModel !== 'free'}
+                    required
                     data-testid="input-price"
                   />
                 </div>

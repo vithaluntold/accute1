@@ -502,18 +502,8 @@ export default function FormsPage() {
           if (editingForm) {
             updateMutation.mutate({ id: editingForm.id, data });
           } else {
-            // Create with default backend-managed fields
-            createMutation.mutate({
-              ...data,
-              fields: [],
-              sections: [],
-              pages: [],
-              conditionalRules: [],
-              validationRules: [],
-              calculatedFields: [],
-              folderStructure: {},
-              settings: {},
-            });
+            // Backend will set default fields
+            createMutation.mutate(data);
           }
         }}
         isPending={createMutation.isPending || updateMutation.isPending}
@@ -1015,17 +1005,28 @@ function FormDialog({ open, onOpenChange, form, marketplaceMetadata, onSubmit, i
     if (open) {
       // Pre-fill with marketplace metadata when creating new form
       if (!form && marketplaceMetadata) {
-        formHook.reset({
+        // Map marketplace category to form category enum
+        const validCategories: readonly ("custom" | "tax" | "audit" | "onboarding")[] = ["custom", "tax", "audit", "onboarding"];
+        const category: "custom" | "tax" | "audit" | "onboarding" = validCategories.includes(marketplaceMetadata.category as any) 
+          ? (marketplaceMetadata.category as "custom" | "tax" | "audit" | "onboarding")
+          : "custom";
+        
+        const resetData: { name: string; description: string; category: "custom" | "tax" | "audit" | "onboarding" } = {
           name: marketplaceMetadata.name || "",
           description: marketplaceMetadata.description || "",
-          category: (marketplaceMetadata.category as any) || "custom",
-        });
+          category,
+        };
+        
+        formHook.reset(resetData);
       } else {
         // Use existing form data when editing
+        const category: "custom" | "tax" | "audit" | "onboarding" = 
+          (form?.category as "custom" | "tax" | "audit" | "onboarding") || "custom";
+        
         formHook.reset({
           name: form?.name || "",
           description: form?.description || "",
-          category: form?.category || "custom",
+          category,
         });
       }
     }
