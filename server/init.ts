@@ -492,6 +492,12 @@ export async function initializeSystem() {
       console.log("⚠️  Client-contact migration may have already run or failed:", error);
     }
 
+    // Initialize Agent Registry
+    console.log("🤖 Initializing AI Agent Foundry...");
+    const { agentRegistry } = await import("./agent-registry");
+    await agentRegistry.initialize();
+    console.log("✅ Agent Foundry initialized successfully");
+
     console.log("✅ System initialized successfully");
   } catch (error) {
     console.error("❌ System initialization failed:", error);
