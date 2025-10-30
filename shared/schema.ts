@@ -302,9 +302,10 @@ export const taskChecklists = pgTable("task_checklists", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// AI Agents in marketplace
+// AI Agents in marketplace - Enhanced for Foundry
 export const aiAgents = pgTable("ai_agents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").unique(), // Unique identifier (e.g., 'parity', 'cadence') - nullable for existing agents
   name: text("name").notNull(),
   description: text("description").notNull(),
   provider: text("provider").notNull(),
@@ -314,20 +315,36 @@ export const aiAgents = pgTable("ai_agents", {
   rating: integer("rating").default(0),
   installCount: integer("install_count").notNull().default(0),
   isPublic: boolean("is_public").notNull().default(true),
-  // Directory paths for agent code
-  backendPath: text("backend_path"),
-  frontendPath: text("frontend_path"),
+  
+  // Directory paths for agent code (Foundry support)
+  backendPath: text("backend_path"), // Path to backend handler entry point
+  frontendPath: text("frontend_path"), // Path to frontend component entry point
+  iconPath: text("icon_path"), // Path to agent icon
+  manifestJson: text("manifest_json"), // Full manifest JSON for validation
+  
   // Subscription and pricing
   pricingModel: text("pricing_model").notNull().default("free"),
   priceMonthly: integer("price_monthly").default(0),
   priceYearly: integer("price_yearly").default(0),
+  subscriptionMinPlan: text("subscription_min_plan").notNull().default("free"), // Minimum subscription plan required
+  
+  // Access control (Foundry feature)
+  defaultScope: text("default_scope").notNull().default("admin"), // 'admin', 'user' (who gets access by default)
+  
+  // Publishing
+  publishedAt: timestamp("published_at"),
+  publishedBy: varchar("published_by").references(() => users.id),
+  
   // Metadata
   version: text("version").notNull().default("1.0.0"),
   tags: jsonb("tags").notNull().default([]),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  slugIdx: index("ai_agents_slug_idx").on(table.slug),
+  publicIdx: index("ai_agents_public_idx").on(table.isPublic),
+}));
 
 // AI Agent Installations
 export const aiAgentInstallations = pgTable("ai_agent_installations", {
@@ -1905,6 +1922,53 @@ export const marketplaceInstallations = pgTable("marketplace_installations", {
   orgActiveIdx: index("marketplace_installations_org_active_idx").on(table.organizationId, table.isActive),
 }));
 
+// ==================== AI AGENT FOUNDRY ====================
+// Organization-level agent enablement (which orgs have which agents enabled)
+export const organizationAgents = pgTable("organization_agents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  agentId: varchar("agent_id").notNull().references(() => aiAgents.id, { onDelete: "cascade" }),
+  
+  // Status and configuration
+  status: text("status").notNull().default("enabled"), // 'enabled', 'disabled', 'suspended'
+  config: text("config"), // JSON string for agent-specific configuration
+  
+  // Tracking
+  enabledAt: timestamp("enabled_at").notNull().defaultNow(),
+  disabledAt: timestamp("disabled_at"),
+  grantedBy: varchar("granted_by").notNull().references(() => users.id),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgAgentIdx: index("organization_agents_org_agent_idx").on(table.organizationId, table.agentId),
+  statusIdx: index("organization_agents_status_idx").on(table.status),
+  uniqueOrgAgent: index("organization_agents_unique_idx").on(table.organizationId, table.agentId),
+}));
+
+// User-level agent access control (which specific users can access which agents)
+export const userAgentAccess = pgTable("user_agent_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentId: varchar("agent_id").notNull().references(() => aiAgents.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Access level
+  accessLevel: text("access_level").notNull().default("use"), // 'use', 'manage'
+  
+  // Tracking
+  grantedBy: varchar("granted_by").notNull().references(() => users.id),
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userAgentIdx: index("user_agent_access_user_agent_idx").on(table.userId, table.agentId),
+  orgIdx: index("user_agent_access_org_idx").on(table.organizationId),
+  uniqueUserAgent: index("user_agent_access_unique_idx").on(table.userId, table.agentId, table.organizationId),
+}));
+
 // Workflow Assignments - When a client is added to a workflow, it becomes an "assignment"
 // Example: Acme Corporation + 1120 Filing Workflow = Assignment
 export const workflowAssignments = pgTable("workflow_assignments", {
@@ -2151,6 +2215,8 @@ export const insertAiAgentConversationSchema = createInsertSchema(aiAgentConvers
 export const insertAiAgentMessageSchema = createInsertSchema(aiAgentMessages).omit({ id: true, createdAt: true });
 export const insertMarketplaceItemSchema = createInsertSchema(marketplaceItems).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMarketplaceInstallationSchema = createInsertSchema(marketplaceInstallations).omit({ id: true, installedAt: true, updatedAt: true });
+export const insertOrganizationAgentSchema = createInsertSchema(organizationAgents).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUserAgentAccessSchema = createInsertSchema(userAgentAccess).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertWorkflowAssignmentSchema = createInsertSchema(workflowAssignments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFolderSchema = createInsertSchema(folders).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2208,6 +2274,10 @@ export type InsertMarketplaceItem = z.infer<typeof insertMarketplaceItemSchema>;
 export type MarketplaceItem = typeof marketplaceItems.$inferSelect;
 export type InsertMarketplaceInstallation = z.infer<typeof insertMarketplaceInstallationSchema>;
 export type MarketplaceInstallation = typeof marketplaceInstallations.$inferSelect;
+export type InsertOrganizationAgent = z.infer<typeof insertOrganizationAgentSchema>;
+export type OrganizationAgent = typeof organizationAgents.$inferSelect;
+export type InsertUserAgentAccess = z.infer<typeof insertUserAgentAccessSchema>;
+export type UserAgentAccess = typeof userAgentAccess.$inferSelect;
 export type InsertWorkflowAssignment = z.infer<typeof insertWorkflowAssignmentSchema>;
 export type WorkflowAssignment = typeof workflowAssignments.$inferSelect;
 export type InsertPlatformSubscription = z.infer<typeof insertPlatformSubscriptionSchema>;
