@@ -44,7 +44,13 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
-      setLocation("/dashboard");
+      
+      // Redirect Super Admins to platform dashboard, others to org dashboard
+      if (data.role?.scope === "platform") {
+        setLocation("/admin/dashboard", { replace: true });
+      } else {
+        setLocation("/dashboard", { replace: true });
+      }
     },
     onError: (error: any) => {
       toast({
