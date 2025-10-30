@@ -40,6 +40,7 @@ export const platformSubscriptions = pgTable("platform_subscriptions", {
   // Pricing
   monthlyPrice: numeric("monthly_price", { precision: 10, scale: 2 }),
   yearlyPrice: numeric("yearly_price", { precision: 10, scale: 2 }),
+  mrr: numeric("mrr", { precision: 10, scale: 2 }).notNull().default(sql`0`), // Monthly Recurring Revenue
   
   // Limits based on plan
   maxUsers: integer("max_users").notNull().default(5),
