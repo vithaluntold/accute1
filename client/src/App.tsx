@@ -38,6 +38,7 @@ import Workflows from "@/pages/workflows";
 import WorkflowDetail from "@/pages/workflow-detail";
 import WorkflowBuilder from "@/pages/workflow-builder";
 import AIAgents from "@/pages/ai-agents";
+import AgentDetail from "@/pages/agent-detail";
 import Marketplace from "@/pages/marketplace";
 import Assignments from "@/pages/assignments";
 import AssignmentDetail from "@/pages/assignment-detail";
@@ -390,6 +391,13 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
+      </Route>
+      <Route path="/ai-agents/:slug">
+        <OrganizationRoute>
+          <AppLayout>
+            <AgentDetail />
+          </AppLayout>
+        </OrganizationRoute>
       </Route>
       <Route path="/ai-agents">
         <OrganizationRoute>

@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Play, Edit, Trash2, Copy, Workflow, Sparkles } from "lucide-react";
 import type { InstalledAgentView } from "@shared/schema";
-import { AIAgentChat } from "@/components/ai-agent-chat";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -226,17 +225,15 @@ export default function Workflows() {
             </div>
             <div className="flex items-center gap-2">
               {hasCadence && (
-                <AIAgentChat
-                  agentName="Cadence"
-                  mode="dialog"
-                  contextData={{ workflows }}
-                  trigger={
-                    <Button variant="outline" className="bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="button-cadence-chat">
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Ask Cadence AI
-                    </Button>
-                  }
-                />
+                <Button 
+                  variant="outline" 
+                  className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
+                  data-testid="button-cadence-chat"
+                  onClick={() => setLocation('/ai-agents/cadence')}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Ask Cadence AI
+                </Button>
               )}
               <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogTrigger asChild>

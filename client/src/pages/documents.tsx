@@ -28,7 +28,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calendar, Sparkles } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
-import { AIAgentChat } from "@/components/ai-agent-chat";
 import type { InstalledAgentView } from "@shared/schema";
 
 export default function Documents() {
@@ -210,17 +209,15 @@ export default function Documents() {
             </div>
             <div className="flex gap-2">
               {hasParity && (
-                <AIAgentChat
-                  agentName="Parity"
-                  mode="dialog"
-                  contextData={{ documents: filteredDocuments }}
-                  trigger={
-                    <Button variant="outline" className="bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="button-parity-chat">
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Ask Parity AI
-                    </Button>
-                  }
-                />
+                <Button 
+                  variant="outline" 
+                  className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
+                  data-testid="button-parity-chat"
+                  onClick={() => setLocation('/ai-agents/parity')}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Ask Parity AI
+                </Button>
               )}
               <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                 <DialogTrigger asChild>
