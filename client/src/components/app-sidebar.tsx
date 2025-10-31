@@ -45,8 +45,6 @@ const platformMenuCategories = [
   {
     title: "Marketplace Management",
     items: [
-      { title: "Browse Marketplace", url: "/marketplace", icon: Store, permission: null },
-      { title: "Create Template", url: "/admin/marketplace/create", icon: Plus, permission: null },
       { title: "My Published Items", url: "/admin/marketplace/published", icon: Package, permission: null },
       { title: "Agent Foundry", url: "/admin/agent-foundry", icon: Bot, permission: null },
     ]

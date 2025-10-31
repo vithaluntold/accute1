@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, Users, Calendar } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, Building2, Users, Calendar, MoreVertical, Ban, Play, X, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 export default function OrganizationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const { data: orgs, isLoading } = useQuery<Array<{
     id: string;
@@ -19,6 +25,7 @@ export default function OrganizationsPage() {
     userCount?: number;
     clientCount?: number;
     subscription?: {
+      id: string;
       plan: string;
       status: string;
       currentUsers: number;
@@ -28,6 +35,20 @@ export default function OrganizationsPage() {
     };
   }>>({
     queryKey: ["/api/admin/organizations"],
+  });
+
+  // Update subscription status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      return await apiRequest("PATCH", `/api/admin/subscriptions/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      toast({ title: "Subscription status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update subscription", description: error.message, variant: "destructive" });
+    },
   });
 
   const filteredOrgs = orgs?.filter(org =>
@@ -156,9 +177,58 @@ export default function OrganizationsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" data-testid={`button-view-org-${org.id}`}>
-                          View Details
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" data-testid={`button-manage-org-${org.id}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              onClick={() => setLocation(`/admin/subscriptions`)}
+                              data-testid={`action-view-subscription-${org.id}`}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View Subscription
+                            </DropdownMenuItem>
+                            {org.subscription && org.subscription.status === "active" && (
+                              <>
+                                <DropdownMenuItem 
+                                  onClick={() => updateStatusMutation.mutate({ id: org.subscription!.id, status: "suspended" })}
+                                  data-testid={`action-suspend-${org.id}`}
+                                >
+                                  <Ban className="h-4 w-4 mr-2" />
+                                  Suspend (Non-payment)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => updateStatusMutation.mutate({ id: org.subscription!.id, status: "cancelled" })}
+                                  data-testid={`action-cancel-${org.id}`}
+                                >
+                                  <X className="h-4 w-4 mr-2" />
+                                  Cancel Subscription
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {org.subscription && org.subscription.status === "suspended" && (
+                              <DropdownMenuItem 
+                                onClick={() => updateStatusMutation.mutate({ id: org.subscription!.id, status: "active" })}
+                                data-testid={`action-resume-${org.id}`}
+                              >
+                                <Play className="h-4 w-4 mr-2" />
+                                Resume (Manual Override)
+                              </DropdownMenuItem>
+                            )}
+                            {org.subscription && (org.subscription.status === "cancelled" || org.subscription.status === "expired") && (
+                              <DropdownMenuItem 
+                                onClick={() => updateStatusMutation.mutate({ id: org.subscription!.id, status: "active" })}
+                                data-testid={`action-reactivate-${org.id}`}
+                              >
+                                <Play className="h-4 w-4 mr-2" />
+                                Reactivate
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
