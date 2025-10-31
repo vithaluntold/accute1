@@ -56,12 +56,24 @@ export default function OrganizationsPage() {
   };
 
   return (
-    <div className="h-full overflow-auto p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-display font-semibold mb-2" data-testid="heading-organizations">Organizations</h1>
-          <p className="text-muted-foreground">Manage all organizations and their subscriptions</p>
+    <div className="h-full overflow-auto">
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Building2 className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white" data-testid="heading-organizations">Organizations</h1>
+              </div>
+              <p className="text-white/90 text-lg">Manage all organizations and their subscriptions</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 space-y-6">
 
         <Card>
           <CardHeader>

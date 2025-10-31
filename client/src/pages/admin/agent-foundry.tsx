@@ -236,24 +236,29 @@ export default function AgentFoundryPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-            <Bot className="w-8 h-8" />
-            AI Agent Foundry
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Create, manage, and publish AI agents for your platform
-          </p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-agent">
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Bot className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">AI Agent Foundry</h1>
+              </div>
+              <p className="text-white/90 text-lg">Create, manage, and publish AI agents for your platform</p>
+            </div>
+            <Button data-testid="button-create-agent" onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Agent
             </Button>
-          </DialogTrigger>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 max-w-7xl">
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New AI Agent</DialogTitle>

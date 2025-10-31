@@ -99,19 +99,28 @@ export default function MarketplacePublishedPage() {
   );
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Published Templates</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your marketplace templates published to all organizations
-          </p>
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Globe className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Published Templates</h1>
+              </div>
+              <p className="text-white/90 text-lg">Manage your marketplace templates published to all organizations</p>
+            </div>
+            <Button onClick={() => navigate('/admin/marketplace/create')} data-testid="button-create-template">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => navigate('/admin/marketplace/create')} data-testid="button-create-template">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Template
-        </Button>
       </div>
+
+      <div className="container mx-auto px-6 max-w-7xl">
 
       <div className="mb-6">
         <div className="relative">

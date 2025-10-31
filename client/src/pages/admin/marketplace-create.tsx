@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, ArrowRight, Loader2, FileText, Workflow, LayoutTemplate, Mail, MessageSquare } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, FileText, Workflow, LayoutTemplate, Mail, MessageSquare, Package } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function MarketplaceCreatePage() {
@@ -106,23 +106,35 @@ export default function MarketplaceCreatePage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate('/admin/marketplace/published')}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-display font-bold">Create Marketplace Template</h1>
-          <p className="text-muted-foreground mt-1">
-            Step 1: Fill in marketplace details. Step 2: Create template content in the dedicated builder.
-          </p>
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => navigate('/admin/marketplace/published')}
+                data-testid="button-back"
+                className="bg-white/10 hover:bg-white/20 border-white/20 text-white"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <Package className="h-10 w-10 text-white" />
+                  <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Create Marketplace Template</h1>
+                </div>
+                <p className="text-white/90 text-lg">Step 1: Fill in marketplace details. Step 2: Create template content in the dedicated builder.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="container mx-auto px-6 max-w-4xl">
 
       <form onSubmit={handleSubmit}>
         <Card>
@@ -292,6 +304,7 @@ export default function MarketplaceCreatePage() {
           </CardContent>
         </Card>
       </form>
+      </div>
     </div>
   );
 }
