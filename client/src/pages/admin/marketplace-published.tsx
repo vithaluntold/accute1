@@ -16,7 +16,8 @@ import {
   Trash2, 
   Star,
   Download,
-  DollarSign
+  DollarSign,
+  Globe
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
