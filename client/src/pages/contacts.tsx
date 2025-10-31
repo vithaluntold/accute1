@@ -138,7 +138,8 @@ export default function Contacts() {
     (contact.title && contact.title.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const getClientName = (clientId: string) => {
+  const getClientName = (clientId: string | null) => {
+    if (!clientId) return "Unknown";
     const client = clients.find(c => c.id === clientId);
     return client?.companyName || "Unknown";
   };
@@ -175,7 +176,7 @@ export default function Contacts() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Client *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger data-testid="select-client">
                               <SelectValue placeholder="Select a client" />

@@ -114,25 +114,25 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#e5a660]/10 via-transparent to-[#d76082]/10 pointer-events-none" />
+      <section className="relative overflow-hidden gradient-hero">
+        <div className="absolute inset-0 bg-black/20" />
         <div className="container mx-auto px-4 py-24 relative">
           <div className="max-w-4xl mx-auto text-center space-y-6">
-            <Badge className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-white border-0" data-testid="badge-new">
+            <Badge className="bg-white/20 backdrop-blur-sm text-white border border-white/30" data-testid="badge-new">
               <Sparkles className="h-3 w-3 mr-1" />
               AI-Powered Accounting Automation
             </Badge>
             
-            <h1 className="text-5xl md:text-6xl font-display font-bold leading-tight">
+            <h1 className="text-5xl md:text-6xl font-display font-bold leading-tight text-white" data-testid="text-hero-title">
               The First{" "}
-              <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+              <span className="text-white drop-shadow-lg">
                 AI-Native
               </span>
               <br />
               Practice Management Platform
             </h1>
             
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl text-white/90 max-w-2xl mx-auto" data-testid="text-hero-description">
               Accute combines traditional workflow tools' power with cutting-edge AI agents. 
               Automate data entry, client communication, and compliance—saving 15+ hours per week.
             </p>
