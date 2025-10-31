@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, ChevronDown, ChevronRight, CheckCircle2, Circle, Users, Bot, UserPlus, ListChecks } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, CheckCircle2, Circle, Users, Bot, UserPlus, ListChecks, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -81,15 +81,22 @@ export default function Pipelines() {
   }
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Pipelines</h1>
-          <p className="text-muted-foreground mt-1" data-testid="text-page-description">
-            Manage hierarchical project workflows with stages, steps, and tasks
-          </p>
-        </div>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+    <div className="h-full overflow-auto">
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Workflow className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white" data-testid="text-page-title">Pipelines</h1>
+              </div>
+              <p className="text-white/90 text-lg" data-testid="text-page-description">
+                Manage hierarchical project workflows with stages, steps, and tasks
+              </p>
+            </div>
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-pipeline">
               <Plus className="mr-2 h-4 w-4" />
@@ -150,8 +157,11 @@ export default function Pipelines() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </div>
+        </div>
       </div>
 
+      <div className="px-6 space-y-6">
       {pipelines && pipelines.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -181,6 +191,7 @@ export default function Pipelines() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

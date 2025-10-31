@@ -280,6 +280,7 @@ export default function MarketplacePublishedPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
