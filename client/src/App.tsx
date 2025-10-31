@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
+import { RoleGuard } from "@/components/role-guard";
+import { OrganizationRoute } from "@/components/organization-route";
 import { isAuthenticated, getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +82,12 @@ import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
 import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
 import AdminDashboard from "@/pages/admin/admin-dashboard";
 import AgentFoundryPage from "@/pages/admin/agent-foundry";
+import ClientPortalDashboard from "@/pages/client-portal/dashboard";
+import ClientMyDocuments from "@/pages/client-portal/my-documents";
+import ClientMyTasks from "@/pages/client-portal/my-tasks";
+import ClientMyForms from "@/pages/client-portal/my-forms";
+import ClientMySignatures from "@/pages/client-portal/my-signatures";
+import ClientPortalMessages from "@/pages/client-portal/messages";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -224,370 +232,457 @@ function Router() {
       <Route path="/public/:shareToken" component={PublicFormPage} />
 
       <Route path="/dashboard">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Dashboard />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/settings">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Settings />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/mobile-apps">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <MobileApps />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
-      {/* Super Admin Routes */}
+      {/* Super Admin Routes - Platform-Scoped Only */}
       <Route path="/admin/dashboard">
         <ProtectedRoute>
-          <AppLayout>
-            <AdminDashboard />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <AdminDashboard />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/organizations">
         <ProtectedRoute>
-          <AppLayout>
-            <OrganizationsPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <OrganizationsPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/subscriptions">
         <ProtectedRoute>
-          <AppLayout>
-            <SubscriptionsPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <SubscriptionsPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedRoute>
-          <AppLayout>
-            <AllUsersPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <AllUsersPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/tickets">
         <ProtectedRoute>
-          <AppLayout>
-            <AdminTicketsPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <AdminTicketsPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/marketplace/create">
         <ProtectedRoute>
-          <AppLayout>
-            <MarketplaceCreatePage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <MarketplaceCreatePage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/marketplace/published">
         <ProtectedRoute>
-          <AppLayout>
-            <MarketplacePublishedPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <MarketplacePublishedPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/agent-foundry">
         <ProtectedRoute>
-          <AppLayout>
-            <AgentFoundryPage />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <AgentFoundryPage />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/analytics">
         <ProtectedRoute>
-          <AppLayout>
-            <Analytics />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <Analytics />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/assignment-bot">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <AssignmentBot />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/client-onboarding">
         <ProtectedRoute>
-          <AppLayout>
-            <ClientOnboarding />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <ClientOnboarding />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/workflows">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Workflows />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/workflows/:id">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <WorkflowDetail />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/workflow-builder">
         <ProtectedRoute>
-          <AppLayout>
-            <WorkflowBuilder />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <WorkflowBuilder />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/workflows/new">
         <ProtectedRoute>
-          <AppLayout>
-            <WorkflowBuilder />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <WorkflowBuilder />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/workflows/:id/edit">
         <ProtectedRoute>
-          <AppLayout>
-            <WorkflowBuilder />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <WorkflowBuilder />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/ai-agents">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <AIAgents />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/marketplace">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Marketplace />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/assignments/:id">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <AssignmentDetail />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/kanban">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Kanban />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/assignments">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Assignments />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/team">
         <ProtectedRoute>
-          <AppLayout>
-            <Team />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <Team />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/roles">
         <ProtectedRoute>
-          <AppLayout>
-            <Roles />
-          </AppLayout>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <Roles />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
       <Route path="/documents">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Documents />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/forms">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Forms />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/forms/:id/builder">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <FormBuilder />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/forms/:id/preview">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <FormPreview />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/forms/:formId/submissions">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <FormSubmissions />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/forms/:formId/analytics">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <FormAnalytics />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/submissions/:id">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <SubmissionDetail />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/clients">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Clients />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/contacts">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Contacts />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/tags">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Tags />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/folders">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Folders />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/document-requests">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <DocumentRequests />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/my-documents">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <MyDocumentRequests />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/messages">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Messages />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/time-tracking">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <TimeTracking />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/invoices">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Invoices />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/payments">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Payments />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/signatures">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Signatures />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/projects/:id">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <ProjectDetail />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/projects">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Projects />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/team-chat">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <TeamChat />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/calendar">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Calendar />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/email-templates">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <EmailTemplates />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/message-templates">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <MessageTemplates />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/email-accounts">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <EmailAccounts />
           </AppLayout>
-        </ProtectedRoute>
+        </OrganizationRoute>
       </Route>
       <Route path="/inbox">
-        <ProtectedRoute>
+        <OrganizationRoute>
           <AppLayout>
             <Inbox />
           </AppLayout>
+        </OrganizationRoute>
+      </Route>
+
+      {/* Client Portal Routes - Client Role Only */}
+      <Route path="/client-portal/dashboard">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientPortalDashboard />
+            </AppLayout>
+          </RoleGuard>
         </ProtectedRoute>
       </Route>
+      <Route path="/client-portal/documents">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientMyDocuments />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-portal/tasks">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientMyTasks />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-portal/forms">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientMyForms />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-portal/signatures">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientMySignatures />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client-portal/messages">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ClientPortalMessages />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );

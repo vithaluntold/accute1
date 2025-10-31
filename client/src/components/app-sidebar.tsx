@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -149,13 +149,115 @@ const organizationMenuCategories = [
   }
 ];
 
+// Employee-scoped menu (limited organization features)
+const employeeMenuCategories = [
+  {
+    title: "Overview",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: Home, permission: null },
+    ]
+  },
+  {
+    title: "My Work",
+    items: [
+      { title: "Assignments", url: "/assignments", icon: ListTodo, permission: null },
+      { title: "Kanban Board", url: "/kanban", icon: Kanban, permission: null },
+      { title: "Projects", url: "/projects", icon: Network, permission: "projects.view" },
+      { title: "My Documents", url: "/my-documents", icon: FolderOpen, permission: null },
+      { title: "Time Tracking", url: "/time-tracking", icon: Clock, permission: "time.create" },
+    ]
+  },
+  {
+    title: "AI & Tools",
+    items: [
+      { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
+      { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
+    ]
+  },
+  {
+    title: "Documents & Forms",
+    items: [
+      { title: "Documents", url: "/documents", icon: FileText, permission: "documents.view" },
+      { title: "Forms", url: "/forms", icon: ClipboardList, permission: "forms.view" },
+      { title: "E-Signatures", url: "/signatures", icon: FileSignature, permission: "signatures.view" },
+    ]
+  },
+  {
+    title: "Communication",
+    items: [
+      { title: "Messages", url: "/messages", icon: MessageSquare, permission: "messaging.send" },
+      { title: "Team Chat", url: "/team-chat", icon: MessagesSquare, permission: null },
+      { title: "Calendar", url: "/calendar", icon: Calendar, permission: "appointments.view" },
+    ]
+  },
+  {
+    title: "Settings",
+    items: [
+      { title: "My Settings", url: "/settings", icon: Settings, permission: null },
+    ]
+  }
+];
+
+// Client Portal menu (client-facing only)
+const clientPortalMenuCategories = [
+  {
+    title: "My Portal",
+    items: [
+      { title: "Dashboard", url: "/client-portal/dashboard", icon: Home, permission: null },
+    ]
+  },
+  {
+    title: "Documents & Tasks",
+    items: [
+      { title: "My Documents", url: "/client-portal/documents", icon: FileText, permission: null },
+      { title: "My Tasks", url: "/client-portal/tasks", icon: CheckSquare, permission: null },
+      { title: "My Forms", url: "/client-portal/forms", icon: ClipboardList, permission: null },
+      { title: "My Signatures", url: "/client-portal/signatures", icon: FileSignature, permission: null },
+    ]
+  },
+  {
+    title: "Communication",
+    items: [
+      { title: "Messages", url: "/client-portal/messages", icon: MessageSquare, permission: null },
+    ]
+  },
+  {
+    title: "Settings",
+    items: [
+      { title: "My Settings", url: "/settings", icon: Settings, permission: null },
+    ]
+  }
+];
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const user = getUser();
 
-  // Determine which menu to show based on user scope
-  const isPlatformScoped = !user?.organizationId;
-  const menuCategories = isPlatformScoped ? platformMenuCategories : organizationMenuCategories;
+  // Determine which menu to show based on user role
+  const getMenuCategories = () => {
+    if (!user) return organizationMenuCategories;
+    
+    // Platform-scoped Super Admin
+    if (!user.organizationId) {
+      return platformMenuCategories;
+    }
+    
+    // Role-based menu selection
+    const userRole = user.role || user.roleName;
+    switch (userRole) {
+      case "Client":
+        return clientPortalMenuCategories;
+      case "Employee":
+        return employeeMenuCategories;
+      case "Admin":
+      case "Super Admin":
+        return organizationMenuCategories;
+      default:
+        return organizationMenuCategories;
+    }
+  };
+
+  const menuCategories = getMenuCategories();
 
   const handleLogout = () => {
     clearAuth();
