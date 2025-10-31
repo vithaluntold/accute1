@@ -109,7 +109,7 @@ export default function AgentDetail() {
       </div>
 
       {/* Agent Interface */}
-      <div className="flex-1 overflow-hidden p-6">
+      <div className="flex-1 overflow-hidden p-6 pb-24">
         <Suspense
           fallback={
             <div className="flex items-center justify-center h-full">
