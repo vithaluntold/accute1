@@ -1,7 +1,7 @@
 import type { Response } from "express";
-import Anthropic from "@anthropic-ai/sdk";
-import { requireAuth, type AuthRequest, decrypt } from "../../../server/auth";
+import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { LLMService } from "../../../server/llm-service";
 
 interface Message {
   role: "user" | "assistant";
@@ -42,10 +42,8 @@ export const registerRoutes = (app: any) => {
         });
       }
 
-      // Decrypt API key
-      const apiKey = decrypt(llmConfig.apiKeyEncrypted);
-
-      const client = new Anthropic({ apiKey: apiKey });
+      // Initialize LLM service
+      const llmService = new LLMService(llmConfig);
 
       const systemPrompt = `You are Forma, an AI form builder assistant. You help users create forms through conversation.
 
@@ -106,26 +104,22 @@ Great! I've added an email field for you. What other information do you need to 
 - Generate unique IDs for fields
 - Be conversational and helpful`;
 
-      const conversationHistory = history
-        .slice(-4)
-        .map((msg: Message) => ({
-          role: msg.role,
-          content: msg.content
-        }));
+      // Build conversation context from history
+      let conversationContext = '';
+      if (history && history.length > 0) {
+        conversationContext = history
+          .slice(-4) // Last 4 messages for context
+          .map((msg: Message) => `${msg.role}: ${msg.content}`)
+          .join('\n\n');
+      }
+      
+      // Combine context with current message
+      const fullPrompt = conversationContext 
+        ? `${conversationContext}\n\nuser: ${message}`
+        : message;
 
-      const response = await client.messages.create({
-        model: llmConfig.model || "claude-3-5-sonnet-20241022",
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: [
-          ...conversationHistory,
-          { role: "user", content: message }
-        ]
-      });
-
-      const fullResponse = response.content[0].type === "text" 
-        ? response.content[0].text 
-        : "";
+      // Call LLM service
+      const fullResponse = await llmService.sendPrompt(fullPrompt, systemPrompt);
 
       // Parse the response to extract form JSON
       let responseText = fullResponse;

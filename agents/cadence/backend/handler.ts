@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import Anthropic from "@anthropic-ai/sdk";
-import { requireAuth, type AuthRequest, decrypt } from "../../../server/auth";
+import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { LLMService } from "../../../server/llm-service";
 
 interface WorkflowState {
   name: string;
@@ -43,34 +43,23 @@ export const registerRoutes = (app: any) => {
         });
       }
 
-      // Decrypt API key
-      const apiKey = decrypt(llmConfig.apiKeyEncrypted);
+      // Initialize LLM service
+      const llmService = new LLMService(llmConfig);
 
-      // Initialize Anthropic client
-      const anthropic = new Anthropic({
-        apiKey: apiKey,
-      });
-
-      // Build conversation history for Claude
-      const messages: Anthropic.MessageParam[] = [];
-      
-      // Add history (excluding the initial system message)
+      // Build conversation context from history
+      let conversationContext = '';
       if (history && history.length > 0) {
-        history.slice(1).forEach((msg: any) => {
-          if (msg.role === "user" || msg.role === "assistant") {
-            messages.push({
-              role: msg.role as "user" | "assistant",
-              content: msg.content
-            });
-          }
-        });
+        conversationContext = history
+          .slice(1) // Skip system message
+          .filter((msg: any) => msg.role === "user" || msg.role === "assistant")
+          .map((msg: any) => `${msg.role}: ${msg.content}`)
+          .join('\n\n');
       }
-
-      // Add current message
-      messages.push({
-        role: "user",
-        content: message
-      });
+      
+      // Combine context with current message
+      const fullPrompt = conversationContext 
+        ? `${conversationContext}\n\nuser: ${message}`
+        : message;
 
       // System prompt for workflow building
       const systemPrompt = `You are Cadence, an intelligent workflow building assistant. Your job is to help users create workflows through natural conversation.
@@ -122,18 +111,8 @@ Guidelines:
 - Consider typical workflow patterns for common processes
 - Ask if they want to add more stages or steps before marking complete`;
 
-      // Call Claude
-      const completion = await anthropic.messages.create({
-        model: llmConfig.model || "claude-3-5-sonnet-20241022",
-        max_tokens: llmConfig.maxTokens || 4000, // Note: Anthropic SDK accepts max_tokens (not max_output_tokens)
-        temperature: llmConfig.temperature || 0.7,
-        system: systemPrompt,
-        messages: messages
-      });
-
-      const responseText = completion.content[0].type === "text" 
-        ? completion.content[0].text 
-        : "I'm sorry, I couldn't generate a response.";
+      // Call LLM service
+      const responseText = await llmService.sendPrompt(fullPrompt, systemPrompt);
 
       // Extract workflow update from response
       let workflowUpdate = null;
