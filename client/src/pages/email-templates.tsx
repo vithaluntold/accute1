@@ -353,17 +353,28 @@ export default function EmailTemplatesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display">Email Templates</h1>
-          <p className="text-muted-foreground mt-1">Customize email templates with branding and placeholders</p>
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Mail className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Email Templates</h1>
+              </div>
+              <p className="text-white/90 text-lg">Customize email templates with branding and placeholders</p>
+            </div>
+            <Button onClick={() => handleOpenDialog()} className="bg-white text-primary" data-testid="button-new-template">
+              <Plus className="w-4 h-4 mr-2" />
+              New Template
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => handleOpenDialog()} data-testid="button-new-template">
-          <Plus className="w-4 h-4 mr-2" />
-          New Template
-        </Button>
       </div>
+      
+      <div className="flex flex-col gap-6 p-6">
 
       <div className="grid grid-cols-1 gap-6">
         {isLoading ? (
@@ -735,6 +746,7 @@ export default function EmailTemplatesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

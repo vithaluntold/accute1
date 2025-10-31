@@ -203,44 +203,49 @@ export default function Workflows() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-display font-bold mb-2">Workflows</h1>
-            {hasCadence && (
-              <Badge variant="secondary" className="gap-1" data-testid="badge-cadence-copilot">
-                <Sparkles className="h-4 w-4" />
-                Cadence AI
-              </Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground">
-            Automate your accounting processes with AI-powered workflows
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasCadence && (
-            <AIAgentChat
-              agentName="Cadence"
-              mode="dialog"
-              contextData={{ workflows }}
-              trigger={
-                <Button variant="outline" data-testid="button-cadence-chat">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Ask Cadence AI
-                </Button>
-              }
-            />
-          )}
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-workflow">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Workflow
-              </Button>
-            </DialogTrigger>
-            <DialogContent data-testid="dialog-create-workflow">
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <Workflow className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Workflows</h1>
+                {hasCadence && (
+                  <Badge variant="secondary" className="gap-1" data-testid="badge-cadence-copilot">
+                    <Sparkles className="h-4 w-4" />
+                    Cadence AI
+                  </Badge>
+                )}
+              </div>
+              <p className="text-white/90 text-lg">
+                Automate your accounting processes with AI-powered workflows
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {hasCadence && (
+                <AIAgentChat
+                  agentName="Cadence"
+                  mode="dialog"
+                  contextData={{ workflows }}
+                  trigger={
+                    <Button variant="outline" className="bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="button-cadence-chat">
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Ask Cadence AI
+                    </Button>
+                  }
+                />
+              )}
+              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-white text-primary" data-testid="button-create-workflow">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Workflow
+                  </Button>
+                    </DialogTrigger>
+                <DialogContent data-testid="dialog-create-workflow">
               <DialogHeader>
                 <DialogTitle>Create New Workflow</DialogTitle>
                 <DialogDescription>
@@ -304,10 +309,14 @@ export default function Workflows() {
                   {createWorkflow.isPending ? 'Creating...' : 'Create Workflow'}
                 </Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="container mx-auto p-6 max-w-7xl">
 
       <div className="flex items-center gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
@@ -506,6 +515,7 @@ export default function Workflows() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

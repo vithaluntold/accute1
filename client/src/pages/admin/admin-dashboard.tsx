@@ -99,13 +99,22 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-display font-bold">Platform Overview</h1>
-        <p className="text-muted-foreground mt-1">
-          Monitor platform-wide metrics and system health
-        </p>
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="max-w-4xl">
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingUp className="h-10 w-10 text-white" />
+              <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Platform Overview</h1>
+            </div>
+            <p className="text-white/90 text-lg">Monitor platform-wide metrics and system health</p>
+          </div>
+        </div>
       </div>
+
+      <div className="container mx-auto p-6">
 
       {/* Top Row - Key Metrics */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -303,6 +312,7 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

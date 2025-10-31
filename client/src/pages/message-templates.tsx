@@ -200,22 +200,28 @@ export default function MessageTemplatesPage() {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold flex items-center gap-2">
-            <MessageSquare className="w-8 h-8" />
-            Message Templates
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Create and manage reusable message templates
-          </p>
+    <div>
+      {/* Gradient Hero Section */}
+      <div className="relative mb-8">
+        <div className="absolute inset-0 gradient-hero opacity-90"></div>
+        <div className="relative container mx-auto p-6 md:p-8">
+          <div className="flex items-center justify-between">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-3 mb-2">
+                <MessageSquare className="h-10 w-10 text-white" />
+                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Message Templates</h1>
+              </div>
+              <p className="text-white/90 text-lg">Create and manage reusable message templates</p>
+            </div>
+            <Button onClick={() => setDialogOpen(true)} className="bg-white text-primary" data-testid="button-create">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setDialogOpen(true)} data-testid="button-create">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Template
-        </Button>
       </div>
+
+      <div className="container mx-auto p-6">
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -394,6 +400,7 @@ export default function MessageTemplatesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
