@@ -36,6 +36,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
+import { GradientHero } from "@/components/gradient-hero";
 
 type Project = {
   id: string;
@@ -237,19 +238,21 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display">Projects</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage client engagements and track deliverables
-          </p>
-        </div>
-        <Button onClick={openCreateDialog} data-testid="button-new-project">
-          <Plus className="w-4 h-4 mr-2" />
-          New Project
-        </Button>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Briefcase}
+        title="Projects"
+        description="Manage client engagements and track deliverables"
+        testId="hero-projects"
+        actions={
+          <Button onClick={openCreateDialog} variant="outline" className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30" data-testid="button-new-project">
+            <Plus className="w-4 h-4 mr-2" />
+            New Project
+          </Button>
+        }
+      />
+      
+      <div className="flex flex-col gap-6 p-6">
 
       {isLoading ? (
         <Card>
@@ -558,6 +561,7 @@ export default function ProjectsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

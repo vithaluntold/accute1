@@ -15,6 +15,7 @@ import { insertContactSchema, type InsertContact, type Contact, type Client } fr
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Search, Mail, Phone, Building2, Trash2, Edit, User, Star } from "lucide-react";
 import { TagSelector } from "@/components/tag-selector";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -146,15 +147,15 @@ export default function Contacts() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
-            <p className="text-muted-foreground">Manage your client contacts</p>
-          </div>
+      <GradientHero
+        icon={User}
+        title="Contacts"
+        description="Manage your client contacts"
+        testId="hero-contacts"
+        actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openCreateDialog} data-testid="button-create-contact">
+              <Button onClick={openCreateDialog} variant="outline" className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30" data-testid="button-create-contact">
                 <Plus className="h-4 w-4" />
                 Add Contact
               </Button>
@@ -338,8 +339,10 @@ export default function Contacts() {
               </Form>
             </DialogContent>
           </Dialog>
-        </div>
-
+        }
+      />
+      
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Calendar, User, Building2 } from "lucide-react";
+import { Calendar, User, Building2, LayoutGrid } from "lucide-react";
+import { GradientHero } from "@/components/gradient-hero";
 
 type Assignment = {
   id: string;
@@ -256,29 +257,31 @@ export default function Kanban() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-full">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold mb-2">Kanban Board</h1>
-          <p className="text-muted-foreground">
-            Drag assignments between stages to track progress
-          </p>
-        </div>
-        <div className="w-72">
-          <Select value={selectedWorkflowId} onValueChange={setSelectedWorkflowId}>
-            <SelectTrigger data-testid="select-workflow-kanban">
-              <SelectValue placeholder="Select a workflow" />
-            </SelectTrigger>
-            <SelectContent>
-              {workflows.map((workflow) => (
-                <SelectItem key={workflow.id} value={workflow.id}>
-                  {workflow.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={LayoutGrid}
+        title="Kanban Board"
+        description="Drag assignments between stages to track progress"
+        testId="hero-kanban"
+        actions={
+          <div className="w-72">
+            <Select value={selectedWorkflowId} onValueChange={setSelectedWorkflowId}>
+              <SelectTrigger data-testid="select-workflow-kanban" className="bg-white/20 backdrop-blur-sm text-white border-white/30">
+                <SelectValue placeholder="Select a workflow" />
+              </SelectTrigger>
+              <SelectContent>
+                {workflows.map((workflow) => (
+                  <SelectItem key={workflow.id} value={workflow.id}>
+                    {workflow.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
+      
+      <div className="container mx-auto p-6 max-w-full">
 
       {!selectedWorkflowId ? (
         <div className="flex flex-col items-center justify-center h-[400px] gap-4">
@@ -385,6 +388,7 @@ export default function Kanban() {
           </DragOverlay>
         </DndContext>
       )}
+      </div>
     </div>
   );
 }

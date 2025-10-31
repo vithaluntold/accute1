@@ -39,6 +39,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
+import { GradientHero } from "@/components/gradient-hero";
 
 interface Assignment {
   id: string;
@@ -241,40 +242,44 @@ export default function Assignments() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold mb-2">Assignments</h1>
-          <p className="text-muted-foreground">
-            Manage client workflow assignments and track progress
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            if (clients.length === 0) {
-              toast({
-                title: 'No clients available',
-                description: 'Please create a client first before creating an assignment.',
-                variant: 'destructive',
-              });
-              return;
-            }
-            if (workflows.length === 0) {
-              toast({
-                title: 'No workflows available',
-                description: 'Please create a workflow first before creating an assignment.',
-                variant: 'destructive',
-              });
-              return;
-            }
-            setCreateDialogOpen(true);
-          }}
-          data-testid="button-create-assignment"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Assignment
-        </Button>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Workflow}
+        title="Assignments"
+        description="Manage client workflow assignments and track progress"
+        testId="hero-assignments"
+        actions={
+          <Button
+            onClick={() => {
+              if (clients.length === 0) {
+                toast({
+                  title: 'No clients available',
+                  description: 'Please create a client first before creating an assignment.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              if (workflows.length === 0) {
+                toast({
+                  title: 'No workflows available',
+                  description: 'Please create a workflow first before creating an assignment.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              setCreateDialogOpen(true);
+            }}
+            variant="outline"
+            className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30"
+            data-testid="button-create-assignment"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Assignment
+          </Button>
+        }
+      />
+      
+      <div className="container mx-auto p-6 max-w-7xl">
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -594,6 +599,7 @@ export default function Assignments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

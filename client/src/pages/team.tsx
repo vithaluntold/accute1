@@ -15,8 +15,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, UserPlus, Mail, Phone, Copy, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
+import { Loader2, UserPlus, Mail, Phone, Copy, CheckCircle2, XCircle, Clock, AlertCircle, Users } from "lucide-react";
 import { formatDistance } from "date-fns";
+import { GradientHero } from "@/components/gradient-hero";
 
 const inviteSchema = z.object({
   type: z.enum(["email", "sms"]),
@@ -143,19 +144,20 @@ export default function Team() {
   );
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold" data-testid="heading-team">Team Management</h1>
-          <p className="text-muted-foreground">Manage your team members and invitations</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-invite-member">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Invite Member
-            </Button>
-          </DialogTrigger>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Users}
+        title="Team Management"
+        description="Manage your team members and invitations"
+        testId="hero-team"
+        actions={
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30" data-testid="button-invite-member">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Invite Member
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle data-testid="dialog-title-invite">Invite Team Member</DialogTitle>
@@ -319,7 +321,10 @@ export default function Team() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
+      
+      <div className="container mx-auto p-6 space-y-6">
 
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
@@ -497,6 +502,7 @@ export default function Team() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Trash2, Shield, Check, X, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GradientHero } from "@/components/gradient-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -275,23 +276,20 @@ export default function Roles() {
   const customRoles = roles.filter(r => !r.isSystemRole);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold" data-testid="heading-roles">
-            Roles & Permissions
-          </h1>
-          <p className="text-muted-foreground">
-            Create custom roles and assign granular permissions
-          </p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-role">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Role
-            </Button>
-          </DialogTrigger>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Shield}
+        title="Roles & Permissions"
+        description="Create custom roles and assign granular permissions"
+        testId="hero-roles"
+        actions={
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30" data-testid="button-create-role">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Role
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle data-testid="dialog-title-create-role">Create New Role</DialogTitle>
@@ -343,7 +341,10 @@ export default function Roles() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
+      
+      <div className="container mx-auto p-6 space-y-6">
 
       {rolesLoading || permissionsLoading ? (
         <Card>
@@ -564,6 +565,7 @@ export default function Roles() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
