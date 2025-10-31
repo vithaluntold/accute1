@@ -157,17 +157,17 @@ export default function Landing() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 pt-8 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-6 pt-8 text-sm text-white/90">
               <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#e5a660]" />
+                <Check className="h-4 w-4 text-white" />
                 No credit card required
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#e5a660]" />
+                <Check className="h-4 w-4 text-white" />
                 14-day free trial
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-[#e5a660]" />
+                <Check className="h-4 w-4 text-white" />
                 Cancel anytime
               </div>
             </div>
