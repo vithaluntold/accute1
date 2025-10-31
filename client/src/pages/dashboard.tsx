@@ -168,7 +168,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-display font-bold">My Tasks</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <Card className="overflow-visible hover-elevate transition-base gradient-subtle">
+          <Card className="gradient-subtle">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
               <div className="p-2 rounded-lg bg-primary/10">
@@ -180,7 +180,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-visible hover-elevate transition-base bg-info/5">
+          <Card className="bg-info/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending</CardTitle>
               <div className="p-2 rounded-lg bg-info/10">
@@ -192,7 +192,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-visible hover-elevate transition-base bg-warning/5">
+          <Card className="bg-warning/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">In Progress</CardTitle>
               <div className="p-2 rounded-lg bg-warning/10">
@@ -204,7 +204,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-visible hover-elevate transition-base bg-success/5">
+          <Card className="bg-success/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Completed</CardTitle>
               <div className="p-2 rounded-lg bg-success/10">
@@ -216,7 +216,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-visible hover-elevate transition-base bg-destructive/5">
+          <Card className="bg-destructive/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Overdue</CardTitle>
               <div className="p-2 rounded-lg bg-destructive/10">
