@@ -1,7 +1,7 @@
 {
   "slug": "cadence",
   "name": "Cadence",
-  "description": "Workflow timing and scheduling optimizer. Chat to build custom workflows visually.",
+  "description": "God of operations. Expert workflow automation builder. Chat to create and manage operational workflows, processes, and automations visually.",
   "category": "workflow",
   "provider": "anthropic",
   "frontendEntry": "./frontend/CadenceAgent.tsx",

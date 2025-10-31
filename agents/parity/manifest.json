@@ -1,7 +1,7 @@
 {
   "slug": "parity",
   "name": "Parity AI",
-  "description": "Intelligent document generator and compliance assistant. Creates engagement letters, contracts, and financial documents.",
+  "description": "Elite legal document drafting specialist. Like having the world's best lawyer panel. Creates engagement letters, contracts, compliance forms, and professional legal documents.",
   "category": "accounting",
   "provider": "anthropic",
   "frontendEntry": "./frontend/ParityAgent.tsx",

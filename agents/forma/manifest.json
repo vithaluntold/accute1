@@ -1,7 +1,7 @@
 {
   "slug": "forma",
   "name": "Forma",
-  "description": "Intelligent form builder and data collection assistant. Creates dynamic forms with conditional logic.",
+  "description": "OG of Organizers. Expert form builder specialist. Creates dynamic forms with validation, conditional logic, and multiple field types through conversation.",
   "category": "forms",
   "provider": "anthropic",
   "frontendEntry": "./frontend/FormaAgent.tsx",

@@ -25,7 +25,10 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Client Portal**: Dedicated client-facing interface with pages for dashboard, documents, tasks, forms, signatures, and messages, offering simplified UI/UX.
 - **AI Client Onboarding System**: A privacy-first conversational interface for onboarding, including AI-driven validation and automatic provisioning.
 - **AI Agent Chat Interface & Luca AI Chatbot Widget**: Real-time WebSocket streaming for interactive AI agents and a floating, branded chatbot widget.
-- **Conversational AI Agent Interfaces**: Full-screen Replit Agent-style conversational UIs for all agents (Cadence, Forma, Parity) with split-screen layout (chat on left, live preview on right). Agents are accessed via `/ai-agents/:slug` route with dynamic lazy loading. Users chat to build workflows, forms, and documents with real-time artifact preview.
+- **Conversational AI Agent Interfaces**: Full-screen Replit Agent-style conversational UIs for all agents with split-screen layout (chat on left, live preview on right). Agents are accessed via `/ai-agents/:slug` route with dynamic lazy loading. Users chat to build workflows, forms, and documents with real-time artifact preview.
+  - **Parity AI**: Legal document creation specialist - drafts legal documents, contracts, compliance forms, and agreements. Like having the world's best lawyer panel. Focus: Document drafting only.
+  - **Cadence AI**: Workflow automation builder - creates and manages operational workflows, processes, and automations. God of operations. Focus: Workflow building only.
+  - **Forma AI**: Form builder specialist - designs dynamic forms with validation, conditional logic, and field types. OG of Organizers. Focus: Form building only.
 - **Unified Workflows System**: Visual automation with hierarchical project management (Stages → Steps → Tasks), supporting hybrid execution, triggers, conditions, and automated actions.
 - **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage and a comprehensive pricing model (free, per month, per year, per instance, per token, one-time, hybrid).
 - **LLM Configuration Management**: CRUD operations for AI provider credentials using AES-256-GCM encryption.
