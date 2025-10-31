@@ -1,7 +1,7 @@
 # Accute - AI-Powered Accounting Workflow Automation Platform
 
 ## Overview
-Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It offers multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to provide a comprehensive, secure, and intelligent "AI-first" solution that enhances efficiency and ensures compliance for modern accounting practices. It aims to significantly improve efficiency and compliance in accounting practices.
+Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It provides multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform aims to be an "AI-first" solution that enhances efficiency, ensures compliance, and significantly improves modern accounting practices.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
@@ -13,92 +13,43 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 ## System Architecture
 
 ### UI/UX Decisions
-The UI draws inspiration from applications like Linear and Notion, utilizing the Carbon Design System. Key elements include a Porsche-to-Pink gradient, Orbitron (display headers), Inter (body text, labels, UI elements), and Fira Code (monospace) fonts, a collapsible sidebar with organized navigation, top navigation, card-based dashboards, and data tables with sorting and pagination. The platform is fully cross-browser and cross-device compatible, implemented as a Progressive Web App (PWA) for a native-like experience with responsive design, offline support, and mobile-optimized navigation.
+The UI is inspired by applications like Linear and Notion, using the Carbon Design System. It features a Porsche-to-Pink gradient, specific font usage (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is a responsive PWA, ensuring cross-browser, cross-device compatibility, and native-like experience with offline support.
 
 ### Technical Implementations
-The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript. Data persistence is managed by PostgreSQL (Neon) with Drizzle ORM. Authentication incorporates JWT and bcrypt, complemented by AES-256 encryption for sensitive data, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript. Data persistence is handled by PostgreSQL (Neon) with Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
 
 ### Feature Specifications
-- **Multi-tenant Architecture**: Isolated data and distinct SaaS/tenant-level roles.
-- **SaaS Platform Administration (Super Admin)**: Platform-level management interface for the SaaS provider with:
-  - **User & Subscription Management**: View all organizations, manage subscriptions, track billing status, and oversee all platform users across organizations
-  - **Support Ticket System**: Cross-organization support ticket management with priority tracking and resolution workflows
-  - **Marketplace Publishing**: Create and publish system-wide templates (workflows, forms, email templates, documents) available to all organizations
-  - **Platform Analytics**: Monitor platform-wide metrics, subscription health, and usage patterns
-  - **Access Control**: Platform-scoped access via `organizationId === null` check on all `/api/admin/*` endpoints
-  - **Dual Sidebar Navigation**: Context-aware menu showing platform-only sections (Platform Overview, User Management, Marketplace Management, System Templates, Support) for Super Admin vs. full operational menu for organization users
-  - **Database Schema**: `platformSubscriptions` table tracks organization subscription status, billing, and feature access
-- **Role-Based Access Control**: Granular permission management.
-- **Client Portal Task System**: Unified task management system visible in client portal with multi-source task ingestion (employee messages, workflow tasks, form/document requests), source tracking, follow-up scheduling, and escalation rules.
-- **AI Client Onboarding System**: Privacy-first conversational interface for client onboarding, dynamically collecting country-specific tax fields with AI-driven validation, and automatic contact/portal access provisioning.
-- **AI Agent Chat Interface**: Real-time WebSocket streaming for interactive AI agents (Parity, Cadence, Forma, Luca).
-- **Luca AI Chatbot Widget**: A floating, branded chat assistant with cross-browser and cross-device compatibility.
+- **Multi-tenant Architecture**: Provides isolated data and distinct SaaS/tenant-level roles.
+- **SaaS Platform Administration (Super Admin)**: Offers platform-level management including user/subscription management, support ticket system, marketplace publishing, platform analytics, and specialized access control.
+- **Role-Based Access Control**: A four-tier system (Super Admin, Admin, Employee, Client) with UI separation and route protection via `RoleGuard` and `OrganizationRoute` components, ensuring secure and role-aware navigation.
+- **Client Portal**: Dedicated client-facing interface with pages for dashboard, documents, tasks, forms, signatures, and messages, offering simplified UI/UX.
+- **AI Client Onboarding System**: A privacy-first conversational interface for onboarding, including AI-driven validation and automatic provisioning.
+- **AI Agent Chat Interface & Luca AI Chatbot Widget**: Real-time WebSocket streaming for interactive AI agents and a floating, branded chatbot widget.
 - **Unified Workflows System**: Visual automation with hierarchical project management (Stages → Steps → Tasks), supporting hybrid execution, triggers, conditions, and automated actions.
-- **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage.
-- **LLM Configuration Management**: CRUD operations for AI provider credentials with AES-256-GCM encryption.
+- **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage and a comprehensive pricing model (free, per month, per year, per instance, per token, one-time, hybrid).
+- **LLM Configuration Management**: CRUD operations for AI provider credentials using AES-256-GCM encryption.
 - **PKI Digital Signatures**: Tamper-proof document verification using RSA-2048.
 - **Secure Document Management**: Encrypted storage, authenticated downloads, and access control.
 - **User & Client Management**: Tools for managing users, roles, and client profiles.
 - **Audit Trails**: Comprehensive logging of all activities.
 - **Form Builder & Renderer**: Dynamic form creation with 22 field types and conditional logic.
-- **Polymorphic Tagging System**: Organize resources with flexible tagging.
-- **Marketplace System**: Provides templates (Documents, Forms, Pipelines) with pricing models and installation tracking.
-- **Workflow Assignment System**: Assign clients to workflows, track progress, and manage status lifecycles.
+- **Polymorphic Tagging System**: Flexible organization of resources.
+- **Marketplace System**: Provides templates (Documents, Forms, Pipelines) with pricing models.
+- **Workflow Assignment System**: Manages client assignments, tracks progress, and status lifecycles.
 - **Hierarchical Folder Structure**: Self-referencing folder tree with unlimited nesting, content categorization, and sharing permissions.
 - **Auto-Progression Engine**: Cascading automation for workflow progression.
-- **Analytics Dashboard**: Comprehensive analytics with backend API endpoints and interactive frontend visualizations.
-- **Email Template Management**: Complete system for creating, managing, and customizing email templates with organization-scoped isolation, dynamic placeholders, branding configuration, and live preview.
+- **Analytics Dashboard**: Comprehensive analytics with backend APIs and interactive frontend visualizations.
+- **Email Template Management**: System for creating, managing, and customizing email templates with organization-scoped isolation and dynamic placeholders.
 - **Automation Configuration UI**: Visual workflow task automation with 10 action types.
-- **Email Inbox Integration**: OAuth/IMAP email account management with AI processing.
-- **AI Email Processor**: Converts emails to tasks using LLM analysis.
-- **Assignment Detail Page**: Hierarchical workflow progress tracking (Stages → Steps → Tasks).
-- **Kanban Board**: Drag-and-drop assignment management across workflow stages.
+- **Email Inbox Integration & AI Email Processor**: OAuth/IMAP email account management with AI processing to convert emails to tasks.
+- **Assignment Detail Page & Kanban Board**: Hierarchical workflow progress tracking and drag-and-drop assignment management.
 - **Assignment Status Bot**: AI-powered conversational assistant for assignment queries.
-- **Task Ingestion System**: Multi-source task creation with organization-scoped security, including workflow tasks, message-based tasks, and form request tasks.
-- **Projects Management**: Comprehensive client engagement tracking system distinct from workflow-based assignments. Features include:
-  - **Purpose**: Manage ad-hoc client work, consulting engagements, and projects outside standardized workflows
-  - **Client Linkage**: Associate projects with specific clients for centralized engagement tracking
-  - **Budget Tracking**: Set project budgets and track actual costs against estimates with visual progress indicators
-  - **Timeline Management**: Define start dates, due dates, and track project completion
-  - **Priority & Status Management**: Categorize projects (Low/Medium/High/Urgent priority, Active/On Hold/Completed/Cancelled status)
-  - **Team Assignment**: Assign project owners from your team for accountability
-  - **Task Kanban Board**: Visual drag-and-drop task management across four columns (To Do, In Progress, Review, Completed)
-  - **Task Details**: Each task includes title, description, assignee, priority, due date, estimated/actual hours
-  - **Organization Scoping**: All projects and tasks isolated by organizationId for multi-tenant security
-  - **Database Schema**: `projects` table (engagement metadata) and `project_tasks` table (individual deliverables)
-  - **Integration**: Complements workflow-based Assignments by handling non-standardized client work
-  - **Use Cases**: One-off consulting projects, custom client requests, internal initiatives, engagements without predefined workflows
-- **AI Agent Foundry**: Comprehensive agent onboarding system enabling dynamic registration and deployment of custom AI agents with manifest-driven architecture. Features include:
-  - **Purpose**: Create a "foundry" where new AI agents can be onboarded by uploading frontend/backend code files and registering via manifest
-  - **Manifest System**: Each agent has a `manifest.json` defining slug, name, paths, capabilities, subscription requirements, pricing model, and default permissions
-  - **Folder Structure**: Agents stored in `/agents/{slug}/` with frontend, backend, and manifest files
-  - **Dynamic Loading**: Backend AgentRegistry validates and lazy-loads agent handlers; frontend lazy-loads React components
-  - **Access Control**:
-    - **Admins**: Full access to all agents by default
-    - **Users**: Access only if explicitly granted by admin
-    - **Clients**: No access (blocked by role scope)
-  - **Subscription-Aware**: Agents require minimum subscription plan level (free, starter, professional, enterprise)
-  - **Comprehensive Pricing Model**: Each agent can have flexible, granular pricing:
-    - **Free**: No cost to organizations
-    - **Per Month**: Monthly subscription fee (e.g., $29.99/month)
-    - **Per Year**: Annual subscription fee (e.g., $299.99/year)
-    - **Per Instance**: Usage-based pricing per execution (e.g., $0.50 per invocation)
-    - **Per Token**: LLM token consumption pricing (e.g., $0.000001 per token)
-    - **One-Time**: Lifetime access fee (e.g., $99.99 once)
-    - **Hybrid**: Combine multiple models (e.g., $10/month + $0.10/instance)
-  - **Usage Tracking**: `ai_agent_usage` table tracks instance counts, token consumption, and costs for per-instance and per-token billing
-  - **Multi-Tenant**: Organizations can independently enable/disable agents via `organization_agents` table
-  - **User Permissions**: Granular user-level access control via `user_agent_access` table
-  - **Database Schema**:
-    - `ai_agents`: Enhanced registry with slug, paths, manifest, comprehensive pricing fields (priceMonthly, priceYearly, pricePerInstance, pricePerToken, oneTimeFee, pricingModel), subscription requirements, and publishing status
-    - `ai_agent_usage`: Tracks usage metrics (instance count, token count, execution time) and calculated costs per billing period for organizations
-    - `organization_agents`: Tracks which organizations have which agents enabled
-    - `user_agent_access`: User-specific agent permissions within organizations
-  - **API Pattern**: Agents expose functionality via `/api/agents/:slug/...` with standardized interfaces
-  - **Integration**: Works with existing marketplace system; Super Admins create and publish agents platform-wide
+- **Task Ingestion System**: Multi-source task creation with organization-scoped security.
+- **Projects Management**: Comprehensive client engagement tracking for ad-hoc work, distinct from workflow-based assignments, featuring budget tracking, timeline management, priority/status management, team assignment, and a task Kanban board.
+- **AI Agent Foundry**: A system for onboarding, dynamic registration, and deployment of custom AI agents via a manifest-driven architecture, supporting various pricing models and multi-tenant/user-level access control.
 
 ### System Design Choices
-The project is organized into `client/`, `server/`, and `shared/` directories. Security is a foundational principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
+The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
@@ -106,5 +57,5 @@ The project is organized into `client/`, `server/`, and `shared/` directories. S
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
 - **Multer**: For file uploads.
-- **expr-eval**: Used for secure expression evaluation in conditional logic.
-- **Recharts**: Frontend library for data visualizations and charts.
+- **expr-eval**: For secure expression evaluation.
+- **Recharts**: Frontend library for data visualizations.
