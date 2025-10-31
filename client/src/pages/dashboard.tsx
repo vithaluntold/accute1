@@ -384,9 +384,9 @@ export default function Dashboard() {
       )}
 
       {/* Task Lists */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Overdue Tasks */}
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
@@ -427,7 +427,7 @@ export default function Dashboard() {
         </Card>
 
         {/* In Progress Tasks */}
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -468,7 +468,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Pending Tasks */}
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
@@ -511,7 +511,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Tasks Due Soon */}
-        <Card>
+        <Card className="w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-amber-500" />
