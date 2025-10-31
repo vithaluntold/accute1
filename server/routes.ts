@@ -8517,6 +8517,22 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Register AI agent custom routes
+  try {
+    const { agentRegistry } = await import("./agent-registry");
+    const agents = agentRegistry.getAllAgents();
+    
+    for (const agent of agents) {
+      try {
+        await agentRegistry.registerAgentRoutes(app, agent.slug);
+      } catch (error) {
+        console.error(`Failed to register routes for agent ${agent.slug}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to register agent routes:", error);
+  }
+
   const httpServer = createServer(app);
   return httpServer;
 }
