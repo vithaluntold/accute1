@@ -66,6 +66,14 @@ class AgentRegistry {
       const agentDir = path.join(this.agentsDir, slug);
       const manifestPath = path.join(agentDir, "manifest.json");
       
+      // Check if manifest exists before trying to read it
+      try {
+        await fs.access(manifestPath);
+      } catch {
+        // Silently skip directories without manifests (agents in development)
+        return;
+      }
+      
       const manifestContent = await fs.readFile(manifestPath, "utf-8");
       const manifest: AgentManifest = JSON.parse(manifestContent);
       
@@ -435,26 +443,7 @@ export const AGENT_REGISTRY: Record<string, AgentConfig> = {
     requiresToolExecution: false,
     supportsStreaming: true,
   },
-  kanban: {
-    name: 'kanban',
-    displayName: 'Kanban View',
-    category: 'visualization',
-    path: '../agents/kanban/backend/index',
-    className: 'KanbanAgent',
-    capabilities: ['kanban_visualization', 'workflow_analysis', 'task_organization'],
-    requiresToolExecution: false,
-    supportsStreaming: true,
-  },
-  luca: {
-    name: 'luca',
-    displayName: 'Luca',
-    category: 'accounting',
-    path: '../agents/luca/backend/index',
-    className: 'LucaAgent',
-    capabilities: ['accounting_guidance', 'tax_planning', 'financial_analysis', 'compliance_support', 'support_tickets', 'audit_preparation'],
-    requiresToolExecution: true,
-    supportsStreaming: true,
-  },
+  // kanban and luca agents not yet implemented
 };
 
 export function getAgentConfig(agentName: string): AgentConfig | null {
