@@ -114,7 +114,7 @@ export default function Dashboard() {
         </div>
       </div>
       
-      <div className="px-6">
+      <div className="px-6 space-y-6">
 
       {/* Mobile App Download Banner */}
       {!isPWA && showMobileAppBanner && (
