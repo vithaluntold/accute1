@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { ParityAgent } from "./index";
+import { storage } from "../../../server/storage";
 
 interface Message {
   role: "user" | "assistant";
@@ -20,8 +21,8 @@ export const registerRoutes = (app: any) => {
     try {
       const { message, history, currentDocument } = req.body;
       
-      // Get LLM configuration from the request (added by auth middleware)
-      const llmConfig = req.llmConfig;
+      // Get default LLM configuration for the organization
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
       
       if (!llmConfig) {
         return res.status(400).json({ 

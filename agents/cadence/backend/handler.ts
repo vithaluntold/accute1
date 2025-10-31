@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireAuth, type AuthRequest } from "../../../server/auth";
+import { requireAuth, type AuthRequest, decrypt } from "../../../server/auth";
+import { storage } from "../../../server/storage";
 
 interface WorkflowState {
   name: string;
@@ -33,18 +34,21 @@ export const registerRoutes = (app: any) => {
     try {
       const { message, history, currentWorkflow } = req.body;
       
-      // Get LLM configuration from the request (added by auth middleware)
-      const llmConfig = (req as any).llmConfig;
+      // Get default LLM configuration for the organization
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
       
-      if (!llmConfig || !llmConfig.apiKey) {
+      if (!llmConfig) {
         return res.json({
-          response: "Hi! I'm Cadence. To start building workflows, I need an Anthropic API key to be configured in your LLM settings. Once that's set up, I can help you create custom workflows conversationally!",
+          response: "Hi! I'm Cadence. To start building workflows, I need an API key to be configured in your LLM settings. Once that's set up, I can help you create custom workflows conversationally!",
         });
       }
 
+      // Decrypt API key
+      const apiKey = decrypt(llmConfig.apiKeyEncrypted);
+
       // Initialize Anthropic client
       const anthropic = new Anthropic({
-        apiKey: llmConfig.apiKey,
+        apiKey: apiKey,
       });
 
       // Build conversation history for Claude

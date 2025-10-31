@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireAuth, type AuthRequest } from "../../../server/auth";
+import { requireAuth, type AuthRequest, decrypt } from "../../../server/auth";
+import { storage } from "../../../server/storage";
 
 interface Message {
   role: "user" | "assistant";
@@ -32,15 +33,19 @@ export const registerRoutes = (app: any) => {
     try {
       const { message, history, currentForm } = req.body;
       
-      const llmConfig = req.llmConfig;
+      // Get default LLM configuration for the organization
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
       
-      if (!llmConfig || !llmConfig.apiKey) {
+      if (!llmConfig) {
         return res.status(400).json({ 
           error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
         });
       }
 
-      const client = new Anthropic({ apiKey: llmConfig.apiKey });
+      // Decrypt API key
+      const apiKey = decrypt(llmConfig.apiKeyEncrypted);
+
+      const client = new Anthropic({ apiKey: apiKey });
 
       const systemPrompt = `You are Forma, an AI form builder assistant. You help users create forms through conversation.
 
