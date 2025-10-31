@@ -282,50 +282,63 @@ export default function FormsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-display">Forms</h1>
-            {hasForma && (
-              <Badge variant="secondary" className="gap-1" data-testid="badge-forma-copilot">
-                <Sparkles className="w-4 h-4" />
-                Forma AI
-              </Badge>
-            )}
+    <div className="space-y-6">
+      {/* Gradient Header Section */}
+      <div className="gradient-hero relative overflow-hidden rounded-b-2xl">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative px-6 py-8 md:py-12">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-display font-bold text-white">Forms</h1>
+                {hasForma && (
+                  <Badge variant="secondary" className="gap-1 bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="badge-forma-copilot">
+                    <Sparkles className="w-4 h-4" />
+                    Forma AI
+                  </Badge>
+                )}
+              </div>
+              <p className="text-white/90 text-lg">
+                Create and manage form templates for clients and workflows
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {hasForma && (
+                <AIAgentChat
+                  agentName="Forma"
+                  mode="dialog"
+                  contextData={{ forms: filteredForms }}
+                  trigger={
+                    <Button variant="outline" className="bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="button-forma-chat">
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Ask Forma AI
+                    </Button>
+                  }
+                />
+              )}
+              <Button 
+                variant="outline" 
+                className="bg-white/20 border-white/30 text-white backdrop-blur-sm"
+                onClick={() => setTemplateGalleryOpen(true)} 
+                data-testid="button-create-from-template"
+              >
+                <Sparkles className="w-4 w-4 mr-2" />
+                Create from Template
+              </Button>
+              <Button 
+                className="bg-white text-primary"
+                onClick={() => setCreateDialogOpen(true)} 
+                data-testid="button-create-form"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Form
+              </Button>
+            </div>
           </div>
-          <p className="text-muted-foreground mt-1">
-            Create and manage form templates for clients and workflows
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasForma && (
-            <AIAgentChat
-              agentName="Forma"
-              mode="dialog"
-              contextData={{ forms: filteredForms }}
-              trigger={
-                <Button variant="outline" data-testid="button-forma-chat">
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Ask Forma AI
-                </Button>
-              }
-            />
-          )}
-          <Button 
-            variant="outline" 
-            onClick={() => setTemplateGalleryOpen(true)} 
-            data-testid="button-create-from-template"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Create from Template
-          </Button>
-          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-form">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Form
-          </Button>
         </div>
       </div>
+
+      <div className="px-6 space-y-6">
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -859,6 +872,7 @@ export default function FormsPage() {
           </Tabs>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

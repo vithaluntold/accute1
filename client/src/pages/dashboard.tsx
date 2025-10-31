@@ -102,13 +102,19 @@ export default function Dashboard() {
   const pendingTasks = myTasks?.filter(t => t.status === 'pending') || [];
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
-          Welcome back, {user?.firstName || user?.username}
-        </h1>
-        <p className="text-muted-foreground">Track your tasks and stay on top of deadlines</p>
+    <div className="flex flex-col gap-6">
+      {/* Hero Section with Gradient */}
+      <div className="gradient-hero relative overflow-hidden rounded-b-2xl">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative px-6 py-8 md:py-12">
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-white mb-2 animate-fade-in" data-testid="text-dashboard-title">
+            Welcome back, {user?.firstName || user?.username}
+          </h1>
+          <p className="text-white/90 text-lg">Track your tasks and stay on top of deadlines</p>
+        </div>
       </div>
+      
+      <div className="px-6">
 
       {/* Mobile App Download Banner */}
       {!isPWA && showMobileAppBanner && (
@@ -157,55 +163,68 @@ export default function Dashboard() {
 
       {/* My Task Statistics */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">My Tasks</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-1 w-12 gradient-primary rounded-full"></div>
+          <h2 className="text-xl font-display font-bold">My Tasks</h2>
+        </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          <Card>
+          <Card className="hover-elevate transition-base gradient-subtle">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-              <ListTodo className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 rounded-lg bg-primary/10">
+                <ListTodo className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-my-total">{myStats?.total || 0}</div>
+              <div className="text-3xl font-display font-bold gradient-text-primary" data-testid="stat-my-total">{myStats?.total || 0}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-elevate transition-base bg-info/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 rounded-lg bg-info/10">
+                <Clock className="h-4 w-4 text-info" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-my-pending">{myStats?.pending || 0}</div>
+              <div className="text-3xl font-display font-bold text-info" data-testid="stat-my-pending">{myStats?.pending || 0}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-elevate transition-base bg-warning/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 rounded-lg bg-warning/10">
+                <TrendingUp className="h-4 w-4 text-warning" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-my-in-progress">{myStats?.in_progress || 0}</div>
+              <div className="text-3xl font-display font-bold text-warning" data-testid="stat-my-in-progress">{myStats?.in_progress || 0}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-elevate transition-base bg-success/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              <div className="p-2 rounded-lg bg-success/10">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-my-completed">{myStats?.completed || 0}</div>
+              <div className="text-3xl font-display font-bold text-success" data-testid="stat-my-completed">{myStats?.completed || 0}</div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover-elevate transition-base bg-destructive/5">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-              <AlertCircle className="h-4 w-4 text-destructive" />
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive" data-testid="stat-my-overdue">
+              <div className="text-3xl font-display font-bold text-destructive" data-testid="stat-my-overdue">
                 {myStats?.overdue || 0}
               </div>
             </CardContent>
@@ -216,7 +235,10 @@ export default function Dashboard() {
       {/* Team Statistics (Manager View) */}
       {hasWorkflowsView && (
         <div>
-          <h2 className="text-lg font-semibold mb-3">Team Overview</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-1 w-12 gradient-accent rounded-full"></div>
+            <h2 className="text-xl font-display font-bold">Team Overview</h2>
+          </div>
           {teamStatsLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
@@ -281,7 +303,10 @@ export default function Dashboard() {
       {/* Practice Statistics (Admin View) */}
       {hasReportsView && (
         <div>
-          <h2 className="text-lg font-semibold mb-3">Practice Overview</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-1 w-12 gradient-success rounded-full"></div>
+            <h2 className="text-xl font-display font-bold">Practice Overview</h2>
+          </div>
           {practiceStatsLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {[1, 2, 3, 4].map((i) => (
@@ -527,6 +552,7 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
