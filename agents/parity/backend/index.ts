@@ -66,11 +66,13 @@ When generating engagement letters or other documents, provide comprehensive, in
 Be helpful, professional, and provide actionable guidance. If the user asks about creating documents or validating data, guide them through the process and explain what information you need.`;
 
     try {
+      console.log("Calling LLM service with message:", userMessage.substring(0, 100));
       const response = await this.llmService.sendPrompt(userMessage, systemPrompt);
+      console.log("LLM response received, length:", response.length);
       return response;
     } catch (error) {
       console.error('Parity conversational mode failed:', error);
-      return 'I apologize, but I encountered an error processing your request. Please check your LLM configuration and try again.';
+      throw error; // Re-throw so handler can catch and return proper error details
     }
   }
 

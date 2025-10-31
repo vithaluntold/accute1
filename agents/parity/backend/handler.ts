@@ -24,6 +24,8 @@ export const registerRoutes = (app: any) => {
       // Get default LLM configuration for the organization
       const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
       
+      console.log("LLM Config found:", llmConfig ? `Provider: ${llmConfig.provider}, Model: ${llmConfig.model}` : "None");
+      
       if (!llmConfig) {
         return res.status(400).json({ 
           error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
@@ -32,6 +34,7 @@ export const registerRoutes = (app: any) => {
 
       // Initialize Parity agent
       const agent = new ParityAgent(llmConfig);
+      console.log("Parity agent initialized, executing prompt...");
       
       // Build conversation context
       const conversationContext = history
