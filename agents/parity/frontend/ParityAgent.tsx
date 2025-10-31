@@ -110,10 +110,10 @@ export default function ParityAgent() {
   };
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full gap-4">
+    <ResizablePanelGroup direction="horizontal" className="h-full">
       {/* Left Panel - Chat Interface */}
       <ResizablePanel defaultSize={50} minSize={30}>
-        <Card className="flex flex-col h-full">
+        <Card className="flex flex-col h-full mr-2">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
@@ -221,7 +221,7 @@ export default function ParityAgent() {
 
       {/* Right Panel - Document Preview */}
       <ResizablePanel defaultSize={50} minSize={30}>
-        <Card className="flex flex-col h-full">
+        <Card className="flex flex-col h-full ml-2">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
