@@ -5,7 +5,7 @@
   "category": "forms",
   "provider": "anthropic",
   "frontendEntry": "./frontend/FormaAgent.tsx",
-  "backendEntry": "./backend/index.ts",
+  "backendEntry": "./backend/handler.ts",
   "capabilities": ["chat", "form-builder", "data-validation"],
   "subscriptionMinPlan": "free",
   "defaultScope": "admin",

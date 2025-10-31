@@ -5,7 +5,7 @@
   "category": "accounting",
   "provider": "anthropic",
   "frontendEntry": "./frontend/ParityAgent.tsx",
-  "backendEntry": "./backend/index.ts",
+  "backendEntry": "./backend/handler.ts",
   "capabilities": ["chat", "document-generation", "compliance"],
   "subscriptionMinPlan": "free",
   "defaultScope": "admin",
