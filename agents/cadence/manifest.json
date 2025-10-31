@@ -1,0 +1,20 @@
+{
+  "slug": "cadence",
+  "name": "Cadence",
+  "description": "Workflow timing and scheduling optimizer. Chat to build custom workflows visually.",
+  "category": "workflow",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/CadenceAgent.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["chat", "workflow-builder", "scheduling"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["workflow", "automation", "scheduling", "timing"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}

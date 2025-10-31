@@ -1,0 +1,20 @@
+{
+  "slug": "forma",
+  "name": "Forma",
+  "description": "Intelligent form builder and data collection assistant. Creates dynamic forms with conditional logic.",
+  "category": "forms",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/FormaAgent.tsx",
+  "backendEntry": "./backend/index.ts",
+  "capabilities": ["chat", "form-builder", "data-validation"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["forms", "data-collection", "builder", "automation"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}

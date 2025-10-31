@@ -8327,22 +8327,27 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(404).json({ error: "Agent manifest not found" });
       }
       
-      // Check subscription requirement
-      const subscription = await db
-        .select()
-        .from(platformSubscriptions)
-        .where(eq(platformSubscriptions.organizationId, organizationId))
-        .limit(1);
+      // Check subscription requirement - bypass for cadence, forma, and parity (always free)
+      const freeAgents = ['cadence', 'forma', 'parity'];
+      const isFreeAgent = freeAgents.includes(slug);
       
-      const currentPlan = subscription.length > 0 ? subscription[0].plan : "free";
-      const planHierarchy = ["free", "starter", "professional", "enterprise"];
-      const userLevel = planHierarchy.indexOf(currentPlan);
-      const requiredLevel = planHierarchy.indexOf(agent[0].subscriptionMinPlan || "free");
-      
-      if (userLevel < requiredLevel) {
-        return res.status(403).json({ 
-          error: `Agent requires ${agent[0].subscriptionMinPlan} plan or higher. Your organization has ${currentPlan} plan.` 
-        });
+      if (!isFreeAgent) {
+        const subscription = await db
+          .select()
+          .from(platformSubscriptions)
+          .where(eq(platformSubscriptions.organizationId, organizationId))
+          .limit(1);
+        
+        const currentPlan = subscription.length > 0 ? subscription[0].plan : "free";
+        const planHierarchy = ["free", "starter", "professional", "enterprise"];
+        const userLevel = planHierarchy.indexOf(currentPlan);
+        const requiredLevel = planHierarchy.indexOf(agent[0].subscriptionMinPlan || "free");
+        
+        if (userLevel < requiredLevel) {
+          return res.status(403).json({ 
+            error: `Agent requires ${agent[0].subscriptionMinPlan} plan or higher. Your organization has ${currentPlan} plan.` 
+          });
+        }
       }
       
       await agentRegistry.enableAgentForOrganization(slug, organizationId, req.user!.id);

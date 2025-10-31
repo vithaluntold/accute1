@@ -1,0 +1,20 @@
+{
+  "slug": "parity",
+  "name": "Parity AI",
+  "description": "Intelligent document generator and compliance assistant. Creates engagement letters, contracts, and financial documents.",
+  "category": "accounting",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/ParityAgent.tsx",
+  "backendEntry": "./backend/index.ts",
+  "capabilities": ["chat", "document-generation", "compliance"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["documents", "compliance", "accounting", "generation"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}
