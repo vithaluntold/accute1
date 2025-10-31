@@ -25,6 +25,7 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Client Portal**: Dedicated client-facing interface with pages for dashboard, documents, tasks, forms, signatures, and messages, offering simplified UI/UX.
 - **AI Client Onboarding System**: A privacy-first conversational interface for onboarding, including AI-driven validation and automatic provisioning.
 - **AI Agent Chat Interface & Luca AI Chatbot Widget**: Real-time WebSocket streaming for interactive AI agents and a floating, branded chatbot widget.
+- **Conversational AI Agent Interfaces**: Full-screen Replit Agent-style conversational UIs for all agents (Cadence, Forma, Parity) with split-screen layout (chat on left, live preview on right). Agents are accessed via `/ai-agents/:slug` route with dynamic lazy loading. Users chat to build workflows, forms, and documents with real-time artifact preview.
 - **Unified Workflows System**: Visual automation with hierarchical project management (Stages → Steps → Tasks), supporting hybrid execution, triggers, conditions, and automated actions.
 - **AI Agent Marketplace & Execution System**: Enables browsing, installation, and management of AI agents with secure LLM credential storage and a comprehensive pricing model (free, per month, per year, per instance, per token, one-time, hybrid).
 - **LLM Configuration Management**: CRUD operations for AI provider credentials using AES-256-GCM encryption.
@@ -51,6 +52,8 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.
+
+**Agent Routing Architecture**: Individual AI agents are accessed via dynamic routing at `/ai-agents/:slug`. The `AgentDetail` page (`client/src/pages/agent-detail.tsx`) lazy-loads agent components on-demand and provides loading/error states. Navigation from Documents/Workflows/Forms pages to their respective agents (Parity, Cadence, Forma) uses `setLocation('/ai-agents/:slug')` for full-screen conversational interfaces, replacing modal dialogs.
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
