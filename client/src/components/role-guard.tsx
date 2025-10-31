@@ -33,7 +33,7 @@ export function RoleGuard({ children, allowedRoles, fallbackPath }: RoleGuardPro
     return <Redirect to="/login" />;
   }
 
-  const userRole = user.role;
+  const userRole = user.roleName || user.role;
   const hasAccess = allowedRoles.includes(userRole);
 
   if (!hasAccess) {
