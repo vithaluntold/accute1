@@ -47,6 +47,7 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Task Ingestion System**: Multi-source task creation with organization-scoped security.
 - **Projects Management**: Comprehensive client engagement tracking for ad-hoc work, distinct from workflow-based assignments, featuring budget tracking, timeline management, priority/status management, team assignment, and a task Kanban board.
 - **AI Agent Foundry**: A system for onboarding, dynamic registration, and deployment of custom AI agents via a manifest-driven architecture, supporting various pricing models and multi-tenant/user-level access control.
+- **Template Scoping System**: Dual-scope template architecture with global (super admin, visible to all) and organization (admin, internal only) templates for workflows, forms, email templates, message templates, and document templates, with explicit scope field in database schema and UI badges for visual identification.
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core principle, implemented through robust authentication, encryption, and access control, with distinct SaaS-level and tenant-level role separation for multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security.

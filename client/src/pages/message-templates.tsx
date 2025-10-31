@@ -38,6 +38,7 @@ type MessageTemplate = {
   variables: string[] | null;
   isActive: boolean;
   isDefault: boolean;
+  scope: 'global' | 'organization';
   organizationId: string | null;
   createdBy: string;
   createdAt: string;
@@ -249,9 +250,9 @@ export default function MessageTemplatesPage() {
                           Inactive
                         </Badge>
                       )}
-                      {template.organizationId === null && (
-                        <Badge className="ml-2 text-xs bg-gradient-to-r from-blue-600 to-pink-600">
-                          Platform
+                      {template.scope === 'global' && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          Global
                         </Badge>
                       )}
                     </CardDescription>

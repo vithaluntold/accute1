@@ -922,6 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const workflow = await storage.createWorkflow({
         ...req.body,
+        scope: req.user!.organizationId ? 'organization' : 'global', // Super admin creates global templates
         organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.userId!,
       });
@@ -2385,7 +2386,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: 'engagement_letter',
         content: content,
         description: 'AI-generated engagement letter template created by Parity',
-        organizationId: req.user!.organizationId!,
+        scope: req.user!.organizationId ? 'organization' : 'global', // Super admin creates global templates
+        organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.userId!,
         isDefault: false,
         isActive: true,
@@ -3361,6 +3363,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const parsed = insertFormTemplateSchema.parse(req.body);
       const form = await storage.createFormTemplate({
         ...parsed,
+        scope: req.user!.organizationId ? 'organization' : 'global', // Super admin creates global templates
         organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.user!.id,
       });
@@ -5091,6 +5094,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         variables: req.body.variables || [],
         isDefault: false,
         usageCount: 0,
+        scope: req.user!.organizationId ? 'organization' : 'global', // Super admin creates global templates
         organizationId: req.user!.organizationId || null, // Allow null for super admin
         createdBy: req.user!.id,
       };
@@ -5191,6 +5195,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         variables: req.body.variables || [],
         isDefault: false,
         usageCount: 0,
+        scope: req.user!.organizationId ? 'organization' : 'global', // Super admin creates global templates
         organizationId: req.user!.organizationId || null,
         createdBy: req.user!.id,
       };

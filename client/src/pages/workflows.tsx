@@ -437,6 +437,11 @@ export default function Workflows() {
                       <CardTitle className="text-xl" data-testid={`workflow-name-${workflow.id}`}>
                         {workflow.name}
                       </CardTitle>
+                      {workflow.scope === 'global' && (
+                        <Badge variant="secondary" className="text-xs" data-testid={`workflow-scope-${workflow.id}`}>
+                          Global
+                        </Badge>
+                      )}
                       <Badge
                         variant={workflow.isActive ? "default" : "outline"}
                         data-testid={`workflow-status-${workflow.id}`}

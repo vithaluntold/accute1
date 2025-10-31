@@ -122,7 +122,10 @@ export const workflows = pgTable("workflows", {
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull().default("custom"), // 'tax', 'audit', 'bookkeeping', 'custom'
-  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
+  
+  // Template scoping: 'global' (super admin, visible to all) or 'organization' (admin, org-specific)
+  scope: text("scope").notNull().default("organization"), // 'global', 'organization'
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for global templates, org ID for org-scoped
   createdBy: varchar("created_by").notNull().references(() => users.id),
   status: text("status").notNull().default("draft"), // 'draft', 'active', 'completed', 'archived'
   currentStageId: varchar("current_stage_id"), // Track which stage workflow is currently on
@@ -487,7 +490,10 @@ export const documentTemplates = pgTable("document_templates", {
   category: text("category").notNull().default("engagement_letter"), // engagement_letter, audit_letter, tax_organizer, etc.
   content: text("content").notNull(), // Template content with placeholders like {{client_name}}
   description: text("description"), // Brief description of template
-  organizationId: varchar("organization_id").references(() => organizations.id), // null for system templates
+  
+  // Template scoping: 'global' (super admin, visible to all) or 'organization' (admin, org-specific)
+  scope: text("scope").notNull().default("organization"), // 'global', 'organization'
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for global templates, org ID for org-scoped
   createdBy: varchar("created_by").references(() => users.id),
   isDefault: boolean("is_default").notNull().default(false), // System-provided templates
   isActive: boolean("is_active").notNull().default(true),
@@ -896,7 +902,10 @@ export const formTemplates = pgTable("form_templates", {
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull().default("custom"), // 'tax', 'audit', 'onboarding', 'custom'
-  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
+  
+  // Template scoping: 'global' (super admin, visible to all) or 'organization' (admin, org-specific)
+  scope: text("scope").notNull().default("organization"), // 'global', 'organization'
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for global templates, org ID for org-scoped
   createdBy: varchar("created_by").notNull().references(() => users.id),
   // Form structure
   fields: jsonb("fields").notNull().default(sql`'[]'::jsonb`), // Array of form fields
@@ -1805,9 +1814,13 @@ export const appointments = pgTable("appointments", {
 // Email Templates
 export const emailTemplates = pgTable("email_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   name: text("name").notNull(),
   category: text("category").notNull(), // welcome, reminder, invoice, signature_request, custom
+  
+  // Template scoping: 'global' (super admin, visible to all) or 'organization' (admin, org-specific)
+  scope: text("scope").notNull().default("organization"), // 'global', 'organization'
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for global templates, org ID for org-scoped
+  
   subject: text("subject").notNull(),
   body: text("body").notNull(), // HTML content with merge fields {{client_name}}, {{portal_link}}, etc.
   variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`), // Available merge fields
@@ -1831,9 +1844,13 @@ export const emailTemplates = pgTable("email_templates", {
 // Message Templates - Quick message templates for client communication
 export const messageTemplates = pgTable("message_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").references(() => organizations.id), // nullable for system-wide templates
   name: text("name").notNull(),
   category: text("category").notNull(), // follow_up, status_update, request_info, greeting, custom
+  
+  // Template scoping: 'global' (super admin, visible to all) or 'organization' (admin, org-specific)
+  scope: text("scope").notNull().default("organization"), // 'global', 'organization'
+  organizationId: varchar("organization_id").references(() => organizations.id), // null for global templates, org ID for org-scoped
+  
   content: text("content").notNull(), // Message content with merge fields {{client_name}}, {{firm_name}}, etc.
   variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`),
   isActive: boolean("is_active").notNull().default(true),

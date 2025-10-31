@@ -775,7 +775,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createWorkflow(workflow: InsertWorkflow & { organizationId: string; createdBy: string }): Promise<Workflow> {
+  async createWorkflow(workflow: InsertWorkflow & { organizationId: string | null; createdBy: string }): Promise<Workflow> {
     const result = await db.insert(schema.workflows).values(workflow).returning();
     return result[0];
   }
@@ -794,7 +794,12 @@ export class DbStorage implements IStorage {
 
   async getWorkflowsByOrganization(organizationId: string): Promise<Workflow[]> {
     return await db.select().from(schema.workflows)
-      .where(eq(schema.workflows.organizationId, organizationId))
+      .where(
+        or(
+          eq(schema.workflows.organizationId, organizationId),
+          isNull(schema.workflows.organizationId) // Include global templates
+        )
+      )
       .orderBy(desc(schema.workflows.updatedAt));
   }
 
@@ -2488,7 +2493,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async createFormTemplate(template: InsertFormTemplate & { organizationId: string; createdBy: string }): Promise<FormTemplate> {
+  async createFormTemplate(template: InsertFormTemplate & { organizationId: string | null; createdBy: string }): Promise<FormTemplate> {
     const result = await db.insert(schema.formTemplates).values(template).returning();
     return result[0];
   }
@@ -2507,7 +2512,12 @@ export class DbStorage implements IStorage {
 
   async getFormTemplatesByOrganization(organizationId: string): Promise<FormTemplate[]> {
     return await db.select().from(schema.formTemplates)
-      .where(eq(schema.formTemplates.organizationId, organizationId))
+      .where(
+        or(
+          eq(schema.formTemplates.organizationId, organizationId),
+          isNull(schema.formTemplates.organizationId) // Include global templates
+        )
+      )
       .orderBy(desc(schema.formTemplates.updatedAt));
   }
 

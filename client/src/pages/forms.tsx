@@ -380,9 +380,16 @@ export default function FormsPage() {
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="truncate" data-testid={`text-form-name-${form.id}`}>
-                      {form.name}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CardTitle className="truncate" data-testid={`text-form-name-${form.id}`}>
+                        {form.name}
+                      </CardTitle>
+                      {form.scope === 'global' && (
+                        <Badge variant="secondary" className="text-xs" data-testid={`form-scope-${form.id}`}>
+                          Global
+                        </Badge>
+                      )}
+                    </div>
                     <CardDescription className="mt-1 line-clamp-2">
                       {form.description || "No description"}
                     </CardDescription>

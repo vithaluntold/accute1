@@ -51,6 +51,7 @@ type EmailTemplate = {
   footerText: string | null;
   socialLinks: Record<string, string> | null;
   brandingColors: Record<string, string> | null;
+  scope: 'global' | 'organization';
   organizationId: string | null;
   createdBy: string;
   createdAt: string;
@@ -400,8 +401,8 @@ export default function EmailTemplatesPage() {
                       <CardTitle>{template.name}</CardTitle>
                       <div className="flex gap-2">
                         <Badge variant="outline" className="capitalize">{template.category}</Badge>
-                        {template.organizationId === null && (
-                          <Badge variant="secondary">System</Badge>
+                        {template.scope === 'global' && (
+                          <Badge variant="secondary" className="text-xs">Global</Badge>
                         )}
                         <Badge variant={template.isActive ? "default" : "secondary"}>
                           {template.isActive ? "Active" : "Inactive"}
