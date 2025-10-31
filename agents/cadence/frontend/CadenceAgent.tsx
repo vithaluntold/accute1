@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 
 interface Message {
   role: "user" | "assistant";
@@ -90,9 +95,10 @@ export default function CadenceAgent() {
   };
 
   return (
-    <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <ResizablePanelGroup direction="horizontal" className="h-full gap-4">
       {/* Left Panel - Chat Interface */}
-      <Card className="flex flex-col h-full">
+      <ResizablePanel defaultSize={50} minSize={30}>
+        <Card className="flex flex-col h-full">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
@@ -181,9 +187,13 @@ export default function CadenceAgent() {
           </div>
         </CardContent>
       </Card>
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
 
       {/* Right Panel - Live Workflow Preview */}
-      <Card className="flex flex-col h-full">
+      <ResizablePanel defaultSize={50} minSize={30}>
+        <Card className="flex flex-col h-full">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <Workflow className="h-5 w-5" />
@@ -332,6 +342,7 @@ export default function CadenceAgent() {
           </ScrollArea>
         </CardContent>
       </Card>
-    </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }
