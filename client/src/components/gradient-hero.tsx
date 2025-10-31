@@ -23,7 +23,8 @@ export function GradientHero({
       aria-label={`${title} page header`}
       data-testid={testId}
     >
-      <div className="absolute inset-0 gradient-hero opacity-90" aria-hidden="true"></div>
+      <div className="absolute inset-0 gradient-hero" aria-hidden="true"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60" aria-hidden="true"></div>
       <div className="relative container mx-auto p-6 md:p-8">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="max-w-4xl flex-1">

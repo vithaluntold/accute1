@@ -38,15 +38,15 @@ export default function SignaturesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: signatureRequests, isLoading } = useQuery({
+  const { data: signatureRequests = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/signature-requests"],
   });
 
-  const { data: clients } = useQuery({
+  const { data: clients = [] } = useQuery<any[]>({
     queryKey: ["/api/clients"],
   });
 
-  const { data: documents } = useQuery({
+  const { data: documents = [] } = useQuery<any[]>({
     queryKey: ["/api/documents"],
   });
 
