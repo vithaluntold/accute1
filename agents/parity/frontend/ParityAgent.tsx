@@ -56,9 +56,21 @@ export default function ParityAgent() {
       });
 
       const data = await response.json();
+      
+      // Check if the response contains an error
+      if (data.error) {
+        console.error("API Error:", data.error, data.details);
+        const errorMessage: Message = {
+          role: "assistant",
+          content: `Sorry, I encountered an error: ${data.error}${data.details ? ` (${data.details})` : ''}`
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+      
       const assistantMessage: Message = { 
         role: "assistant", 
-        content: data.response,
+        content: data.response || "No response received",
         document: data.document
       };
       
@@ -69,7 +81,7 @@ export default function ParityAgent() {
         setCurrentDocument(data.document);
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Network/Parse Error:", error);
       const errorMessage: Message = {
         role: "assistant",
         content: "Sorry, I encountered an error. Please ensure you have configured your AI provider credentials in Settings > LLM Configuration."
