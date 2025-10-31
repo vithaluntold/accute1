@@ -32,6 +32,7 @@ import { FileSignature, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function SignaturesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);

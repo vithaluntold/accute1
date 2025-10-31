@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Mail, Plus, Trash2, RefreshCw, Settings, CheckCircle, AlertCircle } from "lucide-react";
 import type { EmailAccount } from "@shared/schema";
+import { GradientHero } from "@/components/gradient-hero";
 
 const emailAccountSchema = z.object({
   provider: z.enum(["gmail", "outlook", "imap", "exchange"]),

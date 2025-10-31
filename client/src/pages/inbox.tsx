@@ -27,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { EmailMessage, EmailAccount } from "@shared/schema";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function Inbox() {
   const { toast } = useToast();

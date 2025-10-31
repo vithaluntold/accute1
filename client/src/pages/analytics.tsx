@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Briefcase, CheckCircle2, DollarSign, Ticket, Bot, Clock } from "lucide-react";
+import { TrendingUp, Users, Briefcase, CheckCircle2, DollarSign, Ticket, Bot, Clock, BarChart3 } from "lucide-react";
+import { GradientHero } from "@/components/gradient-hero";
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -207,40 +208,44 @@ export default function Analytics() {
   ].filter(item => item.value > 0) : [];
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="heading-analytics">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Comprehensive insights into your practice performance</p>
-        </div>
-        <div className="flex gap-2">
-          <Select value={filterBy} onValueChange={(value) => { setFilterBy(value); setSelectedUserId(""); }}>
-            <SelectTrigger className="w-48" data-testid="select-filter-type">
-              <SelectValue placeholder="Filter by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Data</SelectItem>
-              <SelectItem value="user">Specific User</SelectItem>
-              <SelectItem value="admin">Admins Only</SelectItem>
-              <SelectItem value="team_manager">Team Managers</SelectItem>
-            </SelectContent>
-          </Select>
-          {filterBy === "user" && (
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger className="w-48" data-testid="select-user">
-                <SelectValue placeholder="Select user" />
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={BarChart3}
+        title="Analytics Dashboard"
+        description="Comprehensive insights into your practice performance"
+        testId="hero-analytics"
+        actions={
+          <div className="flex gap-2">
+            <Select value={filterBy} onValueChange={(value) => { setFilterBy(value); setSelectedUserId(""); }}>
+              <SelectTrigger className="w-48 bg-white/20 backdrop-blur-sm text-white border-white/30" data-testid="select-filter-type">
+                <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
-                {users.map((user: any) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">All Data</SelectItem>
+                <SelectItem value="user">Specific User</SelectItem>
+                <SelectItem value="admin">Admins Only</SelectItem>
+                <SelectItem value="team_manager">Team Managers</SelectItem>
               </SelectContent>
             </Select>
-          )}
-        </div>
-      </div>
+            {filterBy === "user" && (
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="w-48 bg-white/20 backdrop-blur-sm text-white border-white/30" data-testid="select-user">
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user: any) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        }
+      />
+      
+      <div className="p-6 space-y-6">
 
       {/* Overview Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -536,6 +541,7 @@ export default function Analytics() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

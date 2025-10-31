@@ -36,6 +36,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Search, Bot, Download, Check, Sparkles, Plus, DollarSign, Tag, FolderCode } from "lucide-react";
+import { GradientHero } from "@/components/gradient-hero";
 
 const createAgentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -174,25 +175,21 @@ export default function AIAgents() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold mb-2 flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-[#e5a660]" />
-            AI Agent Marketplace
-          </h1>
-          <p className="text-muted-foreground">
-            Browse and install pre-built AI agents to automate your workflows
-          </p>
-        </div>
-        {isSuperAdmin && (
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-agent">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Agent
-              </Button>
-            </DialogTrigger>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Sparkles}
+        title="AI Agent Marketplace"
+        description="Browse and install pre-built AI agents to automate your workflows"
+        testId="hero-ai-agents"
+        actions={
+          isSuperAdmin ? (
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/30" data-testid="button-create-agent">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Agent
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create AI Agent</DialogTitle>
@@ -462,10 +459,12 @@ export default function AIAgents() {
               </Form>
             </DialogContent>
           </Dialog>
-        )}
-      </div>
-
-      <div className="flex items-center gap-4 mb-6 flex-wrap">
+          ) : undefined
+        }
+      />
+      
+      <div className="container mx-auto p-6 max-w-7xl space-y-6">
+        <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -648,6 +647,7 @@ export default function AIAgents() {
           </p>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
+import { GradientHero } from "@/components/gradient-hero";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -227,17 +228,15 @@ export default function Settings() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
-            Settings
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Configure AI providers and platform settings
-          </p>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={SettingsIcon}
+        title="Settings"
+        description="Configure AI providers and platform settings"
+        testId="hero-settings"
+      />
+      
+      <div className="container mx-auto p-6 space-y-6">
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
@@ -603,6 +602,7 @@ export default function Settings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
