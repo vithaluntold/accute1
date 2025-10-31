@@ -12,7 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Pipeline, PipelineStage, PipelineStep, PipelineTask, TaskSubtask, TaskChecklist, User } from "@shared/schema";
+import type { TaskSubtask, TaskChecklist, User } from "@shared/schema";
+
+// Temporary type definitions until schema is updated
+type Pipeline = any;
+type PipelineStage = any;
+type PipelineStep = any;
+type PipelineTask = any;
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -902,10 +908,12 @@ function TaskItem({ task, expanded, onToggle, users }: { task: PipelineTask; exp
               <div className="flex items-center gap-2">
                 <Avatar className="h-5 w-5">
                   <AvatarFallback className="text-xs">
-                    {assignedUser.fullName?.split(' ').map(n => n[0]).join('') || 'U'}
+                    {(assignedUser.firstName && assignedUser.lastName) ? `${assignedUser.firstName[0]}${assignedUser.lastName[0]}` : 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-xs text-muted-foreground">{assignedUser.fullName || assignedUser.email}</span>
+                <span className="text-xs text-muted-foreground">
+                  {assignedUser.firstName && assignedUser.lastName ? `${assignedUser.firstName} ${assignedUser.lastName}` : assignedUser.email}
+                </span>
               </div>
             )}
             <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
@@ -927,9 +935,9 @@ function TaskItem({ task, expanded, onToggle, users }: { task: PipelineTask; exp
                         <SelectValue placeholder="Choose a user" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users?.map((user) => (
+                        {users?.map((user: User) => (
                           <SelectItem key={user.id} value={user.id}>
-                            {user.fullName || user.email}
+                            {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email}
                           </SelectItem>
                         ))}
                       </SelectContent>
