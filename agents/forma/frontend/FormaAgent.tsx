@@ -7,6 +7,11 @@ import { Separator } from "@/components/ui/separator";
 import { FormInput, Send, Sparkles, Plus, Type, CheckSquare, Calendar, Hash, Mail, Phone } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 
 interface Message {
   role: "user" | "assistant";
@@ -123,9 +128,10 @@ export default function FormaAgent() {
   };
 
   return (
-    <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <ResizablePanelGroup direction="horizontal" className="h-full gap-4">
       {/* Left Panel - Chat Interface */}
-      <Card className="flex flex-col h-full">
+      <ResizablePanel defaultSize={50} minSize={30}>
+        <Card className="flex flex-col h-full">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
@@ -218,9 +224,13 @@ export default function FormaAgent() {
           </div>
         </CardContent>
       </Card>
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
 
       {/* Right Panel - Live Form Preview */}
-      <Card className="flex flex-col h-full">
+      <ResizablePanel defaultSize={50} minSize={30}>
+        <Card className="flex flex-col h-full">
         <CardHeader className="border-b">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -348,6 +358,7 @@ export default function FormaAgent() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }
