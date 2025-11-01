@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2 } from "lucide-react";
+import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -43,12 +45,16 @@ interface Step {
 export default function CadenceAgent() {
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
-    content: "Hi! I'm Cadence, your workflow timing and scheduling optimizer. Tell me what workflow you'd like to build, and I'll help you create it step by step. For example: 'Create a client onboarding workflow' or 'Build a monthly tax filing process'."
+    content: "Hi! I'm Cadence, your workflow builder. I can help you in two ways:\n\n**1. Conversational Building:**\n• Describe your workflow and I'll build it with you\n\n**2. Upload a Document:**\n• Upload a workflow specification (PDF, DOCX, TXT)\n• I'll extract the hierarchy and create your workflow automatically\n• Document should contain: Workflow > Stages > Steps > Tasks structure\n\nHow would you like to start?"
   }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -97,6 +103,87 @@ export default function CadenceAgent() {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploadedFile(file);
+    setIsLoading(true);
+    setTodos([
+      { id: "1", content: "Uploading document...", status: "in_progress" },
+      { id: "2", content: "Parsing document content", status: "pending" },
+      { id: "3", content: "Extracting workflow structure", status: "pending" },
+      { id: "4", content: "Creating stages and steps", status: "pending" },
+      { id: "5", content: "Finalizing workflow", status: "pending" }
+    ]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setMessages(prev => [...prev, {
+        role: "user",
+        content: `📄 Uploaded document: ${file.name}`
+      }]);
+
+      setTodos(prev => prev.map(t => 
+        t.id === "1" ? { ...t, status: "completed" as const } :
+        t.id === "2" ? { ...t, status: "in_progress" as const } : t
+      ));
+
+      const response = await fetch("/api/agents/cadence/upload-document", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+      
+      setTodos(prev => prev.map(t => ({ ...t, status: "completed" as const })));
+      
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.response,
+        workflowUpdate: data.workflowUpdate
+      }]);
+
+      if (data.workflowUpdate) {
+        setWorkflowState(data.workflowUpdate);
+      }
+
+      const totalSteps = data.workflowUpdate?.stages.reduce((acc: number, stage: Stage) => acc + stage.steps.length, 0) || 0;
+      toast({
+        title: "Document processed",
+        description: `Created workflow with ${data.workflowUpdate?.stages.length || 0} stages and ${totalSteps} steps.`
+      });
+
+      setTodos([]);
+      setUploadedFile(null);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setTodos([]);
+      toast({
+        title: "Upload failed",
+        description: "Failed to process document. Please try again.",
+        variant: "destructive"
+      });
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "Sorry, I couldn't process that document. Please try again or describe your workflow requirements instead."
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
     }
   };
 
@@ -169,8 +256,33 @@ export default function CadenceAgent() {
             </div>
           </ScrollArea>
           
+          {/* Todo List - shown during document processing */}
+          {todos.length > 0 && (
+            <div className="px-4 pt-4">
+              <AgentTodoList todos={todos} title="Processing Document" />
+            </div>
+          )}
+
           <div className="p-4 border-t">
             <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                variant="outline"
+                size="icon"
+                title="Upload workflow document"
+                data-testid="button-upload-document"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
