@@ -1172,6 +1172,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Luca Chat Session Routes ====================
+
+  // Get all chat sessions for current user
+  app.get("/api/luca-chat-sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const sessions = await storage.getLucaChatSessionsByUser(req.user!.id);
+      res.json(sessions);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error fetching sessions:', error);
+      res.status(500).json({ error: "Failed to fetch chat sessions" });
+    }
+  });
+
+  // Get a specific chat session with messages
+  app.get("/api/luca-chat-sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getLucaChatSession(req.params.id);
+      
+      if (!session || session.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const messages = await storage.getLucaChatMessagesBySession(session.id);
+      
+      res.json({ ...session, messages });
+    } catch (error: any) {
+      console.error('[Luca Chat] Error fetching session:', error);
+      res.status(500).json({ error: "Failed to fetch chat session" });
+    }
+  });
+
+  // Create a new chat session
+  app.post("/api/luca-chat-sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { title, llmConfigId } = req.body;
+      
+      const session = await storage.createLucaChatSession({
+        userId: req.user!.id,
+        organizationId: req.user!.organizationId || undefined,
+        title: title || "New Chat",
+        llmConfigId,
+      });
+      
+      res.json(session);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error creating session:', error);
+      res.status(500).json({ error: "Failed to create chat session" });
+    }
+  });
+
+  // Update a chat session (rename, pin, etc.)
+  app.patch("/api/luca-chat-sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getLucaChatSession(req.params.id);
+      
+      if (!existing || existing.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const { title, isPinned, isActive } = req.body;
+      const updates: any = {};
+      
+      if (title !== undefined) updates.title = title;
+      if (isPinned !== undefined) updates.isPinned = isPinned;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const session = await storage.updateLucaChatSession(req.params.id, updates);
+      res.json(session);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error updating session:', error);
+      res.status(500).json({ error: "Failed to update chat session" });
+    }
+  });
+
+  // Delete a chat session
+  app.delete("/api/luca-chat-sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getLucaChatSession(req.params.id);
+      
+      if (!existing || existing.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      await storage.deleteLucaChatSession(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Luca Chat] Error deleting session:', error);
+      res.status(500).json({ error: "Failed to delete chat session" });
+    }
+  });
+
+  // Add a message to a session
+  app.post("/api/luca-chat-sessions/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getLucaChatSession(req.params.id);
+      
+      if (!session || session.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const { role, content, metadata } = req.body;
+      
+      const message = await storage.createLucaChatMessage({
+        sessionId: session.id,
+        role,
+        content,
+        metadata: metadata || {},
+      });
+      
+      // Update session's lastMessageAt
+      await storage.updateLucaChatSession(session.id, {
+        lastMessageAt: new Date(),
+      });
+      
+      res.json(message);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error creating message:', error);
+      res.status(500).json({ error: "Failed to create message" });
+    }
+  });
+
   // ==================== AI Agent Routes ====================
   
   app.get("/api/ai-agents", requireAuth, async (req: Request, res: Response) => {
