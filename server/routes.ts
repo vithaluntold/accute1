@@ -3571,15 +3571,27 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       if (!existing) {
         return res.status(404).json({ error: "Form not found" });
       }
-      if (existing.organizationId !== req.user!.organizationId) {
+      
+      // Super Admin can delete global forms (organizationId: null)
+      // Regular users can only delete their organization's forms
+      const isSuperAdmin = !req.user!.organizationId;
+      const isGlobalForm = !existing.organizationId;
+      const isOwnOrganizationForm = existing.organizationId === req.user!.organizationId;
+      
+      if (!isSuperAdmin && !isOwnOrganizationForm) {
         return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Prevent regular users from deleting global forms
+      if (!isSuperAdmin && isGlobalForm) {
+        return res.status(403).json({ error: "Cannot delete global forms" });
       }
       
       await storage.deleteFormTemplate(req.params.id);
       
       await logActivity(
         req.user!.id,
-        req.user!.organizationId!,
+        req.user!.organizationId || undefined,
         "delete",
         "form",
         req.params.id,

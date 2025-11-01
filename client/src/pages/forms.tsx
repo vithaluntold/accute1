@@ -91,6 +91,12 @@ export default function FormsPage() {
   }, [marketplaceTemplateId, createDialogOpen, setLocation]);
   const { toast } = useToast();
 
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  const isSuperAdmin = currentUser?.role?.name === "Super Admin";
+
   const { data: forms = [], isLoading } = useQuery<FormTemplate[]>({
     queryKey: ["/api/forms"],
   });
@@ -483,14 +489,16 @@ export default function FormsPage() {
                     Publish
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDeleteConfirmForm(form)}
-                  data-testid={`button-delete-form-${form.id}`}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+                {(isSuperAdmin || form.scope === 'organization') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDeleteConfirmForm(form)}
+                    data-testid={`button-delete-form-${form.id}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
