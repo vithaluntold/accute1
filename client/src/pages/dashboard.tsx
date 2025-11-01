@@ -118,7 +118,7 @@ export default function Dashboard() {
 
       {/* Mobile App Download Banner */}
       {!isPWA && showMobileAppBanner && (
-        <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-accent/5" data-testid="card-mobile-app-banner">
+        <Card className="border-primary/50 bg-gradient-to-r from-[#e5a660]/5 to-[#d76082]/5" data-testid="card-mobile-app-banner">
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3 flex-1">

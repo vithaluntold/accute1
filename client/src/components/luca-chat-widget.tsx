@@ -620,7 +620,7 @@ export function LucaChatWidget() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Chat Header */}
-        <div className="relative bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3 border-b">
+        <div className="relative bg-gradient-to-r from-[#e5a660] to-[#d76082] px-4 py-3 border-b">
           <div className="absolute inset-0 bg-black/10" />
           <div className="relative flex items-center gap-3">
             {!showSidebar && !isMobile && (
@@ -804,7 +804,7 @@ export function LucaChatWidget() {
                   >
                     {message.role === "assistant" && (
                       <Avatar className="h-8 w-8 flex-shrink-0">
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-pink-500/20">
+                        <AvatarFallback className="bg-gradient-to-br from-[#e5a660]/20 to-[#d76082]/20">
                           <img 
                             src={lucaLogoUrl} 
                             alt="Luca" 
@@ -816,7 +816,7 @@ export function LucaChatWidget() {
                     <div
                       className={`rounded-2xl px-4 py-2.5 max-w-[80%] ${
                         message.role === "user"
-                          ? "bg-gradient-to-br from-primary to-purple-500 text-white shadow-md"
+                          ? "bg-gradient-to-br from-[#e5a660] to-[#d76082] text-white shadow-md"
                           : "bg-muted"
                       }`}
                     >
@@ -900,7 +900,7 @@ export function LucaChatWidget() {
         >
           <Button
             size="lg"
-            className="h-14 w-14 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-gradient-to-br from-primary to-pink-500 border-2 border-white/20"
+            className="h-14 w-14 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-gradient-to-br from-[#e5a660] to-[#d76082] border-2 border-white/20"
             onClick={() => setIsOpen(true)}
             data-testid="button-open-luca-chat"
           >
@@ -929,7 +929,7 @@ export function LucaChatWidget() {
         >
           <div className="bg-background/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
             {/* Header with Gradient */}
-            <div className="relative bg-gradient-to-br from-primary via-purple-500 to-pink-500 p-6 pb-8">
+            <div className="relative bg-gradient-to-br from-[#e5a660] to-[#d76082] p-6 pb-8">
               <div className="absolute inset-0 bg-black/20" />
               <Button
                 size="icon"
