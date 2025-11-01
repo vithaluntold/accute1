@@ -26,6 +26,8 @@ import { FinACEverseFooter } from "@/components/finaceverse-footer";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { LucaChatWidget } from "@/components/luca-chat-widget";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
@@ -122,6 +124,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex items-center gap-2">
+              <ThemeToggle />
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" data-testid="button-workspace-switcher" className="gap-2">
@@ -699,10 +703,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="system" storageKey="accute-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
