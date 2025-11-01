@@ -2,6 +2,9 @@ import type { Request, Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
 import { LLMService } from "../../../server/llm-service";
+import multer from "multer";
+import * as pdfParse from "pdf-parse";
+import mammoth from "mammoth";
 
 interface WorkflowState {
   name: string;
@@ -193,6 +196,147 @@ Guidelines:
     } catch (error: any) {
       console.error("Save workflow error:", error);
       res.status(500).json({ error: "Failed to save workflow" });
+    }
+  });
+
+  // Document upload and parsing endpoint
+  const upload = multer({ storage: multer.memoryStorage() });
+  
+  app.post("/api/agents/cadence/upload-document", requireAuth, upload.single("file"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Get LLM configuration
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      if (!llmConfig) {
+        return res.status(400).json({ 
+          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
+        });
+      }
+
+      // Parse document based on file type
+      let documentText = "";
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+
+      if (fileExtension === "pdf") {
+        const pdfData = await (pdfParse as any)(req.file.buffer);
+        documentText = pdfData.text;
+      } else if (fileExtension === "docx") {
+        const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+        documentText = result.value;
+      } else if (fileExtension === "txt") {
+        documentText = req.file.buffer.toString('utf-8');
+      } else {
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, or TXT files." });
+      }
+
+      // Use AI to extract workflow structure
+      const llmService = new LLMService(llmConfig);
+
+      const systemPrompt = `You are Cadence, an AI workflow builder. You analyze documents containing workflow specifications and convert them into structured workflows.
+
+**YOUR TASK:**
+1. Read the provided workflow document
+2. Extract the hierarchical structure: Workflow > Stages > Steps > Tasks
+3. Identify all stages, steps, and tasks
+4. Return a complete workflow structure
+
+**WORKFLOW STRUCTURE:**
+{
+  "name": "Workflow Name (derived from document)",
+  "description": "Brief description",
+  "stages": [
+    {
+      "id": "unique_id",
+      "name": "Stage Name",
+      "order": 0,
+      "steps": [
+        {
+          "id": "unique_id",
+          "name": "Step Name",
+          "description": "Step description",
+          "order": 0,
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "status": "complete"
+}
+
+**STRUCTURE EXTRACTION RULES:**
+- **Workflow**: The top-level process name
+- **Stages**: Major phases or sections (e.g., "Onboarding", "Review", "Approval")
+- **Steps**: Individual tasks or actions within each stage
+- **Tasks/Subtasks**: Can be included as steps with detailed descriptions
+
+**HIERARCHY EXAMPLES:**
+1. Section headers → Stages
+2. Numbered/bulleted items → Steps
+3. Sub-items → Include in step descriptions
+4. Checklists → Convert to individual steps
+
+**IMPORTANT:**
+- Extract ALL stages, steps, and tasks from the document
+- Maintain the hierarchical order
+- Use descriptive names
+- Set status to "complete" when done
+- Generate unique IDs for each stage and step
+
+**RESPONSE FORMAT:**
+Respond with TWO parts separated by "---WORKFLOW_JSON---":
+1. A brief summary of what you found
+2. The complete workflow JSON
+
+Example:
+I found a 3-stage client onboarding workflow with 12 total steps. Here's your structured workflow.
+---WORKFLOW_JSON---
+{"name":"Client Onboarding","description":"Complete client onboarding process","stages":[...],"status":"complete"}`;
+
+      const userPrompt = `Please analyze this document and create a workflow from it:
+
+---DOCUMENT START---
+${documentText}
+---DOCUMENT END---
+
+Extract the workflow structure (Workflow > Stages > Steps > Tasks) and return the complete workflow.`;
+
+      const fullResponse = await llmService.sendPrompt(userPrompt, systemPrompt);
+
+      // Parse the response
+      let responseText = fullResponse;
+      let workflowUpdate: WorkflowState | undefined = undefined;
+
+      if (fullResponse.includes("---WORKFLOW_JSON---")) {
+        const parts = fullResponse.split("---WORKFLOW_JSON---");
+        responseText = parts[0].trim();
+        
+        try {
+          const jsonPart = parts[1].trim();
+          workflowUpdate = JSON.parse(jsonPart);
+        } catch (e) {
+          console.error("Failed to parse workflow JSON:", e);
+          return res.status(500).json({ error: "Failed to parse AI response" });
+        }
+      }
+
+      if (!workflowUpdate) {
+        return res.status(500).json({ error: "AI did not return a valid workflow structure" });
+      }
+
+      res.json({ 
+        response: responseText,
+        workflowUpdate
+      });
+      
+    } catch (error) {
+      console.error("Error processing document:", error);
+      res.status(500).json({ 
+        error: "Failed to process document",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 };
