@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText } from "lucide-react";
+import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText, MessageSquare, Trash2, Edit2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import {
   ResizablePanelGroup,
@@ -42,6 +44,17 @@ interface Step {
   status: "pending" | "added" | "complete";
 }
 
+interface AgentSession {
+  id: string;
+  name: string;
+  agentSlug: string;
+  userId: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+  messages?: Message[];
+}
+
 export default function CadenceAgent() {
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
@@ -52,6 +65,13 @@ export default function CadenceAgent() {
   const [workflowState, setWorkflowState] = useState<WorkflowState | null>(null);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  
+  // Session management state
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [showSessionSidebar, setShowSessionSidebar] = useState(true);
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,21 +81,132 @@ export default function CadenceAgent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Fetch sessions
+  const { data: sessions = [] } = useQuery<AgentSession[]>({
+    queryKey: ["/api/agents/cadence/sessions"],
+  });
+
+  // Create new session (explicit creation via UI button)
+  const createSessionMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await apiRequest("POST", "/api/agents/cadence/sessions", { name });
+      return await response.json();
+    },
+    onSuccess: (newSession) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
+      setCurrentSessionId(newSession.id);
+      setMessages([{
+        role: "assistant",
+        content: "Hi! I'm Cadence, your workflow builder. What workflow would you like to create?"
+      }]);
+      setWorkflowState(null);
+    },
+  });
+
+  // Create session implicitly (for sendMessage without resetting messages)
+  const createSessionSilently = async (name: string) => {
+    const response = await apiRequest("POST", "/api/agents/cadence/sessions", { name });
+    const newSession = await response.json();
+    queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
+    setCurrentSessionId(newSession.id);
+    return newSession;
+  };
+
+  // Update session
+  const updateSessionMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const response = await apiRequest("PATCH", `/api/agents/cadence/sessions/${id}`, { name });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
+      setEditingSessionId(null);
+      setEditingTitle("");
+    },
+  });
+
+  // Delete session
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/agents/cadence/sessions/${id}`, {});
+      return await response.json();
+    },
+    onSuccess: (_data, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
+      if (currentSessionId === deletedId) {
+        setCurrentSessionId(null);
+        setMessages([{
+          role: "assistant",
+          content: "Hi! I'm Cadence. What workflow would you like to create?"
+        }]);
+        setWorkflowState(null);
+      }
+    },
+  });
+
+  // Load session messages when switching sessions
+  useEffect(() => {
+    if (currentSessionId) {
+      loadSessionMessages(currentSessionId);
+    }
+  }, [currentSessionId]);
+
+  const loadSessionMessages = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/agents/cadence/sessions/${sessionId}`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      
+      if (data.messages && data.messages.length > 0) {
+        const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          workflowUpdate: msg.metadata?.workflowUpdate,
+        }));
+        setMessages(loadedMessages);
+        
+        // Restore last workflow if exists (use a copy to avoid mutation)
+        const reversedCopy = [...loadedMessages].reverse();
+        const lastMsgWithWorkflow = reversedCopy.find(m => m.workflowUpdate);
+        if (lastMsgWithWorkflow?.workflowUpdate) {
+          setWorkflowState(lastMsgWithWorkflow.workflowUpdate);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading session:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load session",
+        variant: "destructive",
+      });
+    }
+  };
+
   const sendMessage = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = { role: "user", content: input };
+    const userInput = input; // Save before clearing
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
+      // Create session if needed
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        const sessionName = `Workflow Session ${new Date().toLocaleDateString()}`;
+        const newSession = await createSessionSilently(sessionName);
+        sessionId = newSession.id;
+      }
+
       const response = await fetch("/api/agents/cadence/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ 
-          message: input, 
+          message: userInput, 
           history: messages,
           currentWorkflow: workflowState 
         }),
@@ -93,6 +224,19 @@ export default function CadenceAgent() {
       // Update workflow state if provided
       if (data.workflowUpdate) {
         setWorkflowState(data.workflowUpdate);
+      }
+
+      // Persist messages to session
+      if (sessionId) {
+        await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+          role: "user",
+          content: userInput,
+        });
+        await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+          role: "assistant",
+          content: data.response,
+          metadata: data.workflowUpdate ? { workflowUpdate: data.workflowUpdate } : {},
+        });
       }
     } catch (error) {
       console.error("Error:", error);
@@ -189,8 +333,104 @@ export default function CadenceAgent() {
 
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
-      {/* Left Panel - Chat Interface */}
-      <ResizablePanel defaultSize={50} minSize={30}>
+      {/* Session Sidebar */}
+      {showSessionSidebar && (
+        <>
+          <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+            <Card className="flex flex-col h-full mr-2">
+              <CardHeader className="border-b">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Sessions
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => createSessionMutation.mutate(`Session ${sessions.length + 1}`)}
+                    disabled={createSessionMutation.isPending}
+                    data-testid="button-new-session"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 p-0 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="p-2 space-y-1">
+                    {sessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className={`group p-2 rounded-md cursor-pointer hover-elevate ${
+                          currentSessionId === session.id ? "bg-accent" : ""
+                        }`}
+                        onClick={() => setCurrentSessionId(session.id)}
+                        data-testid={`session-${session.id}`}
+                      >
+                        {editingSessionId === session.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                                } else if (e.key === "Escape") {
+                                  setEditingSessionId(null);
+                                }
+                              }}
+                              className="h-7 text-xs"
+                              autoFocus
+                              data-testid="input-edit-session"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs truncate flex-1">{session.name}</span>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingSessionId(session.id);
+                                  setEditingTitle(session.name);
+                                }}
+                                data-testid="button-edit-session"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm("Delete this session?")) {
+                                    deleteSessionMutation.mutate(session.id);
+                                  }
+                                }}
+                                data-testid="button-delete-session"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </ResizablePanel>
+          <ResizableHandle />
+        </>
+      )}
+
+      {/* Chat Interface */}
+      <ResizablePanel defaultSize={showSessionSidebar ? 40 : 50} minSize={30}>
         <Card className="flex flex-col h-full mr-2">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
