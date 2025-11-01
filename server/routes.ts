@@ -1872,14 +1872,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignment.assignedTo ? storage.getUser(assignment.assignedTo) : null,
       ]);
 
-      // Fetch workflow structure with stages, steps, and tasks
-      const stages = await storage.getStagesByWorkflow(assignment.workflowId);
+      // Fetch assignment-specific workflow structure with stages, steps, and tasks
+      const stages = await storage.getAssignmentStagesByAssignment(assignment.id);
       const stagesWithStepsAndTasks = await Promise.all(
         stages.map(async (stage) => {
-          const steps = await storage.getStepsByStage(stage.id);
+          const steps = await storage.getAssignmentStepsByStage(stage.id);
           const stepsWithTasks = await Promise.all(
             steps.map(async (step) => {
-              const tasks = await storage.getTasksByStep(step.id);
+              const tasks = await storage.getAssignmentTasksByStep(step.id);
               return { ...step, tasks };
             })
           );
@@ -1926,6 +1926,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedBy: req.userId!,
         totalStages: stages.length,
       });
+
+      // Clone workflow structure to assignment
+      await storage.cloneWorkflowToAssignment(assignment.id, validated.workflowId, req.user!.organizationId!);
 
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_assignment", assignment.id, { client: client.companyName, workflow: workflow.name }, req);
       res.json(assignment);

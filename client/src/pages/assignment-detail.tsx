@@ -84,12 +84,13 @@ interface AssignmentDetail {
 }
 
 export default function AssignmentDetail() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const assignmentId = params.id;
   const { toast } = useToast();
 
   const { data: assignment, isLoading } = useQuery<AssignmentDetail>({
     queryKey: [`/api/assignments/${assignmentId}`],
+    enabled: !!assignmentId,
   });
 
   const updateTaskMutation = useMutation({
