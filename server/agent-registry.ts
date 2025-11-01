@@ -443,7 +443,16 @@ export const AGENT_REGISTRY: Record<string, AgentConfig> = {
     requiresToolExecution: false,
     supportsStreaming: true,
   },
-  // kanban and luca agents not yet implemented
+  luca: {
+    name: 'luca',
+    displayName: 'Luca',
+    category: 'assistant',
+    path: '../agents/luca/backend/index',
+    className: 'LucaAgent',
+    capabilities: ['accounting', 'taxation', 'finance', 'support_tickets', 'conversational'],
+    requiresToolExecution: true,
+    supportsStreaming: true,
+  },
 };
 
 export function getAgentConfig(agentName: string): AgentConfig | null {

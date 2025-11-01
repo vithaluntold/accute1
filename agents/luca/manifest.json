@@ -1,0 +1,19 @@
+{
+  "slug": "luca",
+  "name": "Luca",
+  "description": "Expert AI assistant specializing in accounting, finance, and taxation. Provides comprehensive guidance and creates support tickets for complex issues requiring professional review.",
+  "category": "assistant",
+  "provider": "multi",
+  "frontendEntry": "./frontend/LucaWidget.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["chat", "accounting", "taxation", "finance", "support-tickets"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["accounting", "taxation", "finance", "chat", "assistant"],
+  "configuration": {
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}
