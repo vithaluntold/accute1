@@ -206,14 +206,48 @@ Great! I've added an email field for you. What other information do you need to 
     }
   });
 
-  // Document upload and parsing endpoint
-  const upload = multer({ storage: multer.memoryStorage() });
-  
-  app.post("/api/agents/forma/upload-document", requireAuth, upload.single("file"), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+  // Document upload and parsing endpoint with security limits
+  const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max file size
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedMimes = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+      ];
+      
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only PDF, DOCX, and TXT files are allowed.'));
       }
+    }
+  });
+  
+  app.post("/api/agents/forma/upload-document", requireAuth, (req: AuthRequest, res: Response, next: any) => {
+    upload.single("file")(req, res, async (err: any) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+          }
+          return res.status(400).json({ error: `Upload error: ${err.message}` });
+        }
+        return res.status(400).json({ error: err.message || 'Invalid file upload' });
+      }
+
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        // Additional file size check
+        if (req.file.size > 10 * 1024 * 1024) {
+          return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
+        }
 
       // Get LLM configuration
       const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
@@ -331,12 +365,13 @@ Extract all questions and convert them to form fields. Return the complete form 
         formUpdate
       });
       
-    } catch (error) {
-      console.error("Error processing document:", error);
-      res.status(500).json({ 
-        error: "Failed to process document",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
+      } catch (error) {
+        console.error("Error processing document:", error);
+        res.status(500).json({ 
+          error: "Failed to process document",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    });
   });
 };
