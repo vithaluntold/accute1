@@ -325,19 +325,39 @@ export function LucaChatWidget() {
         const data = JSON.parse(event.data);
         
         if (data.type === 'stream_start') {
-          streamingMessageIdRef.current = data.messageId;
+          const messageId = data.messageId || data.conversationId || Date.now().toString();
+          streamingMessageIdRef.current = messageId;
           streamingContentRef.current = "";
           
           const assistantMessage: Message = {
-            id: data.messageId,
+            id: messageId,
             role: "assistant",
             content: "",
             timestamp: new Date(),
             isStreaming: true,
           };
           setMessages((prev) => [...prev, assistantMessage]);
-        } else if (data.type === 'stream_chunk' && streamingMessageIdRef.current) {
-          streamingContentRef.current += data.content;
+        } else if (data.type === 'stream_chunk') {
+          // Handle first chunk - create message if not exists
+          if (!streamingMessageIdRef.current) {
+            const messageId = Date.now().toString();
+            streamingMessageIdRef.current = messageId;
+            streamingContentRef.current = "";
+            
+            const assistantMessage: Message = {
+              id: messageId,
+              role: "assistant",
+              content: "",
+              timestamp: new Date(),
+              isStreaming: true,
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+          }
+          
+          // Append chunk (backend sends 'chunk' not 'content')
+          const chunkText = data.chunk || data.content || '';
+          streamingContentRef.current += chunkText;
+          
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === streamingMessageIdRef.current
@@ -345,33 +365,37 @@ export function LucaChatWidget() {
                 : msg
             )
           );
-        } else if (data.type === 'stream_end' && streamingMessageIdRef.current) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamingMessageIdRef.current
-                ? { ...msg, isStreaming: false }
-                : msg
-            )
-          );
-          
-          if (currentSessionId && streamingContentRef.current) {
-            addMessageMutation.mutate({
-              sessionId: currentSessionId,
-              role: "assistant",
-              content: streamingContentRef.current,
-            });
+        } else if (data.type === 'stream_end') {
+          if (streamingMessageIdRef.current) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamingMessageIdRef.current
+                  ? { ...msg, isStreaming: false }
+                  : msg
+              )
+            );
+            
+            if (currentSessionId && streamingContentRef.current) {
+              addMessageMutation.mutate({
+                sessionId: currentSessionId,
+                role: "assistant",
+                content: streamingContentRef.current,
+              });
+            }
+            
+            streamingMessageIdRef.current = null;
+            streamingContentRef.current = "";
           }
-          
-          streamingMessageIdRef.current = null;
-          streamingContentRef.current = "";
           setIsStreaming(false);
         } else if (data.type === 'error') {
           toast({
             title: "Error",
-            description: data.message || "An error occurred",
+            description: data.error || data.message || "An error occurred",
             variant: "destructive",
           });
           setIsStreaming(false);
+          streamingMessageIdRef.current = null;
+          streamingContentRef.current = "";
         }
       } catch (error) {
         console.error('[Luca Chat] Error parsing WebSocket message:', error);
