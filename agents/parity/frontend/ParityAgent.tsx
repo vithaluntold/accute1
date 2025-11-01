@@ -3,9 +3,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Sparkles, Download, Copy, CheckCircle2 } from "lucide-react";
+import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -33,7 +50,12 @@ export default function ParityAgent() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentDocument, setCurrentDocument] = useState<GeneratedDocument | null>(null);
-  const { toast } = useToast();
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateCategory, setTemplateCategory] = useState("engagement_letter");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [editableContent, setEditableContent] = useState("");
+  const { toast} = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when messages change
@@ -127,7 +149,60 @@ export default function ParityAgent() {
     }
   };
 
+  const openSaveDialog = () => {
+    if (currentDocument) {
+      setTemplateName(currentDocument.title);
+      setTemplateCategory(
+        currentDocument.type.toLowerCase().includes("engagement") ? "engagement_letter" :
+        currentDocument.type.toLowerCase().includes("agreement") ? "service_agreement" :
+        currentDocument.type.toLowerCase().includes("contract") ? "contract" :
+        "engagement_letter"
+      );
+      setTemplateDescription(`Generated ${currentDocument.type}`);
+      setEditableContent(currentDocument.content);
+      setShowSaveDialog(true);
+    }
+  };
+
+  const saveAsTemplate = async () => {
+    try {
+      const response = await fetch("/api/agents/parity/save-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: templateName,
+          category: templateCategory,
+          description: templateDescription,
+          content: editableContent
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Template saved",
+          description: "Your document has been saved as a reusable template."
+        });
+        setShowSaveDialog(false);
+      } else {
+        const data = await response.json();
+        toast({
+          title: "Error",
+          description: data.error || "Failed to save template.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save template.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
+    <>
     <ResizablePanelGroup direction="horizontal" className="h-full">
       {/* Left Panel - Chat Interface */}
       <ResizablePanel defaultSize={50} minSize={30}>
@@ -268,6 +343,14 @@ export default function ParityAgent() {
                   <Download className="h-4 w-4 mr-1" />
                   Download
                 </Button>
+                <Button 
+                  size="sm"
+                  onClick={openSaveDialog}
+                  data-testid="button-save-template"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save as Template
+                </Button>
               </div>
             )}
           </CardTitle>
@@ -325,5 +408,93 @@ export default function ParityAgent() {
       </Card>
       </ResizablePanel>
     </ResizablePanelGroup>
+
+    {/* Save as Template Dialog */}
+    <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+      <DialogContent className="max-w-2xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle>Save as Template</DialogTitle>
+          <DialogDescription>
+            Edit and save this document as a reusable template for future use.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="template-name">Template Name</Label>
+            <Input
+              id="template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g., Standard CPA Engagement Letter"
+              data-testid="input-template-name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template-category">Category</Label>
+            <Select value={templateCategory} onValueChange={setTemplateCategory}>
+              <SelectTrigger id="template-category" data-testid="select-template-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="engagement_letter">Engagement Letter</SelectItem>
+                <SelectItem value="service_agreement">Service Agreement</SelectItem>
+                <SelectItem value="contract">Contract</SelectItem>
+                <SelectItem value="compliance_form">Compliance Form</SelectItem>
+                <SelectItem value="legal_notice">Legal Notice</SelectItem>
+                <SelectItem value="tax_form">Tax Form</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template-description">Description</Label>
+            <Input
+              id="template-description"
+              value={templateDescription}
+              onChange={(e) => setTemplateDescription(e.target.value)}
+              placeholder="Brief description of this template"
+              data-testid="input-template-description"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template-content">Content (Editable)</Label>
+            <Textarea
+              id="template-content"
+              value={editableContent}
+              onChange={(e) => setEditableContent(e.target.value)}
+              className="font-mono text-sm min-h-[300px]"
+              placeholder="Document content..."
+              data-testid="textarea-template-content"
+            />
+            <p className="text-xs text-muted-foreground">
+              You can edit the content before saving as a template
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowSaveDialog(false)}
+            data-testid="button-cancel-save"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={saveAsTemplate}
+            disabled={!templateName.trim() || !editableContent.trim()}
+            data-testid="button-confirm-save"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Template
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

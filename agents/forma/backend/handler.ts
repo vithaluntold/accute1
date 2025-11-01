@@ -6,6 +6,7 @@ import multer from "multer";
 import * as pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { insertFormTemplateSchema } from "../../../shared/schema";
 
 interface Message {
   role: "user" | "assistant";
@@ -185,17 +186,48 @@ Great! I've added an email field for you. What other information do you need to 
     }
   });
 
-  // Save form endpoint
+  // Save form as template
   app.post("/api/agents/forma/save-form", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const formData = req.body;
+      // Prepare template data with organization context
+      const templateData = {
+        ...req.body,
+        scope: "organization",
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id,
+        version: 1,
+        status: "published",
+        category: req.body.category || "custom",
+        description: req.body.description || "",
+        conditionalLogic: req.body.conditionalLogic || [],
+        validationRules: req.body.validationRules || [],
+        styling: req.body.styling || {}
+      };
+
+      // Validate using Zod schema
+      const validationResult = insertFormTemplateSchema.safeParse(templateData);
       
-      // TODO: Save to database
-      // For now, just return success
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid form template data",
+          details: validationResult.error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            message: issue.message
+          }))
+        });
+      }
+
+      // Save to form_templates table with validated data
+      const template = await storage.createFormTemplate({
+        ...validationResult.data,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+
       res.json({ 
         success: true,
-        message: "Form saved successfully",
-        formId: `form-${Date.now()}`
+        message: "Form saved as template successfully",
+        templateId: template.id
       });
       
     } catch (error) {

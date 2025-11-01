@@ -175,7 +175,7 @@ Guidelines:
         }))
       }));
 
-      // Save to database via storage layer
+      // Save to database via storage layer as a template
       const { storage } = await import("../../../server/storage");
       const savedWorkflow = await storage.createWorkflow({
         name: workflow.name,
@@ -183,8 +183,8 @@ Guidelines:
         category: "custom",
         stages: stages,
         triggers: [],
-        status: "draft",
-        isTemplate: false,
+        status: "published",
+        isTemplate: true, // Save as template for reuse
         organizationId: organizationId!,
         createdBy: userId!,
       });

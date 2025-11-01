@@ -49,39 +49,39 @@ export const registerRoutes = (app: any) => {
       // Execute conversational mode
       const response = await agent.execute(fullPrompt);
       
-      // Try to detect if the AI generated a document
+      // Parse document from response using markers
       let documentUpdate: DocumentState | undefined = undefined;
+      let conversationalResponse = response;
       
-      // Simple heuristic: if response is long and contains document-like content
-      if (typeof response === "string" && response.length > 500) {
-        // Check if it looks like a formal document
-        const looksLikeDocument = (
-          response.includes("ENGAGEMENT LETTER") ||
-          response.includes("SERVICE AGREEMENT") ||
-          response.includes("Dear") ||
-          response.includes("Sincerely") ||
-          response.includes("This Agreement") ||
-          response.includes("effective as of")
-        );
+      if (typeof response === "string" && response.includes("---DOCUMENT---")) {
+        const docStart = response.indexOf("---DOCUMENT---");
+        const docEnd = response.indexOf("---END DOCUMENT---");
         
-        if (looksLikeDocument) {
-          // Extract document title from first line or use default
-          const firstLine = response.split('\n')[0].trim();
-          const title = firstLine.length > 0 && firstLine.length < 100 
-            ? firstLine.replace(/[#*]/g, '').trim()
-            : "Generated Document";
+        if (docStart !== -1 && docEnd !== -1) {
+          // Extract conversational part (before document)
+          conversationalResponse = response.substring(0, docStart).trim();
           
-          documentUpdate = {
-            title,
-            type: response.includes("ENGAGEMENT LETTER") ? "Engagement Letter" : "Document",
-            content: response,
-            status: "complete"
-          };
+          // Extract document block
+          const documentBlock = response.substring(docStart + 14, docEnd).trim();
+          
+          // Parse document metadata and content
+          const titleMatch = documentBlock.match(/TITLE:\s*(.+)/);
+          const typeMatch = documentBlock.match(/TYPE:\s*(.+)/);
+          const contentMatch = documentBlock.match(/CONTENT:\s*([\s\S]+)/);
+          
+          if (titleMatch && contentMatch) {
+            documentUpdate = {
+              title: titleMatch[1].trim(),
+              type: typeMatch ? typeMatch[1].trim() : "Document",
+              content: contentMatch[1].trim(),
+              status: "complete"
+            };
+          }
         }
       }
       
       res.json({ 
-        response: typeof response === "string" ? response : JSON.stringify(response, null, 2),
+        response: conversationalResponse || (typeof response === "string" ? response : JSON.stringify(response, null, 2)),
         document: documentUpdate
       });
       
@@ -115,6 +115,40 @@ export const registerRoutes = (app: any) => {
       console.error("Error saving document:", error);
       res.status(500).json({ 
         error: "Failed to save document",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Save as template
+  app.post("/api/agents/parity/save-template", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, category, description, content } = req.body;
+      
+      if (!name || !content) {
+        return res.status(400).json({ error: "Name and content are required" });
+      }
+
+      const template = await storage.createDocumentTemplate({
+        name,
+        category: category || "engagement_letter",
+        content,
+        description: description || "",
+        scope: "organization",
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id
+      });
+
+      res.json({ 
+        success: true,
+        message: "Template saved successfully",
+        templateId: template.id
+      });
+      
+    } catch (error) {
+      console.error("Error saving template:", error);
+      res.status(500).json({ 
+        error: "Failed to save template",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }
