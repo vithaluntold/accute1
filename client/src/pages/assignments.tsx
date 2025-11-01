@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,7 @@ export default function Assignments() {
     priority: "medium",
   });
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Fetch assignments
   const { data: assignments = [], isLoading } = useQuery<Assignment[]>({
@@ -101,7 +102,7 @@ export default function Assignments() {
     mutationFn: async (data: typeof newAssignment) => {
       return apiRequest('POST', '/api/assignments', data);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/assignments'] });
       toast({
         title: 'Success',
@@ -117,6 +118,10 @@ export default function Assignments() {
         dueDate: "",
         priority: "medium",
       });
+      // Navigate to the newly created assignment
+      if (data?.id) {
+        setLocation(`/assignments/${data.id}`);
+      }
     },
     onError: (error: any) => {
       toast({
