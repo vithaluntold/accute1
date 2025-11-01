@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,9 +22,17 @@ const stripeSettingsSchema = z.object({
 
 type StripeSettings = z.infer<typeof stripeSettingsSchema>;
 
+// Utility function to mask a value showing only last 4 characters
+function maskValue(value: string | undefined): string {
+  if (!value) return "";
+  if (value.length <= 4) return value;
+  return "●".repeat(value.length - 4) + value.slice(-4);
+}
+
 export default function PlatformSettingsPage() {
   const { toast } = useToast();
   const [showSecrets, setShowSecrets] = useState(false);
+  const [editedKeys, setEditedKeys] = useState<Set<string>>(new Set());
 
   const form = useForm<StripeSettings>({
     resolver: zodResolver(stripeSettingsSchema),
@@ -39,9 +47,26 @@ export default function PlatformSettingsPage() {
     queryKey: ["/api/platform-settings"],
   });
 
+  // Reset form when settings are loaded
+  useEffect(() => {
+    if (settings) {
+      form.reset(settings);
+    }
+  }, [settings, form]);
+
   const updateMutation = useMutation({
     mutationFn: async (data: StripeSettings) => {
-      return await apiRequest("PATCH", "/api/platform-settings", data);
+      // Only send keys that don't start with *** (i.e., that have been changed)
+      const payload: StripeSettings = {
+        stripePublicKey: data.stripePublicKey,
+        stripeSecretKey: data.stripeSecretKey && !data.stripeSecretKey.startsWith("***") 
+          ? data.stripeSecretKey 
+          : undefined,
+        stripeWebhookSecret: data.stripeWebhookSecret && !data.stripeWebhookSecret.startsWith("***")
+          ? data.stripeWebhookSecret
+          : undefined,
+      };
+      return await apiRequest("PATCH", "/api/platform-settings", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/platform-settings"] });
@@ -63,10 +88,6 @@ export default function PlatformSettingsPage() {
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
       </div>
     );
-  }
-
-  if (settings) {
-    form.reset(settings);
   }
 
   return (
@@ -119,67 +140,87 @@ export default function PlatformSettingsPage() {
                     <FormField
                       control={form.control}
                       name="stripePublicKey"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Publishable Key (VITE_STRIPE_PUBLIC_KEY)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type={showSecrets ? "text" : "password"}
-                              placeholder="pk_test_..."
-                              data-testid="input-stripe-public-key"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Your Stripe publishable key - safe to use in frontend code
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const displayValue = showSecrets ? field.value : field.value;
+                        return (
+                          <FormItem>
+                            <FormLabel>Publishable Key (VITE_STRIPE_PUBLIC_KEY)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={displayValue || ""}
+                                type="text"
+                                placeholder="pk_test_..."
+                                data-testid="input-stripe-public-key"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Your Stripe publishable key - safe to use in frontend code
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
                       control={form.control}
                       name="stripeSecretKey"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Secret Key (STRIPE_SECRET_KEY)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type={showSecrets ? "text" : "password"}
-                              placeholder="sk_test_..."
-                              data-testid="input-stripe-secret-key"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Your Stripe secret key - keep this secure, only used server-side
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const isServerMasked = field.value?.startsWith("***");
+                        return (
+                          <FormItem>
+                            <FormLabel>Secret Key (STRIPE_SECRET_KEY)</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                                type={showSecrets || isServerMasked ? "text" : "password"}
+                                placeholder="sk_test_... (or enter new key)"
+                                data-testid="input-stripe-secret-key"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Your Stripe secret key - keep this secure, only used server-side
+                              {isServerMasked && " (currently set, enter new value to update)"}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <FormField
                       control={form.control}
                       name="stripeWebhookSecret"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Webhook Signing Secret</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type={showSecrets ? "text" : "password"}
-                              placeholder="whsec_..."
-                              data-testid="input-stripe-webhook-secret"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Stripe webhook signing secret for verifying webhook events
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const isServerMasked = field.value?.startsWith("***");
+                        return (
+                          <FormItem>
+                            <FormLabel>Webhook Signing Secret</FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onBlur={field.onBlur}
+                                name={field.name}
+                                ref={field.ref}
+                                type={showSecrets || isServerMasked ? "text" : "password"}
+                                placeholder="whsec_... (or enter new secret)"
+                                data-testid="input-stripe-webhook-secret"
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Stripe webhook signing secret for verifying webhook events
+                              {isServerMasked && " (currently set, enter new value to update)"}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
 
                     <div className="flex items-center gap-4">
