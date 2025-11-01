@@ -27,6 +27,7 @@ import { Plus, Search, Play, Edit, Trash2, Copy, Workflow, Sparkles } from "luci
 import type { InstalledAgentView } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function Workflows() {
   const [location, setLocation] = useLocation();
@@ -202,47 +203,42 @@ export default function Workflows() {
   }
 
   return (
-    <div>
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <Workflow className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Workflows</h1>
-                {hasCadence && (
-                  <Badge variant="secondary" className="gap-1" data-testid="badge-cadence-copilot">
-                    <Sparkles className="h-4 w-4" />
-                    Cadence AI
-                  </Badge>
-                )}
-              </div>
-              <p className="text-white/90 text-lg">
-                Automate your accounting processes with AI-powered workflows
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {hasCadence && (
-                <Button 
-                  variant="outline" 
-                  className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
-                  data-testid="button-cadence-chat"
-                  onClick={() => setLocation('/ai-agents/cadence')}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Ask Cadence AI
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Workflow}
+        title={
+          <>
+            Workflows
+            {hasCadence && (
+              <Badge variant="secondary" className="gap-1 bg-white/20 border-white/30 text-white backdrop-blur-sm ml-3" data-testid="badge-cadence-copilot">
+                <Sparkles className="h-4 w-4" />
+                Cadence AI
+              </Badge>
+            )}
+          </>
+        }
+        description="Automate your accounting processes with AI-powered workflows"
+        actions={
+          <>
+            {hasCadence && (
+              <Button 
+                variant="outline" 
+                className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
+                data-testid="button-cadence-chat"
+                onClick={() => setLocation('/ai-agents/cadence')}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Ask Cadence AI
+              </Button>
+            )}
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-white text-primary" data-testid="button-create-workflow">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Workflow
                 </Button>
-              )}
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-white text-primary" data-testid="button-create-workflow">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Workflow
-                  </Button>
-                    </DialogTrigger>
-                <DialogContent data-testid="dialog-create-workflow">
+              </DialogTrigger>
+              <DialogContent data-testid="dialog-create-workflow">
               <DialogHeader>
                 <DialogTitle>Create New Workflow</DialogTitle>
                 <DialogDescription>
@@ -306,14 +302,13 @@ export default function Workflows() {
                   {createWorkflow.isPending ? 'Creating...' : 'Create Workflow'}
                 </Button>
               </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </div>
-      </div>
+            </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
 
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
       <div className="flex items-center gap-4 mb-6">
         <div className="relative flex-1 max-w-md">

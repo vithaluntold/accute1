@@ -29,6 +29,7 @@ import { MessageSquare, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { GradientHero } from "@/components/gradient-hero";
 
 type MessageTemplate = {
   id: string;
@@ -201,28 +202,20 @@ export default function MessageTemplatesPage() {
   };
 
   return (
-    <div>
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <MessageSquare className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Message Templates</h1>
-              </div>
-              <p className="text-white/90 text-lg">Create and manage reusable message templates</p>
-            </div>
-            <Button onClick={() => setDialogOpen(true)} className="bg-white text-primary" data-testid="button-create">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Template
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={MessageSquare}
+        title="Message Templates"
+        description="Create and manage reusable message templates"
+        actions={
+          <Button onClick={() => setDialogOpen(true)} className="bg-white text-primary" data-testid="button-create">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Template
+          </Button>
+        }
+      />
 
-      <div className="container mx-auto p-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

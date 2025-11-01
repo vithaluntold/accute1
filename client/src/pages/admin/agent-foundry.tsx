@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Bot, Plus, CheckCircle, XCircle, Eye, Upload, Code, Settings, Loader2, Package, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GradientHero } from "@/components/gradient-hero";
 import {
   Dialog,
   DialogContent,
@@ -236,28 +237,20 @@ export default function AgentFoundryPage() {
   };
 
   return (
-    <div>
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <Bot className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">AI Agent Foundry</h1>
-              </div>
-              <p className="text-white/90 text-lg">Create, manage, and publish AI agents for your platform</p>
-            </div>
-            <Button data-testid="button-create-agent" onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Agent
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={Bot}
+        title="AI Agent Foundry"
+        description="Create, manage, and publish AI agents for your platform"
+        actions={
+          <Button data-testid="button-create-agent" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Agent
+          </Button>
+        }
+      />
 
-      <div className="container mx-auto px-6 max-w-7xl">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>

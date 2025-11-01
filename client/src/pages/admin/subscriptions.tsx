@@ -13,6 +13,7 @@ import { Search, CreditCard, Building2, TrendingUp, DollarSign, Plus, MoreVertic
 import { format, addMonths, addYears } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -130,23 +131,14 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="h-full overflow-auto">
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <CreditCard className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white" data-testid="heading-subscriptions">Subscriptions</h1>
-              </div>
-              <p className="text-white/90 text-lg">Manage platform subscriptions and billing</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <GradientHero
+        icon={CreditCard}
+        title="Subscriptions"
+        description="Manage platform subscriptions and billing"
+        testId="heading-subscriptions"
+      />
 
-      <div className="max-w-7xl mx-auto px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>

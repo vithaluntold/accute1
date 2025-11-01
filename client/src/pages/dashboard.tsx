@@ -10,6 +10,7 @@ import { useIsPWA } from "@/hooks/use-mobile-detect";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import type { WorkflowTask } from "@shared/schema";
+import { GradientHero } from "@/components/gradient-hero";
 
 interface TaskStats {
   total: number;
@@ -102,19 +103,15 @@ export default function Dashboard() {
   const pendingTasks = myTasks?.filter(t => t.status === 'pending') || [];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Hero Section with Gradient */}
-      <div className="gradient-hero relative overflow-hidden rounded-b-2xl">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative px-6 py-8 md:py-12">
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-white mb-2 animate-fade-in" data-testid="text-dashboard-title">
-            Welcome back, {user?.firstName || user?.username}
-          </h1>
-          <p className="text-white/90 text-lg">Track your tasks and stay on top of deadlines</p>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={TrendingUp}
+        title={`Welcome back, ${user?.firstName || user?.username}`}
+        description="Track your tasks and stay on top of deadlines"
+        testId="dashboard-hero"
+      />
       
-      <div className="px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
       {/* Mobile App Download Banner */}
       {!isPWA && showMobileAppBanner && (

@@ -18,6 +18,7 @@ import {
   Loader2,
   ShoppingBag
 } from "lucide-react";
+import { GradientHero } from "@/components/gradient-hero";
 
 interface MarketplaceItem {
   id: string;
@@ -327,22 +328,14 @@ export default function Marketplace() {
   const pipelineItems = filterItems('pipeline_template');
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Gradient Header */}
-      <div className="gradient-hero relative overflow-hidden rounded-b-2xl">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative px-6 py-8 md:py-12">
-          <div className="flex items-center gap-3 mb-2">
-            <ShoppingBag className="h-10 w-10 text-white" />
-            <h1 className="text-3xl md:text-4xl font-display font-bold text-white">Marketplace</h1>
-          </div>
-          <p className="text-white/90 text-lg">
-            Browse and install templates to accelerate your workflow
-          </p>
-        </div>
-      </div>
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={ShoppingBag}
+        title="Marketplace"
+        description="Browse and install templates to accelerate your workflow"
+      />
 
-      <div className="px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
       {/* Search */}
       <div className="mb-6">

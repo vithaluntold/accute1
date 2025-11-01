@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, HelpCircle, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function AdminTicketsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,23 +80,14 @@ export default function AdminTicketsPage() {
 
   return (
     <div className="h-full overflow-auto">
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <HelpCircle className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white" data-testid="heading-support-tickets">Support Tickets</h1>
-              </div>
-              <p className="text-white/90 text-lg">Manage platform support tickets across all organizations</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <GradientHero
+        icon={HelpCircle}
+        title="Support Tickets"
+        description="Manage platform support tickets across all organizations"
+        testId="heading-support-tickets"
+      />
 
-      <div className="max-w-7xl mx-auto px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
         <div className="grid gap-4 md:grid-cols-4">
           <Card>

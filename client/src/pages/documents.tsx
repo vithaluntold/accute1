@@ -29,6 +29,7 @@ import { Search, FileText, Upload, Download, Trash2, Eye, Loader2, File, Calenda
 import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
 import type { InstalledAgentView } from "@shared/schema";
+import { GradientHero } from "@/components/gradient-hero";
 
 export default function Documents() {
   const [location, setLocation] = useLocation();
@@ -188,45 +189,42 @@ export default function Documents() {
   }
 
   return (
-    <div>
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <FileText className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white">Documents</h1>
-                {hasParity && (
-                  <Badge variant="secondary" className="gap-1" data-testid="badge-parity-copilot">
-                    <Sparkles className="h-4 w-4" />
-                    Parity AI
-                  </Badge>
-                )}
-              </div>
-              <p className="text-white/90 text-lg">Manage and organize your client documents securely</p>
-            </div>
-            <div className="flex gap-2">
-              {hasParity && (
-                <Button 
-                  variant="outline" 
-                  className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
-                  data-testid="button-parity-chat"
-                  onClick={() => setLocation('/ai-agents/parity')}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Ask Parity AI
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={FileText}
+        title={
+          <>
+            Documents
+            {hasParity && (
+              <Badge variant="secondary" className="gap-1 bg-white/20 border-white/30 text-white backdrop-blur-sm ml-3" data-testid="badge-parity-copilot">
+                <Sparkles className="h-4 w-4" />
+                Parity AI
+              </Badge>
+            )}
+          </>
+        }
+        description="Manage and organize your client documents securely"
+        actions={
+          <>
+            {hasParity && (
+              <Button 
+                variant="outline" 
+                className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
+                data-testid="button-parity-chat"
+                onClick={() => setLocation('/ai-agents/parity')}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Ask Parity AI
+              </Button>
+            )}
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-white text-primary" data-testid="button-upload-document">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document
                 </Button>
-              )}
-              <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-white text-primary" data-testid="button-upload-document">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>Upload Document</DialogTitle>
                 <DialogDescription>
@@ -283,13 +281,12 @@ export default function Documents() {
                 </div>
               </div>
             </DialogContent>
-          </Dialog>
-            </div>
-          </div>
-        </div>
-      </div>
+            </Dialog>
+          </>
+        }
+      />
 
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
       <div className="mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

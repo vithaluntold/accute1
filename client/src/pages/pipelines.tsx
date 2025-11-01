@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { TaskSubtask, TaskChecklist, User } from "@shared/schema";
+import { GradientHero } from "@/components/gradient-hero";
 
 // Temporary type definitions until schema is updated
 type Pipeline = any;
@@ -82,28 +83,20 @@ export default function Pipelines() {
 
   return (
     <div className="h-full overflow-auto">
-      {/* Gradient Hero Section */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 gradient-hero opacity-90"></div>
-        <div className="relative container mx-auto p-6 md:p-8">
-          <div className="flex items-center justify-between">
-            <div className="max-w-4xl">
-              <div className="flex items-center gap-3 mb-2">
-                <Workflow className="h-10 w-10 text-white" />
-                <h1 className="text-4xl md:text-5xl font-display font-bold text-white" data-testid="text-page-title">Pipelines</h1>
-              </div>
-              <p className="text-white/90 text-lg" data-testid="text-page-description">
-                Manage hierarchical project workflows with stages, steps, and tasks
-              </p>
-            </div>
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-pipeline">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Pipeline
-            </Button>
-          </DialogTrigger>
-          <DialogContent data-testid="dialog-create-pipeline">
+      <GradientHero
+        icon={Workflow}
+        title="Pipelines"
+        description="Manage hierarchical project workflows with stages, steps, and tasks"
+        testId="gradient-hero-pipelines"
+        actions={
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-primary" data-testid="button-create-pipeline">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Pipeline
+              </Button>
+            </DialogTrigger>
+            <DialogContent data-testid="dialog-create-pipeline">
             <DialogHeader>
               <DialogTitle>Create New Pipeline</DialogTitle>
             </DialogHeader>
@@ -155,13 +148,12 @@ export default function Pipelines() {
                 {createPipeline.isPending ? "Creating..." : "Create Pipeline"}
               </Button>
             </DialogFooter>
-          </DialogContent>
-        </Dialog>
-          </div>
-        </div>
-      </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
-      <div className="px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
       {pipelines && pipelines.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">

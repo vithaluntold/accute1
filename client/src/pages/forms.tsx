@@ -6,6 +6,7 @@ import {
   MessageSquare, Star, Calendar, Briefcase, HeadphonesIcon, ShoppingCart, Mail, DollarSign, UserPlus,
   List, BarChart3, Share2, Copy, Download, Link2, Settings, Lock, Users, CalendarDays, Hash, StickyNote
 } from "lucide-react";
+import { GradientHero } from "@/components/gradient-hero";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -281,61 +282,56 @@ export default function FormsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Gradient Header Section */}
-      <div className="gradient-hero relative overflow-hidden rounded-b-2xl">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative px-6 py-8 md:py-12">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl md:text-4xl font-display font-bold text-white">Forms</h1>
-                {hasForma && (
-                  <Badge variant="secondary" className="gap-1 bg-white/20 border-white/30 text-white backdrop-blur-sm" data-testid="badge-forma-copilot">
-                    <Sparkles className="w-4 h-4" />
-                    Forma AI
-                  </Badge>
-                )}
-              </div>
-              <p className="text-white/90 text-lg">
-                Create and manage form templates for clients and workflows
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {hasForma && (
-                <Button 
-                  variant="outline" 
-                  className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
-                  data-testid="button-forma-chat"
-                  onClick={() => setLocation('/ai-agents/forma')}
-                >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Ask Forma AI
-                </Button>
-              )}
+    <div className="h-full overflow-auto">
+      <GradientHero
+        icon={FileText}
+        title={
+          <>
+            Forms
+            {hasForma && (
+              <Badge variant="secondary" className="gap-1 bg-white/20 border-white/30 text-white backdrop-blur-sm ml-3" data-testid="badge-forma-copilot">
+                <Sparkles className="w-4 h-4" />
+                Forma AI
+              </Badge>
+            )}
+          </>
+        }
+        description="Create and manage form templates for clients and workflows"
+        actions={
+          <>
+            {hasForma && (
               <Button 
                 variant="outline" 
-                className="bg-white/20 border-white/30 text-white backdrop-blur-sm"
-                onClick={() => setTemplateGalleryOpen(true)} 
-                data-testid="button-create-from-template"
+                className="bg-white/20 border-white/30 text-white backdrop-blur-sm" 
+                data-testid="button-forma-chat"
+                onClick={() => setLocation('/ai-agents/forma')}
               >
-                <Sparkles className="w-4 w-4 mr-2" />
-                Create from Template
+                <Sparkles className="w-4 h-4 mr-2" />
+                Ask Forma AI
               </Button>
-              <Button 
-                className="bg-white text-primary"
-                onClick={() => setCreateDialogOpen(true)} 
-                data-testid="button-create-form"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Form
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+            )}
+            <Button 
+              variant="outline" 
+              className="bg-white/20 border-white/30 text-white backdrop-blur-sm"
+              onClick={() => setTemplateGalleryOpen(true)} 
+              data-testid="button-create-from-template"
+            >
+              <Sparkles className="w-4 w-4 mr-2" />
+              Create from Template
+            </Button>
+            <Button 
+              className="bg-white text-primary"
+              onClick={() => setCreateDialogOpen(true)} 
+              data-testid="button-create-form"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Form
+            </Button>
+          </>
+        }
+      />
 
-      <div className="px-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">

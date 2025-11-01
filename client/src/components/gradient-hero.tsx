@@ -3,10 +3,11 @@ import { LucideIcon } from "lucide-react";
 
 interface GradientHeroProps {
   icon: LucideIcon;
-  title: string;
+  title: ReactNode;
   description: string;
   actions?: ReactNode;
   testId?: string;
+  titleText?: string;
 }
 
 export function GradientHero({
@@ -15,12 +16,19 @@ export function GradientHero({
   description,
   actions,
   testId = "gradient-hero",
+  titleText,
 }: GradientHeroProps) {
+  const ariaLabel = titleText 
+    ? `${titleText} page header`
+    : typeof title === 'string' 
+      ? `${title} page header`
+      : undefined;
+  
   return (
     <header
       className="relative mb-8"
       role="banner"
-      aria-label={`${title} page header`}
+      aria-label={ariaLabel}
       data-testid={testId}
     >
       <div className="absolute inset-0 gradient-hero" aria-hidden="true"></div>
