@@ -115,6 +115,36 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Luca Chat Sessions - Store conversation history
+export const lucaChatSessions = pgTable("luca_chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id),
+  title: text("title").notNull().default("New Chat"),
+  llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id), // Which AI provider was used
+  isActive: boolean("is_active").notNull().default(true),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("luca_chat_sessions_user_idx").on(table.userId),
+  userActiveIdx: index("luca_chat_sessions_user_active_idx").on(table.userId, table.isActive),
+}));
+
+// Luca Chat Messages - Individual messages within sessions
+export const lucaChatMessages = pgTable("luca_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => lucaChatSessions.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Store token usage, model info, etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("luca_chat_messages_session_idx").on(table.sessionId),
+  sessionCreatedIdx: index("luca_chat_messages_session_created_idx").on(table.sessionId, table.createdAt),
+}));
+
 // Workflows - Unified hierarchical project/workflow management with automation
 // Combines stages/steps/tasks hierarchy WITH visual automation capabilities (best of both worlds!)
 export const workflows = pgTable("workflows", {
@@ -2276,6 +2306,8 @@ export const insertAssignmentWorkflowStageSchema = createInsertSchema(assignment
 export const insertAssignmentWorkflowStepSchema = createInsertSchema(assignmentWorkflowSteps).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAssignmentWorkflowTaskSchema = createInsertSchema(assignmentWorkflowTasks).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPlatformSubscriptionSchema = createInsertSchema(platformSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLucaChatSessionSchema = createInsertSchema(lucaChatSessions).omit({ id: true, createdAt: true, updatedAt: true, lastMessageAt: true });
+export const insertLucaChatMessageSchema = createInsertSchema(lucaChatMessages).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -2329,6 +2361,10 @@ export type InsertWorkflowAssignment = z.infer<typeof insertWorkflowAssignmentSc
 export type WorkflowAssignment = typeof workflowAssignments.$inferSelect;
 export type InsertPlatformSubscription = z.infer<typeof insertPlatformSubscriptionSchema>;
 export type PlatformSubscription = typeof platformSubscriptions.$inferSelect;
+export type InsertLucaChatSession = z.infer<typeof insertLucaChatSessionSchema>;
+export type LucaChatSession = typeof lucaChatSessions.$inferSelect;
+export type InsertLucaChatMessage = z.infer<typeof insertLucaChatMessageSchema>;
+export type LucaChatMessage = typeof lucaChatMessages.$inferSelect;
 export type InsertFolder = z.infer<typeof insertFolderSchema>;
 export type Folder = typeof folders.$inferSelect;
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
