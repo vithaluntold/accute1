@@ -816,7 +816,7 @@ export function LucaChatWidget() {
                     <div
                       className={`rounded-2xl px-4 py-2.5 max-w-[80%] ${
                         message.role === "user"
-                          ? "bg-gradient-to-br from-[#e5a660] to-[#d76082] text-white shadow-md"
+                          ? "bg-primary/10 border border-primary/20"
                           : "bg-muted"
                       }`}
                     >
