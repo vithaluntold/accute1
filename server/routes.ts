@@ -949,6 +949,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/workflows/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
     try {
+      const existing = await storage.getWorkflow(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      
+      // Super Admin can delete global workflows (organizationId: null)
+      // Regular users can only delete their organization's workflows
+      const isSuperAdmin = !req.user!.organizationId;
+      const isGlobalWorkflow = !existing.organizationId;
+      const isOwnOrganizationWorkflow = existing.organizationId === req.user!.organizationId;
+      
+      if (!isSuperAdmin && !isOwnOrganizationWorkflow) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Prevent regular users from deleting global workflows
+      if (!isSuperAdmin && isGlobalWorkflow) {
+        return res.status(403).json({ error: "Cannot delete global workflows" });
+      }
+      
       await storage.deleteWorkflow(req.params.id);
       await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "workflow", req.params.id, {}, req);
       res.json({ success: true });
@@ -2397,11 +2417,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/documents/:id", requireAuth, requirePermission("documents.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const document = await storage.getDocument(req.params.id);
-      if (document) {
-        const filePath = path.join(process.cwd(), document.url.replace(/^\//, ''));
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Super Admin can delete global documents (organizationId: null)
+      // Regular users can only delete their organization's documents
+      const isSuperAdmin = !req.user!.organizationId;
+      const isGlobalDocument = !document.organizationId;
+      const isOwnOrganizationDocument = document.organizationId === req.user!.organizationId;
+      
+      if (!isSuperAdmin && !isOwnOrganizationDocument) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Prevent regular users from deleting global documents
+      if (!isSuperAdmin && isGlobalDocument) {
+        return res.status(403).json({ error: "Cannot delete global documents" });
+      }
+      
+      // Delete physical file
+      const filePath = path.join(process.cwd(), document.url.replace(/^\//, ''));
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
       }
       
       await storage.deleteDocument(req.params.id);
