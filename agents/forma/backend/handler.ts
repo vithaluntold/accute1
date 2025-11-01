@@ -85,8 +85,27 @@ export const registerRoutes = (app: any) => {
 - Age, Quantity, Amount → number
 - Birthday, Date → date
 - Yes/No questions → checkbox
-- Multiple choice → select (with options array)
-- Long text → textarea
+- Multiple choice, Dropdowns, Pick one from list → select (MUST include options array)
+- Long text, Comments, Notes → textarea
+
+**CRITICAL - SELECT/DROPDOWN FIELDS:**
+When user asks for dropdowns, selections, or multiple choice, you MUST use type "select" with an "options" array:
+{
+  "id": "unique_id",
+  "label": "Business Type",
+  "type": "select",
+  "required": true,
+  "placeholder": "Select business type",
+  "options": ["Sole Proprietorship", "LLC", "S-Corp", "C-Corp", "Partnership"],
+  "order": 0
+}
+
+Examples that need SELECT type:
+- "Business type dropdown" → type: "select" with business type options
+- "State selection" → type: "select" with state options
+- "Tax filing status" → type: "select" with status options
+- "Industry" → type: "select" with industry options
+- "Choose your plan" → type: "select" with plan options
 
 **RESPONSE FORMAT:**
 Always respond with TWO parts separated by "---FORM_JSON---":

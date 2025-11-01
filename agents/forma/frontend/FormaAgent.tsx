@@ -245,19 +245,31 @@ export default function FormaAgent() {
               <FormInput className="h-5 w-5 text-primary" />
               Form Preview
             </CardTitle>
-            {formState && formState.status === "complete" && (
-              <Button 
-                onClick={saveForm}
-                size="sm"
-                data-testid="button-save-form"
-              >
-                Save Form
-              </Button>
+            {formState && formState.fields.length > 0 && (
+              <div className="flex gap-2">
+                {formState.status === "building" && (
+                  <Button 
+                    onClick={() => setFormState(prev => prev ? {...prev, status: "complete"} : null)}
+                    size="sm"
+                    variant="outline"
+                    data-testid="button-mark-complete"
+                  >
+                    Mark as Complete
+                  </Button>
+                )}
+                <Button 
+                  onClick={saveForm}
+                  size="sm"
+                  data-testid="button-save-form"
+                >
+                  Save & Publish Form
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
         
-        <CardContent className="flex-1 p-0">
+        <CardContent className="flex-1 p-0 overflow-hidden">
           {!formState ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -269,8 +281,8 @@ export default function FormaAgent() {
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
+            <ScrollArea className="h-full w-full">
+              <div className="p-6 space-y-6 pb-20">
                 {/* Form Header */}
                 <div className="space-y-2 pb-4 border-b">
                   <div className="flex items-center justify-between">
