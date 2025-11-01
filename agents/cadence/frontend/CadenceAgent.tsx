@@ -45,7 +45,7 @@ interface Step {
 export default function CadenceAgent() {
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
-    content: "Hi! I'm Cadence, your workflow builder. I can help you in two ways:\n\n**1. Conversational Building:**\n• Describe your workflow and I'll build it with you\n\n**2. Upload a Document:**\n• Upload a workflow specification (PDF, DOCX, TXT)\n• I'll extract the hierarchy and create your workflow automatically\n• Document should contain: Workflow > Stages > Steps > Tasks structure\n\nHow would you like to start?"
+    content: "Hi! I'm Cadence, your workflow builder. I can help you in two ways:\n\n1️⃣ Conversational Building:\n   • Describe your workflow and I'll build it with you\n\n2️⃣ Upload a Document:\n   • Upload a workflow specification (PDF, DOCX, XLSX, TXT)\n   • I'll extract the hierarchy and create your workflow automatically\n   • Document should contain: Workflow > Stages > Steps > Tasks structure\n\nHow would you like to start?"
   }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -268,7 +268,7 @@ export default function CadenceAgent() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.docx,.xlsx,.xls,.txt"
                 onChange={handleFileSelect}
                 className="hidden"
                 data-testid="input-file-upload"

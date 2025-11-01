@@ -40,7 +40,7 @@ interface FormField {
 export default function FormaAgent() {
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
-    content: "Hi! I'm Forma, your AI form builder. I can help you in two ways:\n\n**1. Conversational Building:**\n• Just tell me what form you need\n• I'll ask questions and build it with you\n\n**2. Upload a Document:**\n• Upload a questionnaire (PDF, DOCX, TXT)\n• I'll extract the questions and create your form automatically\n\nHow would you like to start?"
+    content: "Hi! I'm Forma, your AI form builder. I can help you in two ways:\n\n1️⃣ Conversational Building:\n   • Just tell me what form you need\n   • I'll ask questions and build it with you\n\n2️⃣ Upload a Document:\n   • Upload a questionnaire (PDF, DOCX, XLSX, TXT)\n   • I'll extract the questions and create your form automatically\n\nHow would you like to start?"
   }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -306,7 +306,7 @@ export default function FormaAgent() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.docx,.xlsx,.xls,.txt"
                 onChange={handleFileSelect}
                 className="hidden"
                 data-testid="input-file-upload"
