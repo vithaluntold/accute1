@@ -388,6 +388,16 @@ export interface IStorage {
   updateChatMessage(id: string, content: string): Promise<schema.ChatMessage | undefined>;
   deleteChatMessage(id: string): Promise<void>;
 
+  // AI Agent Sessions (Parity, Cadence, Forma)
+  createAgentSession(session: schema.InsertAgentSession): Promise<schema.AgentSession>;
+  getAgentSession(id: string): Promise<schema.AgentSession | undefined>;
+  getAgentSessionsByUser(userId: string, agentSlug: string): Promise<schema.AgentSession[]>;
+  updateAgentSession(id: string, name: string): Promise<schema.AgentSession | undefined>;
+  deleteAgentSession(id: string): Promise<void>;
+  
+  createAgentMessage(message: schema.InsertAgentMessage): Promise<schema.AgentMessage>;
+  getAgentMessagesBySession(sessionId: string): Promise<schema.AgentMessage[]>;
+
   // TaxDome Features - Calendar & Appointments
   createAppointment(appointment: schema.InsertAppointment): Promise<schema.Appointment>;
   getAppointment(id: string): Promise<schema.Appointment | undefined>;
@@ -3328,6 +3338,49 @@ export class DbStorage implements IStorage {
 
   async deleteChatMessage(id: string): Promise<void> {
     await db.delete(schema.chatMessages).where(eq(schema.chatMessages.id, id));
+  }
+
+  // AI Agent Sessions
+  async createAgentSession(session: schema.InsertAgentSession): Promise<schema.AgentSession> {
+    const result = await db.insert(schema.agentSessions).values(session).returning();
+    return result[0];
+  }
+
+  async getAgentSession(id: string): Promise<schema.AgentSession | undefined> {
+    const result = await db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, id));
+    return result[0];
+  }
+
+  async getAgentSessionsByUser(userId: string, agentSlug: string): Promise<schema.AgentSession[]> {
+    return await db.select().from(schema.agentSessions)
+      .where(and(
+        eq(schema.agentSessions.userId, userId),
+        eq(schema.agentSessions.agentSlug, agentSlug)
+      ))
+      .orderBy(desc(schema.agentSessions.updatedAt));
+  }
+
+  async updateAgentSession(id: string, name: string): Promise<schema.AgentSession | undefined> {
+    const result = await db.update(schema.agentSessions)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(schema.agentSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAgentSession(id: string): Promise<void> {
+    await db.delete(schema.agentSessions).where(eq(schema.agentSessions.id, id));
+  }
+
+  async createAgentMessage(message: schema.InsertAgentMessage): Promise<schema.AgentMessage> {
+    const result = await db.insert(schema.agentMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getAgentMessagesBySession(sessionId: string): Promise<schema.AgentMessage[]> {
+    return await db.select().from(schema.agentMessages)
+      .where(eq(schema.agentMessages.sessionId, sessionId))
+      .orderBy(schema.agentMessages.createdAt);
   }
 
   // Calendar & Appointments
