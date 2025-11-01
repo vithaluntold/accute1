@@ -2,6 +2,9 @@ import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
 import { LLMService } from "../../../server/llm-service";
+import multer from "multer";
+import * as pdfParse from "pdf-parse";
+import mammoth from "mammoth";
 
 interface Message {
   role: "user" | "assistant";
@@ -198,6 +201,140 @@ Great! I've added an email field for you. What other information do you need to 
       console.error("Error saving form:", error);
       res.status(500).json({ 
         error: "Failed to save form",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Document upload and parsing endpoint
+  const upload = multer({ storage: multer.memoryStorage() });
+  
+  app.post("/api/agents/forma/upload-document", requireAuth, upload.single("file"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Get LLM configuration
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      if (!llmConfig) {
+        return res.status(400).json({ 
+          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
+        });
+      }
+
+      // Parse document based on file type
+      let documentText = "";
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+
+      if (fileExtension === "pdf") {
+        const pdfData = await (pdfParse as any)(req.file.buffer);
+        documentText = pdfData.text;
+      } else if (fileExtension === "docx") {
+        const result = await mammoth.extractRawText({ buffer: req.file.buffer });
+        documentText = result.value;
+      } else if (fileExtension === "txt") {
+        documentText = req.file.buffer.toString('utf-8');
+      } else {
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, or TXT files." });
+      }
+
+      // Use AI to extract questions and create form
+      const llmService = new LLMService(llmConfig);
+
+      const systemPrompt = `You are Forma, an AI form builder. You analyze documents containing questions or data requirements and convert them into structured forms.
+
+**YOUR TASK:**
+1. Read the provided questionnaire/document
+2. Extract all questions or data fields
+3. Convert each question into an appropriate form field
+4. Return a complete form structure
+
+**FORM STRUCTURE:**
+{
+  "name": "Form Name (derived from document)",
+  "description": "Brief description",
+  "fields": [
+    {
+      "id": "unique_id",
+      "label": "Question text",
+      "type": "text|email|number|date|checkbox|select|textarea",
+      "required": true|false,
+      "placeholder": "Helpful placeholder",
+      "options": ["Option 1", "Option 2"],  // Only for select fields
+      "order": 0
+    }
+  ],
+  "status": "complete"
+}
+
+**FIELD TYPE MAPPING:**
+- Name, Address, Description → text
+- Email address → email
+- Phone, SSN, Tax ID → text
+- Age, Quantity, Amount → number
+- Date of birth, Dates → date
+- Yes/No questions → checkbox
+- Multiple choice questions → select (with options array)
+- Long answers, Comments → textarea
+
+**IMPORTANT:**
+- Extract EVERY question/field from the document
+- Use descriptive labels
+- Infer field types from question context
+- Set status to "complete"
+- Generate unique IDs for each field
+
+**RESPONSE FORMAT:**
+Respond with TWO parts separated by "---FORM_JSON---":
+1. A brief summary of what you found
+2. The complete form JSON
+
+Example:
+I found 8 questions in your client intake questionnaire. I've created a form with all the fields.
+---FORM_JSON---
+{"name":"Client Intake","description":"Collect client information","fields":[...],"status":"complete"}`;
+
+      const userPrompt = `Please analyze this document and create a form from it:
+
+---DOCUMENT START---
+${documentText}
+---DOCUMENT END---
+
+Extract all questions and convert them to form fields. Return the complete form structure.`;
+
+      const fullResponse = await llmService.sendPrompt(userPrompt, systemPrompt);
+
+      // Parse the response
+      let responseText = fullResponse;
+      let formUpdate: FormState | undefined = undefined;
+
+      if (fullResponse.includes("---FORM_JSON---")) {
+        const parts = fullResponse.split("---FORM_JSON---");
+        responseText = parts[0].trim();
+        
+        try {
+          const jsonPart = parts[1].trim();
+          formUpdate = JSON.parse(jsonPart);
+        } catch (e) {
+          console.error("Failed to parse form JSON:", e);
+          return res.status(500).json({ error: "Failed to parse AI response" });
+        }
+      }
+
+      if (!formUpdate) {
+        return res.status(500).json({ error: "AI did not return a valid form structure" });
+      }
+
+      res.json({ 
+        response: responseText,
+        formUpdate
+      });
+      
+    } catch (error) {
+      console.error("Error processing document:", error);
+      res.status(500).json({ 
+        error: "Failed to process document",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }
