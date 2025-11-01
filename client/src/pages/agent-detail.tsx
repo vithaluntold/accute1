@@ -109,19 +109,21 @@ export default function AgentDetail() {
       </div>
 
       {/* Agent Interface */}
-      <div className="flex-1 overflow-hidden p-6 pb-24">
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-4">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                <p className="text-muted-foreground">Loading {agent.name}...</p>
+      <div className="flex-1 overflow-hidden p-6">
+        <div className="h-full">
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                  <p className="text-muted-foreground">Loading {agent.name}...</p>
+                </div>
               </div>
-            </div>
-          }
-        >
-          <AgentComponent />
-        </Suspense>
+            }
+          >
+            <AgentComponent />
+          </Suspense>
+        </div>
       </div>
     </div>
   );
