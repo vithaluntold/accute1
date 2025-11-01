@@ -82,6 +82,7 @@ import SubscriptionsPage from "@/pages/admin/subscriptions";
 import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
 import PricingRegionsPage from "@/pages/admin/pricing-regions";
 import CouponsPage from "@/pages/admin/coupons";
+import PlatformSettingsPage from "@/pages/admin/platform-settings";
 import AllUsersPage from "@/pages/admin/users";
 import AdminTicketsPage from "@/pages/admin/tickets";
 import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
@@ -311,6 +312,15 @@ function Router() {
           <RoleGuard allowedRoles={["Super Admin"]}>
             <AppLayout>
               <CouponsPage />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/platform-settings">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <PlatformSettingsPage />
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>

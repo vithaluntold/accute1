@@ -48,6 +48,7 @@ const platformMenuCategories = [
       { title: "Plans", url: "/admin/subscription-plans", icon: Package, permission: null },
       { title: "Pricing Regions", url: "/admin/pricing-regions", icon: Globe, permission: null },
       { title: "Coupons", url: "/admin/coupons", icon: Percent, permission: null },
+      { title: "Platform Settings", url: "/admin/platform-settings", icon: Settings, permission: null },
     ]
   },
   {

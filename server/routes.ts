@@ -9013,6 +9013,53 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Platform Settings Routes ====================
+  
+  // In-memory store for platform settings (will be replaced with database or env vars)
+  let platformSettings = {
+    stripePublicKey: process.env.VITE_STRIPE_PUBLIC_KEY || "",
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  };
+
+  // Get platform settings (Super Admin only)
+  app.get("/api/platform-settings", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      // Mask secret keys for display
+      res.json({
+        stripePublicKey: platformSettings.stripePublicKey,
+        stripeSecretKey: platformSettings.stripeSecretKey ? "***" + platformSettings.stripeSecretKey.slice(-4) : "",
+        stripeWebhookSecret: platformSettings.stripeWebhookSecret ? "***" + platformSettings.stripeWebhookSecret.slice(-4) : "",
+      });
+    } catch (error: any) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ error: "Failed to fetch platform settings" });
+    }
+  });
+
+  // Update platform settings (Super Admin only)
+  app.patch("/api/platform-settings", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { stripePublicKey, stripeSecretKey, stripeWebhookSecret } = req.body;
+
+      // Update only provided values
+      if (stripePublicKey !== undefined) {
+        platformSettings.stripePublicKey = stripePublicKey;
+      }
+      if (stripeSecretKey !== undefined && !stripeSecretKey.startsWith("***")) {
+        platformSettings.stripeSecretKey = stripeSecretKey;
+      }
+      if (stripeWebhookSecret !== undefined && !stripeWebhookSecret.startsWith("***")) {
+        platformSettings.stripeWebhookSecret = stripeWebhookSecret;
+      }
+
+      res.json({ success: true, message: "Settings updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating platform settings:", error);
+      res.status(500).json({ error: "Failed to update platform settings" });
+    }
+  });
+
   // Calculate subscription price (public)
   app.post("/api/subscription-price/calculate", async (req: Request, res: Response) => {
     try {
