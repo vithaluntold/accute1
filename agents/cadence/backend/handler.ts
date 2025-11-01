@@ -5,6 +5,7 @@ import { LLMService } from "../../../server/llm-service";
 import multer from "multer";
 import * as pdfParse from "pdf-parse";
 import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 interface WorkflowState {
   name: string;
@@ -209,13 +210,15 @@ Guidelines:
       const allowedMimes = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
         'text/plain'
       ];
       
       if (allowedMimes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Invalid file type. Only PDF, DOCX, and TXT files are allowed.'));
+        cb(new Error('Invalid file type. Only PDF, DOCX, XLSX, and TXT files are allowed.'));
       }
     }
   });
@@ -262,8 +265,19 @@ Guidelines:
         documentText = result.value;
       } else if (fileExtension === "txt") {
         documentText = req.file.buffer.toString('utf-8');
+      } else if (fileExtension === "xlsx" || fileExtension === "xls") {
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+        let allText = "";
+        
+        workbook.SheetNames.forEach(sheetName => {
+          const sheet = workbook.Sheets[sheetName];
+          const csvData = XLSX.utils.sheet_to_csv(sheet);
+          allText += `\n--- Sheet: ${sheetName} ---\n${csvData}\n`;
+        });
+        
+        documentText = allText;
       } else {
-        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, or TXT files." });
+        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, XLSX, or TXT files." });
       }
 
       // Use AI to extract workflow structure
