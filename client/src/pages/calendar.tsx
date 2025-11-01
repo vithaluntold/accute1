@@ -17,7 +17,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon, Plus } from "lucide-react";
@@ -86,12 +85,10 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-display">Calendar</h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-new-appointment">
-              <Plus className="w-4 h-4 mr-2" />
-              New Appointment
-            </Button>
-          </DialogTrigger>
+          <Button onClick={() => setDialogOpen(true)} data-testid="button-new-appointment">
+            <Plus className="w-4 h-4 mr-2" />
+            New Appointment
+          </Button>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Schedule Appointment</DialogTitle>

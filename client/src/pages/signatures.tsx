@@ -17,7 +17,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -69,17 +68,27 @@ export default function SignaturesPage() {
     }
   };
 
+  const handleOpenDialog = () => {
+    if (clients.length === 0) {
+      toast({
+        title: "No clients available",
+        description: "Please create a client first before requesting signatures.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDialogOpen(true);
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-display">E-Signatures</h1>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-new-request">
-              <Plus className="w-4 h-4 mr-2" />
-              New Signature Request
-            </Button>
-          </DialogTrigger>
+          <Button onClick={handleOpenDialog} data-testid="button-new-request">
+            <Plus className="w-4 h-4 mr-2" />
+            New Signature Request
+          </Button>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Request E-Signature</DialogTitle>
