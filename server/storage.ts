@@ -106,6 +106,18 @@ export interface IStorage {
   deleteSession(token: string): Promise<void>;
   deleteUserSessions(userId: string): Promise<void>;
 
+  // Luca Chat Sessions
+  createLucaChatSession(session: schema.InsertLucaChatSession): Promise<schema.LucaChatSession>;
+  getLucaChatSession(id: string): Promise<schema.LucaChatSession | undefined>;
+  getLucaChatSessionsByUser(userId: string): Promise<schema.LucaChatSession[]>;
+  updateLucaChatSession(id: string, updates: Partial<schema.InsertLucaChatSession>): Promise<schema.LucaChatSession | undefined>;
+  deleteLucaChatSession(id: string): Promise<void>;
+  
+  // Luca Chat Messages
+  createLucaChatMessage(message: schema.InsertLucaChatMessage): Promise<schema.LucaChatMessage>;
+  getLucaChatMessagesBySession(sessionId: string): Promise<schema.LucaChatMessage[]>;
+  deleteLucaChatMessagesBySession(sessionId: string): Promise<void>;
+
   // Workflows
   getWorkflow(id: string): Promise<Workflow | undefined>;
   createWorkflow(workflow: InsertWorkflow & { organizationId: string; createdBy: string }): Promise<Workflow>;
@@ -767,6 +779,56 @@ export class DbStorage implements IStorage {
 
   async deleteUserSessions(userId: string): Promise<void> {
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+  }
+
+  // Luca Chat Sessions
+  async createLucaChatSession(session: schema.InsertLucaChatSession): Promise<schema.LucaChatSession> {
+    const result = await db.insert(schema.lucaChatSessions).values(session).returning();
+    return result[0];
+  }
+
+  async getLucaChatSession(id: string): Promise<schema.LucaChatSession | undefined> {
+    const result = await db.select().from(schema.lucaChatSessions).where(eq(schema.lucaChatSessions.id, id));
+    return result[0];
+  }
+
+  async getLucaChatSessionsByUser(userId: string): Promise<schema.LucaChatSession[]> {
+    return await db.select()
+      .from(schema.lucaChatSessions)
+      .where(and(
+        eq(schema.lucaChatSessions.userId, userId),
+        eq(schema.lucaChatSessions.isActive, true)
+      ))
+      .orderBy(desc(schema.lucaChatSessions.lastMessageAt));
+  }
+
+  async updateLucaChatSession(id: string, updates: Partial<schema.InsertLucaChatSession>): Promise<schema.LucaChatSession | undefined> {
+    const result = await db.update(schema.lucaChatSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.lucaChatSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLucaChatSession(id: string): Promise<void> {
+    await db.delete(schema.lucaChatSessions).where(eq(schema.lucaChatSessions.id, id));
+  }
+
+  // Luca Chat Messages
+  async createLucaChatMessage(message: schema.InsertLucaChatMessage): Promise<schema.LucaChatMessage> {
+    const result = await db.insert(schema.lucaChatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getLucaChatMessagesBySession(sessionId: string): Promise<schema.LucaChatMessage[]> {
+    return await db.select()
+      .from(schema.lucaChatMessages)
+      .where(eq(schema.lucaChatMessages.sessionId, sessionId))
+      .orderBy(schema.lucaChatMessages.createdAt);
+  }
+
+  async deleteLucaChatMessagesBySession(sessionId: string): Promise<void> {
+    await db.delete(schema.lucaChatMessages).where(eq(schema.lucaChatMessages.sessionId, sessionId));
   }
 
   // Workflows
