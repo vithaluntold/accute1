@@ -150,6 +150,7 @@ const organizationMenuCategories = [
       { title: "Team", url: "/team", icon: Users, permission: "users.view" },
       { title: "Roles & Permissions", url: "/roles", icon: Shield, permission: "roles.view" },
       { title: "Analytics", url: "/analytics", icon: BarChart3, permission: "analytics.view" },
+      { title: "Subscription", url: "/subscription", icon: CreditCard, permission: null },
       { title: "Settings", url: "/settings", icon: Settings, permission: null },
       { title: "Mobile Apps", url: "/mobile-apps", icon: Smartphone, permission: null },
     ]
