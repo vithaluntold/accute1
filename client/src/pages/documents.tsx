@@ -53,12 +53,6 @@ export default function Documents() {
     }
   }, [marketplaceTemplateId, uploadDialogOpen, setLocation]);
 
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-  });
-
-  const isSuperAdmin = currentUser?.role?.name === "Super Admin";
-
   const { data: documents = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/documents"],
   });
@@ -390,16 +384,14 @@ export default function Documents() {
                     <Download className="h-4 w-4 mr-1" />
                     Download
                   </Button>
-                  {(isSuperAdmin || doc.organizationId) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setDeleteTarget(doc.id)}
-                      data-testid={`button-delete-${doc.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDeleteTarget(doc.id)}
+                    data-testid={`button-delete-${doc.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>

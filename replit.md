@@ -38,7 +38,7 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Audit Trails**: Comprehensive logging of all activities.
 - **Form Builder & Renderer**: Dynamic form creation with 22 field types and conditional logic.
 - **Polymorphic Tagging System**: Flexible organization of resources.
-- **Marketplace System**: Provides templates (Documents, Forms, Pipelines) with pricing models.
+- **Marketplace System**: Provides templates (Documents, Forms, Workflows) with pricing models. **Critical Logic**: Super Admin creates global templates → Marketplace. Admin/users adopt templates → Get organization-scoped COPY (independent instance). Admin can freely delete their organization's copies (does NOT affect marketplace or other organizations). Data isolation: Firm X and Firm Y using same template have completely isolated data (submissions, edits, instances).
 - **Workflow Assignment System**: Manages client assignments, tracks progress, and status lifecycles.
 - **Hierarchical Folder Structure**: Self-referencing folder tree with unlimited nesting, content categorization, and sharing permissions.
 - **Auto-Progression Engine**: Cascading automation for workflow progression.

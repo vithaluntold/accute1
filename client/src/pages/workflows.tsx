@@ -61,12 +61,6 @@ export default function Workflows() {
     }
   }, [marketplaceTemplateId, createDialogOpen, marketplaceName, marketplaceDescription, marketplaceCategory, setLocation]);
   
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
-  });
-
-  const isSuperAdmin = currentUser?.role?.name === "Super Admin";
-
   const { data: workflows = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/workflows"],
   });
@@ -485,17 +479,15 @@ export default function Workflows() {
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
-                    {(isSuperAdmin || workflow.scope === 'organization') && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => handleDeleteWorkflow(workflow.id, workflow.name, e)}
-                        disabled={deleteWorkflow.isPending}
-                        data-testid={`button-delete-workflow-${workflow.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleDeleteWorkflow(workflow.id, workflow.name, e)}
+                      disabled={deleteWorkflow.isPending}
+                      data-testid={`button-delete-workflow-${workflow.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </CardHeader>

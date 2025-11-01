@@ -954,19 +954,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Workflow not found" });
       }
       
-      // Super Admin can delete global workflows (organizationId: null)
-      // Regular users can only delete their organization's workflows
+      // Check ownership: Super Admin can delete global workflows, regular users can delete their org's workflows
       const isSuperAdmin = !req.user!.organizationId;
-      const isGlobalWorkflow = !existing.organizationId;
       const isOwnOrganizationWorkflow = existing.organizationId === req.user!.organizationId;
       
       if (!isSuperAdmin && !isOwnOrganizationWorkflow) {
         return res.status(403).json({ error: "Access denied" });
-      }
-      
-      // Prevent regular users from deleting global workflows
-      if (!isSuperAdmin && isGlobalWorkflow) {
-        return res.status(403).json({ error: "Cannot delete global workflows" });
       }
       
       await storage.deleteWorkflow(req.params.id);
@@ -2421,19 +2414,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Document not found" });
       }
       
-      // Super Admin can delete global documents (organizationId: null)
-      // Regular users can only delete their organization's documents
+      // Check ownership: Super Admin can delete global documents, regular users can delete their org's documents
       const isSuperAdmin = !req.user!.organizationId;
-      const isGlobalDocument = !document.organizationId;
       const isOwnOrganizationDocument = document.organizationId === req.user!.organizationId;
       
       if (!isSuperAdmin && !isOwnOrganizationDocument) {
         return res.status(403).json({ error: "Access denied" });
-      }
-      
-      // Prevent regular users from deleting global documents
-      if (!isSuperAdmin && isGlobalDocument) {
-        return res.status(403).json({ error: "Cannot delete global documents" });
       }
       
       // Delete physical file
@@ -3610,19 +3596,12 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(404).json({ error: "Form not found" });
       }
       
-      // Super Admin can delete global forms (organizationId: null)
-      // Regular users can only delete their organization's forms
+      // Check ownership: Super Admin can delete global forms, regular users can delete their org's forms
       const isSuperAdmin = !req.user!.organizationId;
-      const isGlobalForm = !existing.organizationId;
       const isOwnOrganizationForm = existing.organizationId === req.user!.organizationId;
       
       if (!isSuperAdmin && !isOwnOrganizationForm) {
         return res.status(403).json({ error: "Access denied" });
-      }
-      
-      // Prevent regular users from deleting global forms
-      if (!isSuperAdmin && isGlobalForm) {
-        return res.status(403).json({ error: "Cannot delete global forms" });
       }
       
       await storage.deleteFormTemplate(req.params.id);
