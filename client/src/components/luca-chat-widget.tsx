@@ -228,10 +228,8 @@ export function LucaChatWidget() {
       if (selectedLlmConfig) {
         payload.llmConfigId = selectedLlmConfig;
       }
-      return await apiRequest("/api/luca-chat-sessions", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const response = await apiRequest("POST", "/api/luca-chat-sessions", payload);
+      return await response.json();
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
@@ -244,10 +242,8 @@ export function LucaChatWidget() {
   // Update session mutation
   const updateSessionMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<ChatSession> }) => {
-      return await apiRequest(`/api/luca-chat-sessions/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
+      const response = await apiRequest("PATCH", `/api/luca-chat-sessions/${id}`, updates);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
@@ -259,9 +255,8 @@ export function LucaChatWidget() {
   // Delete session mutation
   const deleteSessionMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/luca-chat-sessions/${id}`, {
-        method: "DELETE",
-      });
+      const response = await apiRequest("DELETE", `/api/luca-chat-sessions/${id}`);
+      return await response.json();
     },
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
@@ -276,10 +271,12 @@ export function LucaChatWidget() {
   // Add message to session mutation
   const addMessageMutation = useMutation({
     mutationFn: async ({ sessionId, role, content }: { sessionId: string; role: string; content: string }) => {
-      return await apiRequest(`/api/luca-chat-sessions/${sessionId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ role, content, metadata: {} }),
+      const response = await apiRequest("POST", `/api/luca-chat-sessions/${sessionId}/messages`, {
+        role,
+        content,
+        metadata: {}
       });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
@@ -287,7 +284,7 @@ export function LucaChatWidget() {
   });
 
   const handleNewChat = () => {
-    createSessionMutation.mutate();
+    createSessionMutation.mutate("New Chat");
   };
 
   const handleRenameSession = (sessionId: string, currentTitle: string) => {
