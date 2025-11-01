@@ -69,12 +69,12 @@
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
-  --gradient-primary: linear-gradient(135deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
-  --gradient-hero: linear-gradient(135deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
+  --gradient-primary: linear-gradient(90deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
+  --gradient-hero: linear-gradient(90deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
   --gradient-accent: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(271 81% 56%) 100%);
   --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(158 64% 52%) 100%);
-  --gradient-subtle: linear-gradient(135deg, hsl(32 72% 64% / 0.08) 0%, hsl(343 60% 61% / 0.08) 100%);
-  --gradient-card: linear-gradient(135deg, hsl(32 72% 64% / 0.05) 0%, hsl(343 60% 61% / 0.05) 100%);
+  --gradient-subtle: linear-gradient(90deg, hsl(32 72% 64% / 0.08) 0%, hsl(343 60% 61% / 0.08) 100%);
+  --gradient-card: linear-gradient(90deg, hsl(32 72% 64% / 0.05) 0%, hsl(343 60% 61% / 0.05) 100%);
   
   --accent-surface: 343 60% 97%;
   --success-surface: 142 76% 95%;
@@ -163,8 +163,8 @@
   --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
 
-  --gradient-primary: linear-gradient(135deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
-  --gradient-hero: linear-gradient(135deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
+  --gradient-primary: linear-gradient(90deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
+  --gradient-hero: linear-gradient(90deg, hsl(32 72% 64%) 0%, hsl(343 60% 61%) 100%);
   --gradient-accent: linear-gradient(135deg, hsl(199 89% 48%) 0%, hsl(271 81% 56%) 100%);
   --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(158 64% 52%) 100%);
   --gradient-subtle: linear-gradient(135deg, hsl(32 72% 64% / 0.12) 0%, hsl(343 60% 61% / 0.12) 100%);
