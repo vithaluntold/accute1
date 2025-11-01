@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FormInput, Send, Sparkles, Plus, Type, CheckSquare, Calendar, Hash, Mail, Phone } from "lucide-react";
+import { FormInput, Send, Sparkles, Plus, Type, CheckSquare, Calendar, Hash, Mail, Phone, Upload, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -39,13 +40,16 @@ interface FormField {
 export default function FormaAgent() {
   const [messages, setMessages] = useState<Message[]>([{
     role: "assistant",
-    content: "Hi! I'm Forma, your AI form builder. Tell me what form you need and I'll build it conversationally. For example:\n\n• 'Create a client intake form'\n• 'Build a tax document request form'\n• 'Make an employee onboarding form'\n\nWhat form would you like to create?"
+    content: "Hi! I'm Forma, your AI form builder. I can help you in two ways:\n\n**1. Conversational Building:**\n• Just tell me what form you need\n• I'll ask questions and build it with you\n\n**2. Upload a Document:**\n• Upload a questionnaire (PDF, DOCX, TXT)\n• I'll extract the questions and create your form automatically\n\nHow would you like to start?"
   }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [formState, setFormState] = useState<FormState | null>(null);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -119,6 +123,86 @@ export default function FormaAgent() {
         description: "Failed to save form.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploadedFile(file);
+    setIsLoading(true);
+    setTodos([
+      { id: "1", content: "Uploading document...", status: "in_progress" },
+      { id: "2", content: "Parsing document content", status: "pending" },
+      { id: "3", content: "Extracting questions", status: "pending" },
+      { id: "4", content: "Converting to form fields", status: "pending" },
+      { id: "5", content: "Finalizing form structure", status: "pending" }
+    ]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setMessages(prev => [...prev, {
+        role: "user",
+        content: `📄 Uploaded document: ${file.name}`
+      }]);
+
+      setTodos(prev => prev.map(t => 
+        t.id === "1" ? { ...t, status: "completed" as const } :
+        t.id === "2" ? { ...t, status: "in_progress" as const } : t
+      ));
+
+      const response = await fetch("/api/agents/forma/upload-document", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+      
+      setTodos(prev => prev.map(t => ({ ...t, status: "completed" as const })));
+      
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.response,
+        formUpdate: data.formUpdate
+      }]);
+
+      if (data.formUpdate) {
+        setFormState(data.formUpdate);
+      }
+
+      toast({
+        title: "Document processed",
+        description: `Created form with ${data.formUpdate?.fields.length || 0} fields from your document.`
+      });
+
+      setTodos([]);
+      setUploadedFile(null);
+    } catch (error) {
+      console.error("Upload error:", error);
+      setTodos([]);
+      toast({
+        title: "Upload failed",
+        description: "Failed to process document. Please try again.",
+        variant: "destructive"
+      });
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "Sorry, I couldn't process that document. Please try again or describe your form requirements instead."
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
     }
   };
 
@@ -209,9 +293,34 @@ export default function FormaAgent() {
             </div>
           </ScrollArea>
           
+          {/* Todo List - shown during document processing */}
+          {todos.length > 0 && (
+            <div className="px-4 pt-4">
+              <AgentTodoList todos={todos} title="Processing Document" />
+            </div>
+          )}
+          
           {/* Input Area */}
           <div className="border-t p-4">
             <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                variant="outline"
+                size="icon"
+                title="Upload questionnaire document"
+                data-testid="button-upload-document"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
               <Input
                 placeholder="Describe your form or add fields..."
                 value={input}
