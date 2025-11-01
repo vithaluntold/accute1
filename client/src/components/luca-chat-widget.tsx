@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +19,41 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Send, Sparkles, User, Loader2, Settings2, MessageCircle, X, ChevronDown, Calculator, FileText, TrendingUp, HelpCircle } from "lucide-react";
+import { 
+  Bot, 
+  Send, 
+  Sparkles, 
+  User, 
+  Loader2, 
+  Settings2, 
+  MessageCircle, 
+  X, 
+  ChevronDown, 
+  Calculator, 
+  FileText, 
+  TrendingUp, 
+  HelpCircle,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Edit2,
+  Trash2,
+  MoreVertical,
+  Check,
+  PanelLeftClose,
+  PanelLeft
+} from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import lucaLogoUrl from "@assets/Luca Transparent symbol (1)_1761720299435.png";
 
 interface Message {
@@ -29,6 +62,29 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  userId: string;
+  organizationId?: string;
+  llmConfigId?: string;
+  isPinned: boolean;
+  isActive: boolean;
+  lastMessageAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  messages?: ChatMessage[];
+}
+
+interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  metadata: any;
+  createdAt: Date;
 }
 
 interface QuickAction {
@@ -63,12 +119,17 @@ const quickActions: QuickAction[] = [
 export function LucaChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -86,7 +147,11 @@ export function LucaChatWidget() {
   // Detect mobile devices and screen size changes
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setShowSidebar(false);
+      }
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -95,7 +160,7 @@ export function LucaChatWidget() {
 
   // Prevent body scroll when dialog is open on mobile
   useEffect(() => {
-    if (isOpen && isMobile) {
+    if ((isOpen || isFullScreen) && isMobile) {
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
@@ -109,11 +174,17 @@ export function LucaChatWidget() {
       document.body.style.position = '';
       document.body.style.width = '';
     };
-  }, [isOpen, isMobile]);
+  }, [isOpen, isFullScreen, isMobile]);
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
     queryKey: ["/api/llm-configurations"],
+  });
+
+  // Fetch chat sessions
+  const { data: sessions = [], refetch: refetchSessions } = useQuery<ChatSession[]>({
+    queryKey: ["/api/luca-chat-sessions"],
+    enabled: isOpen || isFullScreen,
   });
 
   // Auto-select default LLM config
@@ -123,6 +194,121 @@ export function LucaChatWidget() {
       setSelectedLlmConfig(defaultConfig.id);
     }
   }, [llmConfigs, selectedLlmConfig]);
+
+  // Load session messages when switching sessions
+  useEffect(() => {
+    if (currentSessionId) {
+      loadSessionMessages(currentSessionId);
+    }
+  }, [currentSessionId]);
+
+  const loadSessionMessages = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/luca-chat-sessions/${sessionId}`);
+      const data = await response.json();
+      
+      const loadedMessages: Message[] = data.messages?.map((msg: ChatMessage) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.createdAt),
+      })) || [];
+      
+      setMessages(loadedMessages);
+      setShowQuickActions(loadedMessages.length === 0);
+    } catch (error) {
+      console.error('[Luca Chat] Error loading session messages:', error);
+    }
+  };
+
+  // Create new session mutation
+  const createSessionMutation = useMutation({
+    mutationFn: async (title: string = "New Chat") => {
+      const payload: any = { title };
+      if (selectedLlmConfig) {
+        payload.llmConfigId = selectedLlmConfig;
+      }
+      return await apiRequest("/api/luca-chat-sessions", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: (newSession) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+      setCurrentSessionId(newSession.id);
+      setMessages([]);
+      setShowQuickActions(true);
+    },
+  });
+
+  // Update session mutation
+  const updateSessionMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ChatSession> }) => {
+      return await apiRequest(`/api/luca-chat-sessions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+      setEditingSessionId(null);
+      setEditingTitle("");
+    },
+  });
+
+  // Delete session mutation
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/luca-chat-sessions/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+      if (currentSessionId === deletedId) {
+        setCurrentSessionId(null);
+        setMessages([]);
+        setShowQuickActions(true);
+      }
+    },
+  });
+
+  // Add message to session mutation
+  const addMessageMutation = useMutation({
+    mutationFn: async ({ sessionId, role, content }: { sessionId: string; role: string; content: string }) => {
+      return await apiRequest(`/api/luca-chat-sessions/${sessionId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ role, content, metadata: {} }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+    },
+  });
+
+  const handleNewChat = () => {
+    createSessionMutation.mutate();
+  };
+
+  const handleRenameSession = (sessionId: string, currentTitle: string) => {
+    setEditingSessionId(sessionId);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleSaveRename = (sessionId: string) => {
+    if (editingTitle.trim()) {
+      updateSessionMutation.mutate({
+        id: sessionId,
+        updates: { title: editingTitle.trim() },
+      });
+    }
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    if (confirm("Are you sure you want to delete this chat session?")) {
+      deleteSessionMutation.mutate(sessionId);
+    }
+  };
 
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -170,6 +356,15 @@ export function LucaChatWidget() {
                 : msg
             )
           );
+          
+          if (currentSessionId && streamingContentRef.current) {
+            addMessageMutation.mutate({
+              sessionId: currentSessionId,
+              role: "assistant",
+              content: streamingContentRef.current,
+            });
+          }
+          
           streamingMessageIdRef.current = null;
           streamingContentRef.current = "";
           setIsStreaming(false);
@@ -198,7 +393,7 @@ export function LucaChatWidget() {
 
     wsRef.current = ws;
     return ws;
-  }, [toast]);
+  }, [toast, currentSessionId, addMessageMutation]);
 
   useEffect(() => {
     return () => {
@@ -214,7 +409,7 @@ export function LucaChatWidget() {
     }
   }, [messages]);
 
-  const handleSend = (messageText?: string) => {
+  const handleSend = async (messageText?: string) => {
     const textToSend = messageText || input.trim();
     if (!textToSend || isStreaming) {
       return;
@@ -229,6 +424,13 @@ export function LucaChatWidget() {
       return;
     }
 
+    let sessionId = currentSessionId;
+    
+    if (!sessionId) {
+      const newSession = await createSessionMutation.mutateAsync("New Chat");
+      sessionId = newSession.id;
+    }
+
     setShowQuickActions(false);
 
     const userMessage: Message = {
@@ -239,6 +441,15 @@ export function LucaChatWidget() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    
+    if (sessionId) {
+      addMessageMutation.mutate({
+        sessionId,
+        role: "user",
+        content: textToSend,
+      });
+    }
+    
     setIsStreaming(true);
 
     const ws = connectWebSocket();
@@ -269,10 +480,390 @@ export function LucaChatWidget() {
     handleSend(action.prompt);
   };
 
+  const renderChatInterface = () => (
+    <div className="flex h-full">
+      {/* Session Sidebar */}
+      {showSidebar && !isMobile && (
+        <div className="w-64 border-r flex flex-col bg-muted/30">
+          {/* Sidebar Header */}
+          <div className="p-3 border-b space-y-2">
+            <Button
+              className="w-full gap-2"
+              onClick={handleNewChat}
+              data-testid="button-new-chat"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </Button>
+          </div>
+
+          {/* Session List */}
+          <ScrollArea className="flex-1 p-2">
+            <div className="space-y-1">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`group relative rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+                    currentSessionId === session.id
+                      ? 'bg-primary/10 border border-primary/20'
+                      : 'hover:bg-muted'
+                  }`}
+                  onClick={() => setCurrentSessionId(session.id)}
+                  data-testid={`session-item-${session.id}`}
+                >
+                  {editingSessionId === session.id ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveRename(session.id);
+                          } else if (e.key === 'Escape') {
+                            setEditingSessionId(null);
+                            setEditingTitle("");
+                          }
+                        }}
+                        className="h-7 text-sm"
+                        autoFocus
+                        data-testid={`input-rename-session-${session.id}`}
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => handleSaveRename(session.id)}
+                        data-testid={`button-save-rename-${session.id}`}
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {session.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(session.lastMessageAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-session-menu-${session.id}`}
+                          >
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRenameSession(session.id, session.title);
+                            }}
+                            data-testid={`button-rename-session-${session.id}`}
+                          >
+                            <Edit2 className="h-3 w-3 mr-2" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSession(session.id);
+                            }}
+                            className="text-destructive"
+                            data-testid={`button-delete-session-${session.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Chat Header */}
+        <div className="relative bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3 border-b">
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="relative flex items-center gap-3">
+            {!showSidebar && !isMobile && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                onClick={() => setShowSidebar(true)}
+                data-testid="button-show-sidebar"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+            )}
+            
+            <div className="p-1.5 rounded-lg bg-white shadow-md">
+              <img 
+                src={lucaLogoUrl} 
+                alt="Luca" 
+                className="h-7 w-7 object-contain"
+                draggable={false}
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-white" data-testid="text-agent-name">
+                  Luca
+                </h3>
+                <div className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />
+              </div>
+              <p className="text-xs text-white/80">
+                Accounting, Finance & Taxation Expert
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {showSidebar && !isMobile && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => setShowSidebar(false)}
+                  data-testid="button-hide-sidebar"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
+              
+              {!isMobile && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  data-testid="button-toggle-fullscreen"
+                >
+                  {isFullScreen ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                onClick={() => {
+                  if (isFullScreen) {
+                    setIsFullScreen(false);
+                  } else {
+                    setIsExpanded(false);
+                    setShowQuickActions(true);
+                  }
+                }}
+                data-testid="button-minimize-chat"
+              >
+                {isFullScreen ? <X className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+
+          {/* LLM Config Selector */}
+          {llmConfigs.length > 0 && (
+            <div className="relative flex items-center gap-2 mt-3">
+              <Settings2 className="h-3.5 w-3.5 text-white/70" />
+              <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                <SelectTrigger className="h-7 text-xs bg-white/10 border-white/20 text-white" data-testid="select-llm-config">
+                  <SelectValue placeholder="Select AI provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {llmConfigs.map((config) => (
+                    <SelectItem key={config.id} value={config.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{config.name}</span>
+                        {config.isDefault && (
+                          <Badge variant="outline" className="text-xs">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {llmConfigs.length === 0 && (
+            <div className="relative mt-3 p-2 rounded-lg bg-yellow-500/20 border border-yellow-400/30">
+              <p className="text-xs text-yellow-100">
+                No LLM providers configured. Go to Settings to add one.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full p-4" ref={scrollRef}>
+            {messages.length === 0 && showQuickActions ? (
+              <div className="space-y-4">
+                <div className="flex flex-col items-center justify-center text-center p-6">
+                  <div className="p-3 rounded-xl bg-primary/10 mb-3">
+                    <img 
+                      src={lucaLogoUrl} 
+                      alt="Luca" 
+                      className="h-10 w-10 object-contain"
+                    />
+                  </div>
+                  <h4 className="font-semibold mb-1.5">Choose a topic to get started</h4>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Or type your own question below
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  {quickActions.map((action, index) => {
+                    const Icon = action.icon;
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleQuickAction(action)}
+                        className="text-left px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-all duration-200 group hover-elevate active-elevate-2"
+                        data-testid={`button-quick-action-${index}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="text-sm font-medium">{action.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <div className="p-4 rounded-full bg-primary/10 mb-4">
+                  <img 
+                    src={lucaLogoUrl} 
+                    alt="Luca" 
+                    className="h-12 w-12 object-contain"
+                  />
+                </div>
+                <h4 className="font-semibold mb-2">Welcome to Luca</h4>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  I'm your AI assistant specializing in accounting, finance, and taxation.
+                  Ask me anything!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex gap-3 ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    {message.role === "assistant" && (
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-pink-500/20">
+                          <img 
+                            src={lucaLogoUrl} 
+                            alt="Luca" 
+                            className="h-5 w-5 object-contain"
+                          />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div
+                      className={`rounded-2xl px-4 py-2.5 max-w-[80%] ${
+                        message.role === "user"
+                          ? "bg-gradient-to-br from-primary to-purple-500 text-white shadow-md"
+                          : "bg-muted"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      {message.isStreaming && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                        </div>
+                      )}
+                    </div>
+                    {message.role === "user" && (
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarFallback className="bg-secondary">
+                          <User className="h-4 w-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+
+        {/* Input Area */}
+        <div className="border-t p-4">
+          <div className="flex gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Message Luca..."
+              className="min-h-[44px] max-h-32 resize-none"
+              rows={1}
+              disabled={isStreaming}
+              data-testid="input-message"
+            />
+            <Button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || isStreaming}
+              size="icon"
+              className="h-11 w-11 flex-shrink-0"
+              data-testid="button-send-message"
+            >
+              {isStreaming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-center text-muted-foreground mt-2">
+            Luca can make mistakes. Verify important information.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Floating Widget - Compact Preview */}
-      {!isOpen && (
+      {!isOpen && !isFullScreen && (
         <div
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] animate-in slide-in-from-bottom-4 duration-500"
           style={{
@@ -298,8 +889,8 @@ export function LucaChatWidget() {
         </div>
       )}
 
-      {/* Expanded Chat Widget */}
-      {isOpen && !isExpanded && (
+      {/* Expanded Chat Widget (Preview State) */}
+      {isOpen && !isExpanded && !isFullScreen && (
         <div
           className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] animate-in slide-in-from-bottom-8 fade-in duration-300"
           style={{
@@ -363,7 +954,7 @@ export function LucaChatWidget() {
                     key={index}
                     onClick={() => handleQuickAction(action)}
                     className="w-full text-left px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-all duration-200 group hover-elevate active-elevate-2"
-                    data-testid={`button-quick-action-${index}`}
+                    data-testid={`button-quick-action-preview-${index}`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
@@ -395,17 +986,17 @@ export function LucaChatWidget() {
       )}
 
       {/* Full Chat Dialog */}
-      <Dialog open={isOpen && isExpanded} onOpenChange={(open) => {
+      <Dialog open={isOpen && isExpanded && !isFullScreen} onOpenChange={(open) => {
         if (!open) {
           setIsOpen(false);
           setIsExpanded(false);
         }
       }}>
         <DialogContent 
-          className={`p-0 flex flex-col ${
+          className={`p-0 flex flex-col overflow-hidden ${
             isMobile 
               ? 'w-full h-full max-w-full max-h-full rounded-none m-0' 
-              : 'max-w-2xl h-[600px] max-h-[85vh]'
+              : 'max-w-4xl h-[600px] max-h-[85vh]'
           }`}
           data-testid="dialog-chat-luca"
           style={isMobile ? {
@@ -422,234 +1013,16 @@ export function LucaChatWidget() {
             <DialogDescription>Your accounting, finance & taxation expert</DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col h-full">
-            {/* Compact Header with Gradient */}
-            <div className="relative bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3">
-              <div className="absolute inset-0 bg-black/10" />
-              <div className="relative flex items-center gap-3">
-                <div className="p-1.5 rounded-lg bg-white shadow-md">
-                  <img 
-                    src={lucaLogoUrl} 
-                    alt="Luca" 
-                    className="h-7 w-7 object-contain"
-                    draggable={false}
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-white" data-testid="text-agent-name">
-                      Luca
-                    </h3>
-                    <div className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />
-                  </div>
-                  <p className="text-xs text-white/80">
-                    Accounting, Finance & Taxation Expert
-                  </p>
-                </div>
-                
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
-                  onClick={() => {
-                    setIsExpanded(false);
-                    setShowQuickActions(true);
-                  }}
-                  data-testid="button-minimize-chat"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* LLM Config Selector */}
-              {llmConfigs.length > 0 && (
-                <div className="relative flex items-center gap-2 mt-3">
-                  <Settings2 className="h-3.5 w-3.5 text-white/70" />
-                  <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
-                    <SelectTrigger className="h-7 text-xs bg-white/10 border-white/20 text-white" data-testid="select-llm-config">
-                      <SelectValue placeholder="Select AI provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {llmConfigs.map((config) => (
-                        <SelectItem key={config.id} value={config.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{config.name}</span>
-                            {config.isDefault && (
-                              <Badge variant="outline" className="text-xs">
-                                Default
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {llmConfigs.length === 0 && (
-                <div className="relative mt-3 p-2 rounded-lg bg-yellow-500/20 border border-yellow-400/30">
-                  <p className="text-xs text-yellow-100">
-                    No LLM providers configured. Go to Settings to add one.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Messages */}
-            <ScrollArea 
-              className={`flex-1 ${isMobile ? 'p-3' : 'p-4'}`} 
-              ref={scrollRef}
-              style={{
-                WebkitOverflowScrolling: 'touch',
-              }}
-            >
-              {messages.length === 0 && showQuickActions ? (
-                <div className="space-y-4">
-                  <div className="flex flex-col items-center justify-center text-center p-6">
-                    <div className="p-3 rounded-xl bg-primary/10 mb-3">
-                      <img 
-                        src={lucaLogoUrl} 
-                        alt="Luca" 
-                        className="h-10 w-10 object-contain"
-                      />
-                    </div>
-                    <h4 className="font-semibold mb-1.5">Choose a topic to get started</h4>
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      Or type your own question below
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    {quickActions.map((action, index) => {
-                      const Icon = action.icon;
-                      return (
-                        <button
-                          key={index}
-                          onClick={() => handleQuickAction(action)}
-                          className="text-left px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-all duration-200 group hover-elevate active-elevate-2"
-                          data-testid={`button-quick-action-expanded-${index}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                              <Icon className="h-4 w-4 text-primary" />
-                            </div>
-                            <span className="text-sm font-medium">{action.label}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                  <div className="p-4 rounded-full bg-primary/10 mb-4">
-                    <img 
-                      src={lucaLogoUrl} 
-                      alt="Luca" 
-                      className="h-12 w-12 object-contain"
-                    />
-                  </div>
-                  <h4 className="font-semibold mb-2">Welcome to Luca</h4>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    I'm your AI assistant specializing in accounting, finance, and taxation.
-                    Ask me anything!
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex gap-3 ${
-                        message.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      {message.role === "assistant" && (
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-pink-500/20">
-                            <img 
-                              src={lucaLogoUrl} 
-                              alt="Luca" 
-                              className="h-5 w-5 object-contain"
-                            />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div
-                        className={`rounded-2xl px-4 py-2.5 ${
-                          isMobile ? 'max-w-[85%]' : 'max-w-[80%]'
-                        } ${
-                          message.role === "user"
-                            ? "bg-gradient-to-br from-primary to-purple-500 text-white shadow-md"
-                            : "bg-muted"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                        {message.isStreaming && (
-                          <div className="flex items-center gap-1 mt-2">
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                          </div>
-                        )}
-                      </div>
-                      {message.role === "user" && (
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarFallback className="bg-secondary">
-                            <User className="h-4 w-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Input */}
-            <div 
-              className={`border-t bg-muted/30 ${isMobile ? 'p-3' : 'p-4'}`}
-              style={isMobile ? {
-                paddingBottom: 'calc(12px + env(safe-area-inset-bottom))'
-              } : {}}
-            >
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder={isMobile ? "Ask Luca..." : "Ask about accounting, finance, or taxation..."}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  className={`${isMobile ? 'min-h-[50px] text-base' : 'min-h-[60px]'} resize-none bg-background`}
-                  disabled={isStreaming}
-                  data-testid="input-chat-message"
-                  style={{
-                    fontSize: isMobile ? '16px' : undefined,
-                  }}
-                />
-                <Button
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || isStreaming}
-                  size="icon"
-                  className={`${isMobile ? 'h-[50px] w-[50px]' : 'h-[60px] w-[60px]'} flex-shrink-0 bg-gradient-to-br from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90`}
-                  data-testid="button-send-message"
-                >
-                  {isStreaming ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
+          {renderChatInterface()}
         </DialogContent>
       </Dialog>
+
+      {/* Full Screen Mode */}
+      {isFullScreen && (
+        <div className="fixed inset-0 z-[9999] bg-background" data-testid="fullscreen-chat-luca">
+          {renderChatInterface()}
+        </div>
+      )}
     </>
   );
 }
