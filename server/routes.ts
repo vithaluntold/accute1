@@ -8686,6 +8686,398 @@ ${msg.bodyText || msg.bodyHtml || ''}
     console.error("Failed to register agent routes:", error);
   }
 
+  // ==================== Subscription Management Routes ====================
+  // Note: These routes are for managing subscription plans, pricing regions, and coupons
+  // They are separate from the user subscription assignment routes
+
+  // Import pricing service
+  const { PricingService } = await import("@shared/pricing-service");
+
+  // Get all subscription plans (public)
+  app.get("/api/subscription-plans", async (req: Request, res: Response) => {
+    try {
+      const { includeInactive } = req.query;
+      
+      const plans = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(includeInactive === 'true' ? sql`true` : eq(schema.subscriptionPlans.isActive, true))
+        .orderBy(schema.subscriptionPlans.displayOrder);
+      
+      res.json(plans);
+    } catch (error: any) {
+      console.error('Get subscription plans error:', error);
+      res.status(500).json({ error: "Failed to fetch subscription plans" });
+    }
+  });
+
+  // Get subscription plan by ID or slug
+  app.get("/api/subscription-plans/:idOrSlug", async (req: Request, res: Response) => {
+    try {
+      const { idOrSlug } = req.params;
+      
+      const plans = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(
+          sql`${schema.subscriptionPlans.id} = ${idOrSlug} OR ${schema.subscriptionPlans.slug} = ${idOrSlug}`
+        )
+        .limit(1);
+      
+      if (plans.length === 0) {
+        return res.status(404).json({ error: "Subscription plan not found" });
+      }
+      
+      // Get volume tiers for this plan
+      const volumeTiers = await db
+        .select()
+        .from(schema.planVolumeTiers)
+        .where(eq(schema.planVolumeTiers.planId, plans[0].id))
+        .orderBy(schema.planVolumeTiers.minSeats);
+      
+      res.json({ ...plans[0], volumeTiers });
+    } catch (error: any) {
+      console.error('Get subscription plan error:', error);
+      res.status(500).json({ error: "Failed to fetch subscription plan" });
+    }
+  });
+
+  // Create subscription plan (Super Admin only)
+  app.post("/api/subscription-plans", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const planData = schema.insertSubscriptionPlanSchema.parse(req.body);
+      
+      const [newPlan] = await db
+        .insert(schema.subscriptionPlans)
+        .values(planData)
+        .returning();
+      
+      await logActivity(req.user!.id, undefined, 'subscription_plan_created', 'subscription_plan', newPlan.id, { planName: newPlan.name }, req);
+      
+      res.json(newPlan);
+    } catch (error: any) {
+      console.error('Create subscription plan error:', error);
+      if (error.code === '23505') {
+        return res.status(400).json({ error: "Plan with this name or slug already exists" });
+      }
+      res.status(500).json({ error: "Failed to create subscription plan" });
+    }
+  });
+
+  // Update subscription plan (Super Admin only)
+  app.patch("/api/subscription-plans/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const [updatedPlan] = await db
+        .update(schema.subscriptionPlans)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(schema.subscriptionPlans.id, id))
+        .returning();
+      
+      if (!updatedPlan) {
+        return res.status(404).json({ error: "Subscription plan not found" });
+      }
+      
+      await logActivity(req.user!.id, undefined, 'subscription_plan_updated', 'subscription_plan', id, updates, req);
+      
+      res.json(updatedPlan);
+    } catch (error: any) {
+      console.error('Update subscription plan error:', error);
+      res.status(500).json({ error: "Failed to update subscription plan" });
+    }
+  });
+
+  // Delete subscription plan (Super Admin only)
+  app.delete("/api/subscription-plans/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if any subscriptions are using this plan
+      const activeSubscriptions = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.planId, id))
+        .limit(1);
+      
+      if (activeSubscriptions.length > 0) {
+        return res.status(400).json({ error: "Cannot delete plan with active subscriptions" });
+      }
+      
+      await db
+        .delete(schema.subscriptionPlans)
+        .where(eq(schema.subscriptionPlans.id, id));
+      
+      await logActivity(req.user!.id, undefined, 'subscription_plan_deleted', 'subscription_plan', id, {}, req);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete subscription plan error:', error);
+      res.status(500).json({ error: "Failed to delete subscription plan" });
+    }
+  });
+
+  // Get all pricing regions (public)
+  app.get("/api/pricing-regions", async (req: Request, res: Response) => {
+    try {
+      const { includeInactive } = req.query;
+      
+      const regions = await db
+        .select()
+        .from(schema.pricingRegions)
+        .where(includeInactive === 'true' ? sql`true` : eq(schema.pricingRegions.isActive, true))
+        .orderBy(schema.pricingRegions.displayOrder);
+      
+      res.json(regions);
+    } catch (error: any) {
+      console.error('Get pricing regions error:', error);
+      res.status(500).json({ error: "Failed to fetch pricing regions" });
+    }
+  });
+
+  // Create pricing region (Super Admin only)
+  app.post("/api/pricing-regions", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const regionData = schema.insertPricingRegionSchema.parse(req.body);
+      
+      const [newRegion] = await db
+        .insert(schema.pricingRegions)
+        .values(regionData)
+        .returning();
+      
+      await logActivity(req.user!.id, undefined, 'pricing_region_created', 'pricing_region', newRegion.id, { regionName: newRegion.name }, req);
+      
+      res.json(newRegion);
+    } catch (error: any) {
+      console.error('Create pricing region error:', error);
+      res.status(500).json({ error: "Failed to create pricing region" });
+    }
+  });
+
+  // Update pricing region (Super Admin only)
+  app.patch("/api/pricing-regions/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const [updatedRegion] = await db
+        .update(schema.pricingRegions)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(schema.pricingRegions.id, id))
+        .returning();
+      
+      if (!updatedRegion) {
+        return res.status(404).json({ error: "Pricing region not found" });
+      }
+      
+      await logActivity(req.user!.id, undefined, 'pricing_region_updated', 'pricing_region', id, updates, req);
+      
+      res.json(updatedRegion);
+    } catch (error: any) {
+      console.error('Update pricing region error:', error);
+      res.status(500).json({ error: "Failed to update pricing region" });
+    }
+  });
+
+  // Delete pricing region (Super Admin only)
+  app.delete("/api/pricing-regions/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      await db
+        .delete(schema.pricingRegions)
+        .where(eq(schema.pricingRegions.id, id));
+      
+      await logActivity(req.user!.id, undefined, 'pricing_region_deleted', 'pricing_region', id, {}, req);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete pricing region error:', error);
+      res.status(500).json({ error: "Failed to delete pricing region" });
+    }
+  });
+
+  // Get all coupons (Super Admin only)
+  app.get("/api/coupons", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { includeInactive } = req.query;
+      
+      const coupons = await db
+        .select()
+        .from(schema.coupons)
+        .where(includeInactive === 'true' ? sql`true` : eq(schema.coupons.isActive, true))
+        .orderBy(sql`${schema.coupons.createdAt} DESC`);
+      
+      res.json(coupons);
+    } catch (error: any) {
+      console.error('Get coupons error:', error);
+      res.status(500).json({ error: "Failed to fetch coupons" });
+    }
+  });
+
+  // Validate coupon code (public)
+  app.post("/api/coupons/validate", async (req: Request, res: Response) => {
+    try {
+      const { code, planId, seatCount } = req.body;
+      
+      if (!code || !planId || !seatCount) {
+        return res.status(400).json({ error: "Code, planId, and seatCount are required" });
+      }
+      
+      const [coupon] = await db
+        .select()
+        .from(schema.coupons)
+        .where(eq(schema.coupons.code, code.toUpperCase()))
+        .limit(1);
+      
+      const validation = PricingService.validateCoupon(coupon || null, planId, seatCount);
+      
+      res.json(validation);
+    } catch (error: any) {
+      console.error('Validate coupon error:', error);
+      res.status(500).json({ error: "Failed to validate coupon" });
+    }
+  });
+
+  // Create coupon (Super Admin only)
+  app.post("/api/coupons", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const couponData = schema.insertCouponSchema.parse({
+        ...req.body,
+        code: req.body.code.toUpperCase(),
+        createdBy: req.user!.id,
+      });
+      
+      const [newCoupon] = await db
+        .insert(schema.coupons)
+        .values(couponData)
+        .returning();
+      
+      await logActivity(req.user!.id, undefined, 'coupon_created', 'coupon', newCoupon.id, { code: newCoupon.code }, req);
+      
+      res.json(newCoupon);
+    } catch (error: any) {
+      console.error('Create coupon error:', error);
+      if (error.code === '23505') {
+        return res.status(400).json({ error: "Coupon code already exists" });
+      }
+      res.status(500).json({ error: "Failed to create coupon" });
+    }
+  });
+
+  // Update coupon (Super Admin only)
+  app.patch("/api/coupons/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      if (updates.code) {
+        updates.code = updates.code.toUpperCase();
+      }
+      
+      const [updatedCoupon] = await db
+        .update(schema.coupons)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(schema.coupons.id, id))
+        .returning();
+      
+      if (!updatedCoupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
+      
+      await logActivity(req.user!.id, undefined, 'coupon_updated', 'coupon', id, updates, req);
+      
+      res.json(updatedCoupon);
+    } catch (error: any) {
+      console.error('Update coupon error:', error);
+      res.status(500).json({ error: "Failed to update coupon" });
+    }
+  });
+
+  // Delete coupon (Super Admin only)
+  app.delete("/api/coupons/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      await db
+        .delete(schema.coupons)
+        .where(eq(schema.coupons.id, id));
+      
+      await logActivity(req.user!.id, undefined, 'coupon_deleted', 'coupon', id, {}, req);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete coupon error:', error);
+      res.status(500).json({ error: "Failed to delete coupon" });
+    }
+  });
+
+  // Calculate subscription price (public)
+  app.post("/api/subscription-price/calculate", async (req: Request, res: Response) => {
+    try {
+      const { planId, billingCycle, seatCount, regionId, couponCode } = req.body;
+      
+      if (!planId || !billingCycle || !seatCount) {
+        return res.status(400).json({ error: "planId, billingCycle, and seatCount are required" });
+      }
+      
+      // Get plan
+      const [plan] = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(eq(schema.subscriptionPlans.id, planId))
+        .limit(1);
+      
+      if (!plan) {
+        return res.status(404).json({ error: "Subscription plan not found" });
+      }
+      
+      // Get region (if specified)
+      let region = undefined;
+      if (regionId) {
+        const [regionData] = await db
+          .select()
+          .from(schema.pricingRegions)
+          .where(eq(schema.pricingRegions.id, regionId))
+          .limit(1);
+        region = regionData;
+      }
+      
+      // Get volume tiers for plan
+      const volumeTiers = await db
+        .select()
+        .from(schema.planVolumeTiers)
+        .where(eq(schema.planVolumeTiers.planId, planId));
+      
+      // Get coupon (if specified)
+      let coupon = undefined;
+      if (couponCode) {
+        const [couponData] = await db
+          .select()
+          .from(schema.coupons)
+          .where(eq(schema.coupons.code, couponCode.toUpperCase()))
+          .limit(1);
+        coupon = couponData;
+      }
+      
+      // Calculate price
+      const calculation = PricingService.calculatePrice({
+        plan,
+        billingCycle,
+        seatCount,
+        region,
+        volumeTiers,
+        coupon,
+      });
+      
+      res.json(calculation);
+    } catch (error: any) {
+      console.error('Calculate price error:', error);
+      res.status(500).json({ error: error.message || "Failed to calculate price" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

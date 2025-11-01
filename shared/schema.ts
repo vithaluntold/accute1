@@ -59,8 +59,31 @@ export const platformSubscriptions = pgTable("platform_subscriptions", {
   
   // Payment info
   paymentMethod: text("payment_method"), // 'credit_card', 'invoice', 'free'
+  paymentGateway: text("payment_gateway").default("manual"), // 'stripe', 'razorpay', 'payu', 'payoneer', 'manual'
   lastPaymentDate: timestamp("last_payment_date"),
   lastPaymentAmount: numeric("last_payment_amount", { precision: 10, scale: 2 }),
+  
+  // Enhanced subscription fields for multi-factor pricing
+  planId: varchar("plan_id").references(() => subscriptionPlans.id), // Link to subscription_plans table
+  currency: text("currency").notNull().default("USD"), // Billing currency
+  regionCode: text("region_code"), // Pricing region (for PPP)
+  seatCount: integer("seat_count").notNull().default(1), // Number of seats
+  basePrice: numeric("base_price", { precision: 10, scale: 2 }), // Calculated base price after regional multiplier
+  perSeatPrice: numeric("per_seat_price", { precision: 10, scale: 2 }), // Calculated per-seat price
+  totalDiscount: numeric("total_discount", { precision: 10, scale: 2 }).notNull().default(sql`0`), // Total discount amount
+  couponId: varchar("coupon_id").references(() => coupons.id), // Applied coupon
+  
+  // Price snapshot - immutable pricing details at subscription time
+  priceSnapshot: jsonb("price_snapshot").default(sql`'{}'::jsonb`), // Store complete pricing breakdown
+  
+  // Payment gateway integration IDs
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  razorpayCustomerId: text("razorpay_customer_id"),
+  razorpaySubscriptionId: text("razorpay_subscription_id"),
+  
+  // Additional metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Flexible metadata storage
   
   // Trial
   trialEndsAt: timestamp("trial_ends_at"),
@@ -73,6 +96,179 @@ export const platformSubscriptions = pgTable("platform_subscriptions", {
   orgIdx: index("platform_subscriptions_org_idx").on(table.organizationId),
   statusIdx: index("platform_subscriptions_status_idx").on(table.status),
   planIdx: index("platform_subscriptions_plan_idx").on(table.plan),
+}));
+
+// Subscription Plans - Define available plans with features, pricing, and limits
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // 'Free', 'Starter', 'Professional', 'Enterprise'
+  slug: text("slug").notNull().unique(), // 'free', 'starter', 'professional', 'enterprise'
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0), // For ordering in UI
+  
+  // Feature configuration - JSON array of feature identifiers
+  features: jsonb("features").notNull().default(sql`'[]'::jsonb`), // ['workflows', 'ai_agents', 'signatures', 'analytics']
+  
+  // Base pricing (USD) - before regional multipliers
+  basePriceMonthly: numeric("base_price_monthly", { precision: 10, scale: 2 }).notNull().default(sql`0`),
+  basePriceYearly: numeric("base_price_yearly", { precision: 10, scale: 2 }).notNull().default(sql`0`),
+  
+  // Per-seat pricing
+  perSeatPriceMonthly: numeric("per_seat_price_monthly", { precision: 10, scale: 2 }).notNull().default(sql`0`),
+  perSeatPriceYearly: numeric("per_seat_price_yearly", { precision: 10, scale: 2 }).notNull().default(sql`0`),
+  
+  // Limits and quotas
+  maxUsers: integer("max_users").notNull().default(5),
+  maxClients: integer("max_clients").notNull().default(10),
+  maxStorage: integer("max_storage").notNull().default(5), // GB
+  maxWorkflows: integer("max_workflows").notNull().default(10),
+  maxAIAgents: integer("max_ai_agents").notNull().default(3),
+  
+  // Included seats (before per-seat pricing kicks in)
+  includedSeats: integer("included_seats").notNull().default(1),
+  
+  // Trial settings
+  trialDays: integer("trial_days").notNull().default(0), // 0 = no trial
+  
+  // Stripe integration
+  stripeProductId: text("stripe_product_id"), // Stripe Product ID
+  stripePriceMonthlyId: text("stripe_price_monthly_id"), // Stripe Price ID for monthly
+  stripePriceYearlyId: text("stripe_price_yearly_id"), // Stripe Price ID for yearly
+  
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  isPublic: boolean("is_public").notNull().default(true), // Show in public pricing page
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("subscription_plans_slug_idx").on(table.slug),
+  displayOrderIdx: index("subscription_plans_display_order_idx").on(table.displayOrder),
+}));
+
+// Pricing Regions - Country-based pricing multipliers for purchasing power parity
+export const pricingRegions = pgTable("pricing_regions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // 'North America', 'Western Europe', 'India', etc.
+  countryCodes: jsonb("country_codes").notNull().default(sql`'[]'::jsonb`), // Array of ISO country codes ['US', 'CA']
+  currency: text("currency").notNull().default("USD"), // 'USD', 'EUR', 'INR', etc.
+  currencySymbol: text("currency_symbol").notNull().default("$"),
+  
+  // Pricing multiplier (1.0 = full price, 0.5 = 50% discount)
+  priceMultiplier: numeric("price_multiplier", { precision: 5, scale: 3 }).notNull().default(sql`1.000`),
+  
+  // Stripe-specific settings
+  stripeCurrency: text("stripe_currency"), // Stripe currency code (lowercase)
+  
+  isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(0),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  displayOrderIdx: index("pricing_regions_display_order_idx").on(table.displayOrder),
+}));
+
+// Plan Volume Tiers - Volume discounts for per-seat pricing
+export const planVolumeTiers = pgTable("plan_volume_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "cascade" }),
+  
+  // Tier configuration
+  minSeats: integer("min_seats").notNull(), // Minimum seats for this tier (e.g., 11)
+  maxSeats: integer("max_seats"), // Maximum seats for this tier (null = unlimited)
+  
+  // Discount
+  discountPercentage: numeric("discount_percentage", { precision: 5, scale: 2 }).notNull().default(sql`0`), // 0-100
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  planIdx: index("plan_volume_tiers_plan_idx").on(table.planId),
+  planSeatsIdx: index("plan_volume_tiers_plan_seats_idx").on(table.planId, table.minSeats),
+}));
+
+// Coupons - Discount codes for promotional offers
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // 'LAUNCH2024', 'SAVE50', etc.
+  name: text("name").notNull(), // Display name
+  description: text("description"),
+  
+  // Discount type and value
+  discountType: text("discount_type").notNull(), // 'percentage', 'fixed_amount'
+  discountValue: numeric("discount_value", { precision: 10, scale: 2 }).notNull(), // 20 (for 20%), or 50.00 (for $50)
+  
+  // Applicability
+  applicablePlans: jsonb("applicable_plans").default(sql`'[]'::jsonb`), // Empty = all plans, or array of plan IDs
+  minimumSeats: integer("minimum_seats"), // Minimum seats required to use coupon
+  
+  // Usage limits
+  maxRedemptions: integer("max_redemptions"), // null = unlimited
+  currentRedemptions: integer("current_redemptions").notNull().default(0),
+  maxRedemptionsPerOrganization: integer("max_redemptions_per_organization").notNull().default(1),
+  
+  // Validity period
+  validFrom: timestamp("valid_from").notNull().defaultNow(),
+  validUntil: timestamp("valid_until"),
+  
+  // Duration (how long the discount applies)
+  durationMonths: integer("duration_months"), // null = forever, 1 = first month, 3 = first 3 months, etc.
+  
+  // Stripe integration
+  stripeCouponId: text("stripe_coupon_id"), // Stripe Coupon ID
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  codeIdx: index("coupons_code_idx").on(table.code),
+  validIdx: index("coupons_valid_idx").on(table.isActive, table.validFrom, table.validUntil),
+}));
+
+// Coupon Redemptions - Track coupon usage
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").notNull().references(() => coupons.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  subscriptionId: varchar("subscription_id").references(() => platformSubscriptions.id, { onDelete: "set null" }),
+  
+  // Snapshot of coupon at redemption time
+  discountSnapshot: jsonb("discount_snapshot").notNull(), // Store coupon details at time of redemption
+  
+  redeemedBy: varchar("redeemed_by").references(() => users.id),
+  redeemedAt: timestamp("redeemed_at").notNull().defaultNow(),
+}, (table) => ({
+  couponIdx: index("coupon_redemptions_coupon_idx").on(table.couponId),
+  orgIdx: index("coupon_redemptions_org_idx").on(table.organizationId),
+  uniqueOrgCoupon: unique("unique_org_coupon").on(table.couponId, table.organizationId),
+}));
+
+// Subscription Events - Audit trail for subscription lifecycle events
+export const subscriptionEvents = pgTable("subscription_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => platformSubscriptions.id, { onDelete: "cascade" }),
+  
+  // Event details
+  eventType: text("event_type").notNull(), // 'created', 'plan_changed', 'payment_succeeded', 'payment_failed', 'cancelled', etc.
+  eventSource: text("event_source").notNull(), // 'stripe', 'razorpay', 'admin', 'system'
+  externalEventId: text("external_event_id"), // Stripe event ID, for deduplication
+  
+  // Event data
+  eventData: jsonb("event_data").notNull().default(sql`'{}'::jsonb`), // Full event payload
+  
+  // Processing status
+  processed: boolean("processed").notNull().default(false),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  subscriptionIdx: index("subscription_events_subscription_idx").on(table.subscriptionId),
+  typeIdx: index("subscription_events_type_idx").on(table.eventType),
+  externalIdx: index("subscription_events_external_idx").on(table.externalEventId),
+  processedIdx: index("subscription_events_processed_idx").on(table.processed),
 }));
 
 // Roles table (Super Admin, Admin, Employee, Client)
@@ -2334,6 +2530,12 @@ export const insertAssignmentWorkflowTaskSchema = createInsertSchema(assignmentW
 export const insertPlatformSubscriptionSchema = createInsertSchema(platformSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertLucaChatSessionSchema = createInsertSchema(lucaChatSessions).omit({ id: true, createdAt: true, updatedAt: true, lastMessageAt: true });
 export const insertLucaChatMessageSchema = createInsertSchema(lucaChatMessages).omit({ id: true, createdAt: true });
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPricingRegionSchema = createInsertSchema(pricingRegions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlanVolumeTierSchema = createInsertSchema(planVolumeTiers).omit({ id: true, createdAt: true });
+export const insertCouponSchema = createInsertSchema(coupons).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCouponRedemptionSchema = createInsertSchema(couponRedemptions).omit({ id: true, redeemedAt: true });
+export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -2415,3 +2617,15 @@ export type InsertAssignmentWorkflowStep = z.infer<typeof insertAssignmentWorkfl
 export type AssignmentWorkflowStep = typeof assignmentWorkflowSteps.$inferSelect;
 export type InsertAssignmentWorkflowTask = z.infer<typeof insertAssignmentWorkflowTaskSchema>;
 export type AssignmentWorkflowTask = typeof assignmentWorkflowTasks.$inferSelect;
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertPricingRegion = z.infer<typeof insertPricingRegionSchema>;
+export type PricingRegion = typeof pricingRegions.$inferSelect;
+export type InsertPlanVolumeTier = z.infer<typeof insertPlanVolumeTierSchema>;
+export type PlanVolumeTier = typeof planVolumeTiers.$inferSelect;
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type Coupon = typeof coupons.$inferSelect;
+export type InsertCouponRedemption = z.infer<typeof insertCouponRedemptionSchema>;
+export type CouponRedemption = typeof couponRedemptions.$inferSelect;
+export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
