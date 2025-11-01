@@ -434,7 +434,7 @@ export default function CadenceAgent() {
         <Card className="flex flex-col h-full mr-2">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -461,7 +461,7 @@ export default function CadenceAgent() {
                 >
                   {msg.role === "assistant" && (
                     <div className="flex items-start">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex-shrink-0">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
                         <Bot className="h-4 w-4 text-white" />
                       </div>
                     </div>
@@ -479,7 +479,7 @@ export default function CadenceAgent() {
               ))}
               {isLoading && (
                 <div className="flex gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500">
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                   <div className="bg-muted p-3 rounded-lg animate-pulse">
@@ -577,7 +577,7 @@ export default function CadenceAgent() {
           <ScrollArea className="h-full p-6">
             {!workflowState ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mb-4">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400/20 to-pink-500/20 flex items-center justify-center mb-4">
                   <Workflow className="h-10 w-10 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">No Workflow Yet</h3>

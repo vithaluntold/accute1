@@ -449,7 +449,7 @@ export default function ParityAgent() {
         <Card className="flex flex-col h-full mr-2">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-pink-500">
               <FileText className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -476,7 +476,7 @@ export default function ParityAgent() {
                 >
                   {msg.role === "assistant" && (
                     <div className="flex items-start">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex-shrink-0">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
                         <Sparkles className="h-4 w-4 text-white" />
                       </div>
                     </div>
@@ -506,7 +506,7 @@ export default function ParityAgent() {
               {isLoading && (
                 <div className="flex gap-3 justify-start">
                   <div className="flex items-start">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex-shrink-0">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
                       <Sparkles className="h-4 w-4 text-white animate-pulse" />
                     </div>
                   </div>
