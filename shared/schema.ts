@@ -2629,3 +2629,91 @@ export type InsertCouponRedemption = z.infer<typeof insertCouponRedemptionSchema
 export type CouponRedemption = typeof couponRedemptions.$inferSelect;
 export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
 export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+export const subscriptionPlanFormSchema = insertSubscriptionPlanSchema.extend({
+  featuresInput: z.string().optional(),
+}).omit({ stripePriceIdMonthly: true, stripePriceIdYearly: true, stripeProductId: true });
+
+export const pricingRegionFormSchema = insertPricingRegionSchema.extend({
+  countriesInput: z.string().optional(),
+});
+
+export const couponFormSchema = insertCouponSchema.extend({
+  allowedPlansInput: z.string().optional(),
+}).omit({ createdBy: true, currentRedemptions: true });
+
+export type SubscriptionPlanFormData = z.infer<typeof subscriptionPlanFormSchema>;
+export type PricingRegionFormData = z.infer<typeof pricingRegionFormSchema>;
+export type CouponFormData = z.infer<typeof couponFormSchema>;
+
+export function transformPlanFormData(data: SubscriptionPlanFormData): InsertSubscriptionPlan {
+  const { featuresInput, ...rest } = data;
+  return {
+    ...rest,
+    features: featuresInput ? featuresInput.split("\n").filter(f => f.trim()) : [],
+  };
+}
+
+export function transformRegionFormData(data: PricingRegionFormData): InsertPricingRegion {
+  const { countriesInput, ...rest } = data;
+  return {
+    ...rest,
+    countries: countriesInput ? countriesInput.split("\n").filter(c => c.trim()) : [],
+  };
+}
+
+export function transformCouponFormData(data: CouponFormData): Omit<InsertCoupon, 'createdBy'> {
+  const { allowedPlansInput, ...rest } = data;
+  return {
+    ...rest,
+    allowedPlans: allowedPlansInput
+      ? allowedPlansInput.split("\n").filter(p => p.trim())
+      : null,
+  };
+}
+
+export const defaultPlanFormValues: SubscriptionPlanFormData = {
+  name: "",
+  slug: "",
+  description: "",
+  monthlyPrice: "0",
+  yearlyPrice: "0",
+  features: [],
+  featuresInput: "",
+  maxUsers: null,
+  maxClients: null,
+  maxStorage: null,
+  includedSeats: 1,
+  additionalSeatPrice: "0",
+  isActive: true,
+  isFeatured: false,
+  displayOrder: 0,
+};
+
+export const defaultRegionFormValues: PricingRegionFormData = {
+  name: "",
+  code: "",
+  countries: [],
+  countriesInput: "",
+  currency: "USD",
+  currencySymbol: "$",
+  multiplier: "1.0",
+  description: "",
+  isActive: true,
+  displayOrder: 0,
+};
+
+export const defaultCouponFormValues: CouponFormData = {
+  code: "",
+  description: "",
+  discountType: "percentage",
+  discountValue: "10",
+  minSeats: null,
+  maxSeats: null,
+  allowedPlans: null,
+  allowedPlansInput: "",
+  maxRedemptions: null,
+  validFrom: new Date().toISOString().split('T')[0],
+  validUntil: null,
+  isActive: true,
+};

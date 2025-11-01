@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -40,6 +40,14 @@ const platformMenuCategories = [
       { title: "Organizations", url: "/admin/organizations", icon: Building2, permission: null },
       { title: "Subscriptions", url: "/admin/subscriptions", icon: CreditCard, permission: null },
       { title: "All Users", url: "/admin/users", icon: Users, permission: null },
+    ]
+  },
+  {
+    title: "Subscription Management",
+    items: [
+      { title: "Plans", url: "/admin/subscription-plans", icon: Package, permission: null },
+      { title: "Pricing Regions", url: "/admin/pricing-regions", icon: Globe, permission: null },
+      { title: "Coupons", url: "/admin/coupons", icon: Percent, permission: null },
     ]
   },
   {
