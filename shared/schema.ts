@@ -1821,6 +1821,30 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// AI Agent Sessions (for Parity, Cadence, Forma)
+export const agentSessions = pgTable("agent_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentSlug: text("agent_slug").notNull(), // 'parity', 'cadence', 'forma'
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // User-editable session name
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userAgentIdx: index("agent_sessions_user_agent_idx").on(table.userId, table.agentSlug),
+}));
+
+export const agentMessages = pgTable("agent_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => agentSessions.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // For storing artifacts, file refs, etc
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("agent_messages_session_idx").on(table.sessionId),
+}));
+
 // Calendar & Appointments
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2282,6 +2306,8 @@ export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({ i
 export const insertChatChannelSchema = createInsertSchema(chatChannels).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChatMemberSchema = createInsertSchema(chatMembers).omit({ id: true });
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export const insertAgentSessionSchema = createInsertSchema(agentSessions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAgentMessageSchema = createInsertSchema(agentMessages).omit({ id: true, createdAt: true });
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2333,6 +2359,10 @@ export type InsertChatMember = z.infer<typeof insertChatMemberSchema>;
 export type ChatMember = typeof chatMembers.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertAgentSession = z.infer<typeof insertAgentSessionSchema>;
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type InsertAgentMessage = z.infer<typeof insertAgentMessageSchema>;
+export type AgentMessage = typeof agentMessages.$inferSelect;
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
