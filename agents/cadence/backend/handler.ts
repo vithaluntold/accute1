@@ -6,6 +6,7 @@ import multer from "multer";
 import * as pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 
 interface WorkflowState {
   name: string;
@@ -33,6 +34,8 @@ interface Step {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const registerRoutes = (app: any) => {
+  // Register session management routes
+  registerAgentSessionRoutes(app, "cadence");
   // Chat endpoint for conversational workflow building
   app.post("/api/agents/cadence/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {

@@ -7,6 +7,7 @@ import * as pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { insertFormTemplateSchema } from "../../../shared/schema";
+import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 
 interface Message {
   role: "user" | "assistant";
@@ -33,6 +34,8 @@ interface FormState {
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const registerRoutes = (app: any) => {
+  // Register session management routes
+  registerAgentSessionRoutes(app, "forma");
   // Chat endpoint for conversational form building
   app.post("/api/agents/forma/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {

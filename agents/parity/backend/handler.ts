@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { ParityAgent } from "./index";
 import { storage } from "../../../server/storage";
+import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 
 interface Message {
   role: "user" | "assistant";
@@ -16,6 +17,8 @@ interface DocumentState {
 }
 
 export const registerRoutes = (app: any) => {
+  // Register session management routes
+  registerAgentSessionRoutes(app, "parity");
   // Chat endpoint for conversational document generation
   app.post("/api/agents/parity/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
