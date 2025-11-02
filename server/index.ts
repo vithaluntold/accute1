@@ -71,6 +71,10 @@ import path from "path";
 
 const app = express();
 
+// Explicitly set Express environment from NODE_ENV
+// This ensures app.get("env") works correctly in production
+app.set("env", process.env.NODE_ENV || "development");
+
 app.use(cookieParser());
 
 declare module 'http' {
