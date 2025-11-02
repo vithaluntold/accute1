@@ -53,12 +53,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import TeamChat from "@/components/TeamChat";
 import type { Team, TeamMember, User } from "@shared/schema";
 
 const addMemberSchema = z.object({
@@ -311,14 +318,21 @@ export default function TeamDetailPage() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Team Members</CardTitle>
-          <CardDescription>
-            {members.length} {members.length === 1 ? "member" : "members"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Tabs defaultValue="members" className="w-full">
+        <TabsList>
+          <TabsTrigger value="members" data-testid="tab-members">Members</TabsTrigger>
+          <TabsTrigger value="chat" data-testid="tab-chat">Chat</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="members" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                {members.length} {members.length === 1 ? "member" : "members"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
           {membersLoading ? (
             <p className="text-muted-foreground text-center py-4">Loading members...</p>
           ) : members.length === 0 ? (
@@ -388,8 +402,14 @@ export default function TeamDetailPage() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="chat" className="mt-6">
+          <TeamChat teamId={teamId!} teamName={team.name} />
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={!!removingMember} onOpenChange={() => setRemovingMember(null)}>
         <AlertDialogContent data-testid="dialog-remove-member">

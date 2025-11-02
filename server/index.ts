@@ -67,6 +67,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 import { setupWebSocket } from "./websocket";
 import { setupRoundtableWebSocket } from "./roundtable-websocket";
+import { setupTeamChatWebSocket } from "./team-chat-websocket";
 import path from "path";
 
 const app = express();
@@ -195,6 +196,15 @@ app.use((req, res, next) => {
     } catch (wsError) {
       console.error('❌ Roundtable WebSocket initialization failed:', wsError);
       console.warn('⚠️  Continuing without Roundtable WebSocket support');
+    }
+    
+    // Setup WebSocket server for Team Chat
+    try {
+      const teamChatWss = setupTeamChatWebSocket(server);
+      console.log('🔌 Team Chat WebSocket server initialized at /ws/team-chat');
+    } catch (wsError) {
+      console.error('❌ Team Chat WebSocket initialization failed:', wsError);
+      console.warn('⚠️  Continuing without Team Chat WebSocket support');
     }
 
     // Setup Vite (dev) or static file serving (production) BEFORE error handler

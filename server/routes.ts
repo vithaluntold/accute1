@@ -3583,6 +3583,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Team Chat Routes
+  app.get("/api/teams/:teamId/messages", requireAuth, requirePermission("teams.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.teamId);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      // Verify user is a team member
+      const members = await storage.getTeamMembers(req.params.teamId);
+      const isMember = members.some(m => m.userId === req.userId);
+      if (!isMember) {
+        return res.status(403).json({ error: "You are not a member of this team" });
+      }
+      
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const messages = await storage.getTeamChatMessages(req.params.teamId, limit);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch team chat messages" });
+    }
+  });
+
   // ==================== AI Client Onboarding Routes ====================
   
   // Start a new AI-assisted client onboarding session
