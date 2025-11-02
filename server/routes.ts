@@ -1657,8 +1657,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update Roundtable session
-  app.patch("/api/roundtable/sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.patch("/api/roundtable/sessions/:id", requireAuth, rateLimit(30, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
+      // SECURITY: Validate input
+      const updateSchema = z.object({
+        objective: z.string().max(1000).optional(),
+        status: z.enum(['active', 'completed', 'cancelled']).optional(),
+      });
+      
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid input", details: validation.error.errors });
+      }
+
       const session = await storage.getRoundtableSession(req.params.id);
       
       if (!session) {
@@ -1701,13 +1712,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add agent to session
-  app.post("/api/roundtable/sessions/:id/participants", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/roundtable/sessions/:id/participants", requireAuth, rateLimit(15, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
-      const { agentSlug } = req.body;
+      // SECURITY: Validate agent slug with whitelist
+      const participantSchema = z.object({
+        agentSlug: z.enum(['luca', 'cadence', 'forma', 'parity', 'email', 'messages']),
+      });
       
-      if (!agentSlug) {
-        return res.status(400).json({ error: "Agent slug required" });
+      const validation = participantSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid agent slug", details: validation.error.errors });
       }
+
+      const { agentSlug } = validation.data;
 
       const session = await storage.getRoundtableSession(req.params.id);
       if (!session) {
@@ -1772,9 +1789,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Approve deliverable
-  app.post("/api/roundtable/deliverables/:id/approve", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/roundtable/deliverables/:id/approve", requireAuth, rateLimit(20, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
-      const { feedback } = req.body;
+      // SECURITY: Validate input with Zod schema
+      const approvalSchema = z.object({
+        feedback: z.string().max(5000).optional().nullable(),
+      });
+      
+      const validation = approvalSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid input", details: validation.error.errors });
+      }
+
+      const { feedback } = validation.data;
       
       const deliverable = await storage.getRoundtableDeliverable(req.params.id);
       if (!deliverable) {
@@ -1816,9 +1843,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Reject deliverable
-  app.post("/api/roundtable/deliverables/:id/reject", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/roundtable/deliverables/:id/reject", requireAuth, rateLimit(20, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
-      const { feedback } = req.body;
+      // SECURITY: Validate input with Zod schema
+      const rejectionSchema = z.object({
+        feedback: z.string().min(1).max(5000),
+      });
+      
+      const validation = rejectionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid input. Feedback is required for rejections.", details: validation.error.errors });
+      }
+
+      const { feedback } = validation.data;
       
       const deliverable = await storage.getRoundtableDeliverable(req.params.id);
       if (!deliverable) {

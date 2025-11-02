@@ -59,11 +59,16 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
   const orchestrator = new RoundtableOrchestrator(storage);
   const wss = new WebSocketServer({ 
     server: httpServer,
-    path: '/ws/roundtable'
+    path: '/ws/roundtable',
+    maxPayload: 1024 * 1024 // SECURITY: 1MB max payload to prevent DoS
   });
 
   // Track active connections by session
   const sessionConnections = new Map<string, Set<RoundtableWebSocket>>();
+  
+  // SECURITY: Track connections per user to prevent connection flooding
+  const userConnections = new Map<string, number>();
+  const MAX_CONNECTIONS_PER_USER = 5;
 
   // Heartbeat to detect broken connections
   const heartbeatInterval = setInterval(() => {
@@ -90,6 +95,46 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
 
     // Authenticate WebSocket connection
     try {
+      // SECURITY: Strict Origin validation to prevent cross-origin WebSocket hijacking
+      const origin = req.headers.origin;
+      
+      // SECURITY: Reject Origin-less requests (must have Origin header)
+      if (!origin) {
+        console.log('[Roundtable WS] Missing Origin header');
+        ws.close(4003, 'Origin header required');
+        return;
+      }
+
+      // Parse origin URL and extract host
+      let originHost: string;
+      try {
+        const originUrl = new URL(origin);
+        originHost = originUrl.host; // host includes port if present
+      } catch (error) {
+        console.log('[Roundtable WS] Invalid Origin format:', origin);
+        ws.close(4003, 'Invalid Origin format');
+        return;
+      }
+
+      // SECURITY: Exact host matching (not prefix) to prevent subdomain hijacking
+      const allowedHosts = [
+        process.env.REPLIT_DEV_DOMAIN,
+        ...(process.env.REPLIT_DOMAINS ? process.env.REPLIT_DOMAINS.split(',') : []),
+        'localhost:5000',
+        '0.0.0.0:5000'
+      ].filter(Boolean);
+
+      const isAllowed = allowedHosts.some(allowedHost => {
+        // Exact match for host:port or just host
+        return originHost === allowedHost || originHost === `${allowedHost}:5000`;
+      });
+
+      if (!isAllowed) {
+        console.log('[Roundtable WS] Unauthorized origin:', originHost, 'Allowed:', allowedHosts);
+        ws.close(4003, 'Unauthorized origin');
+        return;
+      }
+
       const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
       const sessionToken = cookies['session_token'];
 
@@ -113,8 +158,19 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
         return;
       }
 
+      // SECURITY: Enforce connection limit per user
+      const currentConnections = userConnections.get(user.id) || 0;
+      if (currentConnections >= MAX_CONNECTIONS_PER_USER) {
+        console.log('[Roundtable WS] Too many connections for user:', user.id);
+        ws.close(4002, 'Too many connections');
+        return;
+      }
+
       ws.userId = user.id;
       ws.organizationId = user.organizationId || undefined;
+
+      // Track user connection
+      userConnections.set(user.id, currentConnections + 1);
 
       console.log(`[Roundtable WS] Connected: user=${user.id}, org=${user.organizationId}`);
 
@@ -126,7 +182,38 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
       // Handle incoming messages
       ws.on('message', async (data) => {
         try {
-          const message: RoundtableMessage = JSON.parse(data.toString());
+          // SECURITY: Validate payload size
+          const dataStr = data.toString();
+          if (dataStr.length > 100 * 1024) { // 100KB max per message
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              error: 'Message too large' 
+            }));
+            return;
+          }
+
+          const message: RoundtableMessage = JSON.parse(dataStr);
+          
+          // SECURITY: Validate message structure
+          if (!message.type || typeof message.type !== 'string') {
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              error: 'Invalid message format' 
+            }));
+            return;
+          }
+
+          // SECURITY: Sanitize text content
+          if (message.content && typeof message.content === 'string') {
+            if (message.content.length > 10000) { // 10KB max text content
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                error: 'Message content too long' 
+            }));
+              return;
+            }
+          }
+
           console.log('[Roundtable WS] Message received:', message.type);
 
           switch (message.type) {
@@ -187,6 +274,17 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
         if (ws.sessionId) {
           removeFromSession(ws.sessionId, ws);
         }
+        
+        // SECURITY: Decrement user connection count
+        if (ws.userId) {
+          const count = userConnections.get(ws.userId) || 0;
+          if (count <= 1) {
+            userConnections.delete(ws.userId);
+          } else {
+            userConnections.set(ws.userId, count - 1);
+          }
+        }
+        
         console.log(`[Roundtable WS] Disconnected: user=${ws.userId}`);
       });
 
