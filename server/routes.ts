@@ -1563,9 +1563,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new Roundtable session
-  app.post("/api/roundtable/sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/roundtable/sessions", requireAuth, rateLimit(10, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
       const { objective, initialAgents = [] } = req.body;
+      
+      // Input validation
+      if (!objective || typeof objective !== 'string' || objective.trim().length === 0) {
+        return res.status(400).json({ error: "Valid objective is required" });
+      }
+
+      if (objective.length > 1000) {
+        return res.status(400).json({ error: "Objective must be 1000 characters or less" });
+      }
+
+      if (!Array.isArray(initialAgents)) {
+        return res.status(400).json({ error: "Initial agents must be an array" });
+      }
+
+      if (initialAgents.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 initial agents allowed" });
+      }
+
+      // Validate agent slugs
+      const validAgentSlugs = ['luca', 'cadence', 'forma', 'parity', 'email', 'messages'];
+      for (const slug of initialAgents) {
+        if (typeof slug !== 'string' || !validAgentSlugs.includes(slug.toLowerCase())) {
+          return res.status(400).json({ error: `Invalid agent slug: ${slug}` });
+        }
+      }
       
       if (!req.user!.organizationId) {
         return res.status(400).json({ error: "Organization required" });
@@ -1575,14 +1600,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await storage.createRoundtableSession({
         organizationId: req.user!.organizationId,
         userId: req.userId,
-        objective,
+        objective: objective.trim(),
         status: 'active',
       });
 
       // Add initial agents if specified
       if (initialAgents.length > 0) {
         const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
-        const orchestrator = RoundtableOrchestrator.getInstance(storage);
+        const orchestrator = new RoundtableOrchestrator(storage);
         
         for (const agentSlug of initialAgents) {
           await orchestrator.addAgentToSession(session.id, agentSlug);
@@ -1612,7 +1637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get full session context
       const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
-      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      const orchestrator = new RoundtableOrchestrator(storage);
       const context = await orchestrator.getSessionContext(req.params.id);
 
       // Get messages and participants
@@ -1694,8 +1719,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
-      const orchestrator = RoundtableOrchestrator.getInstance(storage);
-      const participant = await orchestrator.addAgentToSession(req.params.id, agentSlug);
+      const orchestrator = new RoundtableOrchestrator(storage);
+      const participant = await orchestrator.addAgentToSession(req.params.id, agentSlug, req.userId!);
 
       await logActivity(req.userId, req.user!.organizationId!, "add_agent", "roundtable_session", req.params.id, { agentSlug }, req);
       res.json(participant);
@@ -1717,7 +1742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
-      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      const orchestrator = new RoundtableOrchestrator(storage);
       await orchestrator.removeAgentFromSession(req.params.id, req.params.participantId);
 
       await logActivity(req.userId, req.user!.organizationId!, "remove_agent", "roundtable_session", req.params.id, { participantId: req.params.participantId }, req);
@@ -1765,9 +1790,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create approval record
       const approval = await storage.createRoundtableApproval({
         deliverableId: req.params.id,
-        approverId: req.userId,
+        sessionId: deliverable.sessionId,
+        userId: req.userId!,
         decision: 'approved',
-        feedback,
+        feedback: feedback || null,
+        savedToTemplateId: null,
+        autoSaved: false,
       });
 
       // Update deliverable status
@@ -1777,8 +1805,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Use orchestrator to handle auto-save logic
       const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
-      const orchestrator = RoundtableOrchestrator.getInstance(storage);
-      await orchestrator.approveDeliverable(req.params.id, req.userId, feedback);
+      const orchestrator = new RoundtableOrchestrator(storage);
+      await orchestrator.approveDeliverable(req.params.id, req.userId!, feedback);
 
       await logActivity(req.userId, req.user!.organizationId!, "approve", "roundtable_deliverable", req.params.id, { feedback }, req);
       res.json({ approval, deliverable: await storage.getRoundtableDeliverable(req.params.id) });
@@ -1806,9 +1834,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create rejection record
       const approval = await storage.createRoundtableApproval({
         deliverableId: req.params.id,
-        approverId: req.userId,
+        sessionId: deliverable.sessionId,
+        userId: req.userId!,
         decision: 'rejected',
         feedback: feedback || 'Deliverable rejected',
+        savedToTemplateId: null,
+        autoSaved: false,
       });
 
       // Update deliverable status

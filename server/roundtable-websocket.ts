@@ -22,8 +22,8 @@ interface RoundtableMessage {
     | 'remove_agent'
     | 'present_deliverable'
     | 'stop_presentation'
-    | 'typing_start'
-    | 'typing_stop'
+    | 'start_typing'
+    | 'stop_typing'
     | 'ping';
   sessionId?: string;
   content?: string;
@@ -39,11 +39,12 @@ interface BroadcastMessage {
     | 'participant_joined'
     | 'participant_left'
     | 'new_message'
+    | 'private_message'
     | 'agent_added'
     | 'agent_removed'
     | 'deliverable_created'
-    | 'presentation_started'
-    | 'presentation_stopped'
+    | 'deliverable_presentation'
+    | 'presentation_ended'
     | 'typing_indicator'
     | 'roster_update'
     | 'error';
@@ -165,8 +166,8 @@ export function setupRoundtableWebSocket(httpServer: Server): WebSocketServer {
               await handleStopPresentation(ws, message, orchestrator, sessionConnections);
               break;
 
-            case 'typing_start':
-            case 'typing_stop':
+            case 'start_typing':
+            case 'stop_typing':
               await handleTypingIndicator(ws, message, sessionConnections);
               break;
 
@@ -379,7 +380,7 @@ async function handleSendPrivateMessage(
     for (const client of Array.from(connections)) {
       if (client.userId === recipient.participantId) {
         client.send(JSON.stringify({
-          type: 'new_message',
+          type: 'private_message',
           data: savedMessage
         }));
         break;
@@ -389,7 +390,7 @@ async function handleSendPrivateMessage(
 
   // Also send back to sender
   ws.send(JSON.stringify({
-    type: 'new_message',
+    type: 'private_message',
     data: savedMessage
   }));
 }
@@ -464,7 +465,7 @@ async function handlePresentDeliverable(
 
   // Broadcast presentation start
   broadcastToSession(ws.sessionId, sessionConnections, {
-    type: 'presentation_started',
+    type: 'deliverable_presentation',
     data: deliverable
   });
 }
@@ -486,7 +487,7 @@ async function handleStopPresentation(
 
   // Broadcast presentation stop
   broadcastToSession(ws.sessionId, sessionConnections, {
-    type: 'presentation_stopped'
+    type: 'presentation_ended'
   });
 }
 
@@ -500,7 +501,7 @@ async function handleTypingIndicator(
 ) {
   if (!ws.sessionId || !ws.userId) return;
 
-  const isTyping = message.type === 'typing_start';
+  const isTyping = message.type === 'start_typing';
   const channelType = message.channelType || 'main';
 
   // Broadcast typing indicator
