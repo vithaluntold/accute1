@@ -173,14 +173,11 @@ function ImapForm({ onSuccess }: { onSuccess: () => void }) {
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof imapFormSchema>) => {
-      const { ImapEmailService } = await import('@/lib/imap-helpers');
-      const encrypted = ImapEmailService.encryptPassword(data.password, data.email);
-      
       return await apiRequest("POST", "/api/email-accounts", {
         provider: "imap",
         email: data.email,
         authType: "password",
-        encryptedCredentials: encrypted,
+        password: data.password,
         imapHost: data.imapHost,
         imapPort: data.imapPort,
         useSsl: data.useSsl

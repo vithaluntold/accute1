@@ -8292,13 +8292,26 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
   // Create email account
   app.post("/api/email-accounts", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      const { password, ...restBody } = req.body;
+      
       // Schema without server-controlled fields
       const clientSchema = schema.insertEmailAccountSchema.omit({
         organizationId: true,
         userId: true,
       });
       
-      const validatedData = clientSchema.parse(req.body);
+      let accountData: any = { ...restBody };
+      
+      // SECURITY: Encrypt IMAP password server-side using AES-256-GCM
+      if (restBody.provider === 'imap' && password) {
+        const imapCredentials = JSON.stringify({
+          user: restBody.email,
+          pass: password
+        });
+        accountData.encryptedCredentials = cryptoUtils.encrypt(imapCredentials);
+      }
+      
+      const validatedData = clientSchema.parse(accountData);
       
       const account = await storage.createEmailAccount({
         ...validatedData,
@@ -8380,10 +8393,18 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
         redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
       });
 
-      const state = Buffer.from(JSON.stringify({
+      // SECURITY: Create HMAC-signed state to prevent CSRF/forgery
+      const statePayload = JSON.stringify({
         userId: req.userId,
-        organizationId: req.user!.organizationId
-      })).toString('base64');
+        organizationId: req.user!.organizationId,
+        nonce: crypto.randomBytes(16).toString('hex'),
+        timestamp: Date.now()
+      });
+      const signature = crypto
+        .createHmac('sha256', process.env.JWT_SECRET!)
+        .update(statePayload)
+        .digest('hex');
+      const state = Buffer.from(JSON.stringify({ payload: statePayload, signature })).toString('base64');
 
       const authUrl = service.generateAuthUrl(state);
       res.json({ authUrl });
@@ -8402,7 +8423,25 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
         return res.status(400).send('Missing code or state parameter');
       }
 
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      // SECURITY: Verify HMAC signature to prevent state forgery
+      const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      const { payload, signature } = decoded;
+      
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.JWT_SECRET!)
+        .update(payload)
+        .digest('hex');
+      
+      if (signature !== expectedSignature) {
+        return res.status(403).send('Invalid state signature - possible CSRF attack');
+      }
+
+      const stateData = JSON.parse(payload);
+      
+      // SECURITY: Check timestamp to prevent replay attacks (5 minute window)
+      if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
+        return res.status(403).send('State expired - please try again');
+      }
       
       const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
       const service = new GmailOAuthService({
@@ -8451,10 +8490,18 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
         redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
       });
 
-      const state = Buffer.from(JSON.stringify({
+      // SECURITY: Create HMAC-signed state to prevent CSRF/forgery
+      const statePayload = JSON.stringify({
         userId: req.userId,
-        organizationId: req.user!.organizationId
-      })).toString('base64');
+        organizationId: req.user!.organizationId,
+        nonce: crypto.randomBytes(16).toString('hex'),
+        timestamp: Date.now()
+      });
+      const signature = crypto
+        .createHmac('sha256', process.env.JWT_SECRET!)
+        .update(statePayload)
+        .digest('hex');
+      const state = Buffer.from(JSON.stringify({ payload: statePayload, signature })).toString('base64');
 
       const authUrl = service.getAuthUrl(state);
       res.json({ authUrl });
@@ -8473,7 +8520,25 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
         return res.status(400).send('Missing code or state parameter');
       }
 
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      // SECURITY: Verify HMAC signature to prevent state forgery
+      const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      const { payload, signature } = decoded;
+      
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.JWT_SECRET!)
+        .update(payload)
+        .digest('hex');
+      
+      if (signature !== expectedSignature) {
+        return res.status(403).send('Invalid state signature - possible CSRF attack');
+      }
+
+      const stateData = JSON.parse(payload);
+      
+      // SECURITY: Check timestamp to prevent replay attacks (5 minute window)
+      if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
+        return res.status(403).send('State expired - please try again');
+      }
       
       const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
       const service = new OutlookOAuthService({
