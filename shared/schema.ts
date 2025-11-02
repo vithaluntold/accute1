@@ -150,6 +150,8 @@ export const subscriptionPlans = pgTable("subscription_plans", {
 export const pricingRegions = pgTable("pricing_regions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(), // 'North America', 'Western Europe', 'India', etc.
+  code: text("code"), // 'NA', 'EU', 'IN', etc.
+  description: text("description"), // Optional description
   countryCodes: jsonb("country_codes").notNull().default(sql`'[]'::jsonb`), // Array of ISO country codes ['US', 'CA']
   currency: text("currency").notNull().default("USD"), // 'USD', 'EUR', 'INR', etc.
   currencySymbol: text("currency_symbol").notNull().default("$"),
@@ -2658,7 +2660,7 @@ export function transformRegionFormData(data: PricingRegionFormData): InsertPric
   const { countriesInput, ...rest } = data;
   return {
     ...rest,
-    countries: countriesInput ? countriesInput.split("\n").filter(c => c.trim()) : [],
+    countryCodes: countriesInput ? countriesInput.split("\n").filter(c => c.trim()) : [],
   };
 }
 
@@ -2916,12 +2918,12 @@ export const defaultPlanFormValues: SubscriptionPlanFormData = {
 export const defaultRegionFormValues: PricingRegionFormData = {
   name: "",
   code: "",
-  countries: [],
+  description: "",
+  countryCodes: [],
   countriesInput: "",
   currency: "USD",
   currencySymbol: "$",
-  multiplier: "1.0",
-  description: "",
+  priceMultiplier: "1.0",
   isActive: true,
   displayOrder: 0,
 };

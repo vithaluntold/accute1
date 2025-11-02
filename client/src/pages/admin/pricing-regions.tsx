@@ -92,15 +92,16 @@ export default function PricingRegionsPage() {
   const handleOpenDialog = (region?: PricingRegion) => {
     if (region) {
       setEditingRegion(region);
+      const countryCodes = Array.isArray(region.countryCodes) ? region.countryCodes as string[] : [];
       form.reset({
         name: region.name,
-        code: region.code,
-        countries: region.countries,
-        countriesInput: region.countries.join("\n"),
+        code: region.code || "",
+        description: region.description || "",
+        countryCodes: countryCodes,
+        countriesInput: countryCodes.join("\n"),
         currency: region.currency,
         currencySymbol: region.currencySymbol,
-        multiplier: region.multiplier,
-        description: region.description || "",
+        priceMultiplier: region.priceMultiplier,
         isActive: region.isActive,
         displayOrder: region.displayOrder,
       });
@@ -127,14 +128,14 @@ export default function PricingRegionsPage() {
 
   const filteredRegions = regions?.filter(region =>
     region.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    region.code.toLowerCase().includes(searchQuery.toLowerCase())
+    (region.code && region.code.toLowerCase().includes(searchQuery.toLowerCase()))
   ) || [];
 
   const stats = {
     totalRegions: regions?.length || 0,
     activeRegions: regions?.filter(r => r.isActive).length || 0,
     averageMultiplier: regions && regions.length > 0 
-      ? (regions.reduce((sum, r) => sum + parseFloat(r.multiplier), 0) / regions.length).toFixed(2)
+      ? (regions.reduce((sum, r) => sum + parseFloat(r.priceMultiplier), 0) / regions.length).toFixed(2)
       : "0.00",
   };
 
@@ -227,12 +228,12 @@ export default function PricingRegionsPage() {
                       <TableCell>
                         <div className="space-y-1">
                           <div className="font-medium" data-testid={`text-region-name-${region.id}`}>{region.name}</div>
-                          <div className="text-sm text-muted-foreground">{region.code}</div>
+                          {region.code && <div className="text-sm text-muted-foreground">{region.code}</div>}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          {region.countries.length} {region.countries.length === 1 ? 'country' : 'countries'}
+                          {Array.isArray(region.countryCodes) ? region.countryCodes.length : 0} {(Array.isArray(region.countryCodes) ? region.countryCodes.length : 0) === 1 ? 'country' : 'countries'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -242,7 +243,7 @@ export default function PricingRegionsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" data-testid={`badge-multiplier-${region.id}`}>
-                          {region.multiplier}x
+                          {region.priceMultiplier}x
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -316,9 +317,9 @@ export default function PricingRegionsPage() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Region Code *</FormLabel>
+                      <FormLabel>Region Code</FormLabel>
                       <FormControl>
-                        <Input placeholder="IN" {...field} data-testid="input-region-code" />
+                        <Input placeholder="IN" {...field} value={field.value || ""} data-testid="input-region-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -397,7 +398,7 @@ export default function PricingRegionsPage() {
 
               <FormField
                 control={form.control}
-                name="multiplier"
+                name="priceMultiplier"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Price Multiplier (PPP-based) *</FormLabel>
