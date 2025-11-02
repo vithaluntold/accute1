@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FormInput, Send, Sparkles, Plus, Type, CheckSquare, Calendar, Hash, Mail, Phone, Upload, FileText, MessageSquare, Trash2, Edit2 } from "lucide-react";
+import { FormInput, Send, Sparkles, Plus, Type, CheckSquare, Calendar, Hash, Mail, Phone, Upload, FileText, MessageSquare, Trash2, Edit2, Store, Save } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
+import { getUser } from "@/lib/auth";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -248,17 +249,26 @@ export default function FormaAgent() {
     if (!formState) return;
 
     try {
+      const user = getUser();
+      const isSuperAdmin = user?.role === "super_admin";
+      const scope = isSuperAdmin ? "global" : "organization";
+      
       const response = await fetch("/api/agents/forma/save-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(formState),
+        body: JSON.stringify({
+          ...formState,
+          scope
+        }),
       });
 
       if (response.ok) {
         toast({
-          title: "Form saved",
-          description: "Your form has been saved successfully."
+          title: isSuperAdmin ? "Published to Marketplace" : "Form Saved",
+          description: isSuperAdmin 
+            ? "Form published globally to marketplace" 
+            : "Form saved to your organization's templates"
         });
       }
     } catch (error) {
@@ -611,14 +621,24 @@ export default function FormaAgent() {
                   size="sm"
                   data-testid="button-save-form"
                 >
-                  Save & Publish Form
+                  {getUser()?.role === "super_admin" ? (
+                    <>
+                      <Store className="h-4 w-4 mr-1" />
+                      Publish to Marketplace
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save to Templates
+                    </>
+                  )}
                 </Button>
               </div>
             )}
           </div>
         </CardHeader>
         
-        <CardContent className="flex-1 p-0 overflow-hidden">
+        <CardContent className="flex-1 p-0 overflow-auto">
           {!formState ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -630,7 +650,7 @@ export default function FormaAgent() {
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-full w-full">
+            <ScrollArea className="h-full w-full" type="always">
               <div className="p-6 space-y-6 pb-20">
                 {/* Form Header */}
                 <div className="space-y-2 pb-4 border-b">

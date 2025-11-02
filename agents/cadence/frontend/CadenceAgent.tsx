@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText, MessageSquare, Trash2, Edit2 } from "lucide-react";
+import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText, MessageSquare, Trash2, Edit2, Store } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
+import { getUser } from "@/lib/auth";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -573,8 +574,8 @@ export default function CadenceAgent() {
           </CardTitle>
         </CardHeader>
         
-        <CardContent className="flex-1 p-0">
-          <ScrollArea className="h-full p-6">
+        <CardContent className="flex-1 p-0 overflow-auto">
+          <ScrollArea className="h-full p-6" type="always">
             {!workflowState ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400/20 to-pink-500/20 flex items-center justify-center mb-4">
@@ -674,26 +675,50 @@ export default function CadenceAgent() {
                       data-testid="button-save-workflow"
                       onClick={async () => {
                         try {
+                          const user = getUser();
+                          const isSuperAdmin = user?.role === "super_admin";
+                          const scope = isSuperAdmin ? "global" : "organization";
+                          
                           const response = await fetch("/api/agents/cadence/save-workflow", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             credentials: "include",
-                            body: JSON.stringify({ workflow: workflowState }),
+                            body: JSON.stringify({ 
+                              workflow: workflowState,
+                              scope
+                            }),
                           });
                           const data = await response.json();
                           if (data.success) {
-                            // Show success message and navigate
-                            alert("Workflow saved successfully!");
+                            toast({ 
+                              title: isSuperAdmin ? "Published to Marketplace" : "Saved to Templates",
+                              description: isSuperAdmin 
+                                ? "Workflow published globally to marketplace" 
+                                : "Workflow saved to your organization's templates"
+                            });
                             window.location.href = "/workflows";
                           }
                         } catch (error) {
                           console.error("Failed to save workflow:", error);
-                          alert("Failed to save workflow. Please try again.");
+                          toast({ 
+                            title: "Error", 
+                            description: "Failed to save workflow. Please try again.",
+                            variant: "destructive"
+                          });
                         }
                       }}
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Save Workflow
+                      {getUser()?.role === "super_admin" ? (
+                        <>
+                          <Store className="h-4 w-4 mr-2" />
+                          Publish to Marketplace
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Save to Templates
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}

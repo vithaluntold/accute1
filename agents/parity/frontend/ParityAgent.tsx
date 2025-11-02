@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare } from "lucide-react";
+import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare, Store } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getUser } from "@/lib/auth";
 import {
   Dialog,
   DialogContent,
@@ -310,6 +311,10 @@ export default function ParityAgent() {
 
   const saveAsTemplate = async () => {
     try {
+      const user = getUser();
+      const isSuperAdmin = user?.role === "super_admin";
+      const scope = isSuperAdmin ? "global" : "organization";
+      
       const response = await fetch("/api/agents/parity/save-template", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,14 +323,17 @@ export default function ParityAgent() {
           name: templateName,
           category: templateCategory,
           description: templateDescription,
-          content: editableContent
+          content: editableContent,
+          scope
         }),
       });
 
       if (response.ok) {
         toast({
-          title: "Template saved",
-          description: "Your document has been saved as a reusable template."
+          title: isSuperAdmin ? "Published to Marketplace" : "Template Saved",
+          description: isSuperAdmin 
+            ? "Document template published globally to marketplace" 
+            : "Document template saved to your organization's templates"
         });
         setShowSaveDialog(false);
       } else {
@@ -588,8 +596,17 @@ export default function ParityAgent() {
                   onClick={openSaveDialog}
                   data-testid="button-save-template"
                 >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save as Template
+                  {getUser()?.role === "super_admin" ? (
+                    <>
+                      <Store className="h-4 w-4 mr-1" />
+                      Publish to Marketplace
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-1" />
+                      Save as Template
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -608,7 +625,7 @@ export default function ParityAgent() {
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-full">
+            <ScrollArea className="h-full" type="always">
               <div className="p-6 space-y-4">
                 {/* Document Header */}
                 <div className="space-y-2 pb-4 border-b">
