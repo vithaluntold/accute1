@@ -355,8 +355,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const otp = generateOTP();
       const expiresAt = getOTPExpiry();
 
+      // Clean up expired OTPs first
+      await storage.deleteExpiredOtps();
+
       // Store OTP in database
-      await storage.createOtpVerification({
+      const otpRecord = await storage.createOtpVerification({
         phone,
         otp,
         expiresAt,
@@ -364,17 +367,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verified: false,
       });
 
-      // Send OTP via SMS
+      // Try to send OTP via SMS (non-blocking for testing/development)
       const smsResult = await sendOTP(phone, otp);
 
       if (!smsResult.success) {
+        console.warn(`SMS not sent to ${phone}: ${smsResult.error}`);
+        // In development/testing, return success even if SMS fails (OTP is in DB for testing)
+        // In production, Twilio should be configured
+        if (process.env.NODE_ENV === 'development') {
+          return res.json({ 
+            success: true,
+            message: "OTP generated (SMS not configured - check database)",
+            expiresAt,
+            developmentOnly: { otpId: otpRecord.id }
+          });
+        }
         return res.status(500).json({ 
           error: smsResult.error || "Failed to send OTP SMS" 
         });
       }
-
-      // Clean up expired OTPs
-      await storage.deleteExpiredOtps();
 
       res.json({ 
         success: true,
