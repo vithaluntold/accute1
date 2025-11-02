@@ -73,9 +73,31 @@ export default function CadenceAgent() {
   const [editingTitle, setEditingTitle] = useState("");
   const [showSessionSidebar, setShowSessionSidebar] = useState(true);
   
+  // Marketplace template state
+  const [marketplaceTemplateId, setMarketplaceTemplateId] = useState<string | null>(null);
+  const [marketplaceMetadata, setMarketplaceMetadata] = useState<{
+    name?: string;
+    description?: string;
+    category?: string;
+  }>({});
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Read marketplace template params from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const templateId = params.get("marketplaceTemplateId");
+    const name = params.get("name");
+    const description = params.get("description");
+    const category = params.get("category");
+
+    if (templateId) {
+      setMarketplaceTemplateId(templateId);
+      setMarketplaceMetadata({ name: name || undefined, description: description || undefined, category: category || undefined });
+    }
+  }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -450,6 +472,19 @@ export default function CadenceAgent() {
           </CardTitle>
         </CardHeader>
         
+        {/* Marketplace Banner */}
+        {marketplaceTemplateId && (
+          <div className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-2 text-sm flex items-center gap-2">
+            <Store className="h-4 w-4" />
+            <div className="flex-1">
+              <strong>Marketplace Mode:</strong> Building template "{marketplaceMetadata.name || 'Untitled'}"
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+              Global Template
+            </Badge>
+          </div>
+        )}
+        
         <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
@@ -690,12 +725,33 @@ export default function CadenceAgent() {
                           });
                           const data = await response.json();
                           if (data.success) {
-                            toast({ 
-                              title: isSuperAdmin ? "Published to Marketplace" : "Saved to Templates",
-                              description: isSuperAdmin 
-                                ? "Workflow published globally to marketplace" 
-                                : "Workflow saved to your organization's templates"
-                            });
+                            const workflowId = data.workflowId;
+                            
+                            // If this is for a marketplace template, link it back
+                            if (marketplaceTemplateId && workflowId) {
+                              try {
+                                await apiRequest("PATCH", `/api/marketplace/items/${marketplaceTemplateId}`, {
+                                  sourceId: workflowId
+                                });
+                                toast({
+                                  title: "Marketplace Template Created",
+                                  description: "Workflow template has been created and linked to marketplace"
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: "Warning",
+                                  description: "Template created but failed to link to marketplace",
+                                  variant: "destructive"
+                                });
+                              }
+                            } else {
+                              toast({ 
+                                title: isSuperAdmin ? "Published to Marketplace" : "Saved to Templates",
+                                description: isSuperAdmin 
+                                  ? "Workflow published globally to marketplace" 
+                                  : "Workflow saved to your organization's templates"
+                              });
+                            }
                             window.location.href = "/workflows";
                           }
                         } catch (error) {
