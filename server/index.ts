@@ -1,3 +1,65 @@
+// CRITICAL: Validate required environment variables BEFORE any imports
+// This prevents cryptic crashes from missing database or auth configuration
+function validateEnvironment() {
+  const requiredVars = [
+    { name: 'DATABASE_URL', critical: true },
+    { name: 'JWT_SECRET', critical: true },
+    { name: 'SESSION_SECRET', critical: true },
+  ];
+
+  const optionalVars = [
+    { name: 'ENCRYPTION_KEY', critical: false, minLength: 32 },
+  ];
+
+  const missing: string[] = [];
+  const warnings: string[] = [];
+
+  // Check required variables
+  for (const { name, critical } of requiredVars) {
+    if (!process.env[name]) {
+      if (critical) {
+        missing.push(name);
+      }
+    }
+  }
+
+  // Check optional variables with warnings
+  for (const { name, critical, minLength } of optionalVars) {
+    if (!process.env[name]) {
+      warnings.push(`${name} not set - related features will be disabled`);
+    } else if (minLength && process.env[name]!.length < minLength) {
+      warnings.push(`${name} is too short (minimum ${minLength} characters) - related features may not work`);
+    }
+  }
+
+  // Report issues
+  if (missing.length > 0) {
+    console.error('❌ CRITICAL: Missing required environment variables:');
+    missing.forEach(name => console.error(`   - ${name}`));
+    console.error('\n💡 To fix this:');
+    console.error('   1. Create a .env file in your project root');
+    console.error('   2. Add the required variables (see .env.example)');
+    console.error('   3. For production, set these in your deployment platform\n');
+    console.error('Example .env file:');
+    console.error('   DATABASE_URL="postgresql://user:pass@host:5432/dbname"');
+    console.error('   JWT_SECRET="your-random-secret-key-here"');
+    console.error('   SESSION_SECRET="another-random-secret-key-here"\n');
+    
+    // Exit immediately - don't try to start the server
+    process.exit(1);
+  }
+
+  // Show warnings for optional variables
+  if (warnings.length > 0) {
+    console.warn('⚠️  Optional configuration warnings:');
+    warnings.forEach(warning => console.warn(`   - ${warning}`));
+    console.warn('');
+  }
+}
+
+// Run validation before any imports that might use these variables
+validateEnvironment();
+
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes, setInitializationStatus } from "./routes";
@@ -6,13 +68,6 @@ import { initializeSystem } from "./init";
 import { setupWebSocket } from "./websocket";
 import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import path from "path";
-
-// Security check: Warn if encryption key is not set
-if (!process.env.ENCRYPTION_KEY || process.env.ENCRYPTION_KEY.length < 32) {
-  console.warn('⚠️  WARNING: ENCRYPTION_KEY not configured. LLM features will be disabled.');
-  console.warn('   To enable AI agents, set ENCRYPTION_KEY (32+ characters).');
-  console.warn('   Generate one with: node -e "console.log(crypto.randomBytes(32).toString(\'base64\'))"');
-}
 
 const app = express();
 
