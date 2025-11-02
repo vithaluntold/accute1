@@ -8,6 +8,17 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 - **Admin Employee Management**: Added comprehensive safeguards for employee deletion (prevents self-deletion, enforces tenant isolation, blocks deleting last active admin, uses permission-based role detection).
 - **Messages UI Fix**: Fixed client dropdown to use `companyName` field and filter to active clients only.
 - **AI Agent Marketplace**: Marked Luca agent as pre-installed; removed duplicate Parity agent listing by moving `parity-example` to `_parity-example`.
+- **Agent Integration**: Added AI agent buttons to Email Templates (Scribe), Message Templates (Echo), and Inbox (Relay) pages for easy access.
+
+## TODO: Email Inbox Sync Implementation
+The email accounts infrastructure exists (`/email-accounts` page, schema, routes) but requires:
+1. **OAuth Implementation**: Implement Gmail OAuth 2.0 and Microsoft OAuth flows for secure authentication
+2. **IMAP Service**: Build email sync service using nodemailer/imap-simple for IMAP/SMTP providers (GoDaddy, generic email)
+3. **Sync Worker**: Create background job to periodically fetch emails from connected accounts
+4. **Token Refresh**: Implement OAuth token refresh logic for Gmail/Outlook
+5. **Email Parser**: Parse incoming emails and store in emailMessages table
+
+NOTE: Gmail connector dismissed - each user connects their own accounts via OAuth, not platform-wide connection.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
