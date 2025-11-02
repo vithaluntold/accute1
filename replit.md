@@ -10,15 +10,34 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 - **AI Agent Marketplace**: Marked Luca agent as pre-installed; removed duplicate Parity agent listing by moving `parity-example` to `_parity-example`.
 - **Agent Integration**: Added AI agent buttons to Email Templates (Scribe), Message Templates (Echo), and Inbox (Relay) pages for easy access.
 
-## TODO: Email Inbox Sync Implementation
-The email accounts infrastructure exists (`/email-accounts` page, schema, routes) but requires:
-1. **OAuth Implementation**: Implement Gmail OAuth 2.0 and Microsoft OAuth flows for secure authentication
-2. **IMAP Service**: Build email sync service using nodemailer/imap-simple for IMAP/SMTP providers (GoDaddy, generic email)
-3. **Sync Worker**: Create background job to periodically fetch emails from connected accounts
-4. **Token Refresh**: Implement OAuth token refresh logic for Gmail/Outlook
-5. **Email Parser**: Parse incoming emails and store in emailMessages table
+## Email Inbox Sync - COMPLETED (November 2025)
+✅ **OAuth Implementation**: 
+- Gmail OAuth 2.0 using googleapis package with secure HMAC-signed state to prevent CSRF
+- Microsoft OAuth using @azure/msal-node and @microsoft/microsoft-graph-client
+- State parameters include timestamp validation (5-minute window) to prevent replay attacks
 
-NOTE: Gmail connector dismissed - each user connects their own accounts via OAuth, not platform-wide connection.
+✅ **IMAP Service**:
+- Built email sync service using imapflow and mailparser for IMAP/SMTP providers
+- Supports GoDaddy, Exchange, and generic IMAP/SMTP servers
+- IMAP credentials encrypted server-side using AES-256-GCM (never sent plaintext)
+
+✅ **Email Sync**:
+- `/api/email-accounts/:id/sync` endpoint fetches emails via Gmail API, Microsoft Graph API, or IMAP
+- Emails stored in emailMessages table with deduplication by external message ID
+- Frontend SyncButton component triggers on-demand sync with loading states
+
+✅ **Security**:
+- All OAuth tokens encrypted with AES-256-GCM before database storage
+- IMAP passwords encrypted server-side (never exposed to client)
+- HMAC-signed OAuth state prevents account forgery/CSRF attacks
+- Proper tenant isolation (users only sync their organization's accounts)
+
+✅ **UI**:
+- Tabbed dialog: "Gmail / Outlook" (OAuth buttons) vs "IMAP / Exchange" (credentials form)
+- OAuth buttons open popup windows for authorization
+- Sync button per account with real-time status and animated spinner
+
+NOTE: Each user connects their own email accounts via OAuth or IMAP credentials - not platform-wide.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
