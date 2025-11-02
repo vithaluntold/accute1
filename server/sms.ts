@@ -1,18 +1,37 @@
 /**
- * SMS Helper Module for sending messages via Twilio with branded sender ID
+ * SMS Helper Module for OTP verification via Twilio
  * 
- * Configured to use "Accute" as the alphanumeric sender ID for most countries
+ * Sends 6-digit OTP codes for mobile number verification during account setup.
+ * Uses "Accute" as the alphanumeric sender ID for international messages.
  * Automatically falls back to TWILIO_PHONE_NUMBER for USA/Canada (where alphanumeric IDs are not supported)
  * 
  * To enable SMS functionality:
  * 1. Configure TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in Replit Secrets
  * 2. Register "Accute" as your alphanumeric sender ID in Twilio console
  * 3. (Optional) Set TWILIO_PHONE_NUMBER for USA/Canada support
- * 4. SMS will automatically use "Accute" or fall back to phone number based on destination
  */
 
 const BRANDED_SENDER_ID = "Accute";
+const OTP_LENGTH = 6;
+const OTP_EXPIRY_MINUTES = 10;
 
+/**
+ * Generate a random 6-digit OTP code
+ */
+export function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+/**
+ * Calculate OTP expiration timestamp
+ */
+export function getOTPExpiry(): Date {
+  return new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+}
+
+/**
+ * Check if phone number is from USA or Canada
+ */
 function isUSAOrCanada(phone: string): boolean {
   // Remove all non-digit characters
   const cleaned = phone.replace(/\D/g, '');
@@ -33,7 +52,10 @@ function isUSAOrCanada(phone: string): boolean {
   return false;
 }
 
-export async function sendInvitationSMS(phone: string, inviteUrl: string, organizationName: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Send OTP verification code via SMS
+ */
+export async function sendOTP(phone: string, otp: string): Promise<{ success: boolean; error?: string }> {
   try {
     // Check if Twilio is configured
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -72,22 +94,25 @@ export async function sendInvitationSMS(phone: string, inviteUrl: string, organi
     const client = twilio.default(accountSid, authToken);
 
     const message = await client.messages.create({
-      body: `You've been invited to join ${organizationName} on Accute! Click here to register: ${inviteUrl}`,
+      body: `Your Accute verification code is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes. Do not share this code with anyone.`,
       from: senderId,
       to: phone,
     });
 
-    console.log(`SMS sent successfully to ${phone} from ${senderId}. SID: ${message.sid}`);
+    console.log(`OTP sent successfully to ${phone} from ${senderId}. SID: ${message.sid}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to send SMS:", error.message);
+    console.error("Failed to send OTP SMS:", error.message);
     return { 
       success: false, 
-      error: error.message || "Failed to send SMS" 
+      error: error.message || "Failed to send OTP SMS" 
     };
   }
 }
 
+/**
+ * Check if SMS service is configured
+ */
 export function isSMSConfigured(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&

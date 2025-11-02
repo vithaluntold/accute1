@@ -106,6 +106,12 @@ export interface IStorage {
   deleteSession(token: string): Promise<void>;
   deleteUserSessions(userId: string): Promise<void>;
 
+  // OTP Verification
+  createOtpVerification(data: schema.InsertOtpVerification): Promise<schema.OtpVerification>;
+  getLatestOtpByPhone(phone: string): Promise<schema.OtpVerification | undefined>;
+  verifyOtp(id: string): Promise<schema.OtpVerification | undefined>;
+  deleteExpiredOtps(): Promise<void>;
+
   // Luca Chat Sessions
   createLucaChatSession(session: schema.InsertLucaChatSession): Promise<schema.LucaChatSession>;
   getLucaChatSession(id: string): Promise<schema.LucaChatSession | undefined>;
@@ -829,6 +835,35 @@ export class DbStorage implements IStorage {
 
   async deleteUserSessions(userId: string): Promise<void> {
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
+  }
+
+  // OTP Verification Methods
+  async createOtpVerification(data: schema.InsertOtpVerification): Promise<schema.OtpVerification> {
+    const result = await db.insert(schema.otpVerifications).values(data).returning();
+    return result[0];
+  }
+
+  async getLatestOtpByPhone(phone: string): Promise<schema.OtpVerification | undefined> {
+    const result = await db
+      .select()
+      .from(schema.otpVerifications)
+      .where(eq(schema.otpVerifications.phone, phone))
+      .orderBy(desc(schema.otpVerifications.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async verifyOtp(id: string): Promise<schema.OtpVerification | undefined> {
+    const result = await db
+      .update(schema.otpVerifications)
+      .set({ verified: true })
+      .where(eq(schema.otpVerifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteExpiredOtps(): Promise<void> {
+    await db.delete(schema.otpVerifications).where(lt(schema.otpVerifications.expiresAt, new Date()));
   }
 
   // Luca Chat Sessions
