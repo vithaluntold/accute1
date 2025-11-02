@@ -398,6 +398,46 @@ export interface IStorage {
   createAgentMessage(message: schema.InsertAgentMessage): Promise<schema.AgentMessage>;
   getAgentMessagesBySession(sessionId: string): Promise<schema.AgentMessage[]>;
 
+  // AI Roundtable - Multi-Agent Collaborative Sessions
+  createRoundtableSession(session: schema.InsertRoundtableSession): Promise<schema.RoundtableSession>;
+  getRoundtableSession(id: string): Promise<schema.RoundtableSession | undefined>;
+  getRoundtableSessionsByUser(userId: string): Promise<schema.RoundtableSession[]>;
+  getRoundtableSessionsByOrganization(organizationId: string): Promise<schema.RoundtableSession[]>;
+  updateRoundtableSession(id: string, updates: Partial<schema.InsertRoundtableSession>): Promise<schema.RoundtableSession | undefined>;
+  deleteRoundtableSession(id: string): Promise<void>;
+
+  createRoundtableParticipant(participant: schema.InsertRoundtableParticipant): Promise<schema.RoundtableParticipant>;
+  getRoundtableParticipant(id: string): Promise<schema.RoundtableParticipant | undefined>;
+  getRoundtableParticipantsBySession(sessionId: string): Promise<schema.RoundtableParticipant[]>;
+  updateRoundtableParticipant(id: string, updates: Partial<schema.InsertRoundtableParticipant>): Promise<schema.RoundtableParticipant | undefined>;
+  deleteRoundtableParticipant(id: string): Promise<void>;
+
+  createRoundtableMessage(message: schema.InsertRoundtableMessage): Promise<schema.RoundtableMessage>;
+  getRoundtableMessage(id: string): Promise<schema.RoundtableMessage | undefined>;
+  getRoundtableMessagesBySession(sessionId: string, channelType?: string): Promise<schema.RoundtableMessage[]>;
+  getRoundtablePrivateMessages(sessionId: string, participantId: string): Promise<schema.RoundtableMessage[]>;
+  updateRoundtableMessage(id: string, updates: Partial<schema.InsertRoundtableMessage>): Promise<schema.RoundtableMessage | undefined>;
+  deleteRoundtableMessage(id: string): Promise<void>;
+
+  createRoundtableDeliverable(deliverable: schema.InsertRoundtableDeliverable): Promise<schema.RoundtableDeliverable>;
+  getRoundtableDeliverable(id: string): Promise<schema.RoundtableDeliverable | undefined>;
+  getRoundtableDeliverablesBySession(sessionId: string): Promise<schema.RoundtableDeliverable[]>;
+  updateRoundtableDeliverable(id: string, updates: Partial<schema.InsertRoundtableDeliverable>): Promise<schema.RoundtableDeliverable | undefined>;
+  deleteRoundtableDeliverable(id: string): Promise<void>;
+  setCurrentPresentation(sessionId: string, deliverableId: string): Promise<void>;
+  clearCurrentPresentation(sessionId: string): Promise<void>;
+
+  createRoundtableApproval(approval: schema.InsertRoundtableApproval): Promise<schema.RoundtableApproval>;
+  getRoundtableApproval(id: string): Promise<schema.RoundtableApproval | undefined>;
+  getRoundtableApprovalsByDeliverable(deliverableId: string): Promise<schema.RoundtableApproval[]>;
+  getRoundtableApprovalsBySession(sessionId: string): Promise<schema.RoundtableApproval[]>;
+
+  createRoundtableKnowledgeEntry(entry: schema.InsertRoundtableKnowledgeEntry): Promise<schema.RoundtableKnowledgeEntry>;
+  getRoundtableKnowledgeEntry(id: string): Promise<schema.RoundtableKnowledgeEntry | undefined>;
+  getRoundtableKnowledgeEntriesBySession(sessionId: string): Promise<schema.RoundtableKnowledgeEntry[]>;
+  updateRoundtableKnowledgeEntry(id: string, updates: Partial<schema.InsertRoundtableKnowledgeEntry>): Promise<schema.RoundtableKnowledgeEntry | undefined>;
+  deleteRoundtableKnowledgeEntry(id: string): Promise<void>;
+
   // TaxDome Features - Calendar & Appointments
   createAppointment(appointment: schema.InsertAppointment): Promise<schema.Appointment>;
   getAppointment(id: string): Promise<schema.Appointment | undefined>;
@@ -3381,6 +3421,218 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.agentMessages)
       .where(eq(schema.agentMessages.sessionId, sessionId))
       .orderBy(schema.agentMessages.createdAt);
+  }
+
+  // AI Roundtable - Multi-Agent Collaborative Sessions
+  async createRoundtableSession(session: schema.InsertRoundtableSession): Promise<schema.RoundtableSession> {
+    const result = await db.insert(schema.roundtableSessions).values(session).returning();
+    return result[0];
+  }
+
+  async getRoundtableSession(id: string): Promise<schema.RoundtableSession | undefined> {
+    const result = await db.select().from(schema.roundtableSessions)
+      .where(eq(schema.roundtableSessions.id, id));
+    return result[0];
+  }
+
+  async getRoundtableSessionsByUser(userId: string): Promise<schema.RoundtableSession[]> {
+    return await db.select().from(schema.roundtableSessions)
+      .where(eq(schema.roundtableSessions.userId, userId))
+      .orderBy(desc(schema.roundtableSessions.createdAt));
+  }
+
+  async getRoundtableSessionsByOrganization(organizationId: string): Promise<schema.RoundtableSession[]> {
+    return await db.select().from(schema.roundtableSessions)
+      .where(eq(schema.roundtableSessions.organizationId, organizationId))
+      .orderBy(desc(schema.roundtableSessions.createdAt));
+  }
+
+  async updateRoundtableSession(id: string, updates: Partial<schema.InsertRoundtableSession>): Promise<schema.RoundtableSession | undefined> {
+    const result = await db.update(schema.roundtableSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.roundtableSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRoundtableSession(id: string): Promise<void> {
+    await db.delete(schema.roundtableSessions).where(eq(schema.roundtableSessions.id, id));
+  }
+
+  async createRoundtableParticipant(participant: schema.InsertRoundtableParticipant): Promise<schema.RoundtableParticipant> {
+    const result = await db.insert(schema.roundtableParticipants).values(participant).returning();
+    return result[0];
+  }
+
+  async getRoundtableParticipant(id: string): Promise<schema.RoundtableParticipant | undefined> {
+    const result = await db.select().from(schema.roundtableParticipants)
+      .where(eq(schema.roundtableParticipants.id, id));
+    return result[0];
+  }
+
+  async getRoundtableParticipantsBySession(sessionId: string): Promise<schema.RoundtableParticipant[]> {
+    return await db.select().from(schema.roundtableParticipants)
+      .where(eq(schema.roundtableParticipants.sessionId, sessionId))
+      .orderBy(schema.roundtableParticipants.joinedAt);
+  }
+
+  async updateRoundtableParticipant(id: string, updates: Partial<schema.InsertRoundtableParticipant>): Promise<schema.RoundtableParticipant | undefined> {
+    const result = await db.update(schema.roundtableParticipants)
+      .set(updates)
+      .where(eq(schema.roundtableParticipants.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRoundtableParticipant(id: string): Promise<void> {
+    await db.delete(schema.roundtableParticipants).where(eq(schema.roundtableParticipants.id, id));
+  }
+
+  async createRoundtableMessage(message: schema.InsertRoundtableMessage): Promise<schema.RoundtableMessage> {
+    const result = await db.insert(schema.roundtableMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getRoundtableMessage(id: string): Promise<schema.RoundtableMessage | undefined> {
+    const result = await db.select().from(schema.roundtableMessages)
+      .where(eq(schema.roundtableMessages.id, id));
+    return result[0];
+  }
+
+  async getRoundtableMessagesBySession(sessionId: string, channelType?: string): Promise<schema.RoundtableMessage[]> {
+    const conditions = [eq(schema.roundtableMessages.sessionId, sessionId)];
+    if (channelType) {
+      conditions.push(eq(schema.roundtableMessages.channelType, channelType));
+    }
+    return await db.select().from(schema.roundtableMessages)
+      .where(and(...conditions))
+      .orderBy(schema.roundtableMessages.createdAt);
+  }
+
+  async getRoundtablePrivateMessages(sessionId: string, participantId: string): Promise<schema.RoundtableMessage[]> {
+    return await db.select().from(schema.roundtableMessages)
+      .where(
+        and(
+          eq(schema.roundtableMessages.sessionId, sessionId),
+          eq(schema.roundtableMessages.channelType, 'private'),
+          or(
+            eq(schema.roundtableMessages.senderId, participantId),
+            eq(schema.roundtableMessages.recipientParticipantId, participantId)
+          )
+        )
+      )
+      .orderBy(schema.roundtableMessages.createdAt);
+  }
+
+  async updateRoundtableMessage(id: string, updates: Partial<schema.InsertRoundtableMessage>): Promise<schema.RoundtableMessage | undefined> {
+    const result = await db.update(schema.roundtableMessages)
+      .set(updates)
+      .where(eq(schema.roundtableMessages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRoundtableMessage(id: string): Promise<void> {
+    await db.delete(schema.roundtableMessages).where(eq(schema.roundtableMessages.id, id));
+  }
+
+  async createRoundtableDeliverable(deliverable: schema.InsertRoundtableDeliverable): Promise<schema.RoundtableDeliverable> {
+    const result = await db.insert(schema.roundtableDeliverables).values(deliverable).returning();
+    return result[0];
+  }
+
+  async getRoundtableDeliverable(id: string): Promise<schema.RoundtableDeliverable | undefined> {
+    const result = await db.select().from(schema.roundtableDeliverables)
+      .where(eq(schema.roundtableDeliverables.id, id));
+    return result[0];
+  }
+
+  async getRoundtableDeliverablesBySession(sessionId: string): Promise<schema.RoundtableDeliverable[]> {
+    return await db.select().from(schema.roundtableDeliverables)
+      .where(eq(schema.roundtableDeliverables.sessionId, sessionId))
+      .orderBy(schema.roundtableDeliverables.createdAt);
+  }
+
+  async updateRoundtableDeliverable(id: string, updates: Partial<schema.InsertRoundtableDeliverable>): Promise<schema.RoundtableDeliverable | undefined> {
+    const result = await db.update(schema.roundtableDeliverables)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.roundtableDeliverables.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRoundtableDeliverable(id: string): Promise<void> {
+    await db.delete(schema.roundtableDeliverables).where(eq(schema.roundtableDeliverables.id, id));
+  }
+
+  async setCurrentPresentation(sessionId: string, deliverableId: string): Promise<void> {
+    // Clear all other presentations in this session
+    await db.update(schema.roundtableDeliverables)
+      .set({ isPresentingNow: false })
+      .where(eq(schema.roundtableDeliverables.sessionId, sessionId));
+    
+    // Set this deliverable as presenting
+    await db.update(schema.roundtableDeliverables)
+      .set({ isPresentingNow: true, presentedAt: new Date() })
+      .where(eq(schema.roundtableDeliverables.id, deliverableId));
+  }
+
+  async clearCurrentPresentation(sessionId: string): Promise<void> {
+    await db.update(schema.roundtableDeliverables)
+      .set({ isPresentingNow: false })
+      .where(eq(schema.roundtableDeliverables.sessionId, sessionId));
+  }
+
+  async createRoundtableApproval(approval: schema.InsertRoundtableApproval): Promise<schema.RoundtableApproval> {
+    const result = await db.insert(schema.roundtableApprovals).values(approval).returning();
+    return result[0];
+  }
+
+  async getRoundtableApproval(id: string): Promise<schema.RoundtableApproval | undefined> {
+    const result = await db.select().from(schema.roundtableApprovals)
+      .where(eq(schema.roundtableApprovals.id, id));
+    return result[0];
+  }
+
+  async getRoundtableApprovalsByDeliverable(deliverableId: string): Promise<schema.RoundtableApproval[]> {
+    return await db.select().from(schema.roundtableApprovals)
+      .where(eq(schema.roundtableApprovals.deliverableId, deliverableId))
+      .orderBy(schema.roundtableApprovals.createdAt);
+  }
+
+  async getRoundtableApprovalsBySession(sessionId: string): Promise<schema.RoundtableApproval[]> {
+    return await db.select().from(schema.roundtableApprovals)
+      .where(eq(schema.roundtableApprovals.sessionId, sessionId))
+      .orderBy(schema.roundtableApprovals.createdAt);
+  }
+
+  async createRoundtableKnowledgeEntry(entry: schema.InsertRoundtableKnowledgeEntry): Promise<schema.RoundtableKnowledgeEntry> {
+    const result = await db.insert(schema.roundtableKnowledgeEntries).values(entry).returning();
+    return result[0];
+  }
+
+  async getRoundtableKnowledgeEntry(id: string): Promise<schema.RoundtableKnowledgeEntry | undefined> {
+    const result = await db.select().from(schema.roundtableKnowledgeEntries)
+      .where(eq(schema.roundtableKnowledgeEntries.id, id));
+    return result[0];
+  }
+
+  async getRoundtableKnowledgeEntriesBySession(sessionId: string): Promise<schema.RoundtableKnowledgeEntry[]> {
+    return await db.select().from(schema.roundtableKnowledgeEntries)
+      .where(eq(schema.roundtableKnowledgeEntries.sessionId, sessionId))
+      .orderBy(schema.roundtableKnowledgeEntries.createdAt);
+  }
+
+  async updateRoundtableKnowledgeEntry(id: string, updates: Partial<schema.InsertRoundtableKnowledgeEntry>): Promise<schema.RoundtableKnowledgeEntry | undefined> {
+    const result = await db.update(schema.roundtableKnowledgeEntries)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.roundtableKnowledgeEntries.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteRoundtableKnowledgeEntry(id: string): Promise<void> {
+    await db.delete(schema.roundtableKnowledgeEntries).where(eq(schema.roundtableKnowledgeEntries.id, id));
   }
 
   // Calendar & Appointments
