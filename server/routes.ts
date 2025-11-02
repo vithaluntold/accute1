@@ -140,6 +140,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Deployment diagnostics endpoint
+  app.get("/api/diagnostics", (req, res) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "unknown",
+      initialization: {
+        complete: initializationComplete,
+        error: initializationError,
+      },
+      services: {
+        database: !!process.env.DATABASE_URL,
+        encryption: !!process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length >= 32,
+        twilio: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+        twilioPhone: !!process.env.TWILIO_PHONE_NUMBER,
+      },
+      server: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        uptime: process.uptime(),
+      }
+    });
+  });
+
   // ==================== Auth Routes ====================
   
   // Register
