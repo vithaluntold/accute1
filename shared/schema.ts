@@ -11,6 +11,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   firstName: text("first_name"),
   lastName: text("last_name"),
+  phone: text("phone"),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  phoneVerifiedAt: timestamp("phone_verified_at"),
   roleId: varchar("role_id").notNull().references(() => roles.id),
   organizationId: varchar("organization_id").references(() => organizations.id),
   isActive: boolean("is_active").notNull().default(true),
@@ -312,6 +315,20 @@ export const sessions = pgTable("sessions", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// OTP Verification - For phone number verification during account setup
+export const otpVerifications = pgTable("otp_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  phone: text("phone").notNull(),
+  otp: text("otp").notNull(),
+  verified: boolean("verified").notNull().default(false),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  phoneIdx: index("otp_verifications_phone_idx").on(table.phone),
+  userIdx: index("otp_verifications_user_idx").on(table.userId),
+}));
 
 // Luca Chat Sessions - Store conversation history
 export const lucaChatSessions = pgTable("luca_chat_sessions", {
@@ -1537,6 +1554,12 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  phoneVerifiedAt: true,
+});
+
+export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
@@ -1756,6 +1779,8 @@ export const insertDocumentSubmissionSchema = createInsertSchema(documentSubmiss
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
+export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizations.$inferSelect;
 export type InsertRole = z.infer<typeof insertRoleSchema>;
