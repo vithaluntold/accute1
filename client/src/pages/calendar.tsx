@@ -33,7 +33,7 @@ export default function CalendarPage() {
     queryKey: ["/api/appointments"],
   });
 
-  const { data: clients } = useQuery({
+  const { data: clients, isLoading: isLoadingClients, isError: isClientsError } = useQuery({
     queryKey: ["/api/clients"],
   });
 
@@ -42,7 +42,17 @@ export default function CalendarPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       setDialogOpen(false);
-      toast({ title: "Appointment created successfully" });
+      toast({ 
+        title: "Success",
+        description: "Appointment created successfully" 
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create appointment",
+        description: error.message || "An error occurred. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -100,9 +110,13 @@ export default function CalendarPage() {
               </div>
               <div>
                 <Label>Client (Optional)</Label>
-                <Select name="clientId">
+                <Select name="clientId" disabled={isLoadingClients}>
                   <SelectTrigger data-testid="select-client">
-                    <SelectValue placeholder="Select client" />
+                    <SelectValue placeholder={
+                      isLoadingClients ? "Loading clients..." : 
+                      isClientsError ? "Error loading clients" :
+                      "Select client"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No Client</SelectItem>
@@ -113,6 +127,11 @@ export default function CalendarPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {isClientsError && (
+                  <p className="text-sm text-destructive mt-1">
+                    Unable to load clients. You can still create an appointment without selecting a client.
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -132,8 +151,13 @@ export default function CalendarPage() {
                 <Label>Description</Label>
                 <Textarea name="description" placeholder="Meeting details" data-testid="input-description" />
               </div>
-              <Button type="submit" className="w-full" data-testid="button-create-appointment">
-                Create Appointment
+              <Button 
+                type="submit" 
+                className="w-full" 
+                data-testid="button-create-appointment"
+                disabled={createAppointmentMutation.isPending}
+              >
+                {createAppointmentMutation.isPending ? "Creating..." : "Create Appointment"}
               </Button>
             </form>
           </DialogContent>
