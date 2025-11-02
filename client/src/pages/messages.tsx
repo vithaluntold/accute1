@@ -36,15 +36,15 @@ export default function MessagesPage() {
   const [selectedStepId, setSelectedStepId] = useState<string>("");
   const { toast } = useToast();
 
-  const { data: conversations, isLoading } = useQuery({
+  const { data: conversations = [], isLoading } = useQuery({
     queryKey: ["/api/conversations"],
   });
 
-  const { data: clients } = useQuery({
+  const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
   });
 
-  const { data: messages } = useQuery({
+  const { data: messages = [] } = useQuery({
     queryKey: ["/api/conversations", selectedConversation?.id, "messages"],
     enabled: !!selectedConversation,
   });

@@ -10,6 +10,7 @@
   "subscriptionMinPlan": "free",
   "defaultScope": "admin",
   "pricingModel": "free",
+  "preInstalled": true,
   "version": "1.0.0",
   "tags": ["accounting", "taxation", "finance", "chat", "assistant"],
   "configuration": {
