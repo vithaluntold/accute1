@@ -26,9 +26,18 @@ export const registerRoutes = (app: any) => {
   // Chat endpoint for conversational email template building
   app.post("/api/agents/scribe/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { message, history, currentTemplate } = req.body;
+      const { message, history, currentTemplate, llmConfigId } = req.body;
       
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      // Get LLM configuration (user-selected or default)
+      let llmConfig;
+      if (llmConfigId) {
+        llmConfig = await storage.getLlmConfiguration(llmConfigId);
+        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "LLM configuration not found" });
+        }
+      } else {
+        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      }
       
       if (!llmConfig) {
         return res.status(400).json({ 
