@@ -40,7 +40,7 @@ export default function MarketplaceCreatePage() {
         marketplaceTemplateId,
         name: formData.name,
         description: formData.description,
-        category: formData.category,
+        category: templateType,
       });
       
       // Redirect to appropriate AI agent with marketplaceTemplateId and metadata
