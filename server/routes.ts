@@ -991,10 +991,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/users/:id", requireAuth, requirePermission("users.delete"), async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
+
+      // Prevent self-deletion
+      if (id === req.userId) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      // Get the user to be deleted
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Ensure user is in the same organization (tenant isolation)
+      // Super Admins can delete users across organizations
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isSuperAdmin = requesterRole?.scope === "platform" && requesterRole?.isSystemRole === true;
+      
+      if (!isSuperAdmin && userToDelete.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Cannot delete users from other organizations" });
+      }
+
+      // Get the role of the user being deleted
+      const roleToDelete = await storage.getRole(userToDelete.roleId);
+      
+      // Prevent deleting Super Admins unless requester is also Super Admin
+      if (roleToDelete?.scope === "platform" && roleToDelete?.isSystemRole === true) {
+        if (!isSuperAdmin) {
+          return res.status(403).json({ error: "Only Super Admins can delete platform administrators" });
+        }
+      }
+
+      // Prevent deleting the last ACTIVE admin in an organization
+      // This ensures organizations always have at least one active user who can manage the team
+      // Check if the user being deleted has admin-level permissions (permission-based detection)
+      // Skip this check if the user being deleted is already inactive
+      if (roleToDelete && userToDelete.organizationId && userToDelete.isActive) {
+        // Get permissions for the role being deleted
+        const rolePermissions = await storage.getPermissionsByRole(roleToDelete.id);
+        const hasAdminPermissions = rolePermissions.some(p => 
+          p.name === "users.delete" || p.name === "users.create"
+        );
+        
+        // Only check if this is an ACTIVE admin-capable role
+        if (hasAdminPermissions) {
+          const orgUsers = await storage.getUsersByOrganization(userToDelete.organizationId);
+          
+          // Find all users with admin-level permissions in this organization
+          const userRoleChecks = await Promise.all(
+            orgUsers
+              .filter(u => u.id !== id && u.isActive === true)
+              .map(async (u) => {
+                const uRole = await storage.getRole(u.roleId);
+                if (!uRole) return { userId: u.id, isAdmin: false };
+                
+                const uPerms = await storage.getPermissionsByRole(uRole.id);
+                const isAdmin = uPerms.some(p => 
+                  p.name === "users.delete" || p.name === "users.create"
+                );
+                return { userId: u.id, isAdmin };
+              })
+          );
+          
+          const remainingActiveAdmins = userRoleChecks.filter(u => u.isAdmin);
+          
+          if (remainingActiveAdmins.length === 0) {
+            return res.status(400).json({ 
+              error: "Cannot delete the last active administrator in the organization. At least one active admin must remain to manage the team." 
+            });
+          }
+        }
+      }
+
+      // Perform the deletion
       await storage.deleteUser(id);
-      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "user", id, {}, req);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "user", id, { 
+        deletedUser: {
+          username: userToDelete.username,
+          email: userToDelete.email,
+          role: roleToDelete?.name,
+        }
+      }, req);
+      
       res.json({ success: true });
     } catch (error: any) {
+      console.error("Failed to delete user:", error);
       res.status(500).json({ error: "Failed to delete user" });
     }
   });
