@@ -93,13 +93,15 @@ When an invitation is created via `/api/invitations`, the system automatically:
 4. Returns success/failure status in the API response
 
 ### SMS Service (`server/sms.ts`)
-SMS functionality for sending invitation texts via Twilio with branded sender ID "Accute".
+SMS functionality for phone number verification via OTP (One-Time Password) codes using Twilio with branded sender ID "Accute".
 
 **Key Features:**
-- Branded sender ID "Accute" for international messages (works in 100+ countries)
-- Automatic fallback to phone number for USA/Canada (where alphanumeric IDs are prohibited)
-- One-way messaging (recipients cannot reply to branded sender IDs)
-- Secure credential management via Replit Secrets
+- **OTP-Based Phone Verification**: Sends 6-digit OTP codes for mobile number verification during account setup
+- **Branded Sender ID**: Uses "Accute" for international messages (works in 100+ countries)
+- **Automatic Geo-Detection**: Falls back to phone number for USA/Canada (where alphanumeric IDs are prohibited)
+- **Secure OTP Management**: OTP codes expire in 10 minutes with attempt tracking
+- **One-Way Messaging**: Recipients cannot reply to branded sender IDs
+- **Secure Credential Management**: Uses Replit Secrets for API key storage
 
 **Configuration:**
 - **Required:** `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` stored in Replit Secrets
@@ -107,14 +109,34 @@ SMS functionality for sending invitation texts via Twilio with branded sender ID
 - Sender ID "Accute" is hard-coded in the application
 - Must register "Accute" as alphanumeric sender ID in Twilio console for international use
 
-**Usage:**
-Currently implemented for invitation SMS only. The system automatically:
-1. Detects if recipient is in USA/Canada
-2. Uses "Accute" branded sender for international numbers
-3. Falls back to `TWILIO_PHONE_NUMBER` for USA/Canada numbers (if configured)
-4. Returns clear error if USA/Canada number is sent without phone number configured
+**Database Schema:**
+The system uses two tables for phone verification:
+1. **users table**: Contains `phone`, `phoneVerified`, and `phoneVerifiedAt` fields
+2. **otp_verifications table**: Stores OTP codes with expiration, user association, and verification status
+
+**API Endpoints:**
+- **POST /api/auth/send-otp**: Generates and sends a 6-digit OTP code to the provided phone number
+  - Request: `{ phone: string }`
+  - Response: `{ success: boolean, message: string, expiresAt: Date }`
+  - Rate limit: 5 requests per 15 minutes
+  
+- **POST /api/auth/verify-otp**: Verifies the OTP code entered by the user
+  - Request: `{ phone: string, otp: string }`
+  - Response: `{ success: boolean, message: string, otpId: string }`
+  - Rate limit: 10 requests per 15 minutes
+
+**Usage Flow:**
+1. User enters phone number during registration
+2. System generates 6-digit OTP code
+3. OTP is stored in database with 10-minute expiration
+4. SMS is sent to user with OTP code
+5. User enters OTP code
+6. System verifies OTP matches and hasn't expired
+7. Phone number is marked as verified in user record
 
 **Important Notes:**
-- USA/Canada: Requires `TWILIO_PHONE_NUMBER` to be configured or SMS will fail
-- International: Uses branded sender ID "Accute" automatically
-- Future features (mobile verification, notifications) are documented but not yet implemented
+- **USA/Canada**: Requires `TWILIO_PHONE_NUMBER` to be configured or SMS will fail
+- **International**: Uses branded sender ID "Accute" automatically
+- **Security**: OTP codes expire after 10 minutes
+- **Cleanup**: Expired OTPs are automatically deleted during new OTP generation
+- **SMS Purpose**: ONLY for phone verification via OTP, NOT for invitations or general messaging
