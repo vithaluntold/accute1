@@ -194,6 +194,13 @@ export async function initializeSystem() {
       
       // Reports
       { name: "reports.view", resource: "reports", action: "view", description: "View practice-wide reports and analytics" },
+      
+      // Team Management
+      { name: "teams.view", resource: "teams", action: "view", description: "View teams" },
+      { name: "teams.create", resource: "teams", action: "create", description: "Create teams" },
+      { name: "teams.update", resource: "teams", action: "update", description: "Update teams and members" },
+      { name: "teams.delete", resource: "teams", action: "delete", description: "Delete teams" },
+      { name: "teams.manage", resource: "teams", action: "manage", description: "Manage hierarchical supervision" },
     ];
 
     const createdPermissions: any[] = [];

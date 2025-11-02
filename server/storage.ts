@@ -240,6 +240,29 @@ export interface IStorage {
   getOnboardingMessages(sessionId: string): Promise<OnboardingMessage[]>;
   createOnboardingMessage(message: InsertOnboardingMessage): Promise<OnboardingMessage>;
   
+  // Team Management
+  createTeam(team: schema.InsertTeam): Promise<schema.Team>;
+  getTeamById(id: string): Promise<schema.Team | undefined>;
+  getTeamsByOrganization(organizationId: string): Promise<schema.Team[]>;
+  updateTeam(id: string, updates: Partial<schema.InsertTeam>): Promise<schema.Team | undefined>;
+  deleteTeam(id: string): Promise<void>;
+  
+  addTeamMember(member: schema.InsertTeamMember): Promise<schema.TeamMember>;
+  removeTeamMember(teamId: string, userId: string): Promise<void>;
+  getTeamMembers(teamId: string): Promise<(schema.TeamMember & { user: User })[]>;
+  getTeamsByUser(userId: string): Promise<(schema.TeamMember & { team: schema.Team })[]>;
+  updateTeamMemberRole(teamId: string, userId: string, role: string): Promise<void>;
+  
+  createSupervisorRelationship(relationship: schema.InsertSupervisorRelationship): Promise<schema.SupervisorRelationship>;
+  deleteSupervisorRelationship(supervisorId: string, reporteeId: string): Promise<void>;
+  getReportees(supervisorId: string): Promise<User[]>;
+  getSupervisors(reporteeId: string): Promise<User[]>;
+  
+  // Team Chat
+  createTeamChatMessage(message: schema.InsertTeamChatMessage): Promise<schema.TeamChatMessage>;
+  getTeamChatMessages(teamId: string, limit?: number): Promise<schema.TeamChatMessage[]>;
+  getClientChatMessages(clientId: string, limit?: number): Promise<schema.TeamChatMessage[]>;
+  
   // Tags
   getTag(id: string): Promise<Tag | undefined>;
   createTag(tag: InsertTag & { organizationId: string; createdBy: string }): Promise<Tag>;
@@ -2572,6 +2595,152 @@ export class DbStorage implements IStorage {
   async createOnboardingMessage(message: InsertOnboardingMessage): Promise<OnboardingMessage> {
     const result = await db.insert(schema.onboardingMessages).values(message).returning();
     return result[0];
+  }
+
+  // ==================== Team Management ====================
+  
+  async createTeam(team: schema.InsertTeam): Promise<schema.Team> {
+    const result = await db.insert(schema.teams).values(team).returning();
+    return result[0];
+  }
+
+  async getTeamById(id: string): Promise<schema.Team | undefined> {
+    const result = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
+    return result[0];
+  }
+
+  async getTeamsByOrganization(organizationId: string): Promise<schema.Team[]> {
+    return await db.select().from(schema.teams)
+      .where(and(
+        eq(schema.teams.organizationId, organizationId),
+        eq(schema.teams.isActive, true)
+      ))
+      .orderBy(schema.teams.name);
+  }
+
+  async updateTeam(id: string, updates: Partial<schema.InsertTeam>): Promise<schema.Team | undefined> {
+    const result = await db.update(schema.teams)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.teams.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTeam(id: string): Promise<void> {
+    // Cascade delete will handle teamMembers automatically
+    await db.delete(schema.teams).where(eq(schema.teams.id, id));
+  }
+
+  async addTeamMember(member: schema.InsertTeamMember): Promise<schema.TeamMember> {
+    const result = await db.insert(schema.teamMembers).values(member).returning();
+    return result[0];
+  }
+
+  async removeTeamMember(teamId: string, userId: string): Promise<void> {
+    await db.delete(schema.teamMembers)
+      .where(and(
+        eq(schema.teamMembers.teamId, teamId),
+        eq(schema.teamMembers.userId, userId)
+      ));
+  }
+
+  async getTeamMembers(teamId: string): Promise<(schema.TeamMember & { user: User })[]> {
+    const results = await db.select({
+      id: schema.teamMembers.id,
+      teamId: schema.teamMembers.teamId,
+      userId: schema.teamMembers.userId,
+      role: schema.teamMembers.role,
+      joinedAt: schema.teamMembers.joinedAt,
+      user: schema.users,
+    })
+    .from(schema.teamMembers)
+    .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
+    .where(eq(schema.teamMembers.teamId, teamId))
+    .orderBy(schema.users.firstName, schema.users.lastName);
+    
+    return results;
+  }
+
+  async getTeamsByUser(userId: string): Promise<(schema.TeamMember & { team: schema.Team })[]> {
+    const results = await db.select({
+      id: schema.teamMembers.id,
+      teamId: schema.teamMembers.teamId,
+      userId: schema.teamMembers.userId,
+      role: schema.teamMembers.role,
+      joinedAt: schema.teamMembers.joinedAt,
+      team: schema.teams,
+    })
+    .from(schema.teamMembers)
+    .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
+    .where(and(
+      eq(schema.teamMembers.userId, userId),
+      eq(schema.teams.isActive, true)
+    ))
+    .orderBy(schema.teams.name);
+    
+    return results;
+  }
+
+  async updateTeamMemberRole(teamId: string, userId: string, role: string): Promise<void> {
+    await db.update(schema.teamMembers)
+      .set({ role })
+      .where(and(
+        eq(schema.teamMembers.teamId, teamId),
+        eq(schema.teamMembers.userId, userId)
+      ));
+  }
+
+  async createSupervisorRelationship(relationship: schema.InsertSupervisorRelationship): Promise<schema.SupervisorRelationship> {
+    const result = await db.insert(schema.supervisorRelationships).values(relationship).returning();
+    return result[0];
+  }
+
+  async deleteSupervisorRelationship(supervisorId: string, reporteeId: string): Promise<void> {
+    await db.delete(schema.supervisorRelationships)
+      .where(and(
+        eq(schema.supervisorRelationships.supervisorId, supervisorId),
+        eq(schema.supervisorRelationships.reporteeId, reporteeId)
+      ));
+  }
+
+  async getReportees(supervisorId: string): Promise<User[]> {
+    const results = await db.select({ user: schema.users })
+      .from(schema.supervisorRelationships)
+      .innerJoin(schema.users, eq(schema.supervisorRelationships.reporteeId, schema.users.id))
+      .where(eq(schema.supervisorRelationships.supervisorId, supervisorId))
+      .orderBy(schema.users.firstName, schema.users.lastName);
+    
+    return results.map(r => r.user);
+  }
+
+  async getSupervisors(reporteeId: string): Promise<User[]> {
+    const results = await db.select({ user: schema.users })
+      .from(schema.supervisorRelationships)
+      .innerJoin(schema.users, eq(schema.supervisorRelationships.supervisorId, schema.users.id))
+      .where(eq(schema.supervisorRelationships.reporteeId, reporteeId))
+      .orderBy(schema.users.firstName, schema.users.lastName);
+    
+    return results.map(r => r.user);
+  }
+
+  // Team Chat
+  async createTeamChatMessage(message: schema.InsertTeamChatMessage): Promise<schema.TeamChatMessage> {
+    const result = await db.insert(schema.teamChatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getTeamChatMessages(teamId: string, limit: number = 100): Promise<schema.TeamChatMessage[]> {
+    return await db.select().from(schema.teamChatMessages)
+      .where(eq(schema.teamChatMessages.teamId, teamId))
+      .orderBy(desc(schema.teamChatMessages.createdAt))
+      .limit(limit);
+  }
+
+  async getClientChatMessages(clientId: string, limit: number = 100): Promise<schema.TeamChatMessage[]> {
+    return await db.select().from(schema.teamChatMessages)
+      .where(eq(schema.teamChatMessages.clientId, clientId))
+      .orderBy(desc(schema.teamChatMessages.createdAt))
+      .limit(limit);
   }
 
   // Tags

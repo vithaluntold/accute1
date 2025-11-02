@@ -927,6 +927,65 @@ export const onboardingMessages = pgTable("onboarding_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ==================== TEAM MANAGEMENT SYSTEM ====================
+
+// Teams - organizational units within a practice (distinct from Employee Management)
+export const teams = pgTable("teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("teams_org_idx").on(table.organizationId),
+}));
+
+// Team Members - employees assigned to teams with roles
+export const teamMembers = pgTable("team_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'manager', 'member'
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePair: unique().on(table.teamId, table.userId),
+  teamIdx: index("team_members_team_idx").on(table.teamId),
+  userIdx: index("team_members_user_idx").on(table.userId),
+}));
+
+// Supervisor Relationships - hierarchical supervision (can be cross-team)
+export const supervisorRelationships = pgTable("supervisor_relationships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  supervisorId: varchar("supervisor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reporteeId: varchar("reportee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  level: integer("level").notNull().default(1), // 1 = direct, 2+ = indirect
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePair: unique().on(table.supervisorId, table.reporteeId),
+  supervisorIdx: index("supervisor_relationships_supervisor_idx").on(table.supervisorId),
+  reporteeIdx: index("supervisor_relationships_reportee_idx").on(table.reporteeId),
+  orgIdx: index("supervisor_relationships_org_idx").on(table.organizationId),
+}));
+
+// Team Chat Messages - real-time team communication
+export const teamChatMessages = pgTable("team_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  teamId: varchar("team_id").references(() => teams.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").references(() => clients.id), // For cross-team/client chats
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Attachments, mentions, etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  teamIdx: index("team_chat_messages_team_idx").on(table.teamId),
+  clientIdx: index("team_chat_messages_client_idx").on(table.clientId),
+  senderIdx: index("team_chat_messages_sender_idx").on(table.senderId),
+  createdIdx: index("team_chat_messages_created_idx").on(table.createdAt),
+}));
+
 // ==================== CLIENT PORTAL TASK SYSTEM ====================
 
 // Client Portal Tasks - Unified task system visible to clients in their portal
@@ -1692,6 +1751,28 @@ export const insertClientContactSchema = createInsertSchema(clientContacts).omit
   updatedAt: true,
 });
 
+// Team Management Insert Schemas
+export const insertTeamSchema = createInsertSchema(teams).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  joinedAt: true,
+});
+
+export const insertSupervisorRelationshipSchema = createInsertSchema(supervisorRelationships).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTeamChatMessageSchema = createInsertSchema(teamChatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClientOnboardingSessionSchema = createInsertSchema(clientOnboardingSessions).omit({
   id: true,
   createdAt: true,
@@ -1826,6 +1907,14 @@ export type InsertClientOnboardingSession = z.infer<typeof insertClientOnboardin
 export type ClientOnboardingSession = typeof clientOnboardingSessions.$inferSelect;
 export type InsertOnboardingMessage = z.infer<typeof insertOnboardingMessageSchema>;
 export type OnboardingMessage = typeof onboardingMessages.$inferSelect;
+export type InsertTeam = z.infer<typeof insertTeamSchema>;
+export type Team = typeof teams.$inferSelect;
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type InsertSupervisorRelationship = z.infer<typeof insertSupervisorRelationshipSchema>;
+export type SupervisorRelationship = typeof supervisorRelationships.$inferSelect;
+export type InsertTeamChatMessage = z.infer<typeof insertTeamChatMessageSchema>;
+export type TeamChatMessage = typeof teamChatMessages.$inferSelect;
 export type InsertTag = z.infer<typeof insertTagSchema>;
 export type Tag = typeof tags.$inferSelect;
 export type InsertTaggable = z.infer<typeof insertTaggableSchema>;

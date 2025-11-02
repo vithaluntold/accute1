@@ -3349,6 +3349,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Team Management Routes ====================
+
+  // Teams CRUD
+  app.get("/api/teams", requireAuth, requirePermission("teams.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const teams = await storage.getTeamsByOrganization(req.user!.organizationId!);
+      res.json(teams);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch teams" });
+    }
+  });
+
+  app.post("/api/teams", requireAuth, requirePermission("teams.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validated = schema.insertTeamSchema.parse(req.body);
+      const team = await storage.createTeam({
+        ...validated,
+        organizationId: req.user!.organizationId!,
+      });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "team", team.id, { name: team.name }, req);
+      res.json(team);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create team" });
+    }
+  });
+
+  app.get("/api/teams/:id", requireAuth, requirePermission("teams.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.id);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      res.json(team);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch team" });
+    }
+  });
+
+  app.patch("/api/teams/:id", requireAuth, requirePermission("teams.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTeamById(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      const validated = schema.insertTeamSchema.partial().parse(req.body);
+      const { organizationId, ...safeData } = validated as any;
+      
+      const team = await storage.updateTeam(req.params.id, safeData);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "team", req.params.id, {}, req);
+      res.json(team);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update team" });
+    }
+  });
+
+  app.delete("/api/teams/:id", requireAuth, requirePermission("teams.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getTeamById(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      await storage.deleteTeam(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "team", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete team" });
+    }
+  });
+
+  // Team Members
+  app.get("/api/teams/:id/members", requireAuth, requirePermission("teams.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.id);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      const members = await storage.getTeamMembers(req.params.id);
+      res.json(members);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch team members" });
+    }
+  });
+
+  app.post("/api/teams/:id/members", requireAuth, requirePermission("teams.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.id);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      const { userId, role } = req.body;
+      if (!userId || !role) {
+        return res.status(400).json({ error: "userId and role are required" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user || user.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const member = await storage.addTeamMember({
+        teamId: req.params.id,
+        userId,
+        role,
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "team_member", member.id, { team: team.name, user: `${user.firstName} ${user.lastName}` }, req);
+      res.json(member);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add team member" });
+    }
+  });
+
+  app.delete("/api/teams/:teamId/members/:userId", requireAuth, requirePermission("teams.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.teamId);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      await storage.removeTeamMember(req.params.teamId, req.params.userId);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "team_member", "", { teamId: req.params.teamId, userId: req.params.userId }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove team member" });
+    }
+  });
+
+  app.patch("/api/teams/:teamId/members/:userId/role", requireAuth, requirePermission("teams.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const team = await storage.getTeamById(req.params.teamId);
+      if (!team || team.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Team not found" });
+      }
+      
+      const { role } = req.body;
+      if (!role) {
+        return res.status(400).json({ error: "role is required" });
+      }
+      
+      await storage.updateTeamMemberRole(req.params.teamId, req.params.userId, role);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "team_member", "", { teamId: req.params.teamId, userId: req.params.userId, role }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update team member role" });
+    }
+  });
+
+  // Supervision Hierarchy
+  app.post("/api/supervision", requireAuth, requirePermission("teams.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { supervisorId, reporteeId, level } = req.body;
+      
+      if (!supervisorId || !reporteeId) {
+        return res.status(400).json({ error: "supervisorId and reporteeId are required" });
+      }
+      
+      const supervisor = await storage.getUser(supervisorId);
+      const reportee = await storage.getUser(reporteeId);
+      
+      if (!supervisor || supervisor.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Supervisor not found" });
+      }
+      
+      if (!reportee || reportee.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Reportee not found" });
+      }
+      
+      const relationship = await storage.createSupervisorRelationship({
+        organizationId: req.user!.organizationId!,
+        supervisorId,
+        reporteeId,
+        level: level || 1,
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "supervision", relationship.id, { supervisor: `${supervisor.firstName} ${supervisor.lastName}`, reportee: `${reportee.firstName} ${reportee.lastName}` }, req);
+      res.json(relationship);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create supervision relationship" });
+    }
+  });
+
+  app.delete("/api/supervision/:supervisorId/:reporteeId", requireAuth, requirePermission("teams.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const supervisor = await storage.getUser(req.params.supervisorId);
+      const reportee = await storage.getUser(req.params.reporteeId);
+      
+      if (!supervisor || supervisor.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Supervisor not found" });
+      }
+      
+      if (!reportee || reportee.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Reportee not found" });
+      }
+      
+      await storage.deleteSupervisorRelationship(req.params.supervisorId, req.params.reporteeId);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "supervision", "", { supervisorId: req.params.supervisorId, reporteeId: req.params.reporteeId }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete supervision relationship" });
+    }
+  });
+
+  app.get("/api/users/:id/reportees", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user || user.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const reportees = await storage.getReportees(req.params.id);
+      res.json(reportees);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch reportees" });
+    }
+  });
+
+  app.get("/api/users/:id/supervisors", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user || user.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const supervisors = await storage.getSupervisors(req.params.id);
+      res.json(supervisors);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch supervisors" });
+    }
+  });
+
   // ==================== AI Client Onboarding Routes ====================
   
   // Start a new AI-assisted client onboarding session
