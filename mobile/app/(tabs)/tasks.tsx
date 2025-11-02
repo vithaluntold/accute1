@@ -5,6 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -22,7 +23,7 @@ interface Task {
 export default function TasksScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: tasks = [], refetch } = useQuery<Task[]>({
+  const { data: tasks = [], isLoading, error, refetch } = useQuery<Task[]>({
     queryKey: ['tasks'],
     queryFn: () => apiClient.get('/api/tasks'),
   });
@@ -32,6 +33,26 @@ export default function TasksScreen() {
     await refetch();
     setRefreshing(false);
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#0066CC" />
+        <Text style={styles.loadingText}>Loading tasks...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>Failed to load tasks</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -105,6 +126,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#0066CC',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   list: {
     padding: 16,

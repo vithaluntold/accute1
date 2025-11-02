@@ -63,7 +63,18 @@ class ApiClient {
       throw new Error(error.error || `HTTP ${response.status}`);
     }
 
-    return response.json();
+    // Handle 204 No Content and other empty responses
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return undefined as T;
+    }
+
+    // Check if response has content
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+
+    return undefined as T;
   }
 
   async get<T>(endpoint: string): Promise<T> {
