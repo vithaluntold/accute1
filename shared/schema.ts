@@ -2672,6 +2672,229 @@ export function transformCouponFormData(data: CouponFormData): Omit<InsertCoupon
   };
 }
 
+// ============================
+// AI ROUNDTABLE - Multi-Agent Collaborative System
+// ============================
+
+// Roundtable Sessions - Teams-style collaborative sessions with multiple AI agents
+export const roundtableSessions = pgTable("roundtable_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  title: text("title").notNull().default("New Roundtable Session"),
+  description: text("description"),
+  objective: text("objective"), // What the user wants to achieve
+  
+  status: text("status").notNull().default("active"), // 'active', 'paused', 'completed', 'cancelled'
+  
+  // Shared context snapshot - What all agents know
+  sharedContext: jsonb("shared_context").default(sql`'{}'::jsonb`),
+  
+  // LLM configuration for the session
+  llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id),
+  
+  // Timestamps
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("roundtable_sessions_user_idx").on(table.userId),
+  orgIdx: index("roundtable_sessions_org_idx").on(table.organizationId),
+  statusIdx: index("roundtable_sessions_status_idx").on(table.status),
+}));
+
+// Roundtable Participants - Agents and users in each session
+export const roundtableParticipants = pgTable("roundtable_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => roundtableSessions.id, { onDelete: "cascade" }),
+  
+  participantType: text("participant_type").notNull(), // 'agent' or 'user'
+  participantId: text("participant_id").notNull(), // agentSlug (e.g. 'luca', 'cadence') or userId
+  
+  role: text("role"), // For agents: 'project_manager', 'workflow_builder', 'document_creator', 'form_builder'
+  displayName: text("display_name").notNull(),
+  
+  status: text("status").notNull().default("active"), // 'active', 'idle', 'left'
+  
+  // Track agent capabilities for this session
+  capabilities: jsonb("capabilities").default(sql`'[]'::jsonb`), // ['create_workflows', 'create_forms', 'send_emails']
+  
+  // Task queue for this participant
+  assignedTasks: jsonb("assigned_tasks").default(sql`'[]'::jsonb`),
+  
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  leftAt: timestamp("left_at"),
+}, (table) => ({
+  sessionIdx: index("roundtable_participants_session_idx").on(table.sessionId),
+  sessionParticipantIdx: index("roundtable_participants_session_participant_idx").on(table.sessionId, table.participantId),
+}));
+
+// Roundtable Messages - Main discussion and private chats
+export const roundtableMessages = pgTable("roundtable_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => roundtableSessions.id, { onDelete: "cascade" }),
+  
+  // Message channel - determines visibility
+  channelType: text("channel_type").notNull(), // 'main' (everyone sees), 'private' (1-on-1)
+  
+  // For private messages
+  recipientParticipantId: varchar("recipient_participant_id"), // If private, who receives it
+  
+  // Sender info
+  senderType: text("sender_type").notNull(), // 'user' or 'agent'
+  senderId: text("sender_id").notNull(), // userId or agentSlug
+  senderName: text("sender_name").notNull(),
+  
+  // Message content
+  content: text("content").notNull(),
+  messageType: text("message_type").default("text"), // 'text', 'system', 'deliverable_update', 'task_update'
+  
+  // Metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Typing indicators, reactions, references
+  
+  // Streaming support
+  isStreaming: boolean("is_streaming").default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("roundtable_messages_session_idx").on(table.sessionId),
+  sessionChannelIdx: index("roundtable_messages_session_channel_idx").on(table.sessionId, table.channelType),
+  sessionCreatedIdx: index("roundtable_messages_session_created_idx").on(table.sessionId, table.createdAt),
+}));
+
+// Roundtable Deliverables - Work products created by agents (workflows, forms, documents)
+export const roundtableDeliverables = pgTable("roundtable_deliverables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => roundtableSessions.id, { onDelete: "cascade" }),
+  
+  // Who created this
+  creatorParticipantId: varchar("creator_participant_id").notNull().references(() => roundtableParticipants.id),
+  creatorAgentSlug: text("creator_agent_slug").notNull(), // 'cadence', 'forma', 'parity'
+  
+  // Deliverable details
+  deliverableType: text("deliverable_type").notNull(), // 'workflow', 'form', 'document', 'email_template', 'message_template'
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // The actual work product (JSON representation for preview)
+  payload: jsonb("payload").notNull(), // Complete data structure
+  
+  // Presentation state
+  isPresentingNow: boolean("is_presenting_now").default(false),
+  presentedAt: timestamp("presented_at"),
+  
+  // Approval workflow
+  status: text("status").notNull().default("draft"), // 'draft', 'presented', 'approved', 'rejected', 'needs_changes'
+  
+  // If approved, where was it saved
+  savedToTemplateId: varchar("saved_to_template_id"), // Reference to workflows/forms/documentTemplates table
+  savedToType: text("saved_to_type"), // 'workflow', 'form', 'document_template'
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("roundtable_deliverables_session_idx").on(table.sessionId),
+  sessionStatusIdx: index("roundtable_deliverables_session_status_idx").on(table.sessionId, table.status),
+  presentingIdx: index("roundtable_deliverables_presenting_idx").on(table.isPresentingNow),
+}));
+
+// Roundtable Approvals - Track user decisions on deliverables
+export const roundtableApprovals = pgTable("roundtable_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deliverableId: varchar("deliverable_id").notNull().references(() => roundtableDeliverables.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").notNull().references(() => roundtableSessions.id, { onDelete: "cascade" }),
+  
+  // Who made the decision
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  decision: text("decision").notNull(), // 'approved', 'rejected', 'needs_changes'
+  feedback: text("feedback"), // User's comments/feedback
+  
+  // If approved, was it auto-saved?
+  autoSaved: boolean("auto_saved").default(false),
+  savedToTemplateId: varchar("saved_to_template_id"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  deliverableIdx: index("roundtable_approvals_deliverable_idx").on(table.deliverableId),
+  sessionIdx: index("roundtable_approvals_session_idx").on(table.sessionId),
+}));
+
+// Roundtable Knowledge Entries - Shared context/knowledge base for all agents
+export const roundtableKnowledgeEntries = pgTable("roundtable_knowledge_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => roundtableSessions.id, { onDelete: "cascade" }),
+  
+  entryType: text("entry_type").notNull(), // 'document', 'note', 'requirement', 'reference', 'client_info'
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  
+  // Source of this knowledge
+  sourceType: text("source_type"), // 'user_uploaded', 'agent_generated', 'system'
+  sourceParticipantId: varchar("source_participant_id"),
+  
+  // Versioning
+  version: integer("version").notNull().default(1),
+  
+  // Metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("roundtable_knowledge_entries_session_idx").on(table.sessionId),
+  sessionTypeIdx: index("roundtable_knowledge_entries_session_type_idx").on(table.sessionId, table.entryType),
+}));
+
+// Zod schemas and types for Roundtable
+export const insertRoundtableSessionSchema = createInsertSchema(roundtableSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+});
+export type InsertRoundtableSession = z.infer<typeof insertRoundtableSessionSchema>;
+export type RoundtableSession = typeof roundtableSessions.$inferSelect;
+
+export const insertRoundtableParticipantSchema = createInsertSchema(roundtableParticipants).omit({
+  id: true,
+  joinedAt: true,
+});
+export type InsertRoundtableParticipant = z.infer<typeof insertRoundtableParticipantSchema>;
+export type RoundtableParticipant = typeof roundtableParticipants.$inferSelect;
+
+export const insertRoundtableMessageSchema = createInsertSchema(roundtableMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertRoundtableMessage = z.infer<typeof insertRoundtableMessageSchema>;
+export type RoundtableMessage = typeof roundtableMessages.$inferSelect;
+
+export const insertRoundtableDeliverableSchema = createInsertSchema(roundtableDeliverables).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRoundtableDeliverable = z.infer<typeof insertRoundtableDeliverableSchema>;
+export type RoundtableDeliverable = typeof roundtableDeliverables.$inferSelect;
+
+export const insertRoundtableApprovalSchema = createInsertSchema(roundtableApprovals).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertRoundtableApproval = z.infer<typeof insertRoundtableApprovalSchema>;
+export type RoundtableApproval = typeof roundtableApprovals.$inferSelect;
+
+export const insertRoundtableKnowledgeEntrySchema = createInsertSchema(roundtableKnowledgeEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRoundtableKnowledgeEntry = z.infer<typeof insertRoundtableKnowledgeEntrySchema>;
+export type RoundtableKnowledgeEntry = typeof roundtableKnowledgeEntries.$inferSelect;
+
 export const defaultPlanFormValues: SubscriptionPlanFormData = {
   name: "",
   slug: "",
