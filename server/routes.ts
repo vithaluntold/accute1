@@ -585,6 +585,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const inviteUrl = `${req.protocol}://${req.get('host')}/register?token=${token}`;
 
+      // Get organization name for the email/SMS
+      const organization = await storage.getOrganization(req.user!.organizationId!);
+      const organizationName = organization?.name || "Accute";
+
+      // Send invitation automatically based on type
+      let sendResult: { success: boolean; error?: string } = { success: false };
+      
+      if (type === 'email' && email) {
+        const { sendInvitationEmail } = await import('./email');
+        sendResult = await sendInvitationEmail(email, inviteUrl, organizationName, role.name);
+        
+        if (sendResult.success) {
+          console.log(`✓ Invitation email sent to ${email}`);
+        } else {
+          console.error(`✗ Failed to send invitation email to ${email}:`, sendResult.error);
+        }
+      } else if (type === 'sms' && phone) {
+        const { sendInvitationSMS } = await import('./sms');
+        sendResult = await sendInvitationSMS(phone, inviteUrl, organizationName);
+        
+        if (sendResult.success) {
+          console.log(`✓ Invitation SMS sent to ${phone}`);
+        } else {
+          console.error(`✗ Failed to send invitation SMS to ${phone}:`, sendResult.error);
+        }
+      }
+
       res.json({
         invitation: {
           id: invitation.id,
@@ -596,7 +623,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         inviteUrl,
         token,
-        message: type === 'sms' ? "Send this URL via SMS to complete invitation" : "Send this URL via email to complete invitation"
+        sent: sendResult.success,
+        sendError: sendResult.error,
+        message: sendResult.success 
+          ? `Invitation ${type === 'sms' ? 'SMS' : 'email'} sent successfully!`
+          : sendResult.error || `Failed to send invitation ${type === 'sms' ? 'SMS' : 'email'}. Please share the link manually.`
       });
     } catch (error: any) {
       console.error("Invitation creation error:", error);
