@@ -9196,17 +9196,17 @@ ${msg.bodyText || msg.bodyHtml || ''}
           organizationId: user.organizationId?.toString() || '',
           planId: plan.id,
           planName: plan.name,
-          planTier: plan.tier,
+          planTier: plan.slug,
           billingCycle,
           seatCount: seatCount.toString(),
           regionId: region?.id || '',
           couponCode: coupon?.code || '',
-          basePrice: priceCalculation.basePrice.toString(),
-          regionalMultiplier: priceCalculation.regionalMultiplier.toString(),
+          basePrice: (billingCycle === 'monthly' ? priceCalculation.basePriceMonthly : priceCalculation.basePriceYearly).toString(),
+          regionalMultiplier: priceCalculation.regionMultiplier.toString(),
           volumeDiscount: priceCalculation.volumeDiscount.toString(),
           couponDiscount: priceCalculation.couponDiscount.toString(),
           finalPrice: priceCalculation.finalPrice.toString(),
-          priceSnapshotJson: JSON.stringify(priceCalculation.breakdown),
+          priceSnapshotJson: JSON.stringify(priceCalculation.snapshot),
         },
         success_url: `${baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/subscription?canceled=true`,
@@ -9229,6 +9229,252 @@ ${msg.bodyText || msg.bodyHtml || ''}
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
       res.status(500).json({ error: error.message || "Failed to create checkout session" });
+    }
+  });
+
+  // Stripe webhook handler (requires raw body)
+  app.post("/api/webhooks/stripe", async (req: Request, res: Response) => {
+    try {
+      const stripeSecretKey = platformSettings.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+      const webhookSecret = platformSettings.stripeWebhookSecret || process.env.STRIPE_WEBHOOK_SECRET;
+
+      if (!stripeSecretKey || !webhookSecret) {
+        console.error("Stripe webhook: Missing configuration");
+        return res.status(500).json({ error: "Stripe not configured" });
+      }
+
+      // Initialize Stripe
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: "2024-11-20.acacia" as any,
+      });
+
+      const sig = req.headers['stripe-signature'];
+      if (!sig) {
+        console.error("Stripe webhook: Missing signature");
+        return res.status(400).json({ error: "Missing signature" });
+      }
+
+      let event: Stripe.Event;
+
+      try {
+        // Verify webhook signature using raw body
+        const rawBody = (req as any).rawBody;
+        if (!rawBody) {
+          console.error("Stripe webhook: Raw body not available");
+          return res.status(400).json({ error: "Raw body required for signature verification" });
+        }
+
+        event = stripe.webhooks.constructEvent(
+          rawBody,
+          sig,
+          webhookSecret
+        );
+      } catch (err: any) {
+        console.error("Stripe webhook: Signature verification failed:", err.message);
+        return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+      }
+
+      console.log(`Stripe webhook received: ${event.type}`);
+
+      // Handle different event types
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          
+          // Extract metadata
+          const metadata = session.metadata;
+          if (!metadata || !metadata.organizationId || !metadata.planId || !metadata.userId) {
+            console.error("Stripe webhook: Missing metadata in checkout session");
+            break;
+          }
+
+          const userId = metadata.userId; // UUID string
+          const organizationId = metadata.organizationId; // UUID string
+
+          // Create subscription record
+          const subscriptionData = {
+            organizationId,
+            planId: metadata.planId,
+            plan: metadata.planTier || 'professional',
+            status: 'active',
+            seatCount: parseInt(metadata.seatCount),
+            billingCycle: metadata.billingCycle as 'monthly' | 'yearly',
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: new Date(Date.now() + (metadata.billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000),
+            priceSnapshot: metadata.priceSnapshotJson ? JSON.parse(metadata.priceSnapshotJson) : {},
+            stripeCustomerId: session.customer as string,
+            stripeSubscriptionId: session.subscription as string,
+          };
+
+          await db.insert(schema.platformSubscriptions).values(subscriptionData);
+
+          // Increment coupon usage if applicable
+          if (metadata.couponCode) {
+            await db
+              .update(schema.coupons)
+              .set({ 
+                currentRedemptions: sql`${schema.coupons.currentRedemptions} + 1`,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.coupons.code, metadata.couponCode.toUpperCase()));
+
+            // Record redemption
+            await db.insert(schema.couponRedemptions).values({
+              couponId: metadata.couponCode,
+              organizationId,
+              subscriptionId: session.id,
+              discountSnapshot: metadata.priceSnapshotJson ? JSON.parse(metadata.priceSnapshotJson) : {},
+              redeemedBy: metadata.userId,
+            });
+          }
+
+          // Log activity
+          await logActivity(
+            userId,
+            'subscription_activated',
+            organizationId,
+            { 
+              planId: metadata.planId, 
+              seatCount: metadata.seatCount,
+              amount: metadata.finalPrice,
+              stripeSubscriptionId: session.subscription,
+            }
+          );
+
+          console.log(`Subscription created for organization ${organizationId}, plan ${metadata.planId}`);
+          break;
+        }
+
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          
+          // Update subscription status
+          await db
+            .update(schema.platformSubscriptions)
+            .set({
+              status: subscription.status,
+              currentPeriodStart: new Date(subscription.current_period_start * 1000),
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.platformSubscriptions.stripeSubscriptionId, subscription.id));
+
+          console.log(`Subscription ${subscription.id} updated to status: ${subscription.status}`);
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          
+          // Mark subscription as canceled
+          await db
+            .update(schema.platformSubscriptions)
+            .set({
+              status: 'canceled',
+              canceledAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.platformSubscriptions.stripeSubscriptionId, subscription.id));
+
+          // Log activity - fetch user from organization
+          const [sub] = await db
+            .select()
+            .from(schema.platformSubscriptions)
+            .where(eq(schema.platformSubscriptions.stripeSubscriptionId, subscription.id))
+            .limit(1);
+
+          if (sub) {
+            // Get a user from the organization to log activity
+            const [orgUser] = await db
+              .select()
+              .from(schema.users)
+              .where(eq(schema.users.organizationId, sub.organizationId))
+              .limit(1);
+
+            if (orgUser) {
+              await logActivity(
+                parseInt(orgUser.id),
+                'subscription_canceled',
+                sub.organizationId,
+                { stripeSubscriptionId: subscription.id }
+              );
+            }
+          }
+
+          console.log(`Subscription ${subscription.id} canceled`);
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          
+          if (invoice.subscription) {
+            // Update subscription status to past_due
+            await db
+              .update(schema.platformSubscriptions)
+              .set({
+                status: 'past_due',
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.platformSubscriptions.stripeSubscriptionId, invoice.subscription as string));
+
+            // Log event
+            await db.insert(schema.subscriptionEvents).values({
+              id: crypto.randomUUID(),
+              subscriptionId: invoice.subscription as string,
+              eventType: 'payment_failed',
+              eventData: {
+                invoiceId: invoice.id,
+                amountDue: invoice.amount_due,
+                attemptCount: invoice.attempt_count,
+              },
+              createdAt: new Date(),
+            });
+
+            console.log(`Payment failed for subscription ${invoice.subscription}`);
+          }
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          
+          if (invoice.subscription) {
+            // Ensure subscription is active
+            await db
+              .update(schema.platformSubscriptions)
+              .set({
+                status: 'active',
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.platformSubscriptions.stripeSubscriptionId, invoice.subscription as string));
+
+            // Log event
+            await db.insert(schema.subscriptionEvents).values({
+              id: crypto.randomUUID(),
+              subscriptionId: invoice.subscription as string,
+              eventType: 'payment_succeeded',
+              eventData: {
+                invoiceId: invoice.id,
+                amountPaid: invoice.amount_paid,
+              },
+              createdAt: new Date(),
+            });
+
+            console.log(`Payment succeeded for subscription ${invoice.subscription}`);
+          }
+          break;
+        }
+
+        default:
+          console.log(`Unhandled webhook event type: ${event.type}`);
+      }
+
+      // Return 200 to acknowledge receipt
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error("Stripe webhook error:", error);
+      res.status(500).json({ error: error.message || "Webhook processing failed" });
     }
   });
 
