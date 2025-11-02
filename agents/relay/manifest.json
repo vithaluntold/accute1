@@ -1,0 +1,20 @@
+{
+  "slug": "relay",
+  "name": "Relay",
+  "description": "Inbox intelligence specialist. Processes unread emails and intelligently converts them into actionable tasks with context, priority, and assignments.",
+  "category": "automation",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/RelayAgent.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["chat", "email-processing", "task-creation"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["email", "tasks", "automation", "inbox"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.5,
+    "maxTokens": 4000
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "slug": "scribe",
+  "name": "Scribe",
+  "description": "Email template craftsman. Creates professional, engaging email templates with merge fields, personalization, and automation-ready designs.",
+  "category": "communication",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/ScribeAgent.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["chat", "email-generation", "templates"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["email", "templates", "communication", "automation"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}
