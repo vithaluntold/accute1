@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 import { setupWebSocket } from "./websocket";
+import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import path from "path";
 
 // Security check: Warn if encryption key is not set
@@ -71,6 +72,10 @@ app.use((req, res, next) => {
     // Setup WebSocket server for streaming AI agents
     const wss = setupWebSocket(server);
     console.log('🔌 WebSocket server initialized at /ws/ai-stream');
+    
+    // Setup WebSocket server for AI Roundtable collaboration
+    const roundtableWss = setupRoundtableWebSocket(server);
+    console.log('🔌 Roundtable WebSocket server initialized at /ws/roundtable');
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
