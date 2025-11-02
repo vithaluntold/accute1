@@ -120,10 +120,24 @@ const upload = multer({
   }
 });
 
+// Global initialization status for health checks
+let initializationComplete = false;
+let initializationError: string | null = null;
+
+export function setInitializationStatus(complete: boolean, error: string | null = null) {
+  initializationComplete = complete;
+  initializationError = error;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Health check
+  // Health check - ALWAYS responds immediately regardless of initialization status
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      initialized: initializationComplete,
+      initError: initializationError
+    });
   });
 
   // ==================== Auth Routes ====================

@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
-import { registerRoutes } from "./routes";
+import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 import { setupWebSocket } from "./websocket";
@@ -99,10 +99,13 @@ app.use((req, res, next) => {
     try {
       await initializeSystem();
       console.log('✅ System initialized successfully');
+      setInitializationStatus(true, null);
     } catch (initError) {
+      const errorMsg = initError instanceof Error ? initError.message : String(initError);
       console.error('❌ System initialization failed:', initError);
       console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
-      // Don't exit - server can still handle requests
+      setInitializationStatus(false, errorMsg);
+      // Don't exit - server can still handle health checks
       console.warn('⚠️  Server running with limited functionality');
     }
     
