@@ -140,8 +140,32 @@ export default function AIAgents() {
     },
   });
 
+  const uninstallMutation = useMutation({
+    mutationFn: async (installationId: string) => {
+      return apiRequest("DELETE", `/api/ai-agents/install/${installationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-agents/installed"] });
+      toast({
+        title: "Success",
+        description: "AI agent uninstalled successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to uninstall AI agent",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getInstallation = (agentId: string) => {
+    return installedAgents.find((a: any) => a.agentId === agentId);
+  };
+
   const isInstalled = (agentId: string) => {
-    return installedAgents.some((a: any) => a.agentId === agentId);
+    return !!getInstallation(agentId);
   };
 
   const onSubmit = (data: CreateAgentForm) => {
@@ -528,7 +552,8 @@ export default function AIAgents() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAgents.map((agent: any) => {
-            const installed = isInstalled(agent.id);
+            const installation = getInstallation(agent.id);
+            const installed = !!installation;
             
             return (
               <Card key={agent.id} className="hover-elevate flex flex-col" data-testid={`agent-card-${agent.id}`}>
@@ -607,25 +632,28 @@ export default function AIAgents() {
                     </div>
                   )}
 
-                  <Button
-                    className="w-full mt-auto"
-                    variant={installed ? "outline" : "default"}
-                    disabled={installed || installMutation.isPending}
-                    onClick={() => installMutation.mutate(agent.id)}
-                    data-testid={`button-install-${agent.id}`}
-                  >
-                    {installed ? (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Installed
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        {installMutation.isPending ? "Installing..." : "Install"}
-                      </>
-                    )}
-                  </Button>
+                  {installed ? (
+                    <Button
+                      className="w-full mt-auto"
+                      variant="outline"
+                      disabled={uninstallMutation.isPending}
+                      onClick={() => installation && uninstallMutation.mutate(installation.id)}
+                      data-testid={`button-uninstall-${agent.id}`}
+                    >
+                      {uninstallMutation.isPending ? "Uninstalling..." : "Uninstall"}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full mt-auto"
+                      variant="default"
+                      disabled={installMutation.isPending}
+                      onClick={() => installMutation.mutate(agent.id)}
+                      data-testid={`button-install-${agent.id}`}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {installMutation.isPending ? "Installing..." : "Install"}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

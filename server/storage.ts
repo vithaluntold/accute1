@@ -140,6 +140,7 @@ export interface IStorage {
   getAllPublicAiAgents(): Promise<AiAgent[]>;
   getAiAgentsByCategory(category: string): Promise<AiAgent[]>;
   installAiAgent(agentId: string, organizationId: string, userId: string, configuration: any): Promise<AiAgentInstallation>;
+  uninstallAiAgent(installationId: string, organizationId: string): Promise<void>;
   getAiAgentInstallation(agentId: string, organizationId: string): Promise<AiAgentInstallation | undefined>;
   getInstalledAgents(organizationId: string): Promise<schema.InstalledAgentView[]>;
 
@@ -986,6 +987,14 @@ export class DbStorage implements IStorage {
   }
 
   async createAiAgent(agent: InsertAiAgent): Promise<AiAgent> {
+    const existing = await db.select().from(schema.aiAgents)
+      .where(eq(schema.aiAgents.name, agent.name))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      throw new Error(`An agent with the name "${agent.name}" already exists`);
+    }
+
     const result = await db.insert(schema.aiAgents).values(agent).returning();
     return result[0];
   }
@@ -1025,11 +1034,42 @@ export class DbStorage implements IStorage {
       configuration,
     }).returning();
 
+    const countResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(schema.aiAgentInstallations)
+      .where(eq(schema.aiAgentInstallations.agentId, agentId));
+    
     await db.update(schema.aiAgents)
-      .set({ installCount: db.$count(schema.aiAgentInstallations) })
+      .set({ installCount: countResult[0].count })
       .where(eq(schema.aiAgents.id, agentId));
 
     return result[0];
+  }
+
+  async uninstallAiAgent(installationId: string, organizationId: string): Promise<void> {
+    const installation = await db.select().from(schema.aiAgentInstallations)
+      .where(and(
+        eq(schema.aiAgentInstallations.id, installationId),
+        eq(schema.aiAgentInstallations.organizationId, organizationId)
+      ));
+
+    if (installation.length === 0) {
+      throw new Error("Installation not found or unauthorized");
+    }
+
+    const agentId = installation[0].agentId;
+
+    await db.delete(schema.aiAgentInstallations)
+      .where(eq(schema.aiAgentInstallations.id, installationId));
+
+    if (agentId) {
+      const countResult = await db.select({ count: sql<number>`count(*)::int` })
+        .from(schema.aiAgentInstallations)
+        .where(eq(schema.aiAgentInstallations.agentId, agentId));
+      
+      await db.update(schema.aiAgents)
+        .set({ installCount: countResult[0].count })
+        .where(eq(schema.aiAgents.id, agentId));
+    }
   }
 
   async getAiAgentInstallation(agentId: string, organizationId: string): Promise<AiAgentInstallation | undefined> {

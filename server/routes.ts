@@ -1674,6 +1674,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/ai-agents/install/:installationId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      await storage.uninstallAiAgent(
+        req.params.installationId,
+        req.user!.organizationId!
+      );
+      await logActivity(req.userId, req.user!.organizationId || undefined, "uninstall", "ai_agent", req.params.installationId, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to uninstall AI agent" });
+    }
+  });
+
   // Execute AI Agent with conversation persistence and function calling
   app.post("/api/ai-agents/execute", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
