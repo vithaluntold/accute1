@@ -54,6 +54,8 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import * as cryptoUtils from "./crypto-utils";
 import { autoProgressionEngine } from "./auto-progression";
+import Stripe from "stripe";
+import { PricingService } from "@shared/pricing-service";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -9057,6 +9059,176 @@ ${msg.bodyText || msg.bodyHtml || ''}
     } catch (error: any) {
       console.error("Error updating platform settings:", error);
       res.status(500).json({ error: "Failed to update platform settings" });
+    }
+  });
+
+  // ==================== Stripe Checkout Routes ====================
+
+  // Create Stripe checkout session for subscription
+  app.post("/api/subscription/checkout", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const { planId, billingCycle, seatCount, regionId, couponCode } = req.body;
+
+      // Validate inputs
+      if (!planId || !billingCycle || !seatCount) {
+        return res.status(400).json({ error: "planId, billingCycle, and seatCount are required" });
+      }
+
+      // Check if Stripe is configured
+      const stripeSecretKey = platformSettings.stripeSecretKey || process.env.STRIPE_SECRET_KEY;
+      if (!stripeSecretKey) {
+        return res.status(500).json({ error: "Stripe is not configured. Please contact support." });
+      }
+
+      // Initialize Stripe
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: "2024-11-20.acacia",
+      });
+
+      // Get plan
+      const [plan] = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(and(
+          eq(schema.subscriptionPlans.id, planId),
+          eq(schema.subscriptionPlans.isActive, true)
+        ))
+        .limit(1);
+
+      if (!plan) {
+        return res.status(404).json({ error: "Subscription plan not found or inactive" });
+      }
+
+      // Get region
+      let region = undefined;
+      if (regionId) {
+        const [regionData] = await db
+          .select()
+          .from(schema.pricingRegions)
+          .where(and(
+            eq(schema.pricingRegions.id, regionId),
+            eq(schema.pricingRegions.isActive, true)
+          ))
+          .limit(1);
+        
+        if (!regionData) {
+          return res.status(404).json({ error: "Pricing region not found or inactive" });
+        }
+        region = regionData;
+      }
+
+      // Get volume tiers
+      const volumeTiers = await db
+        .select()
+        .from(schema.planVolumeTiers)
+        .where(eq(schema.planVolumeTiers.planId, planId));
+
+      // Get coupon if provided
+      let coupon = undefined;
+      if (couponCode) {
+        const [couponData] = await db
+          .select()
+          .from(schema.coupons)
+          .where(and(
+            eq(schema.coupons.code, couponCode.toUpperCase()),
+            eq(schema.coupons.isActive, true)
+          ))
+          .limit(1);
+
+        if (couponData) {
+          // Validate coupon
+          const now = new Date();
+          if (couponData.expiresAt && new Date(couponData.expiresAt) < now) {
+            return res.status(400).json({ error: "Coupon has expired" });
+          }
+          if (couponData.usageLimit && couponData.timesUsed >= couponData.usageLimit) {
+            return res.status(400).json({ error: "Coupon usage limit reached" });
+          }
+          if (couponData.applicablePlans && couponData.applicablePlans.length > 0) {
+            if (!couponData.applicablePlans.includes(planId)) {
+              return res.status(400).json({ error: "Coupon not valid for this plan" });
+            }
+          }
+          if (couponData.minimumSeats && seatCount < couponData.minimumSeats) {
+            return res.status(400).json({ error: `Coupon requires at least ${couponData.minimumSeats} seats` });
+          }
+
+          coupon = couponData;
+        }
+      }
+
+      // SERVER-SIDE PRICE VERIFICATION (anti-tampering)
+      const priceCalculation = PricingService.calculatePrice({
+        plan,
+        billingCycle,
+        seatCount,
+        region,
+        volumeTiers,
+        coupon,
+      });
+
+      // Create Stripe checkout session
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        customer_email: user.email || undefined,
+        client_reference_id: user.id.toString(),
+        line_items: [
+          {
+            price_data: {
+              currency: region?.currencyCode.toLowerCase() || 'usd',
+              product_data: {
+                name: `${plan.name} - ${plan.tier} Plan`,
+                description: `${seatCount} seat${seatCount > 1 ? 's' : ''} • ${billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} billing`,
+              },
+              recurring: {
+                interval: billingCycle === 'monthly' ? 'month' : 'year',
+              },
+              unit_amount: Math.round(priceCalculation.finalPrice * 100), // Convert to cents
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          userId: user.id.toString(),
+          organizationId: user.organizationId?.toString() || '',
+          planId: plan.id,
+          planName: plan.name,
+          planTier: plan.tier,
+          billingCycle,
+          seatCount: seatCount.toString(),
+          regionId: region?.id || '',
+          couponCode: coupon?.code || '',
+          basePrice: priceCalculation.basePrice.toString(),
+          regionalMultiplier: priceCalculation.regionalMultiplier.toString(),
+          volumeDiscount: priceCalculation.volumeDiscount.toString(),
+          couponDiscount: priceCalculation.couponDiscount.toString(),
+          finalPrice: priceCalculation.finalPrice.toString(),
+          priceSnapshotJson: JSON.stringify(priceCalculation.breakdown),
+        },
+        success_url: `${baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/subscription?canceled=true`,
+        allow_promotion_codes: false, // We handle coupons internally
+      });
+
+      // Log activity
+      await logActivity(
+        user.id,
+        'subscription_checkout_initiated',
+        user.organizationId || undefined,
+        { planId, seatCount, amount: priceCalculation.finalPrice }
+      );
+
+      res.json({
+        sessionId: session.id,
+        url: session.url,
+        priceSnapshot: priceCalculation,
+      });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ error: error.message || "Failed to create checkout session" });
     }
   });
 

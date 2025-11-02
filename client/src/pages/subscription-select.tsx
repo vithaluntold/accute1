@@ -122,6 +122,37 @@ export default function SubscriptionSelectPage() {
     },
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/subscription/checkout", {
+        planId: selectedPlanId,
+        billingCycle,
+        seatCount,
+        regionId: selectedRegionId,
+        couponCode: appliedCoupon?.code,
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast({
+          title: "Checkout session created",
+          description: "Redirecting to payment...",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Checkout failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleApplyCoupon = () => {
     if (couponCode.trim()) {
       validateCouponMutation.mutate(couponCode.trim().toUpperCase());
@@ -134,10 +165,15 @@ export default function SubscriptionSelectPage() {
   };
 
   const handleSubscribe = () => {
-    toast({ 
-      title: "Checkout coming soon", 
-      description: "Stripe checkout integration will be implemented next" 
-    });
+    if (!selectedPlanId || !selectedRegionId) {
+      toast({
+        title: "Configuration incomplete",
+        description: "Please select a plan and region",
+        variant: "destructive",
+      });
+      return;
+    }
+    checkoutMutation.mutate();
   };
 
   if (plansLoading || regionsLoading) {
@@ -391,10 +427,20 @@ export default function SubscriptionSelectPage() {
                 size="lg"
                 className="w-full"
                 onClick={handleSubscribe}
+                disabled={checkoutMutation.isPending || !priceCalculation}
                 data-testid="button-subscribe"
               >
-                <Crown className="w-5 h-5 mr-2" />
-                Subscribe to {selectedPlan.name}
+                {checkoutMutation.isPending ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Crown className="w-5 h-5 mr-2" />
+                    Subscribe to {selectedPlan.name}
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>
