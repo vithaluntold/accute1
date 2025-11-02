@@ -76,29 +76,49 @@ export function setupTeamChatWebSocket(httpServer: Server): WebSocketServer {
 
     // Authenticate WebSocket connection
     try {
+      let userId: string | undefined;
+
+      // Try cookie-based session authentication first (web clients)
       const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
       const sessionToken = cookies['session_token'];
 
-      if (!sessionToken) {
-        console.log('[Team Chat WS] No session token found');
+      if (sessionToken) {
+        const session = await storage.getSession(sessionToken);
+        if (session && session.expiresAt >= new Date()) {
+          userId = session.userId;
+        }
+      }
+
+      // Fall back to JWT token in query parameter (mobile clients)
+      if (!userId) {
+        const url = new URL(req.url || '', `http://${req.headers.host}`);
+        const token = url.searchParams.get('token');
+        
+        if (token) {
+          const jwtSecret = process.env.JWT_SECRET;
+          if (!jwtSecret) {
+            console.error('[Team Chat WS] JWT_SECRET not configured');
+            ws.close(4001, 'Server configuration error');
+            return;
+          }
+
+          try {
+            const jwt = require('jsonwebtoken');
+            const decoded = jwt.verify(token, jwtSecret) as any;
+            userId = decoded.userId;
+          } catch (error) {
+            console.log('[Team Chat WS] Invalid JWT token');
+          }
+        }
+      }
+
+      if (!userId) {
+        console.log('[Team Chat WS] No valid authentication found');
         ws.close(4001, 'Authentication required');
         return;
       }
 
-      const session = await storage.getSession(sessionToken);
-      if (!session) {
-        console.log('[Team Chat WS] Session not found');
-        ws.close(4001, 'Invalid session');
-        return;
-      }
-      
-      if (session.expiresAt < new Date()) {
-        console.log('[Team Chat WS] Session expired');
-        ws.close(4001, 'Session expired');
-        return;
-      }
-
-      const user = await storage.getUser(session.userId);
+      const user = await storage.getUser(userId);
       if (!user) {
         console.log('[Team Chat WS] User not found');
         ws.close(4001, 'User not found');
