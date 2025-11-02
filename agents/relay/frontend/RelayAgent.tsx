@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Inbox, Send, Plus, Trash2, Edit2, CheckCircle, Calendar, User } from "lucide-react";
+import { Inbox, Send, Plus, Trash2, Edit2, CheckCircle, Calendar, User, Settings2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -58,12 +59,28 @@ export default function RelayAgent() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   
+  // LLM configuration state
+  const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Fetch LLM configurations
+  const { data: llmConfigs = [] } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
+  // Auto-select default LLM config
+  useEffect(() => {
+    const defaultConfig = llmConfigs.find((c) => c.isDefault);
+    if (defaultConfig && !selectedLlmConfig) {
+      setSelectedLlmConfig(defaultConfig.id);
+    }
+  }, [llmConfigs, selectedLlmConfig]);
 
   // Fetch sessions
   const { data: sessions = [] } = useQuery<AgentSession[]>({
@@ -188,7 +205,8 @@ export default function RelayAgent() {
         body: JSON.stringify({ 
           message: userInput, 
           history: messages,
-          emailContent: userInput.includes("From:") || userInput.includes("Subject:") ? userInput : undefined
+          emailContent: userInput.includes("From:") || userInput.includes("Subject:") ? userInput : undefined,
+          llmConfigId: selectedLlmConfig
         }),
       });
 
@@ -358,6 +376,33 @@ export default function RelayAgent() {
               </div>
             </ScrollArea>
           </CardContent>
+          {llmConfigs.length > 0 && (
+            <div className="p-3 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium">AI Provider</span>
+              </div>
+              <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-llm-config">
+                  <SelectValue placeholder="Select AI provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {llmConfigs.map((config) => (
+                    <SelectItem key={config.id} value={config.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{config.name}</span>
+                        {config.isDefault && (
+                          <Badge variant="outline" className="text-xs">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </Card>
       </ResizablePanel>
 
