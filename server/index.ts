@@ -64,8 +64,15 @@ app.use((req, res, next) => {
   try {
     // Initialize system roles and permissions on startup
     console.log('🔧 Initializing system...');
-    await initializeSystem();
-    console.log('✅ System initialized successfully');
+    
+    try {
+      await initializeSystem();
+      console.log('✅ System initialized successfully');
+    } catch (initError) {
+      console.error('❌ System initialization failed:', initError);
+      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
+      throw initError;
+    }
     
     const server = await registerRoutes(app);
     
@@ -99,20 +106,40 @@ app.use((req, res, next) => {
     // this serves both the API and the client.
     // It is the only port that is not firewalled.
     const port = parseInt(process.env.PORT || '5000', 10);
+    const host = '0.0.0.0';
     
-    server.listen({
-      port,
-      host: "0.0.0.0",
-    }, () => {
+    // Use simple listen signature (port, host, callback) instead of options object
+    // to avoid reusePort issues with Cloud Run/Autoscale deployments
+    server.listen(port, host, () => {
+      console.log(`✅ Server successfully started`);
+      console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`   Listening on: ${host}:${port}`);
       log(`serving on port ${port}`);
     }).on('error', (err: Error) => {
       console.error('❌ Server failed to start:', err);
-      console.error('Error details:', err.message);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
+      
+      if ('code' in err) {
+        console.error('Error code:', (err as any).code);
+      }
+      if ('syscall' in err) {
+        console.error('System call:', (err as any).syscall);
+      }
+      
       process.exit(1);
     });
   } catch (error) {
     console.error('❌ Failed to initialize application:', error);
-    console.error('Error details:', error instanceof Error ? error.message : String(error));
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
+    
+    if (error && typeof error === 'object') {
+      console.error('Additional error properties:', JSON.stringify(error, null, 2));
+    }
+    
     process.exit(1);
   }
 })();
