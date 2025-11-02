@@ -48,3 +48,21 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+### Mobile Application
+- **Technology**: React Native with Expo (managed workflow, SDK 54)
+- **Navigation**: Expo Router (file-based routing with TypeScript)
+- **State Management**: React Query v5 for server state, React Context for auth
+- **Authentication**: JWT tokens stored securely using Expo SecureStore
+- **API Client**: Centralized HTTP client with automatic token management and error handling
+- **Architecture**: Separate mobile/ directory with (auth), (tabs), and (manager) route groups
+- **Core Features**:
+  - Secure login with JWT authentication
+  - Dashboard with workflow and task statistics
+  - Tasks management with status and priority filtering
+  - Teams browsing with member counts
+  - Manager Dashboard for reportee task oversight
+  - Settings and profile management
+- **Platform Support**: iOS and Android (single codebase)
+- **Development**: Runs on iOS Simulator, Android Emulator, and physical devices via Expo Go
+- **Production**: Ready for EAS Build and deployment to App Store/Play Store
