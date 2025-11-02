@@ -1461,6 +1461,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getEmailMessageByExternalId(messageId: string): Promise<schema.EmailMessage | undefined> {
+    const result = await db.select().from(schema.emailMessages).where(eq(schema.emailMessages.messageId, messageId));
+    return result[0];
+  }
+
   async getEmailMessagesByAccount(emailAccountId: string): Promise<schema.EmailMessage[]> {
     return await db.select().from(schema.emailMessages)
       .where(eq(schema.emailMessages.emailAccountId, emailAccountId))

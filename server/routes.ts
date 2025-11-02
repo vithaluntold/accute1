@@ -8370,6 +8370,286 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
     }
   });
 
+  // ==================== Email OAuth Routes ====================
+
+  // Start OAuth flow for Gmail
+  app.get("/api/email-accounts/oauth/gmail/start", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
+      const service = new GmailOAuthService({
+        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
+      });
+
+      const state = Buffer.from(JSON.stringify({
+        userId: req.userId,
+        organizationId: req.user!.organizationId
+      })).toString('base64');
+
+      const authUrl = service.generateAuthUrl(state);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error('Gmail OAuth start error:', error);
+      res.status(500).json({ error: error.message || "Failed to start Gmail OAuth flow" });
+    }
+  });
+
+  // Gmail OAuth callback
+  app.get("/api/email-accounts/oauth/gmail/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        return res.status(400).send('Missing code or state parameter');
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      
+      const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
+      const service = new GmailOAuthService({
+        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
+      });
+
+      const tokens = await service.getTokensFromCode(code as string);
+      const profile = await service.getUserProfile(service.encryptCredentials(tokens));
+      
+      const emailAccount = await storage.createEmailAccount({
+        organizationId: stateData.organizationId,
+        userId: stateData.userId,
+        provider: 'gmail',
+        email: profile.emailAddress,
+        displayName: profile.emailAddress,
+        authType: 'oauth',
+        encryptedCredentials: service.encryptCredentials(tokens),
+        status: 'active'
+      });
+
+      await logActivity(stateData.userId, stateData.organizationId, "create", "email_account", emailAccount.id, { email: emailAccount.email, provider: 'gmail' }, req as any);
+
+      res.send(`
+        <html>
+          <head><title>Gmail Connected</title></head>
+          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+            <h1>✓ Gmail Account Connected</h1>
+            <p>You can close this window and return to Accute.</p>
+            <script>
+              setTimeout(() => window.close(), 2000);
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error('Gmail OAuth callback error:', error);
+      res.status(500).send('OAuth callback failed: ' + error.message);
+    }
+  });
+
+  // Start OAuth flow for Outlook
+  app.get("/api/email-accounts/oauth/outlook/start", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
+      const service = new OutlookOAuthService({
+        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
+      });
+
+      const state = Buffer.from(JSON.stringify({
+        userId: req.userId,
+        organizationId: req.user!.organizationId
+      })).toString('base64');
+
+      const authUrl = service.getAuthUrl(state);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error('Outlook OAuth start error:', error);
+      res.status(500).json({ error: error.message || "Failed to start Outlook OAuth flow" });
+    }
+  });
+
+  // Outlook OAuth callback
+  app.get("/api/email-accounts/oauth/outlook/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        return res.status(400).send('Missing code or state parameter');
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      
+      const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
+      const service = new OutlookOAuthService({
+        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
+      });
+
+      const tokens = await service.getTokensFromCode(code as string);
+      const profile = await service.getUserProfile(service.encryptCredentials(tokens));
+      
+      const emailAccount = await storage.createEmailAccount({
+        organizationId: stateData.organizationId,
+        userId: stateData.userId,
+        provider: 'outlook',
+        email: profile.emailAddress,
+        displayName: profile.displayName,
+        authType: 'oauth',
+        encryptedCredentials: service.encryptCredentials(tokens),
+        status: 'active'
+      });
+
+      await logActivity(stateData.userId, stateData.organizationId, "create", "email_account", emailAccount.id, { email: emailAccount.email, provider: 'outlook' }, req as any);
+
+      res.send(`
+        <html>
+          <head><title>Outlook Connected</title></head>
+          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+            <h1>✓ Outlook Account Connected</h1>
+            <p>You can close this window and return to Accute.</p>
+            <script>
+              setTimeout(() => window.close(), 2000);
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error('Outlook OAuth callback error:', error);
+      res.status(500).send('OAuth callback failed: ' + error.message);
+    }
+  });
+
+  // Test IMAP connection
+  app.post("/api/email-accounts/test-imap", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { host, port, secure, user, password } = req.body;
+      
+      if (!host || !port || !user || !password) {
+        return res.status(400).json({ error: "Missing required IMAP configuration" });
+      }
+
+      const { ImapEmailService } = await import('./email-sync/imap-service');
+      const service = new ImapEmailService();
+      
+      const isValid = await service.testConnection({
+        host,
+        port: parseInt(port),
+        secure: secure !== false,
+        auth: { user, pass: password }
+      });
+
+      if (isValid) {
+        res.json({ success: true, message: "IMAP connection successful" });
+      } else {
+        res.status(400).json({ error: "IMAP connection failed" });
+      }
+    } catch (error: any) {
+      console.error('IMAP test error:', error);
+      res.status(500).json({ error: "Failed to test IMAP connection: " + error.message });
+    }
+  });
+
+  // Sync emails for an account
+  app.post("/api/email-accounts/:id/sync", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const account = await storage.getEmailAccount(req.params.id);
+      if (!account || account.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      let emails: any[] = [];
+
+      if (account.provider === 'gmail') {
+        const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
+        const service = new GmailOAuthService({
+          redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
+        });
+        
+        const gmailMessages = await service.fetchEmails(account.encryptedCredentials, 50);
+        
+        emails = gmailMessages.map((msg: any) => {
+          const headers = msg.payload?.headers || [];
+          const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value || '';
+          
+          return {
+            messageId: msg.id,
+            from: getHeader('From'),
+            to: [getHeader('To')],
+            subject: getHeader('Subject'),
+            body: msg.snippet || '',
+            sentAt: new Date(parseInt(msg.internalDate)),
+            isRead: !msg.labelIds?.includes('UNREAD')
+          };
+        });
+      } else if (account.provider === 'outlook') {
+        const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
+        const service = new OutlookOAuthService({
+          redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
+        });
+        
+        const outlookMessages = await service.fetchEmails(account.encryptedCredentials, 50);
+        
+        emails = outlookMessages.map((msg: any) => ({
+          messageId: msg.id,
+          from: msg.from?.emailAddress?.address || '',
+          to: msg.toRecipients?.map((r: any) => r.emailAddress.address) || [],
+          cc: msg.ccRecipients?.map((r: any) => r.emailAddress.address) || [],
+          subject: msg.subject || '',
+          body: msg.bodyPreview || '',
+          bodyHtml: msg.body?.content || '',
+          sentAt: new Date(msg.sentDateTime),
+          isRead: msg.isRead
+        }));
+      } else if (account.provider === 'imap' || account.provider === 'exchange') {
+        const { ImapEmailService } = await import('./email-sync/imap-service');
+        const service = new ImapEmailService();
+        
+        emails = await service.fetchEmails(
+          account.encryptedCredentials,
+          account.imapHost!,
+          account.imapPort!,
+          account.useSsl !== false,
+          50
+        );
+      }
+
+      for (const email of emails) {
+        const existing = await storage.getEmailMessageByExternalId(email.messageId);
+        if (!existing) {
+          await storage.createEmailMessage({
+            emailAccountId: account.id,
+            organizationId: account.organizationId,
+            messageId: email.messageId,
+            from: email.from,
+            to: email.to,
+            cc: email.cc || [],
+            bcc: email.bcc || [],
+            subject: email.subject,
+            body: email.body,
+            bodyHtml: email.bodyHtml,
+            sentAt: email.sentAt,
+            isRead: email.isRead
+          });
+        }
+      }
+
+      await storage.updateEmailAccount(account.id, {
+        lastSyncAt: new Date(),
+        status: 'active'
+      });
+
+      res.json({ 
+        success: true, 
+        synced: emails.length,
+        message: `Successfully synced ${emails.length} emails` 
+      });
+    } catch (error: any) {
+      console.error('Email sync error:', error);
+      
+      await storage.updateEmailAccount(req.params.id, {
+        status: 'error',
+        lastSyncError: error.message
+      });
+      
+      res.status(500).json({ error: "Failed to sync emails: " + error.message });
+    }
+  });
+
   // ==================== Email Messages Routes ====================
 
   // Get all email messages for organization
