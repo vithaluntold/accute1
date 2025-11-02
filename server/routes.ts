@@ -331,6 +331,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== OTP Verification Routes ====================
+  
+  // Send OTP to phone number
+  app.post("/api/auth/send-otp", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { phone } = req.body;
+
+      if (!phone) {
+        return res.status(400).json({ error: "Phone number is required" });
+      }
+
+      // Validate phone format (basic validation)
+      const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
+      if (!phoneRegex.test(phone.replace(/[\s()-]/g, ''))) {
+        return res.status(400).json({ error: "Invalid phone number format" });
+      }
+
+      // Import SMS utilities
+      const { sendOTP, generateOTP, getOTPExpiry } = await import('./sms');
+
+      // Generate OTP
+      const otp = generateOTP();
+      const expiresAt = getOTPExpiry();
+
+      // Store OTP in database
+      await storage.createOtpVerification({
+        phone,
+        otp,
+        expiresAt,
+        userId: null,
+        verified: false,
+      });
+
+      // Send OTP via SMS
+      const smsResult = await sendOTP(phone, otp);
+
+      if (!smsResult.success) {
+        return res.status(500).json({ 
+          error: smsResult.error || "Failed to send OTP SMS" 
+        });
+      }
+
+      // Clean up expired OTPs
+      await storage.deleteExpiredOtps();
+
+      res.json({ 
+        success: true,
+        message: "OTP sent successfully",
+        expiresAt 
+      });
+    } catch (error: any) {
+      console.error("Send OTP error:", error);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  // Verify OTP code
+  app.post("/api/auth/verify-otp", rateLimit(10, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { phone, otp } = req.body;
+
+      if (!phone || !otp) {
+        return res.status(400).json({ error: "Phone number and OTP are required" });
+      }
+
+      // Get latest OTP for this phone number
+      const otpRecord = await storage.getLatestOtpByPhone(phone);
+
+      if (!otpRecord) {
+        return res.status(400).json({ error: "No OTP found for this phone number" });
+      }
+
+      // Check if OTP is expired
+      if (new Date() > otpRecord.expiresAt) {
+        return res.status(400).json({ error: "OTP has expired" });
+      }
+
+      // Check if OTP is already verified
+      if (otpRecord.verified) {
+        return res.status(400).json({ error: "OTP has already been used" });
+      }
+
+      // Verify OTP code
+      if (otpRecord.otp !== otp) {
+        return res.status(400).json({ error: "Invalid OTP code" });
+      }
+
+      // Mark OTP as verified
+      await storage.verifyOtp(otpRecord.id);
+
+      res.json({ 
+        success: true,
+        message: "Phone number verified successfully",
+        otpId: otpRecord.id
+      });
+    } catch (error: any) {
+      console.error("Verify OTP error:", error);
+      res.status(500).json({ error: "Failed to verify OTP" });
+    }
+  });
+
   // ==================== Super Admin Routes ====================
 
   // Get super admin keys (requires platform admin)
