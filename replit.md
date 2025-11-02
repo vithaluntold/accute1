@@ -63,6 +63,40 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **OpenAI API**: AI model integration.
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
+- **Resend**: Transactional email service for user invitations and notifications. Configured via Replit connector integration.
+- **Twilio** (Optional): SMS service for mobile invitations. Can be configured via Replit connector integration or manual API key setup.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+## Communication Services
+
+### Email Service (`server/email.ts`)
+The platform uses Resend for sending transactional emails, including user invitations. The email service is integrated via Replit's connector system for secure API key management.
+
+**Key Features:**
+- Automatic invitation email sending when users are invited
+- Professional HTML email templates with gradient branding
+- Secure API key management via Replit connectors
+- Error handling and logging for failed email deliveries
+
+**Configuration:**
+- Email service is configured via the Resend connector in Replit
+- The connector manages API keys and from email address automatically
+- No manual environment variable configuration needed
+
+**Usage:**
+When an invitation is created via `/api/invitations`, the system automatically:
+1. Creates the invitation record in the database
+2. Generates a secure invitation URL with token
+3. Sends a branded email to the recipient with the invitation link
+4. Returns success/failure status in the API response
+
+### SMS Service (`server/sms.ts`)
+Optional SMS functionality for sending invitation texts via Twilio.
+
+**Configuration Options:**
+1. **Replit Twilio Connector** (Recommended): Set up the Twilio connector for automatic credential management
+2. **Manual Setup**: Set environment variables `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER`
+
+**Note:** SMS functionality is optional. If not configured, the system will gracefully fallback and log a warning, allowing email-only invitations to work seamlessly.
