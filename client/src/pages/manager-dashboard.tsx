@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useUser } from "@/hooks/use-user";
+import { getUser } from "@/lib/auth";
 import { Calendar, CheckCircle2, Clock, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,7 @@ import { format } from "date-fns";
 import type { User, Task } from "@shared/schema";
 
 export default function ManagerDashboardPage() {
-  const { user } = useUser();
+  const user = getUser();
   const [selectedReportee, setSelectedReportee] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
