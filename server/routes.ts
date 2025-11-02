@@ -5424,6 +5424,289 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Client Portal Messaging Routes ====================
+
+  // Get client portal stats (dashboard)
+  app.get("/api/client-portal/stats", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // TODO: Calculate actual stats from database
+      // For now, returning mock stats structure
+      const stats = {
+        documents: {
+          total: 0,
+          pending: 0
+        },
+        tasks: {
+          pending: 0,
+          overdue: 0
+        },
+        signatures: {
+          pending: 0
+        },
+        forms: {
+          total: 0
+        }
+      };
+
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch client portal stats" });
+    }
+  });
+
+  // Get all conversations for client
+  app.get("/api/client-portal/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      const conversations = await storage.getConversationsByClient(client.id);
+      res.json(conversations);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Create new conversation (client initiates)
+  app.post("/api/client-portal/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      const { subject } = req.body;
+
+      if (!subject || subject.trim().length === 0) {
+        return res.status(400).json({ error: "Subject is required" });
+      }
+
+      const conversation = await storage.createConversation({
+        organizationId: req.user!.organizationId!,
+        clientId: client.id,
+        subject,
+        status: "active"
+      });
+
+      res.status(201).json(conversation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Get messages for a conversation (client view)
+  app.get("/api/client-portal/conversations/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Verify conversation belongs to this client
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation || conversation.clientId !== client.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const messages = await storage.getMessagesByConversation(req.params.id);
+      
+      // Enrich messages with sender information
+      const enrichedMessages = await Promise.all(messages.map(async (msg: any) => {
+        const sender = await storage.getUser(msg.senderId);
+        return {
+          ...msg,
+          sender: {
+            id: sender?.id,
+            firstName: sender?.firstName,
+            lastName: sender?.lastName,
+            email: sender?.email
+          }
+        };
+      }));
+
+      res.json(enrichedMessages);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Send message in conversation (client)
+  app.post("/api/client-portal/conversations/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Verify conversation belongs to this client
+      const conversation = await storage.getConversation(req.params.id);
+      if (!conversation || conversation.clientId !== client.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { content } = req.body;
+
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      const message = await storage.createMessage({
+        conversationId: req.params.id,
+        senderId: req.user!.id,
+        senderType: "client",
+        content: content.trim(),
+        attachments: []
+      });
+
+      res.status(201).json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Get client portal documents
+  app.get("/api/client-portal/documents", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // TODO: Get documents shared with this client
+      // For now returning empty array
+      res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  // Get client portal tasks
+  app.get("/api/client-portal/tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // TODO: Get tasks assigned to this client
+      // For now returning empty array
+      res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Get client portal forms
+  app.get("/api/client-portal/forms", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // TODO: Get forms assigned to this client
+      // For now returning empty array
+      res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  // Get client portal signature requests
+  app.get("/api/client-portal/signatures", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // TODO: Get signature requests for this client
+      // For now returning empty array
+      res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch signature requests" });
+    }
+  });
+
   // ==================== Document Collection Tracking Routes ====================
 
   // Get all document requests for organization
