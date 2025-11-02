@@ -142,6 +142,9 @@ const organizationMenuCategories = [
     title: "Administration",
     items: [
       { title: "Team", url: "/team", icon: Users, permission: "users.view" },
+      { title: "Teams", url: "/teams", icon: Users, permission: "teams.view" },
+      { title: "Team Hierarchy", url: "/team-hierarchy", icon: Network, permission: "teams.manage" },
+      { title: "Manager Dashboard", url: "/manager-dashboard", icon: BarChart3, permission: null },
       { title: "Roles & Permissions", url: "/roles", icon: Shield, permission: "roles.view" },
       { title: "Analytics", url: "/analytics", icon: BarChart3, permission: "analytics.view" },
       { title: "Subscription", url: "/subscription", icon: CreditCard, permission: null },

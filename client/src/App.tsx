@@ -99,6 +99,10 @@ import ClientMySignatures from "@/pages/client-portal/my-signatures";
 import ClientPortalMessages from "@/pages/client-portal/messages";
 import RoundtablePage from "@/pages/roundtable";
 import RoundtableDetail from "@/pages/roundtable-detail";
+import TeamsPage from "@/pages/teams";
+import TeamDetailPage from "@/pages/team-detail";
+import TeamHierarchyPage from "@/pages/team-hierarchy";
+import ManagerDashboardPage from "@/pages/manager-dashboard";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -522,6 +526,36 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
+      </Route>
+      <Route path="/teams/:id">
+        <OrganizationRoute>
+          <AppLayout>
+            <TeamDetailPage />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/teams">
+        <OrganizationRoute>
+          <AppLayout>
+            <TeamsPage />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/team-hierarchy">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <TeamHierarchyPage />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/manager-dashboard">
+        <OrganizationRoute>
+          <AppLayout>
+            <ManagerDashboardPage />
+          </AppLayout>
+        </OrganizationRoute>
       </Route>
       <Route path="/roles">
         <ProtectedRoute>
