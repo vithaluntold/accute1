@@ -1546,6 +1546,283 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AI Roundtable Routes ====================
+
+  // Get all Roundtable sessions for organization
+  app.get("/api/roundtable/sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.json([]);
+      }
+
+      const sessions = await storage.getRoundtableSessionsByOrganization(req.user!.organizationId);
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  // Create a new Roundtable session
+  app.post("/api/roundtable/sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { objective, initialAgents = [] } = req.body;
+      
+      if (!req.user!.organizationId) {
+        return res.status(400).json({ error: "Organization required" });
+      }
+
+      // Create session
+      const session = await storage.createRoundtableSession({
+        organizationId: req.user!.organizationId,
+        userId: req.userId,
+        objective,
+        status: 'active',
+      });
+
+      // Add initial agents if specified
+      if (initialAgents.length > 0) {
+        const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
+        const orchestrator = RoundtableOrchestrator.getInstance(storage);
+        
+        for (const agentSlug of initialAgents) {
+          await orchestrator.addAgentToSession(session.id, agentSlug);
+        }
+      }
+
+      await logActivity(req.userId, req.user!.organizationId, "create", "roundtable_session", session.id, { objective }, req);
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to create Roundtable session" });
+    }
+  });
+
+  // Get Roundtable session details with full context
+  app.get("/api/roundtable/sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getRoundtableSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Verify access
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Get full session context
+      const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
+      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      const context = await orchestrator.getSessionContext(req.params.id);
+
+      // Get messages and participants
+      const messages = await storage.getRoundtableMessagesBySession(req.params.id);
+      const participants = await storage.getRoundtableParticipantsBySession(req.params.id);
+
+      // Return structure that frontend expects
+      res.json({
+        session,
+        messages,
+        participants,
+        context,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch session details" });
+    }
+  });
+
+  // Update Roundtable session
+  app.patch("/api/roundtable/sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getRoundtableSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updates = req.body;
+      const updated = await storage.updateRoundtableSession(req.params.id, updates);
+      
+      await logActivity(req.userId, req.user!.organizationId!, "update", "roundtable_session", req.params.id, updates, req);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update session" });
+    }
+  });
+
+  // Delete Roundtable session
+  app.delete("/api/roundtable/sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getRoundtableSession(req.params.id);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteRoundtableSession(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId!, "delete", "roundtable_session", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete session" });
+    }
+  });
+
+  // Add agent to session
+  app.post("/api/roundtable/sessions/:id/participants", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { agentSlug } = req.body;
+      
+      if (!agentSlug) {
+        return res.status(400).json({ error: "Agent slug required" });
+      }
+
+      const session = await storage.getRoundtableSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
+      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      const participant = await orchestrator.addAgentToSession(req.params.id, agentSlug);
+
+      await logActivity(req.userId, req.user!.organizationId!, "add_agent", "roundtable_session", req.params.id, { agentSlug }, req);
+      res.json(participant);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to add agent" });
+    }
+  });
+
+  // Remove agent from session
+  app.delete("/api/roundtable/sessions/:id/participants/:participantId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getRoundtableSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
+      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      await orchestrator.removeAgentFromSession(req.params.id, req.params.participantId);
+
+      await logActivity(req.userId, req.user!.organizationId!, "remove_agent", "roundtable_session", req.params.id, { participantId: req.params.participantId }, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to remove agent" });
+    }
+  });
+
+  // Get deliverables for session
+  app.get("/api/roundtable/sessions/:id/deliverables", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getRoundtableSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const deliverables = await storage.getRoundtableDeliverablesBySession(req.params.id);
+      res.json(deliverables);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch deliverables" });
+    }
+  });
+
+  // Approve deliverable
+  app.post("/api/roundtable/deliverables/:id/approve", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { feedback } = req.body;
+      
+      const deliverable = await storage.getRoundtableDeliverable(req.params.id);
+      if (!deliverable) {
+        return res.status(404).json({ error: "Deliverable not found" });
+      }
+
+      // Get session to verify access
+      const session = await storage.getRoundtableSession(deliverable.sessionId);
+      if (!session || session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Create approval record
+      const approval = await storage.createRoundtableApproval({
+        deliverableId: req.params.id,
+        approverId: req.userId,
+        decision: 'approved',
+        feedback,
+      });
+
+      // Update deliverable status
+      await storage.updateRoundtableDeliverable(req.params.id, {
+        status: 'approved',
+      });
+
+      // Use orchestrator to handle auto-save logic
+      const { RoundtableOrchestrator } = await import('./roundtable-orchestrator');
+      const orchestrator = RoundtableOrchestrator.getInstance(storage);
+      await orchestrator.approveDeliverable(req.params.id, req.userId, feedback);
+
+      await logActivity(req.userId, req.user!.organizationId!, "approve", "roundtable_deliverable", req.params.id, { feedback }, req);
+      res.json({ approval, deliverable: await storage.getRoundtableDeliverable(req.params.id) });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to approve deliverable" });
+    }
+  });
+
+  // Reject deliverable
+  app.post("/api/roundtable/deliverables/:id/reject", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { feedback } = req.body;
+      
+      const deliverable = await storage.getRoundtableDeliverable(req.params.id);
+      if (!deliverable) {
+        return res.status(404).json({ error: "Deliverable not found" });
+      }
+
+      // Get session to verify access
+      const session = await storage.getRoundtableSession(deliverable.sessionId);
+      if (!session || session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Create rejection record
+      const approval = await storage.createRoundtableApproval({
+        deliverableId: req.params.id,
+        approverId: req.userId,
+        decision: 'rejected',
+        feedback: feedback || 'Deliverable rejected',
+      });
+
+      // Update deliverable status
+      await storage.updateRoundtableDeliverable(req.params.id, {
+        status: 'rejected',
+      });
+
+      await logActivity(req.userId, req.user!.organizationId!, "reject", "roundtable_deliverable", req.params.id, { feedback }, req);
+      res.json({ approval, deliverable: await storage.getRoundtableDeliverable(req.params.id) });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to reject deliverable" });
+    }
+  });
+
   // ==================== Marketplace Routes ====================
   
   // Get all published marketplace items (public view)

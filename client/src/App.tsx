@@ -97,6 +97,8 @@ import ClientMyTasks from "@/pages/client-portal/my-tasks";
 import ClientMyForms from "@/pages/client-portal/my-forms";
 import ClientMySignatures from "@/pages/client-portal/my-signatures";
 import ClientPortalMessages from "@/pages/client-portal/messages";
+import RoundtablePage from "@/pages/roundtable";
+import RoundtableDetail from "@/pages/roundtable-detail";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -467,6 +469,20 @@ function Router() {
         <OrganizationRoute>
           <AppLayout>
             <AIAgents />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/roundtable/:id">
+        <OrganizationRoute>
+          <AppLayout>
+            <RoundtableDetail />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/roundtable">
+        <OrganizationRoute>
+          <AppLayout>
+            <RoundtablePage />
           </AppLayout>
         </OrganizationRoute>
       </Route>
