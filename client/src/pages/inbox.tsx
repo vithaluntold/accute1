@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ import { GradientHero } from "@/components/gradient-hero";
 
 export default function Inbox() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -162,6 +164,14 @@ export default function Inbox() {
         <div className="flex gap-2">
           <Button
             variant="default"
+            onClick={() => setLocation('/ai-agents/relay')}
+            data-testid="button-open-relay"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Open Relay AI
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => batchProcessMutation.mutate()}
             disabled={batchProcessMutation.isPending || messages.filter(m => !m.aiProcessed).length === 0}
             data-testid="button-batch-process"

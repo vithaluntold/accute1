@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Plus, Edit, Trash2, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Edit, Trash2, Loader2, Sparkles } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -208,10 +208,20 @@ export default function MessageTemplatesPage() {
         title="Message Templates"
         description="Create and manage reusable message templates"
         actions={
-          <Button onClick={() => setDialogOpen(true)} className="bg-white text-primary" data-testid="button-create">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Template
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setLocation('/ai-agents/echo')} 
+              className="bg-white text-primary"
+              data-testid="button-create-with-echo"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Create with Echo AI
+            </Button>
+            <Button onClick={() => setDialogOpen(true)} variant="outline" className="bg-white/10 text-white border-white/20" data-testid="button-create">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Template
+            </Button>
+          </div>
         }
       />
 

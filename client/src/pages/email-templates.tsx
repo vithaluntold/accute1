@@ -34,7 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, Plus, Edit, Trash2, Eye, Image, Palette, Link2 } from "lucide-react";
+import { Mail, Plus, Edit, Trash2, Eye, Image, Palette, Link2, Sparkles } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -361,10 +361,20 @@ export default function EmailTemplatesPage() {
         title="Email Templates"
         description="Customize email templates with branding and placeholders"
         actions={
-          <Button onClick={() => handleOpenDialog()} className="bg-white text-primary" data-testid="button-new-template">
-            <Plus className="w-4 h-4 mr-2" />
-            New Template
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setLocation('/ai-agents/scribe')} 
+              className="bg-white text-primary"
+              data-testid="button-create-with-scribe"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Create with Scribe AI
+            </Button>
+            <Button onClick={() => handleOpenDialog()} variant="outline" className="bg-white/10 text-white border-white/20" data-testid="button-new-template">
+              <Plus className="w-4 h-4 mr-2" />
+              New Template
+            </Button>
+          </div>
         }
       />
       
