@@ -7,7 +7,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -714,14 +714,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`✗ Failed to send invitation email to ${email}:`, sendResult.error);
         }
       } else if (type === 'sms' && phone) {
-        const { sendInvitationSMS } = await import('./sms');
-        sendResult = await sendInvitationSMS(phone, inviteUrl, organizationName);
-        
-        if (sendResult.success) {
-          console.log(`✓ Invitation SMS sent to ${phone}`);
-        } else {
-          console.error(`✗ Failed to send invitation SMS to ${phone}:`, sendResult.error);
-        }
+        // SMS is only for OTP verification, not for invitations
+        // Return the invite URL for manual sharing
+        console.log(`⚠️  SMS invitations not supported. SMS is only for OTP verification.`);
+        sendResult = { 
+          success: false, 
+          error: 'SMS invitations not supported. Please share the invite link manually or use email invitations.' 
+        };
       }
 
       res.json({
@@ -8827,8 +8826,12 @@ ${msg.bodyText || msg.bodyHtml || ''}
         .where(eq(schema.platformSubscriptions.id, id));
       
       // Cancel Stripe subscription if exists
-      if (subscription.stripeSubscriptionId && stripe) {
+      if (subscription.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY) {
         try {
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+            apiVersion: '2024-11-20.acacia'
+          });
+          
           await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
             cancel_at_period_end: !immediate,
           });
