@@ -79,6 +79,7 @@ import NotFound from "@/pages/not-found";
 import MobileApps from "@/pages/mobile-apps";
 import OrganizationsPage from "@/pages/admin/organizations";
 import SubscriptionsPage from "@/pages/admin/subscriptions";
+import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
 import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
 import PricingRegionsPage from "@/pages/admin/pricing-regions";
 import CouponsPage from "@/pages/admin/coupons";
@@ -295,6 +296,15 @@ function Router() {
           <RoleGuard allowedRoles={["Super Admin"]}>
             <AppLayout>
               <SubscriptionsPage />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/subscription-analytics">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Super Admin"]}>
+            <AppLayout>
+              <SubscriptionAnalyticsPage />
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>

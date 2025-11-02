@@ -8162,6 +8162,423 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Get subscription details by ID
+  app.get("/api/admin/subscriptions/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.id, id))
+        .limit(1);
+      
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      
+      const org = await storage.getOrganization(subscription.organizationId);
+      const plan = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(eq(schema.subscriptionPlans.id, subscription.planId))
+        .limit(1)
+        .then(r => r[0] || null);
+      
+      const events = await db
+        .select()
+        .from(schema.subscriptionEvents)
+        .where(eq(schema.subscriptionEvents.subscriptionId, id))
+        .orderBy(desc(schema.subscriptionEvents.createdAt))
+        .limit(50);
+      
+      res.json({
+        ...subscription,
+        organization: org,
+        plan,
+        events,
+      });
+    } catch (error: any) {
+      console.error('Get subscription details error:', error);
+      res.status(500).json({ error: "Failed to fetch subscription details" });
+    }
+  });
+
+  // Update subscription status (manual override for Super Admin)
+  app.patch("/api/admin/subscriptions/:id/status", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status, reason } = req.body;
+      
+      if (!status || !['active', 'trial', 'past_due', 'canceled', 'paused'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.id, id))
+        .limit(1);
+      
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      
+      await db
+        .update(schema.platformSubscriptions)
+        .set({
+          status,
+          updatedAt: new Date(),
+          ...(status === 'canceled' ? { canceledAt: new Date() } : {}),
+        })
+        .where(eq(schema.platformSubscriptions.id, id));
+      
+      // Log subscription event
+      await db.insert(schema.subscriptionEvents).values({
+        id: crypto.randomUUID(),
+        subscriptionId: id,
+        eventType: 'status_updated',
+        eventData: { oldStatus: subscription.status, newStatus: status, reason, updatedBy: req.user!.id },
+        createdAt: new Date(),
+      });
+      
+      // Log activity
+      await storage.createActivityLog({
+        userId: req.user!.id,
+        organizationId: subscription.organizationId,
+        action: 'subscription.status_updated',
+        entityType: 'subscription',
+        entityId: id,
+        metadata: { oldStatus: subscription.status, newStatus: status, reason },
+      });
+      
+      res.json({ message: "Subscription status updated successfully" });
+    } catch (error: any) {
+      console.error('Update subscription status error:', error);
+      res.status(500).json({ error: "Failed to update subscription status" });
+    }
+  });
+
+  // Cancel subscription (manual cancellation by Super Admin)
+  app.post("/api/admin/subscriptions/:id/cancel", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { reason, immediate } = req.body;
+      
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.id, id))
+        .limit(1);
+      
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      
+      if (subscription.status === 'canceled') {
+        return res.status(400).json({ error: "Subscription is already canceled" });
+      }
+      
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+      
+      if (immediate) {
+        updateData.status = 'canceled';
+        updateData.canceledAt = new Date();
+      } else {
+        // Schedule cancellation at end of current period
+        updateData.cancelAtPeriodEnd = true;
+      }
+      
+      await db
+        .update(schema.platformSubscriptions)
+        .set(updateData)
+        .where(eq(schema.platformSubscriptions.id, id));
+      
+      // Cancel Stripe subscription if exists
+      if (subscription.stripeSubscriptionId && stripe) {
+        try {
+          await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+            cancel_at_period_end: !immediate,
+          });
+          
+          if (immediate) {
+            await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+          }
+        } catch (stripeError: any) {
+          console.error('Stripe cancellation error:', stripeError);
+          // Continue even if Stripe fails - we've updated our database
+        }
+      }
+      
+      // Log subscription event
+      await db.insert(schema.subscriptionEvents).values({
+        id: crypto.randomUUID(),
+        subscriptionId: id,
+        eventType: 'subscription_canceled',
+        eventData: { reason, immediate, canceledBy: req.user!.id },
+        createdAt: new Date(),
+      });
+      
+      // Log activity
+      await storage.createActivityLog({
+        userId: req.user!.id,
+        organizationId: subscription.organizationId,
+        action: 'subscription.canceled',
+        entityType: 'subscription',
+        entityId: id,
+        metadata: { reason, immediate },
+      });
+      
+      res.json({ 
+        message: immediate 
+          ? "Subscription canceled immediately" 
+          : "Subscription will be canceled at the end of the current billing period" 
+      });
+    } catch (error: any) {
+      console.error('Cancel subscription error:', error);
+      res.status(500).json({ error: "Failed to cancel subscription" });
+    }
+  });
+
+  // Subscription analytics endpoints
+  app.get("/api/admin/analytics/subscription-metrics", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      // Get all active subscriptions
+      const activeSubscriptions = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'active'));
+      
+      // Calculate MRR (Monthly Recurring Revenue)
+      const mrr = activeSubscriptions.reduce((sum, sub) => sum + parseFloat(sub.mrr || '0'), 0);
+      
+      // Calculate ARR (Annual Recurring Revenue)
+      const arr = mrr * 12;
+      
+      // Total active subscriptions
+      const totalActive = activeSubscriptions.length;
+      
+      // Trial subscriptions
+      const trialCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'trial'))
+        .then(r => r[0]?.count || 0);
+      
+      // Past due subscriptions
+      const pastDueCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'past_due'))
+        .then(r => r[0]?.count || 0);
+      
+      // Canceled this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const canceledThisMonth = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(sql`${schema.platformSubscriptions.status} = 'canceled' AND ${schema.platformSubscriptions.canceledAt} >= ${startOfMonth}`)
+        .then(r => r[0]?.count || 0);
+      
+      // New subscriptions this month
+      const newThisMonth = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.platformSubscriptions)
+        .where(sql`${schema.platformSubscriptions.createdAt} >= ${startOfMonth}`)
+        .then(r => r[0]?.count || 0);
+      
+      // Churn rate (canceled / (active + canceled) this month)
+      const churnRate = totalActive > 0 
+        ? (canceledThisMonth / (totalActive + canceledThisMonth)) * 100 
+        : 0;
+      
+      // Subscription distribution by plan
+      const planDistribution = await db
+        .select({
+          planId: schema.platformSubscriptions.planId,
+          planSlug: schema.platformSubscriptions.planSlug,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.status, 'active'))
+        .groupBy(schema.platformSubscriptions.planId, schema.platformSubscriptions.planSlug);
+      
+      // Get plan names
+      const planDistributionWithNames = await Promise.all(
+        planDistribution.map(async (dist) => {
+          const plan = await db
+            .select()
+            .from(schema.subscriptionPlans)
+            .where(eq(schema.subscriptionPlans.id, dist.planId))
+            .limit(1)
+            .then(r => r[0] || null);
+          
+          return {
+            planName: plan?.name || dist.planSlug,
+            count: dist.count,
+          };
+        })
+      );
+      
+      res.json({
+        mrr: parseFloat(mrr.toFixed(2)),
+        arr: parseFloat(arr.toFixed(2)),
+        activeSubscriptions: totalActive,
+        trialSubscriptions: trialCount,
+        pastDueSubscriptions: pastDueCount,
+        newThisMonth,
+        canceledThisMonth,
+        churnRate: parseFloat(churnRate.toFixed(2)),
+        planDistribution: planDistributionWithNames,
+      });
+    } catch (error: any) {
+      console.error('Get subscription metrics error:', error);
+      res.status(500).json({ error: "Failed to fetch subscription metrics" });
+    }
+  });
+
+  // Revenue trends over time
+  app.get("/api/admin/analytics/revenue-trends", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { months = 12 } = req.query;
+      const monthsNum = parseInt(months as string) || 12;
+      
+      // Get subscription events for the period
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - monthsNum);
+      
+      const subscriptions = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(sql`${schema.platformSubscriptions.createdAt} >= ${startDate}`);
+      
+      // Group by month
+      const monthlyData = new Map<string, { month: string; mrr: number; newSubs: number; canceledSubs: number; }>();
+      
+      // Initialize all months
+      for (let i = monthsNum - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthKey = date.toISOString().slice(0, 7); // YYYY-MM
+        monthlyData.set(monthKey, { month: monthKey, mrr: 0, newSubs: 0, canceledSubs: 0 });
+      }
+      
+      // Calculate MRR snapshots and subscription counts
+      for (const sub of subscriptions) {
+        const createdMonth = new Date(sub.createdAt).toISOString().slice(0, 7);
+        if (monthlyData.has(createdMonth)) {
+          monthlyData.get(createdMonth)!.newSubs++;
+        }
+        
+        if (sub.canceledAt) {
+          const canceledMonth = new Date(sub.canceledAt).toISOString().slice(0, 7);
+          if (monthlyData.has(canceledMonth)) {
+            monthlyData.get(canceledMonth)!.canceledSubs++;
+          }
+        }
+      }
+      
+      // Calculate cumulative MRR for each month
+      const allActiveByMonth = await Promise.all(
+        Array.from(monthlyData.keys()).map(async (monthKey) => {
+          const endOfMonth = new Date(monthKey + '-01');
+          endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+          
+          const activeSubs = await db
+            .select()
+            .from(schema.platformSubscriptions)
+            .where(sql`
+              ${schema.platformSubscriptions.status} = 'active' 
+              AND ${schema.platformSubscriptions.createdAt} < ${endOfMonth}
+              AND (${schema.platformSubscriptions.canceledAt} IS NULL OR ${schema.platformSubscriptions.canceledAt} >= ${endOfMonth})
+            `);
+          
+          const mrr = activeSubs.reduce((sum, sub) => sum + parseFloat(sub.mrr || '0'), 0);
+          return { monthKey, mrr };
+        })
+      );
+      
+      // Update monthly data with MRR
+      for (const { monthKey, mrr } of allActiveByMonth) {
+        if (monthlyData.has(monthKey)) {
+          monthlyData.get(monthKey)!.mrr = parseFloat(mrr.toFixed(2));
+        }
+      }
+      
+      res.json(Array.from(monthlyData.values()).sort((a, b) => a.month.localeCompare(b.month)));
+    } catch (error: any) {
+      console.error('Get revenue trends error:', error);
+      res.status(500).json({ error: "Failed to fetch revenue trends" });
+    }
+  });
+
+  // Subscription lifecycle analytics
+  app.get("/api/admin/analytics/subscription-lifecycle", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      // Get all subscriptions
+      const allSubscriptions = await db
+        .select()
+        .from(schema.platformSubscriptions);
+      
+      // Calculate lifecycle metrics
+      const statusDistribution = {
+        active: allSubscriptions.filter(s => s.status === 'active').length,
+        trial: allSubscriptions.filter(s => s.status === 'trial').length,
+        past_due: allSubscriptions.filter(s => s.status === 'past_due').length,
+        canceled: allSubscriptions.filter(s => s.status === 'canceled').length,
+        paused: allSubscriptions.filter(s => s.status === 'paused').length,
+      };
+      
+      // Billing cycle distribution
+      const billingCycleDistribution = {
+        monthly: allSubscriptions.filter(s => s.status === 'active' && s.billingCycle === 'monthly').length,
+        annual: allSubscriptions.filter(s => s.status === 'active' && s.billingCycle === 'annual').length,
+      };
+      
+      // Average subscription value
+      const activeSubs = allSubscriptions.filter(s => s.status === 'active');
+      const avgMonthlyValue = activeSubs.length > 0
+        ? activeSubs.reduce((sum, s) => sum + parseFloat(s.mrr || '0'), 0) / activeSubs.length
+        : 0;
+      
+      const avgAnnualValue = activeSubs.filter(s => s.billingCycle === 'annual').length > 0
+        ? activeSubs.filter(s => s.billingCycle === 'annual').reduce((sum, s) => sum + parseFloat(s.mrr || '0'), 0) * 12 / activeSubs.filter(s => s.billingCycle === 'annual').length
+        : 0;
+      
+      // Trial to paid conversion rate
+      const totalTrials = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.subscriptionEvents)
+        .where(sql`${schema.subscriptionEvents.eventType} = 'trial_started'`)
+        .then(r => r[0]?.count || 0);
+      
+      const convertedTrials = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.subscriptionEvents)
+        .where(sql`${schema.subscriptionEvents.eventType} = 'trial_converted'`)
+        .then(r => r[0]?.count || 0);
+      
+      const trialConversionRate = totalTrials > 0 ? (convertedTrials / totalTrials) * 100 : 0;
+      
+      res.json({
+        statusDistribution,
+        billingCycleDistribution,
+        avgMonthlyValue: parseFloat(avgMonthlyValue.toFixed(2)),
+        avgAnnualValue: parseFloat(avgAnnualValue.toFixed(2)),
+        trialConversionRate: parseFloat(trialConversionRate.toFixed(2)),
+        totalSubscriptions: allSubscriptions.length,
+      });
+    } catch (error: any) {
+      console.error('Get subscription lifecycle error:', error);
+      res.status(500).json({ error: "Failed to fetch subscription lifecycle analytics" });
+    }
+  });
+
   // Get all platform users
   app.get("/api/admin/users", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {

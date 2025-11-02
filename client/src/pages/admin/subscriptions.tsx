@@ -8,416 +8,607 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Search, CreditCard, Building2, TrendingUp, DollarSign, Plus, MoreVertical, Ban, Play, X } from "lucide-react";
-import { format, addMonths, addYears } from "date-fns";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, CreditCard, Building2, TrendingUp, DollarSign, MoreVertical, Ban, Play, Eye, RefreshCw, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GradientHero } from "@/components/gradient-hero";
 
+interface Subscription {
+  id: string;
+  organizationId: string;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  planId: string;
+  planSlug: string;
+  status: string;
+  billingCycle: string;
+  mrr: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  trialEndsAt: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SubscriptionDetails extends Subscription {
+  plan: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  events: Array<{
+    id: string;
+    eventType: string;
+    eventData: any;
+    createdAt: string;
+  }>;
+}
+
 export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newSubscription, setNewSubscription] = useState({
-    organizationId: "",
-    plan: "free",
-    billingCycle: "monthly",
-    isTrialing: false,
-  });
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<string | null>(null);
+  const [updateStatusDialogOpen, setUpdateStatusDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [statusUpdateData, setStatusUpdateData] = useState({ status: "", reason: "" });
+  const [cancelData, setCancelData] = useState({ reason: "", immediate: false });
   const { toast } = useToast();
 
-  const { data: subscriptions, isLoading } = useQuery<Array<{
-    id: string;
-    organizationId: string;
-    organization: {
-      name: string;
-      slug: string;
-    };
-    plan: string;
-    status: string;
-    billingCycle: string;
-    monthlyPrice?: string;
-    yearlyPrice?: string;
-    currentPeriodStart: string;
-    currentPeriodEnd: string;
-    nextBillingDate?: string;
-    currentUsers: number;
-    currentClients: number;
-    maxUsers: number;
-    maxClients: number;
-    isTrialing: boolean;
-    trialEndsAt?: string;
-  }>>({
+  const { data: subscriptions, isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/admin/subscriptions"],
   });
 
-  // Fetch organizations for dropdown
-  const { data: organizations } = useQuery<Array<{ id: string; name: string }>>({
-    queryKey: ["/api/admin/organizations"],
-  });
-
-  // Create subscription mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof newSubscription) => {
-      const now = new Date();
-      const periodEnd = data.billingCycle === "yearly" ? addYears(now, 1) : addMonths(now, 1);
-      
-      return await apiRequest("POST", "/api/admin/subscriptions", {
-        ...data,
-        currentPeriodStart: now.toISOString(),
-        currentPeriodEnd: periodEnd.toISOString(),
-        nextBillingDate: periodEnd.toISOString(),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
-      setCreateDialogOpen(false);
-      setNewSubscription({ organizationId: "", plan: "free", billingCycle: "monthly", isTrialing: false });
-      toast({ title: "Subscription created successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to create subscription", description: error.message, variant: "destructive" });
-    },
+  const { data: subscriptionDetails } = useQuery<SubscriptionDetails>({
+    queryKey: [`/api/admin/subscriptions/${selectedSubscription}`],
+    enabled: !!selectedSubscription && detailsDialogOpen,
   });
 
   // Update subscription status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return await apiRequest("PATCH", `/api/admin/subscriptions/${id}`, { status });
+    mutationFn: async ({ id, status, reason }: { id: string; status: string; reason: string }) => {
+      const response = await apiRequest("PATCH", `/api/admin/subscriptions/${id}/status`, { status, reason });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
-      toast({ title: "Subscription status updated" });
+      if (selectedSubscription) {
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/subscriptions/${selectedSubscription}`] });
+      }
+      setUpdateStatusDialogOpen(false);
+      setStatusUpdateData({ status: "", reason: "" });
+      toast({ title: "Subscription status updated successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update subscription", description: error.message, variant: "destructive" });
     },
   });
 
-  const filteredSubs = subscriptions?.filter(sub =>
-    sub.organization.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    sub.plan.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  // Cancel subscription mutation
+  const cancelMutation = useMutation({
+    mutationFn: async ({ id, reason, immediate }: { id: string; reason: string; immediate: boolean }) => {
+      const response = await apiRequest("POST", `/api/admin/subscriptions/${id}/cancel`, { reason, immediate });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      if (selectedSubscription) {
+        queryClient.invalidateQueries({ queryKey: [`/api/admin/subscriptions/${selectedSubscription}`] });
+      }
+      setCancelDialogOpen(false);
+      setCancelData({ reason: "", immediate: false });
+      toast({ title: "Subscription canceled successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to cancel subscription", description: error.message, variant: "destructive" });
+    },
+  });
 
-  const getPlanBadgeVariant = (plan: string) => {
-    switch (plan) {
-      case "free": return "secondary";
-      case "starter": return "default";
-      case "professional": return "default";
-      case "enterprise": return "default";
-      default: return "secondary";
-    }
-  };
+  const filteredSubs = subscriptions?.filter(sub => {
+    const matchesSearch = sub.organization?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.planSlug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.organization?.slug.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || sub.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  }) || [];
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
       case "active": return "default";
-      case "suspended": return "destructive";
-      case "cancelled": return "secondary";
-      case "expired": return "destructive";
+      case "trial": return "outline";
+      case "past_due": return "destructive";
+      case "canceled": return "secondary";
+      case "paused": return "secondary";
       default: return "secondary";
     }
   };
 
   const stats = {
-    totalRevenue: subscriptions?.reduce((sum, sub) => {
-      const price = sub.billingCycle === "yearly" ? parseFloat(sub.yearlyPrice || "0") : parseFloat(sub.monthlyPrice || "0");
-      return sum + (sub.status === "active" ? price : 0);
+    totalMRR: subscriptions?.filter(s => s.status === 'active').reduce((sum, sub) => {
+      return sum + parseFloat(sub.mrr || "0");
     }, 0) || 0,
-    activeSubscriptions: subscriptions?.filter(s => s.status === "active").length || 0,
-    totalOrganizations: subscriptions?.length || 0,
-    trialing: subscriptions?.filter(s => s.isTrialing).length || 0,
+    activeSubscriptions: subscriptions?.filter(s => s.status === 'active').length || 0,
+    trialSubscriptions: subscriptions?.filter(s => s.status === 'trial').length || 0,
+    pastDueSubscriptions: subscriptions?.filter(s => s.status === 'past_due').length || 0,
   };
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="min-h-screen bg-background">
       <GradientHero
+        title="Subscription Management"
+        description="Manage platform subscriptions, billing, and revenue"
         icon={CreditCard}
-        title="Subscriptions"
-        description="Manage platform subscriptions and billing"
-        testId="heading-subscriptions"
       />
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+          <Card data-testid="card-mrr-metric">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Monthly Recurring Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold" data-testid="text-monthly-revenue">${stats.totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Active subscriptions</p>
+              <div className="text-2xl font-bold" data-testid="text-mrr-value">
+                ${stats.totalMRR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                From {stats.activeSubscriptions} active subscriptions
+              </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold" data-testid="text-active-count">{stats.activeSubscriptions}</div>
-              <p className="text-xs text-muted-foreground">of {stats.totalOrganizations} total</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Trialing</CardTitle>
+
+          <Card data-testid="card-active-metric">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold" data-testid="text-trialing-count">{stats.trialing}</div>
-              <p className="text-xs text-muted-foreground">Trial subscriptions</p>
+              <div className="text-2xl font-bold" data-testid="text-active-count">
+                {stats.activeSubscriptions}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ARR: ${(stats.totalMRR * 12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orgs</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+
+          <Card data-testid="card-trial-metric">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Trial Subscriptions</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold" data-testid="text-total-orgs">{stats.totalOrganizations}</div>
-              <p className="text-xs text-muted-foreground">Organizations</p>
+              <div className="text-2xl font-bold" data-testid="text-trial-count">
+                {stats.trialSubscriptions}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Potential customers
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-past-due-metric">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Past Due</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive" data-testid="text-past-due-count">
+                {stats.pastDueSubscriptions}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Requires attention
+              </p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Subscriptions Table */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <CardTitle>All Subscriptions</CardTitle>
-                <CardDescription>View and manage organization subscriptions</CardDescription>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="relative w-64">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    data-testid="input-search-subscriptions"
-                    placeholder="Search subscriptions..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-                <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-subscription">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Subscription
-                </Button>
-              </div>
-            </div>
+            <CardTitle>Platform Subscriptions</CardTitle>
+            <CardDescription>
+              View and manage all organization subscriptions
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Search and Filters */}
+            <div className="flex gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search organizations or plans..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-subscriptions"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="trial">Trial</SelectItem>
+                  <SelectItem value="past_due">Past Due</SelectItem>
+                  <SelectItem value="canceled">Canceled</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Table */}
             {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="loading-subscriptions">Loading subscriptions...</div>
+              <div className="text-center py-8 text-muted-foreground">Loading subscriptions...</div>
             ) : filteredSubs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground" data-testid="empty-subscriptions">
-                No subscriptions found
+              <div className="text-center py-8 text-muted-foreground">
+                {searchQuery || statusFilter !== "all" ? "No subscriptions match your filters" : "No subscriptions found"}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Organization</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Billing</TableHead>
-                    <TableHead>Usage</TableHead>
-                    <TableHead>Next Billing</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSubs.map((sub) => (
-                    <TableRow key={sub.id} data-testid={`row-subscription-${sub.id}`}>
-                      <TableCell>
-                        <div className="font-medium" data-testid={`text-org-name-${sub.id}`}>{sub.organization.name}</div>
-                        <div className="text-sm text-muted-foreground">@{sub.organization.slug}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getPlanBadgeVariant(sub.plan)} data-testid={`badge-plan-${sub.id}`}>
-                          {sub.plan.toUpperCase()}
-                        </Badge>
-                        {sub.isTrialing && (
-                          <Badge variant="secondary" className="ml-2">
-                            Trial
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(sub.status)} data-testid={`badge-status-${sub.id}`}>
-                          {sub.status.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">
-                          ${sub.billingCycle === "yearly" ? sub.yearlyPrice : sub.monthlyPrice}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {sub.billingCycle === "yearly" ? "per year" : "per month"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm space-y-1">
-                          <div>{sub.currentUsers}/{sub.maxUsers} users</div>
-                          <div>{sub.currentClients}/{sub.maxClients} clients</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {sub.nextBillingDate && (
-                          <div className="text-sm">
-                            {format(new Date(sub.nextBillingDate), "MMM d, yyyy")}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" data-testid={`button-manage-subscription-${sub.id}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {sub.status === "active" && (
-                              <>
-                                <DropdownMenuItem 
-                                  onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "suspended" })}
-                                  data-testid={`action-suspend-${sub.id}`}
-                                >
-                                  <Ban className="h-4 w-4 mr-2" />
-                                  Suspend (Non-payment)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "cancelled" })}
-                                  data-testid={`action-cancel-${sub.id}`}
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Cancel
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {sub.status === "suspended" && (
-                              <DropdownMenuItem 
-                                onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "active" })}
-                                data-testid={`action-resume-${sub.id}`}
-                              >
-                                <Play className="h-4 w-4 mr-2" />
-                                Resume (Manual Override)
-                              </DropdownMenuItem>
-                            )}
-                            {(sub.status === "cancelled" || sub.status === "expired") && (
-                              <DropdownMenuItem 
-                                onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "active" })}
-                                data-testid={`action-reactivate-${sub.id}`}
-                              >
-                                <Play className="h-4 w-4 mr-2" />
-                                Reactivate
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Organization</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Billing Cycle</TableHead>
+                      <TableHead>MRR</TableHead>
+                      <TableHead>Current Period</TableHead>
+                      <TableHead>Payment Provider</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSubs.map((subscription) => (
+                      <TableRow key={subscription.id} data-testid={`row-subscription-${subscription.id}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium" data-testid={`text-org-name-${subscription.id}`}>
+                              {subscription.organization?.name || 'Unknown'}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {subscription.organization?.slug || 'N/A'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" data-testid={`badge-plan-${subscription.id}`}>
+                            {subscription.planSlug}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(subscription.status)} data-testid={`badge-status-${subscription.id}`}>
+                            {subscription.status}
+                          </Badge>
+                          {subscription.cancelAtPeriodEnd && (
+                            <div className="text-xs text-destructive mt-1">
+                              Cancels at period end
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="capitalize">{subscription.billingCycle}</TableCell>
+                        <TableCell className="font-mono" data-testid={`text-mrr-${subscription.id}`}>
+                          ${parseFloat(subscription.mrr || '0').toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {format(new Date(subscription.currentPeriodStart), 'MMM d, yyyy')}
+                            <span className="text-muted-foreground"> to </span>
+                            {format(new Date(subscription.currentPeriodEnd), 'MMM d, yyyy')}
+                          </div>
+                          {subscription.trialEndsAt && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Trial ends: {format(new Date(subscription.trialEndsAt), 'MMM d, yyyy')}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {subscription.stripeSubscriptionId ? (
+                            <Badge variant="outline">Stripe</Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Manual</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-actions-${subscription.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedSubscription(subscription.id);
+                                  setDetailsDialogOpen(true);
+                                }}
+                                data-testid={`menu-view-details-${subscription.id}`}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              {subscription.status !== 'canceled' && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedSubscription(subscription.id);
+                                      setStatusUpdateData({ status: subscription.status, reason: "" });
+                                      setUpdateStatusDialogOpen(true);
+                                    }}
+                                    data-testid={`menu-update-status-${subscription.id}`}
+                                  >
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Update Status
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedSubscription(subscription.id);
+                                      setCancelData({ reason: "", immediate: false });
+                                      setCancelDialogOpen(true);
+                                    }}
+                                    className="text-destructive"
+                                    data-testid={`menu-cancel-${subscription.id}`}
+                                  >
+                                    <Ban className="mr-2 h-4 w-4" />
+                                    Cancel Subscription
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      </main>
 
-      {/* Create Subscription Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* View Details Dialog */}
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create New Subscription</DialogTitle>
+            <DialogTitle>Subscription Details</DialogTitle>
             <DialogDescription>
-              Create a new subscription for an organization. This will enable platform access based on the selected plan.
+              Detailed information about this subscription
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="organization">Organization *</Label>
-              <Select 
-                value={newSubscription.organizationId} 
-                onValueChange={(value) => setNewSubscription({ ...newSubscription, organizationId: value })}
+          {subscriptionDetails ? (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Organization</Label>
+                  <div className="mt-1 font-medium">{subscriptionDetails.organization?.name}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Plan</Label>
+                  <div className="mt-1">
+                    <Badge variant="outline">{subscriptionDetails.plan?.name || subscriptionDetails.planSlug}</Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                  <div className="mt-1">
+                    <Badge variant={getStatusBadgeVariant(subscriptionDetails.status)}>
+                      {subscriptionDetails.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Billing Cycle</Label>
+                  <div className="mt-1 capitalize">{subscriptionDetails.billingCycle}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">MRR</Label>
+                  <div className="mt-1 font-mono font-medium">${parseFloat(subscriptionDetails.mrr || '0').toFixed(2)}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Current Period</Label>
+                  <div className="mt-1 text-sm">
+                    {format(new Date(subscriptionDetails.currentPeriodStart), 'MMM d, yyyy')} - {format(new Date(subscriptionDetails.currentPeriodEnd), 'MMM d, yyyy')}
+                  </div>
+                </div>
+                {subscriptionDetails.stripeCustomerId && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Stripe Customer ID</Label>
+                    <div className="mt-1 font-mono text-sm">{subscriptionDetails.stripeCustomerId}</div>
+                  </div>
+                )}
+                {subscriptionDetails.stripeSubscriptionId && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Stripe Subscription ID</Label>
+                    <div className="mt-1 font-mono text-sm">{subscriptionDetails.stripeSubscriptionId}</div>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Created</Label>
+                  <div className="mt-1 text-sm">{format(new Date(subscriptionDetails.createdAt), 'MMM d, yyyy HH:mm')}</div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                  <div className="mt-1 text-sm">{format(new Date(subscriptionDetails.updatedAt), 'MMM d, yyyy HH:mm')}</div>
+                </div>
+              </div>
+
+              {subscriptionDetails.events && subscriptionDetails.events.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium">Recent Events</Label>
+                  <div className="mt-2 space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-3">
+                    {subscriptionDetails.events.map((event: any, index: number) => (
+                      <div key={index} className="text-sm pb-2 border-b last:border-0">
+                        <div className="flex justify-between items-start">
+                          <Badge variant="outline" className="text-xs">{event.eventType}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(event.createdAt), 'MMM d, yyyy HH:mm')}
+                          </span>
+                        </div>
+                        {event.eventData && (
+                          <div className="mt-1 text-xs text-muted-foreground font-mono">
+                            {JSON.stringify(event.eventData, null, 2)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">Loading details...</div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update Status Dialog */}
+      <Dialog open={updateStatusDialogOpen} onOpenChange={setUpdateStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Subscription Status</DialogTitle>
+            <DialogDescription>
+              Manually update the subscription status (admin override)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-status">New Status</Label>
+              <Select
+                value={statusUpdateData.status}
+                onValueChange={(value) => setStatusUpdateData({ ...statusUpdateData, status: value })}
               >
-                <SelectTrigger id="organization" data-testid="select-organization">
-                  <SelectValue placeholder="Select organization" />
+                <SelectTrigger id="new-status" data-testid="select-new-status">
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {organizations?.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="trial">Trial</SelectItem>
+                  <SelectItem value="past_due">Past Due</SelectItem>
+                  <SelectItem value="canceled">Canceled</SelectItem>
+                  <SelectItem value="paused">Paused</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="plan">Plan *</Label>
-              <Select 
-                value={newSubscription.plan} 
-                onValueChange={(value) => setNewSubscription({ ...newSubscription, plan: value })}
-              >
-                <SelectTrigger id="plan" data-testid="select-plan">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free (5 users, 10 clients)</SelectItem>
-                  <SelectItem value="starter">Starter (10 users, 25 clients)</SelectItem>
-                  <SelectItem value="professional">Professional (25 users, 100 clients)</SelectItem>
-                  <SelectItem value="enterprise">Enterprise (Unlimited)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billing">Billing Cycle *</Label>
-              <Select 
-                value={newSubscription.billingCycle} 
-                onValueChange={(value) => setNewSubscription({ ...newSubscription, billingCycle: value })}
-              >
-                <SelectTrigger id="billing" data-testid="select-billing-cycle">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly (Save 20%)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="trial"
-                checked={newSubscription.isTrialing}
-                onChange={(e) => setNewSubscription({ ...newSubscription, isTrialing: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300"
-                data-testid="checkbox-trial"
+            <div>
+              <Label htmlFor="status-reason">Reason (for audit trail)</Label>
+              <Textarea
+                id="status-reason"
+                placeholder="Enter reason for status change..."
+                value={statusUpdateData.reason}
+                onChange={(e) => setStatusUpdateData({ ...statusUpdateData, reason: e.target.value })}
+                data-testid="textarea-status-reason"
               />
-              <Label htmlFor="trial" className="cursor-pointer">
-                Start with 30-day free trial
-              </Label>
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setCreateDialogOpen(false)}
-              data-testid="button-cancel-create"
+            <Button
+              variant="outline"
+              onClick={() => setUpdateStatusDialogOpen(false)}
+              data-testid="button-cancel-status-update"
             >
               Cancel
             </Button>
-            <Button 
-              onClick={() => createMutation.mutate(newSubscription)} 
-              disabled={!newSubscription.organizationId || createMutation.isPending}
-              data-testid="button-submit-create"
+            <Button
+              onClick={() => {
+                if (selectedSubscription) {
+                  updateStatusMutation.mutate({
+                    id: selectedSubscription,
+                    status: statusUpdateData.status,
+                    reason: statusUpdateData.reason,
+                  });
+                }
+              }}
+              disabled={!statusUpdateData.status || updateStatusMutation.isPending}
+              data-testid="button-submit-status-update"
             >
-              {createMutation.isPending ? "Creating..." : "Create Subscription"}
+              {updateStatusMutation.isPending ? "Updating..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Subscription Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Subscription</DialogTitle>
+            <DialogDescription>
+              Cancel this subscription. This action will be logged for audit purposes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cancel-reason">Reason for Cancellation</Label>
+              <Textarea
+                id="cancel-reason"
+                placeholder="Enter reason for cancellation..."
+                value={cancelData.reason}
+                onChange={(e) => setCancelData({ ...cancelData, reason: e.target.value })}
+                data-testid="textarea-cancel-reason"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="immediate-cancel"
+                checked={cancelData.immediate}
+                onChange={(e) => setCancelData({ ...cancelData, immediate: e.target.checked })}
+                className="h-4 w-4"
+                data-testid="checkbox-immediate-cancel"
+              />
+              <Label htmlFor="immediate-cancel" className="text-sm font-normal cursor-pointer">
+                Cancel immediately (instead of at period end)
+              </Label>
+            </div>
+            {!cancelData.immediate && (
+              <div className="bg-muted p-3 rounded-md text-sm">
+                The subscription will remain active until the end of the current billing period.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              data-testid="button-cancel-cancellation"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedSubscription) {
+                  cancelMutation.mutate({
+                    id: selectedSubscription,
+                    reason: cancelData.reason,
+                    immediate: cancelData.immediate,
+                  });
+                }
+              }}
+              disabled={!cancelData.reason || cancelMutation.isPending}
+              data-testid="button-submit-cancellation"
+            >
+              {cancelMutation.isPending ? "Canceling..." : "Cancel Subscription"}
             </Button>
           </DialogFooter>
         </DialogContent>
