@@ -43,22 +43,22 @@ export default function MarketplaceCreatePage() {
         category: formData.category,
       });
       
-      // Redirect to appropriate page with marketplaceTemplateId and metadata to trigger creation
+      // Redirect to appropriate AI agent with marketplaceTemplateId and metadata
       switch (templateType) {
         case 'form_template':
-          navigate(`/forms?${params.toString()}`);
+          navigate(`/ai-agents/forma?${params.toString()}`);
           break;
         case 'pipeline_template':
-          navigate(`/workflows?${params.toString()}`);
+          navigate(`/ai-agents/cadence?${params.toString()}`);
           break;
         case 'document_template':
-          navigate(`/documents?${params.toString()}`);
+          navigate(`/ai-agents/parity?${params.toString()}`);
           break;
         case 'email_template':
-          navigate(`/email-templates?${params.toString()}`);
+          navigate(`/ai-agents/scribe?${params.toString()}`);
           break;
         case 'message_template':
-          navigate(`/message-templates?${params.toString()}`);
+          navigate(`/ai-agents/echo?${params.toString()}`);
           break;
       }
     },
@@ -111,7 +111,7 @@ export default function MarketplaceCreatePage() {
       <GradientHero
         icon={Package}
         title="Create Marketplace Template"
-        description="Step 1: Fill in marketplace details. Step 2: Create template content in the dedicated builder."
+        description="Step 1: Fill in marketplace details. Step 2: Use AI agents to build your template content conversationally."
         actions={
           <Button
             variant="outline"
@@ -135,7 +135,7 @@ export default function MarketplaceCreatePage() {
               Marketplace Template Information
             </CardTitle>
             <CardDescription>
-              Provide basic template information. You'll be redirected to create the actual template content next.
+              Provide basic template information. You'll be redirected to the AI agent to build your template conversationally.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -157,7 +157,12 @@ export default function MarketplaceCreatePage() {
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                You'll be redirected to the appropriate builder to create the {templateType.replace('_template', '').replace('pipeline', 'workflow')} content
+                You'll be redirected to {
+                  templateType === 'document_template' ? 'Parity AI' :
+                  templateType === 'pipeline_template' ? 'Cadence AI' :
+                  templateType === 'form_template' ? 'Forma AI' :
+                  templateType === 'email_template' ? 'Scribe AI' : 'Echo AI'
+                } to create the {templateType.replace('_template', '').replace('pipeline', 'workflow')} content
               </p>
             </div>
 
@@ -278,7 +283,7 @@ export default function MarketplaceCreatePage() {
                 ) : (
                   <>
                     <ArrowRight className="w-4 h-4 mr-2" />
-                    Continue to Builder
+                    Continue to AI Agent
                   </>
                 )}
               </Button>
