@@ -3670,7 +3670,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         sensitiveData.contactLastName?.trim()
       ].filter(Boolean).join(" ") || "";
 
-      // Create client
+      // Create client in inactive state - will be activated when contact verifies their account
       const client = await storage.createClient({
         companyName: sensitiveData.companyName || collectedData.companyName || "Unknown Company",
         contactName: contactName, // Legacy field for backward compatibility
@@ -3689,7 +3689,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
           clientType: collectedData.clientType || "business",
           onboardingSessionId: sessionId,
         },
-        status: "active",
+        status: "inactive", // Client starts as inactive until contact activates
         organizationId: req.user!.organizationId!,
         createdBy: req.userId!,
       });
@@ -3762,7 +3762,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
           let isNewUser = false;
 
           if (shouldCreateUser) {
-            // Create new user
+            // Create new user in inactive state - will be activated after email and phone verification
             tempPassword = crypto.randomBytes(16).toString('base64').slice(0, 16);
             const hashedPassword = await hashPassword(tempPassword);
 
@@ -3775,12 +3775,12 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
               lastName: sensitiveData.contactLastName,
               roleId: clientRole[0].id,
               organizationId: req.user!.organizationId!,
-              isActive: true,
+              isActive: false, // Contact user starts inactive until they verify email and phone
             }).returning();
 
             contactUser = newUser;
             isNewUser = true;
-            console.log("✅ Created new user account for contact:", contactUser.id);
+            console.log("✅ Created new user account for contact (inactive):", contactUser.id);
           }
 
           // Create new contact and link to user
@@ -3895,6 +3895,189 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     } catch (error: any) {
       console.error("Failed to complete onboarding:", error);
       res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
+  // ==================== Portal Activation Routes ====================
+  
+  // Validate portal invitation token and get contact details
+  app.get("/api/portal/validate/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ error: "Invitation token is required" });
+      }
+
+      // Find the portal invitation
+      const invitation = await db.select()
+        .from(schema.portalInvitations)
+        .where(eq(schema.portalInvitations.invitationToken, token))
+        .limit(1);
+
+      if (invitation.length === 0) {
+        return res.status(404).json({ error: "Invalid or expired invitation" });
+      }
+
+      const portalInvite = invitation[0];
+
+      // Check if expired
+      if (new Date() > portalInvite.expiresAt) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      // Check if already accepted
+      if (portalInvite.status === "accepted") {
+        return res.status(400).json({ error: "Invitation has already been used" });
+      }
+
+      // Get contact and user details
+      const contact = await storage.getContact(portalInvite.contactId);
+      const user = await storage.getUser(portalInvite.userId);
+
+      if (!contact || !user) {
+        return res.status(404).json({ error: "Contact or user not found" });
+      }
+
+      res.json({
+        valid: true,
+        contact: {
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+        },
+        user: {
+          username: user.username,
+          isActive: user.isActive,
+          phoneVerified: user.phoneVerified,
+        }
+      });
+    } catch (error: any) {
+      console.error("Portal validation error:", error);
+      res.status(500).json({ error: "Failed to validate invitation" });
+    }
+  });
+
+  // Complete portal activation after phone verification
+  app.post("/api/portal/activate", async (req: Request, res: Response) => {
+    try {
+      const { invitationToken, password, otpId } = req.body;
+
+      if (!invitationToken || !password) {
+        return res.status(400).json({ error: "Invitation token and password are required" });
+      }
+
+      if (!otpId) {
+        return res.status(400).json({ error: "Phone verification (OTP) is required to activate your account" });
+      }
+
+      // Find the portal invitation
+      const invitation = await db.select()
+        .from(schema.portalInvitations)
+        .where(eq(schema.portalInvitations.invitationToken, invitationToken))
+        .limit(1);
+
+      if (invitation.length === 0) {
+        return res.status(404).json({ error: "Invalid or expired invitation" });
+      }
+
+      const portalInvite = invitation[0];
+
+      // Check if expired
+      if (new Date() > portalInvite.expiresAt) {
+        return res.status(400).json({ error: "Invitation has expired" });
+      }
+
+      // Check if already accepted
+      if (portalInvite.status === "accepted") {
+        return res.status(400).json({ error: "Invitation has already been used" });
+      }
+
+      // Get contact and user
+      const contact = await storage.getContact(portalInvite.contactId);
+      if (!contact) {
+        return res.status(404).json({ error: "Contact not found" });
+      }
+
+      const user = await storage.getUser(portalInvite.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify the OTP record exists, is verified, and matches the contact's phone
+      const otpRecord = await db.select()
+        .from(schema.otpVerifications)
+        .where(eq(schema.otpVerifications.id, otpId))
+        .limit(1);
+
+      if (otpRecord.length === 0) {
+        return res.status(400).json({ error: "Invalid OTP verification" });
+      }
+
+      const otp = otpRecord[0];
+
+      // Validate OTP is verified and not expired
+      if (!otp.verified) {
+        return res.status(400).json({ error: "Phone number not verified. Please complete OTP verification first." });
+      }
+
+      if (new Date() > otp.expiresAt) {
+        return res.status(400).json({ error: "OTP verification has expired. Please request a new code." });
+      }
+
+      // Validate OTP phone matches contact phone
+      if (otp.phone !== contact.phone) {
+        return res.status(400).json({ error: "Phone verification does not match contact phone number" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+
+      // Use a transaction to ensure atomicity
+      await db.transaction(async (tx) => {
+        // Update user with new password and activate
+        await tx.update(schema.users)
+          .set({
+            password: hashedPassword,
+            isActive: true,
+            phoneVerified: true,
+            phoneVerifiedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, portalInvite.userId));
+
+        // Activate the client
+        if (contact.clientId) {
+          await tx.update(schema.clients)
+            .set({
+              status: "active",
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.clients.id, contact.clientId));
+          console.log("✅ Activated client:", contact.clientId);
+        }
+
+        // Mark invitation as accepted
+        await tx.update(schema.portalInvitations)
+          .set({
+            status: "accepted",
+            acceptedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.portalInvitations.id, portalInvite.id));
+      });
+
+      console.log("✅ Portal activation completed for user:", portalInvite.userId, "with verified OTP:", otpId);
+
+      res.json({
+        success: true,
+        message: "Account activated successfully",
+        activated: true,
+      });
+    } catch (error: any) {
+      console.error("Portal activation error:", error);
+      res.status(500).json({ error: "Failed to activate portal account" });
     }
   });
 
