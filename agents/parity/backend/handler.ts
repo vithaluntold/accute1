@@ -126,19 +126,22 @@ export const registerRoutes = (app: any) => {
   // Save as template
   app.post("/api/agents/parity/save-template", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { name, category, description, content } = req.body;
+      const { name, category, description, content, scope } = req.body;
       
       if (!name || !content) {
         return res.status(400).json({ error: "Name and content are required" });
       }
+
+      // Validate scope parameter
+      const templateScope = scope === "global" ? "global" : "organization";
 
       const template = await storage.createDocumentTemplate({
         name,
         category: category || "engagement_letter",
         content,
         description: description || "",
-        scope: "organization",
-        organizationId: req.user!.organizationId!,
+        scope: templateScope,
+        organizationId: templateScope === "organization" ? req.user!.organizationId! : null,
         createdBy: req.user!.id
       });
 

@@ -153,13 +153,16 @@ Guidelines:
   // Endpoint to save the completed workflow
   app.post("/api/agents/cadence/save-workflow", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { workflow } = req.body;
+      const { workflow, scope } = req.body;
       const userId = req.userId;
       const organizationId = req.user?.organizationId;
 
       if (!workflow || !workflow.name) {
         return res.status(400).json({ error: "Invalid workflow data" });
       }
+
+      // Validate scope parameter
+      const templateScope = scope === "global" ? "global" : "organization";
 
       // Convert Cadence workflow format to system workflow format
       const stages = workflow.stages.map((stage: Stage) => ({
@@ -188,7 +191,8 @@ Guidelines:
         triggers: [],
         status: "published",
         isTemplate: true, // Save as template for reuse
-        organizationId: organizationId!,
+        scope: templateScope,
+        organizationId: templateScope === "organization" ? organizationId! : null,
         createdBy: userId!,
       });
 

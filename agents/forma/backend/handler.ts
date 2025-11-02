@@ -192,11 +192,14 @@ Great! I've added an email field for you. What other information do you need to 
   // Save form as template
   app.post("/api/agents/forma/save-form", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      // Validate scope parameter
+      const templateScope = req.body.scope === "global" ? "global" : "organization";
+      
       // Prepare template data with organization context
       const templateData = {
         ...req.body,
-        scope: "organization",
-        organizationId: req.user!.organizationId!,
+        scope: templateScope,
+        organizationId: templateScope === "organization" ? req.user!.organizationId! : null,
         createdBy: req.user!.id,
         version: 1,
         status: "published",
@@ -223,7 +226,7 @@ Great! I've added an email field for you. What other information do you need to 
       // Save to form_templates table with validated data
       const template = await storage.createFormTemplate({
         ...validationResult.data,
-        organizationId: req.user!.organizationId!,
+        organizationId: templateScope === "organization" ? req.user!.organizationId! : null,
         createdBy: req.user!.id
       });
 

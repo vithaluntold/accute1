@@ -121,6 +121,29 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
     }
   });
 
+  // Get messages for a session
+  app.get(`${basePath}/:id/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const session = await storage.getAgentSession(id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Verify ownership
+      if (session.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const messages = await storage.getAgentMessagesBySession(id);
+      res.json(messages);
+    } catch (error) {
+      console.error(`Error fetching messages for ${agentSlug} session:`, error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
   // Add a message to a session
   app.post(`${basePath}/:id/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
