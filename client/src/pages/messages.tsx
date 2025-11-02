@@ -172,9 +172,9 @@ export default function MessagesPage() {
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clients?.map((client: any) => (
+                    {clients?.filter((client: any) => client.status === 'active').map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {client.companyName}
                       </SelectItem>
                     ))}
                   </SelectContent>
