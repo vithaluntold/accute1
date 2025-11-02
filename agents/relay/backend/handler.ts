@@ -163,11 +163,15 @@ I've identified a high-priority task from this client request. They need tax doc
         title: req.body.title,
         description: req.body.description,
         priority: req.body.priority || "medium",
-        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
-        status: "pending",
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+        status: "pending" as const,
         assigneeId: req.body.assigneeId || null,
-        createdBy: req.user!.id,
+        clientId: null,
         organizationId: req.user!.organizationId!,
+        assignmentId: null,
+        isCompleted: false,
+        completedAt: null,
+        createdBy: req.user!.id,
         metadata: {
           source: "email",
           emailSubject: req.body.emailSubject,
@@ -176,7 +180,7 @@ I've identified a high-priority task from this client request. They need tax doc
         }
       };
 
-      const task = await storage.createTask(taskData);
+      const task = await storage.createClientPortalTask(taskData);
 
       res.json({ 
         success: true,
