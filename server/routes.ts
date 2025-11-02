@@ -1852,7 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== AI Roundtable Routes ====================
 
   // Get all Roundtable sessions for organization
-  app.get("/api/roundtable/sessions", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/roundtable/sessions", requireAuth, requirePermission("roundtable.access"), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user!.organizationId) {
         return res.json([]);
@@ -1866,7 +1866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create a new Roundtable session
-  app.post("/api/roundtable/sessions", requireAuth, rateLimit(10, 60 * 1000), async (req: AuthRequest, res: Response) => {
+  app.post("/api/roundtable/sessions", requireAuth, requirePermission("roundtable.create"), rateLimit(10, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
       const { objective, initialAgents = [] } = req.body;
       
@@ -1925,7 +1925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get Roundtable session details with full context
-  app.get("/api/roundtable/sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/roundtable/sessions/:id", requireAuth, requirePermission("roundtable.access"), async (req: AuthRequest, res: Response) => {
     try {
       const session = await storage.getRoundtableSession(req.params.id);
       

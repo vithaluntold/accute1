@@ -94,6 +94,7 @@ const organizationMenuCategories = [
     title: "AI & Automation",
     items: [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
+      { title: "AI Roundtable", url: "/roundtable", icon: Users, permission: "roundtable.access" },
       { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
       { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
     ]

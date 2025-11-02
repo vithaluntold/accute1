@@ -186,6 +186,14 @@ export async function initializeSystem() {
       { name: "appointments.create", resource: "appointments", action: "create", description: "Create appointments" },
       { name: "appointments.update", resource: "appointments", action: "update", description: "Update appointments" },
       { name: "appointments.delete", resource: "appointments", action: "delete", description: "Delete appointments" },
+      
+      // Roundtable (AI Collaboration)
+      { name: "roundtable.access", resource: "roundtable", action: "access", description: "Access AI Roundtable for multi-agent collaboration" },
+      { name: "roundtable.create", resource: "roundtable", action: "create", description: "Create Roundtable sessions" },
+      { name: "roundtable.manage", resource: "roundtable", action: "manage", description: "Manage Roundtable sessions and participants" },
+      
+      // Reports
+      { name: "reports.view", resource: "reports", action: "view", description: "View practice-wide reports and analytics" },
     ];
 
     const createdPermissions: any[] = [];
