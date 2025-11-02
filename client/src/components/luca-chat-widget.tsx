@@ -655,12 +655,12 @@ export function LucaChatWidget() {
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
               {showSidebar && !isMobile && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                   onClick={() => setShowSidebar(false)}
                   data-testid="button-hide-sidebar"
                 >
@@ -672,7 +672,7 @@ export function LucaChatWidget() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                   onClick={() => setIsFullScreen(!isFullScreen)}
                   data-testid="button-toggle-fullscreen"
                 >
@@ -687,7 +687,7 @@ export function LucaChatWidget() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                 onClick={() => {
                   if (isFullScreen) {
                     setIsFullScreen(false);
