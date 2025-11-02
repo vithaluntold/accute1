@@ -193,26 +193,8 @@ app.use((req, res, next) => {
       console.warn('⚠️  Continuing without Roundtable WebSocket support');
     }
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      
-      // Log the error for debugging
-      console.error('Request error:', {
-        status,
-        message,
-        path: _req.path,
-        method: _req.method,
-        stack: err.stack
-      });
-
-      res.status(status).json({ message });
-      // Don't throw - just log and respond
-    });
-
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
+    // Setup Vite (dev) or static file serving (production) BEFORE error handler
+    // This ensures the catch-all route for the SPA works correctly
     if (app.get("env") === "development") {
       try {
         await setupVite(app, server);
@@ -230,6 +212,25 @@ app.use((req, res, next) => {
         console.warn('⚠️  Continuing without static file serving');
       }
     }
+
+    // Error handler MUST be registered AFTER static file serving
+    // so it only catches actual errors, not SPA routes
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      
+      // Log the error for debugging
+      console.error('Request error:', {
+        status,
+        message,
+        path: _req.path,
+        method: _req.method,
+        stack: err.stack
+      });
+
+      res.status(status).json({ message });
+      // Don't throw - just log and respond
+    });
     
     console.log('🎉 Application fully initialized and ready!');
     
