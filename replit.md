@@ -3,6 +3,12 @@
 ## Overview
 Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It offers multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to be an "AI-first" solution, enhancing efficiency, ensuring compliance, and significantly improving modern accounting practices. It aims to provide an advanced, secure, and user-friendly environment for financial professionals to automate and manage their workflows effectively.
 
+## Recent Changes (November 2025)
+- **Client Onboarding Security**: Implemented secure portal activation with server-side OTP verification. Clients start inactive and are activated only after phone verification.
+- **Admin Employee Management**: Added comprehensive safeguards for employee deletion (prevents self-deletion, enforces tenant isolation, blocks deleting last active admin, uses permission-based role detection).
+- **Messages UI Fix**: Fixed client dropdown to use `companyName` field and filter to active clients only.
+- **AI Agent Marketplace**: Marked Luca agent as pre-installed; removed duplicate Parity agent listing by moving `parity-example` to `_parity-example`.
+
 ## User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
