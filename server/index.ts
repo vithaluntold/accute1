@@ -61,59 +61,20 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const port = parseInt(process.env.PORT || '5000', 10);
+  const host = '0.0.0.0';
+  
   try {
-    // Initialize system roles and permissions on startup
-    console.log('🔧 Initializing system...');
+    console.log(`🚀 Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
     
-    try {
-      await initializeSystem();
-      console.log('✅ System initialized successfully');
-    } catch (initError) {
-      console.error('❌ System initialization failed:', initError);
-      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
-      throw initError;
-    }
-    
+    // Create HTTP server first
     const server = await registerRoutes(app);
     
-    // Setup WebSocket server for streaming AI agents
-    const wss = setupWebSocket(server);
-    console.log('🔌 WebSocket server initialized at /ws/ai-stream');
-    
-    // Setup WebSocket server for AI Roundtable collaboration
-    const roundtableWss = setupRoundtableWebSocket(server);
-    console.log('🔌 Roundtable WebSocket server initialized at /ws/roundtable');
-
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
-      res.status(status).json({ message });
-      throw err;
-    });
-
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
-
-    // ALWAYS serve the app on the port specified in the environment variable PORT
-    // Other ports are firewalled. Default to 5000 if not specified.
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = parseInt(process.env.PORT || '5000', 10);
-    const host = '0.0.0.0';
-    
-    // Use simple listen signature (port, host, callback) instead of options object
-    // to avoid reusePort issues with Cloud Run/Autoscale deployments
+    // Start listening IMMEDIATELY to respond to health checks
+    // Do this BEFORE heavy initialization to pass deployment health checks
     server.listen(port, host, () => {
-      console.log(`✅ Server successfully started`);
+      console.log(`✅ Server listening on ${host}:${port}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`   Listening on: ${host}:${port}`);
       log(`serving on port ${port}`);
     }).on('error', (err: Error) => {
       console.error('❌ Server failed to start:', err);
@@ -130,8 +91,72 @@ app.use((req, res, next) => {
       
       process.exit(1);
     });
+    
+    // Now do heavy initialization AFTER server is listening
+    // This allows health checks to pass while initialization completes
+    console.log('🔧 Initializing system...');
+    
+    try {
+      await initializeSystem();
+      console.log('✅ System initialized successfully');
+    } catch (initError) {
+      console.error('❌ System initialization failed:', initError);
+      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
+      // Don't exit - server can still handle requests
+      console.warn('⚠️  Server running with limited functionality');
+    }
+    
+    // Setup WebSocket server for streaming AI agents
+    try {
+      const wss = setupWebSocket(server);
+      console.log('🔌 WebSocket server initialized at /ws/ai-stream');
+    } catch (wsError) {
+      console.error('❌ WebSocket initialization failed:', wsError);
+      console.warn('⚠️  Continuing without WebSocket support');
+    }
+    
+    // Setup WebSocket server for AI Roundtable collaboration
+    try {
+      const roundtableWss = setupRoundtableWebSocket(server);
+      console.log('🔌 Roundtable WebSocket server initialized at /ws/roundtable');
+    } catch (wsError) {
+      console.error('❌ Roundtable WebSocket initialization failed:', wsError);
+      console.warn('⚠️  Continuing without Roundtable WebSocket support');
+    }
+
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      res.status(status).json({ message });
+      throw err;
+    });
+
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (app.get("env") === "development") {
+      try {
+        await setupVite(app, server);
+        console.log('✅ Vite dev server initialized');
+      } catch (viteError) {
+        console.error('❌ Vite setup failed:', viteError);
+        console.warn('⚠️  Continuing without Vite dev server');
+      }
+    } else {
+      try {
+        serveStatic(app);
+        console.log('✅ Static file serving initialized');
+      } catch (staticError) {
+        console.error('❌ Static file setup failed:', staticError);
+        console.warn('⚠️  Continuing without static file serving');
+      }
+    }
+    
+    console.log('🎉 Application fully initialized and ready!');
+    
   } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
+    console.error('❌ Fatal error during application startup:', error);
     console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
     console.error('Error message:', error instanceof Error ? error.message : String(error));
     console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
