@@ -60,14 +60,6 @@ const platformMenuCategories = [
     ]
   },
   {
-    title: "System Templates",
-    items: [
-      { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
-      { title: "Forms", url: "/forms", icon: ClipboardList, permission: "forms.view" },
-      { title: "Email Templates", url: "/email-templates", icon: Mail, permission: "templates.view" },
-    ]
-  },
-  {
     title: "Support",
     items: [
       { title: "Support Tickets", url: "/admin/tickets", icon: HelpCircle, permission: null },
