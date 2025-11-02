@@ -64,7 +64,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
 - **Resend**: Transactional email service for user invitations and notifications. Configured via Replit connector integration.
-- **Twilio** (Optional): SMS service for mobile invitations. Can be configured via Replit connector integration or manual API key setup.
+- **Twilio**: SMS service for mobile verification and regular notifications with branded sender ID "Accute". Configured with manual API key setup.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
@@ -93,10 +93,28 @@ When an invitation is created via `/api/invitations`, the system automatically:
 4. Returns success/failure status in the API response
 
 ### SMS Service (`server/sms.ts`)
-Optional SMS functionality for sending invitation texts via Twilio.
+SMS functionality for sending invitation texts via Twilio with branded sender ID "Accute".
 
-**Configuration Options:**
-1. **Replit Twilio Connector** (Recommended): Set up the Twilio connector for automatic credential management
-2. **Manual Setup**: Set environment variables `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER`
+**Key Features:**
+- Branded sender ID "Accute" for international messages (works in 100+ countries)
+- Automatic fallback to phone number for USA/Canada (where alphanumeric IDs are prohibited)
+- One-way messaging (recipients cannot reply to branded sender IDs)
+- Secure credential management via Replit Secrets
 
-**Note:** SMS functionality is optional. If not configured, the system will gracefully fallback and log a warning, allowing email-only invitations to work seamlessly.
+**Configuration:**
+- **Required:** `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` stored in Replit Secrets
+- **Optional:** `TWILIO_PHONE_NUMBER` for USA/Canada support
+- Sender ID "Accute" is hard-coded in the application
+- Must register "Accute" as alphanumeric sender ID in Twilio console for international use
+
+**Usage:**
+Currently implemented for invitation SMS only. The system automatically:
+1. Detects if recipient is in USA/Canada
+2. Uses "Accute" branded sender for international numbers
+3. Falls back to `TWILIO_PHONE_NUMBER` for USA/Canada numbers (if configured)
+4. Returns clear error if USA/Canada number is sent without phone number configured
+
+**Important Notes:**
+- USA/Canada: Requires `TWILIO_PHONE_NUMBER` to be configured or SMS will fail
+- International: Uses branded sender ID "Accute" automatically
+- Future features (mobile verification, notifications) are documented but not yet implemented
