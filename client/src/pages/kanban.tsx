@@ -266,7 +266,7 @@ export default function Kanban() {
         actions={
           <div className="w-72">
             <Select value={selectedWorkflowId} onValueChange={setSelectedWorkflowId}>
-              <SelectTrigger data-testid="select-workflow-kanban" className="bg-white/20 backdrop-blur-sm text-white border-white/30">
+              <SelectTrigger data-testid="select-workflow-kanban" className="bg-white/20 backdrop-blur-sm text-white border-white/30 data-[placeholder]:text-white/90">
                 <SelectValue placeholder="Select a workflow" />
               </SelectTrigger>
               <SelectContent>

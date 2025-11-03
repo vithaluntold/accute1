@@ -8652,11 +8652,12 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
       const { decryptedCredentials } = llmConfig;
       let answer;
 
-      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure_openai') {
+      const isAzure = llmConfig.provider === 'azure_openai' || llmConfig.provider === 'azure';
+      if (llmConfig.provider === 'openai' || isAzure) {
         const OpenAI = (await import('openai')).default;
         const openai = new OpenAI({
-          apiKey: llmConfig.provider === 'azure_openai' ? decryptedCredentials.apiKey : decryptedCredentials.apiKey,
-          ...(llmConfig.provider === 'azure_openai' && {
+          apiKey: decryptedCredentials.apiKey,
+          ...(isAzure && {
             baseURL: `${decryptedCredentials.endpoint}/openai/deployments/${decryptedCredentials.deploymentName}`,
             defaultQuery: { 'api-version': decryptedCredentials.apiVersion || '2024-02-15-preview' },
             defaultHeaders: { 'api-key': decryptedCredentials.apiKey },
@@ -8664,7 +8665,7 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
         });
 
         const completion = await openai.chat.completions.create({
-          model: llmConfig.provider === 'azure_openai' ? decryptedCredentials.deploymentName : (llmConfig.modelName || 'gpt-4'),
+          model: isAzure ? decryptedCredentials.deploymentName : (llmConfig.modelName || 'gpt-4'),
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: question }
