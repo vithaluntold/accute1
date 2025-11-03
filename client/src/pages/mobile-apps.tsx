@@ -1,16 +1,22 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Smartphone, Download, QrCode, Chrome, AppWindow, Share2, Plus, CheckCircle2 } from "lucide-react";
+import { Smartphone, Download, QrCode, Chrome, AppWindow, Share2, Plus, CheckCircle2, Package } from "lucide-react";
 import { SiApple, SiAndroid } from "react-icons/si";
 import { useMobileDetect, useIsPWA } from "@/hooks/use-mobile-detect";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 export default function MobileAppsPage() {
   const { isMobile, isTablet } = useMobileDetect();
   const isPWA = useIsPWA();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
+
+  // Fetch mobile app download info
+  const { data: appInfo } = useQuery<any>({
+    queryKey: ["/api/mobile-apps/info"],
+  });
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -66,6 +72,70 @@ export default function MobileAppsPage() {
             <p className="text-sm text-muted-foreground">
               You're using Accute as an installed app. Enjoy the full native experience!
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Native App Downloads */}
+      {(appInfo?.android?.available || appInfo?.ios?.available) && (
+        <Card className="mb-6 border-purple-500 dark:border-purple-700" data-testid="card-native-downloads">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <CardTitle className="text-purple-600 dark:text-purple-400">Native App Downloads</CardTitle>
+            </div>
+            <CardDescription>Download and install the native mobile apps</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-4">
+              {appInfo?.android?.available && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <SiAndroid className="h-5 w-5 text-green-600" />
+                      <span className="font-semibold">Android APK</span>
+                    </div>
+                    <Badge variant="outline">{appInfo.android.sizeFormatted}</Badge>
+                  </div>
+                  <Button 
+                    onClick={() => window.location.href = appInfo.android.downloadUrl} 
+                    className="w-full" 
+                    variant="default"
+                    data-testid="button-download-apk"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download APK
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    For Android 5.0 and above. Enable "Install from Unknown Sources" in settings.
+                  </p>
+                </div>
+              )}
+              
+              {appInfo?.ios?.available && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <SiApple className="h-5 w-5" />
+                      <span className="font-semibold">iOS IPA</span>
+                    </div>
+                    <Badge variant="outline">{appInfo.ios.sizeFormatted}</Badge>
+                  </div>
+                  <Button 
+                    onClick={() => window.location.href = appInfo.ios.downloadUrl} 
+                    className="w-full" 
+                    variant="default"
+                    data-testid="button-download-ipa"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download IPA
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Requires TestFlight or enterprise signing. iOS 13.0 and above.
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

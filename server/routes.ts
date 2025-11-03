@@ -12148,6 +12148,132 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Mobile App Download Routes ====================
+
+  // Get mobile app download info
+  app.get("/api/mobile-apps/info", async (req: Request, res: Response) => {
+    try {
+      const downloadsDir = path.join(process.cwd(), "public", "downloads");
+      const apkPath = path.join(downloadsDir, "accute-mobile.apk");
+      const ipaPath = path.join(downloadsDir, "accute-mobile.ipa");
+
+      const apkExists = fs.existsSync(apkPath);
+      const ipaExists = fs.existsSync(ipaPath);
+
+      let apkInfo = null;
+      let ipaInfo = null;
+
+      if (apkExists) {
+        const stats = fs.statSync(apkPath);
+        apkInfo = {
+          available: true,
+          filename: "accute-mobile.apk",
+          size: stats.size,
+          sizeFormatted: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+          lastModified: stats.mtime,
+          downloadUrl: "/downloads/accute-mobile.apk",
+        };
+      }
+
+      if (ipaExists) {
+        const stats = fs.statSync(ipaPath);
+        ipaInfo = {
+          available: true,
+          filename: "accute-mobile.ipa",
+          size: stats.size,
+          sizeFormatted: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+          lastModified: stats.mtime,
+          downloadUrl: "/downloads/accute-mobile.ipa",
+        };
+      }
+
+      res.json({
+        android: apkInfo || { available: false },
+        ios: ipaInfo || { available: false },
+        buildInstructions: "/downloads/BUILD_INSTRUCTIONS.md",
+      });
+    } catch (error: any) {
+      console.error("Mobile app info error:", error);
+      res.status(500).json({ error: "Failed to get mobile app info" });
+    }
+  });
+
+  // Download APK with proper headers and CSP
+  app.get("/downloads/accute-mobile.apk", (req: Request, res: Response) => {
+    try {
+      const apkPath = path.join(process.cwd(), "public", "downloads", "accute-mobile.apk");
+
+      if (!fs.existsSync(apkPath)) {
+        return res.status(404).json({ 
+          error: "APK not available. Build the app first using: eas build --platform android --profile production" 
+        });
+      }
+
+      // SECURITY: Set proper headers for APK download
+      res.setHeader("Content-Type", "application/vnd.android.package-archive");
+      res.setHeader("Content-Disposition", "attachment; filename=accute-mobile.apk");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // 1 day cache
+      
+      // CSP headers for downloads
+      res.setHeader("Content-Security-Policy", "default-src 'none'; object-src 'none'; base-uri 'none';");
+
+      // Stream the file
+      const fileStream = fs.createReadStream(apkPath);
+      fileStream.pipe(res);
+
+      fileStream.on("error", (error) => {
+        console.error("APK download error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to download APK" });
+        }
+      });
+    } catch (error: any) {
+      console.error("APK download error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to download APK" });
+      }
+    }
+  });
+
+  // Download IPA with proper headers and CSP
+  app.get("/downloads/accute-mobile.ipa", (req: Request, res: Response) => {
+    try {
+      const ipaPath = path.join(process.cwd(), "public", "downloads", "accute-mobile.ipa");
+
+      if (!fs.existsSync(ipaPath)) {
+        return res.status(404).json({ 
+          error: "IPA not available. Build the app first using: eas build --platform ios --profile production" 
+        });
+      }
+
+      // SECURITY: Set proper headers for IPA download
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.setHeader("Content-Disposition", "attachment; filename=accute-mobile.ipa");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // 1 day cache
+      
+      // CSP headers for downloads
+      res.setHeader("Content-Security-Policy", "default-src 'none'; object-src 'none'; base-uri 'none';");
+
+      // Stream the file
+      const fileStream = fs.createReadStream(ipaPath);
+      fileStream.pipe(res);
+
+      fileStream.on("error", (error) => {
+        console.error("IPA download error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to download IPA" });
+        }
+      });
+    } catch (error: any) {
+      console.error("IPA download error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to download IPA" });
+      }
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
