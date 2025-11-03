@@ -36,13 +36,18 @@ export class ImapEmailService {
   decryptCredentials(encryptedData: string): any {
     const { iv, authTag, encrypted } = JSON.parse(encryptedData);
     
+    const authTagBuffer = Buffer.from(authTag, 'hex');
+    if (authTagBuffer.length !== AUTH_TAG_LENGTH) {
+      throw new Error('Invalid authentication tag length');
+    }
+    
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
       ENCRYPTION_KEY,
       Buffer.from(iv, 'hex')
     );
     
-    decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+    decipher.setAuthTag(authTagBuffer);
     
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
