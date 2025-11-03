@@ -12695,6 +12695,22 @@ ${msg.bodyText || msg.bodyHtml || ''}
       // SECURITY: Safely decrypt customer ID (handles both encrypted and legacy plaintext)
       let razorpayCustomerId = cryptoUtils.safeDecryptRazorpay(subscription.razorpayCustomerId);
       
+      // EFFICIENCY: Lazy re-encryption - automatically upgrade plaintext to encrypted
+      // Check if the stored value is plaintext (needs re-encryption)
+      const isPlaintext = subscription.razorpayCustomerId && 
+                         subscription.razorpayCustomerId.split(':').length !== 3;
+      
+      if (razorpayCustomerId && isPlaintext) {
+        console.info('🔄 LAZY RE-ENCRYPTION: Upgrading plaintext Razorpay customer ID to encrypted format');
+        await db
+          .update(schema.platformSubscriptions)
+          .set({
+            razorpayCustomerId: cryptoUtils.encrypt(razorpayCustomerId),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.platformSubscriptions.id, subscription.id));
+      }
+      
       if (!razorpayCustomerId) {
         const customer = await razorpayService.createCustomer({
           name: org.name,

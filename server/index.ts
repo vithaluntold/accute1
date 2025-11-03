@@ -103,6 +103,54 @@ app.use((req, res, next) => {
   next();
 });
 
+// SECURITY: Comprehensive Security Headers
+// Protects against XSS, clickjacking, MIME sniffing, and other attacks
+app.use((req, res, next) => {
+  // Prevent MIME type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // Prevent clickjacking attacks
+  res.setHeader('X-Frame-Options', 'DENY');
+  
+  // Enable XSS protection (legacy browsers)
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // Control referrer information
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // HSTS - Force HTTPS in production for 1 year with preload
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  
+  // Content Security Policy - Balance security with Vite dev server and Razorpay
+  // NOTE: In production, remove 'unsafe-inline' and 'unsafe-eval' for maximum security
+  const isDev = process.env.NODE_ENV === 'development';
+  const csp = [
+    "default-src 'self'",
+    // SECURITY: unsafe-inline/unsafe-eval only in dev for Vite HMR
+    isDev 
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com"
+      : "script-src 'self' https://checkout.razorpay.com",
+    isDev
+      ? "style-src 'self' 'unsafe-inline'"
+      : "style-src 'self'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://api.razorpay.com https://checkout.razorpay.com ws: wss:",
+    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+  res.setHeader('Content-Security-Policy', csp);
+  
+  // Permissions Policy - Restrict powerful features
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  
+  next();
+});
+
 // SECURITY: Rate limiting for payment endpoints
 // Prevents brute-force attacks and payment fraud attempts
 const paymentLimiter = rateLimit({

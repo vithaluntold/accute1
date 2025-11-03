@@ -267,7 +267,7 @@ export function decrypt(encryptedText: string): string {
  * SECURITY: Safely decrypt Razorpay credentials with backward compatibility
  * Handles both encrypted (new) and plaintext (legacy) values
  * @param value Potentially encrypted Razorpay credential
- * @returns Decrypted credential (or original if plaintext)
+ * @returns Object with decrypted value and metadata for lazy re-encryption
  */
 export function safeDecryptRazorpay(value: string | null | undefined): string | null {
   if (!value) {
@@ -281,13 +281,21 @@ export function safeDecryptRazorpay(value: string | null | undefined): string | 
     try {
       // Attempt decryption - if it works, it was encrypted
       return decrypt(value);
-    } catch (error) {
-      // If decryption fails, it might be plaintext that happens to have colons
-      // Fall through to return plaintext
-      console.warn('Failed to decrypt Razorpay credential, treating as plaintext:', error);
+    } catch (error: any) {
+      // SECURITY: Log detailed error for security team investigation
+      // If decryption fails, could indicate tampering or plaintext with colons
+      console.warn('⚠️ SECURITY ALERT: Failed to decrypt Razorpay credential', {
+        errorType: error.name,
+        errorMessage: error.message,
+        valueFormat: `${parts.length} parts`,
+        suspectedTampering: parts.length === 3, // 3 parts means it LOOKED encrypted but failed
+      });
       return value;
     }
   }
+  
+  // EFFICIENCY: Log plaintext value encountered (for monitoring migration progress)
+  console.info('📊 SECURITY METRICS: Legacy plaintext Razorpay credential encountered - consider re-encryption');
   
   // Value is plaintext (legacy data) - return as-is
   return value;

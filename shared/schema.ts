@@ -2133,8 +2133,13 @@ export const paymentMethods = pgTable("payment_methods", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
+  // EFFICIENCY: Indexes for fast payment method queries
   orgIdx: index("payment_methods_org_idx").on(table.organizationId),
   defaultIdx: index("payment_methods_default_idx").on(table.isDefault),
+  statusIdx: index("payment_methods_status_idx").on(table.status),
+  typeIdx: index("payment_methods_type_idx").on(table.type),
+  // Composite index for fast default payment method lookup per organization
+  orgDefaultIdx: index("payment_methods_org_default_idx").on(table.organizationId, table.isDefault),
 }));
 
 // E-Signatures
