@@ -91,9 +91,9 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
-// SECURITY: HTTPS Enforcement in Production
+// SECURITY: HTTPS Enforcement in Production for API routes only
 // Prevents man-in-the-middle attacks on payment data
-app.use((req, res, next) => {
+app.use('/api', (req, res, next) => {
   if (process.env.NODE_ENV === 'production' && !req.secure && req.get('x-forwarded-proto') !== 'https') {
     return res.status(403).json({ 
       error: 'HTTPS required for secure payment processing',
@@ -103,9 +103,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// SECURITY: Comprehensive Security Headers
+// SECURITY: Comprehensive Security Headers for API routes only
 // Protects against XSS, clickjacking, MIME sniffing, and other attacks
-app.use((req, res, next) => {
+// Only applied to /api/* routes to avoid interfering with Vite dev server
+app.use('/api', (req, res, next) => {
   // Prevent MIME type sniffing
   res.setHeader('X-Content-Type-Options', 'nosniff');
   
@@ -123,12 +124,10 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
   
-  // Content Security Policy - Balance security with Vite dev server and Razorpay
-  // NOTE: In production, remove 'unsafe-inline' and 'unsafe-eval' for maximum security
+  // Content Security Policy - Balance security with Razorpay checkout
   const isDev = process.env.NODE_ENV === 'development';
   const csp = [
     "default-src 'self'",
-    // SECURITY: unsafe-inline/unsafe-eval only in dev for Vite HMR
     isDev 
       ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com"
       : "script-src 'self' https://checkout.razorpay.com",

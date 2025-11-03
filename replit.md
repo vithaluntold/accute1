@@ -111,7 +111,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - Returns HTTP 429 when rate limit exceeded
 
 #### Comprehensive Security Headers
-Multi-layered protection against web attacks:
+Multi-layered protection against web attacks (applied to `/api/*` routes only):
 - **Content Security Policy (CSP)**: Blocks unsafe scripts/styles in production
   - Production: Only allows self and Razorpay (no unsafe-inline/unsafe-eval)
   - Development: Permits unsafe directives for Vite HMR
@@ -121,6 +121,7 @@ Multi-layered protection against web attacks:
 - **X-XSS-Protection**: Enables XSS protection in legacy browsers
 - **Referrer-Policy**: Controls referrer information leakage
 - **Permissions-Policy**: Disables geolocation, microphone, camera
+- **Note**: Headers scoped to API routes to avoid interfering with Vite dev server
 
 #### Payment Audit Logging
 - All payment method operations logged (add, delete, set default)
