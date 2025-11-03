@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "accute",
+    "owner": "vithalv",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -33,6 +34,17 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "apiUrl": "http://localhost:5000",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "4e403f66-a9eb-42ad-b6fa-e9f7828dd385"
+      }
+    },
+    "owner": "vithalv",
+    "projectId": "4e403f66-a9eb-42ad-b6fa-e9f7828dd385"
   }
 }
