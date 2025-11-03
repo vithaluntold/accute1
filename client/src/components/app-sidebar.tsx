@@ -114,6 +114,7 @@ const organizationMenuCategories = [
     title: "Financial",
     items: [
       { title: "Invoices", url: "/invoices", icon: Receipt, permission: "invoices.view" },
+      { title: "Automated Invoicing", url: "/automated-invoicing", icon: DollarSign, permission: "invoices.view" },
       { title: "Payments", url: "/payments", icon: CreditCard, permission: "payments.view" },
       { title: "Time Tracking", url: "/time-tracking", icon: Clock, permission: "time.create" },
     ]

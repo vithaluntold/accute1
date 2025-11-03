@@ -103,6 +103,8 @@ import TeamsPage from "@/pages/teams";
 import TeamDetailPage from "@/pages/team-detail";
 import TeamHierarchyPage from "@/pages/team-hierarchy";
 import ManagerDashboardPage from "@/pages/manager-dashboard";
+import AutomatedInvoicing from "@/pages/automated-invoicing";
+import SubscriptionPricing from "@/pages/subscription-pricing";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -677,6 +679,16 @@ function Router() {
             <Invoices />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/automated-invoicing">
+        <OrganizationRoute>
+          <AppLayout>
+            <AutomatedInvoicing />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/pricing">
+        <SubscriptionPricing />
       </Route>
       <Route path="/payments">
         <OrganizationRoute>
