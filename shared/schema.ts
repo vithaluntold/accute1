@@ -14,6 +14,29 @@ export const users = pgTable("users", {
   phone: text("phone"),
   phoneVerified: boolean("phone_verified").notNull().default(false),
   phoneVerifiedAt: timestamp("phone_verified_at"),
+  
+  // KYC fields for employee verification
+  dateOfBirth: timestamp("date_of_birth"),
+  nationalId: text("national_id"), // SSN, National ID, or equivalent
+  nationalIdType: text("national_id_type"), // 'ssn', 'pan', 'nid', 'passport', etc.
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country").default("US"),
+  
+  // Emergency contact
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  emergencyContactRelation: text("emergency_contact_relation"),
+  
+  // KYC document verification
+  idDocumentUrl: text("id_document_url"), // Uploaded ID proof
+  addressProofUrl: text("address_proof_url"), // Uploaded address proof
+  kycStatus: text("kyc_status").notNull().default("pending"), // 'pending', 'in_review', 'verified', 'rejected'
+  kycVerifiedAt: timestamp("kyc_verified_at"),
+  kycRejectionReason: text("kyc_rejection_reason"),
+  
   roleId: varchar("role_id").notNull().references(() => roles.id),
   organizationId: varchar("organization_id").references(() => organizations.id),
   isActive: boolean("is_active").notNull().default(true),
