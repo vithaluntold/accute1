@@ -60,3 +60,94 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+## Payment Integration & Security
+
+### Razorpay Integration
+- **Payment Gateway**: Razorpay for India, UAE, Turkey, USA markets
+- **Environment Variables Required**:
+  - `RAZORPAY_KEY_ID`: Razorpay API Key ID
+  - `RAZORPAY_KEY_SECRET`: Razorpay API Key Secret
+  - `RAZORPAY_WEBHOOK_SECRET`: Webhook signature verification (optional)
+
+### Saved Payment Methods & Auto-Sweep
+- Admins can save payment methods (cards, UPI) for automatic recurring billing
+- ₹1 verification charge via Razorpay tokenization to save payment instruments
+- Supports credit cards, debit cards, and UPI IDs
+- Stores card last 4 digits, brand, expiry date, and Razorpay tokens
+- Set default payment method for automatic invoice payments (auto-sweep)
+- Payment methods management in **Settings → Payments** page
+
+### Zero-Compromise Payment Security
+**Implemented November 2025 - Enterprise-grade security with zero efficiency compromise**
+
+#### AES-256-GCM Encryption
+- All Razorpay credentials encrypted at rest with authenticated encryption
+- Razorpay customer IDs encrypted in `platformSubscriptions` and `paymentMethods` tables
+- Razorpay token IDs encrypted in `paymentMethods` table
+- Organization RSA private keys encrypted in `organizationKeys` table
+- 16-byte authentication tag for tamper detection
+- **Lazy Re-Encryption**: Automatic upgrade of legacy plaintext data on access
+  - Plaintext credentials transparently re-encrypted when accessed
+  - Zero manual intervention - gradual migration happens automatically
+  - Logged for monitoring migration progress
+
+#### Backward Compatibility
+- `safeDecryptRazorpay()` helper handles both encrypted and legacy plaintext values
+- Detects encrypted format (iv:data:tag) vs plaintext
+- Prevents runtime crashes for existing records
+- Enables gradual migration to encrypted storage
+
+#### HTTPS Enforcement
+- Production environment requires HTTPS for all payment operations
+- Middleware rejects non-HTTPS requests in production
+- Development environment bypasses for local testing
+- Prevents credential exposure via insecure connections
+
+#### Rate Limiting
+- 10 requests per 15-minute window per IP address
+- Applies to all payment method CRUD operations (`/api/payment-methods/*`)
+- Development environment skips for testing convenience
+- Returns HTTP 429 when rate limit exceeded
+
+#### Comprehensive Security Headers
+Multi-layered protection against web attacks:
+- **Content Security Policy (CSP)**: Blocks unsafe scripts/styles in production
+  - Production: Only allows self and Razorpay (no unsafe-inline/unsafe-eval)
+  - Development: Permits unsafe directives for Vite HMR
+- **HSTS**: Force HTTPS for 1 year with preload directive in production
+- **X-Content-Type-Options**: Prevents MIME sniffing attacks
+- **X-Frame-Options**: Prevents clickjacking (DENY)
+- **X-XSS-Protection**: Enables XSS protection in legacy browsers
+- **Referrer-Policy**: Controls referrer information leakage
+- **Permissions-Policy**: Disables geolocation, microphone, camera
+
+#### Payment Audit Logging
+- All payment method operations logged (add, delete, set default)
+- Logged via `logActivity()` with user, organization, and timestamp
+- Audit trail stored in `activityLogs` table for compliance and forensics
+- Security metrics logging tracks plaintext fallbacks and suspected tampering
+
+#### Encryption Key Management
+- Primary: `ENCRYPTION_KEY` environment variable
+- Fallback: `JWT_SECRET` if `ENCRYPTION_KEY` not set
+- Keys derived using scrypt with salt for key derivation
+- Key rotation support through environment variable updates
+
+#### Database Performance Optimization
+Indexed queries for payment operations:
+- `payment_methods_org_default_idx`: Composite index for O(1) default payment lookup
+- `payment_methods_status_idx`: Fast filtering by status (active/expired/failed)
+- `payment_methods_type_idx`: Fast filtering by type (card/UPI/bank)
+- `platformSubscriptions`: Indexed by organization, status, and plan
+- Optimized common queries like "Get default payment method for organization"
+
+#### Bulk Re-Encryption Migration
+Script for legacy data migration available at `server/migrate-encryption.ts`:
+- Dry-run mode to preview changes before applying
+- Migrates platformSubscriptions, paymentMethods, organizationKeys
+- Progress tracking with detailed logging
+- Error handling with graceful degradation
+- Usage: `tsx server/migrate-encryption.ts` (dry run)
+- Apply: `tsx server/migrate-encryption.ts --apply`
+- **Note**: Requires `npm run db:push --force` to sync schema before running
