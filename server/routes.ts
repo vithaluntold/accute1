@@ -12607,6 +12607,330 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Payment Methods Routes (Auto-Sweep) ====================
+
+  // List all payment methods for organization
+  app.get("/api/payment-methods", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const methods = await db
+        .select()
+        .from(schema.paymentMethods)
+        .where(eq(schema.paymentMethods.organizationId, organizationId))
+        .orderBy(desc(schema.paymentMethods.isDefault), desc(schema.paymentMethods.createdAt));
+
+      res.json(methods);
+    } catch (error: any) {
+      console.error("List payment methods error:", error);
+      res.status(500).json({ error: error.message || "Failed to list payment methods" });
+    }
+  });
+
+  // Get a single payment method
+  app.get("/api/payment-methods/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const [method] = await db
+        .select()
+        .from(schema.paymentMethods)
+        .where(
+          and(
+            eq(schema.paymentMethods.id, id),
+            eq(schema.paymentMethods.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!method) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      res.json(method);
+    } catch (error: any) {
+      console.error("Get payment method error:", error);
+      res.status(500).json({ error: error.message || "Failed to get payment method" });
+    }
+  });
+
+  // Setup payment method (initiate Razorpay token creation)
+  app.post("/api/payment-methods/setup", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { amount } = req.body; // Small amount for verification (e.g., ₹1)
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Get organization and subscription
+      const [org] = await db
+        .select()
+        .from(schema.organizations)
+        .where(eq(schema.organizations.id, organizationId))
+        .limit(1);
+
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.organizationId, organizationId))
+        .limit(1);
+
+      if (!org || !subscription) {
+        return res.status(404).json({ error: "Organization or subscription not found" });
+      }
+
+      // Create or get Razorpay customer
+      let razorpayCustomerId = subscription.razorpayCustomerId;
+      
+      if (!razorpayCustomerId) {
+        const customer = await razorpayService.createCustomer({
+          name: org.name,
+          email: req.user!.email,
+          contact: req.user!.phone || '',
+          notes: {
+            organization_id: organizationId,
+            organization_slug: org.slug,
+          },
+        });
+        
+        razorpayCustomerId = customer.id;
+        
+        // Update subscription with customer ID
+        await db
+          .update(schema.platformSubscriptions)
+          .set({
+            razorpayCustomerId: customer.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.platformSubscriptions.id, subscription.id));
+      }
+
+      // Create a small verification order
+      const order = await razorpayService.createOrder({
+        amount: amount || 100, // ₹1 for verification
+        currency: subscription.currency || 'INR',
+        receipt: `setup_${organizationId}_${Date.now()}`,
+        notes: {
+          type: 'payment_method_setup',
+          organization_id: organizationId,
+        },
+      });
+
+      res.json({
+        message: "Payment setup initiated",
+        order,
+        customer_id: razorpayCustomerId,
+      });
+    } catch (error: any) {
+      console.error("Setup payment method error:", error);
+      res.status(500).json({ error: error.message || "Failed to setup payment method" });
+    }
+  });
+
+  // Save payment method after successful verification
+  app.post("/api/payment-methods/save", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { razorpay_payment_id, razorpay_order_id, razorpay_signature, nickname } = req.body;
+      const organizationId = req.user!.organizationId;
+      const userId = req.user!.id;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Verify payment signature
+      const isValid = razorpayService.verifyPaymentSignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid payment signature" });
+      }
+
+      // Fetch payment details from Razorpay
+      const paymentDetails = await razorpayService.fetchPayment(razorpay_payment_id);
+
+      // Extract payment method details
+      const type = paymentDetails.method || 'other';
+      let cardLast4, cardBrand, cardExpMonth, cardExpYear, cardholderName, upiId;
+
+      if (type === 'card' && paymentDetails.card) {
+        cardLast4 = paymentDetails.card.last4;
+        cardBrand = paymentDetails.card.network; // visa, mastercard, etc.
+        cardExpMonth = parseInt(paymentDetails.card.exp_month);
+        cardExpYear = parseInt(paymentDetails.card.exp_year);
+        cardholderName = paymentDetails.card.name;
+      } else if (type === 'upi' && paymentDetails.vpa) {
+        upiId = paymentDetails.vpa; // Masked UPI ID
+      }
+
+      // Create payment method record
+      const [paymentMethod] = await db
+        .insert(schema.paymentMethods)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId,
+          type,
+          nickname: nickname || `${cardBrand || type} ending in ${cardLast4 || '****'}`,
+          isDefault: false, // Will be set separately
+          cardLast4,
+          cardBrand,
+          cardExpMonth,
+          cardExpYear,
+          cardholderName,
+          upiId,
+          razorpayTokenId: razorpay_payment_id, // Store payment ID as token reference
+          razorpayCustomerId: paymentDetails.customer_id,
+          status: 'active',
+          lastUsedAt: new Date(),
+          createdBy: userId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      res.json({
+        message: "Payment method saved successfully",
+        payment_method: paymentMethod,
+      });
+    } catch (error: any) {
+      console.error("Save payment method error:", error);
+      res.status(500).json({ error: error.message || "Failed to save payment method" });
+    }
+  });
+
+  // Set payment method as default
+  app.post("/api/payment-methods/:id/set-default", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Verify payment method exists and belongs to organization
+      const [method] = await db
+        .select()
+        .from(schema.paymentMethods)
+        .where(
+          and(
+            eq(schema.paymentMethods.id, id),
+            eq(schema.paymentMethods.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!method) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // Remove default from all other methods
+      await db
+        .update(schema.paymentMethods)
+        .set({ isDefault: false, updatedAt: new Date() })
+        .where(eq(schema.paymentMethods.organizationId, organizationId));
+
+      // Set this method as default
+      await db
+        .update(schema.paymentMethods)
+        .set({ isDefault: true, updatedAt: new Date() })
+        .where(eq(schema.paymentMethods.id, id));
+
+      // Update subscription with default payment method
+      await db
+        .update(schema.platformSubscriptions)
+        .set({
+          defaultPaymentMethodId: id,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.platformSubscriptions.organizationId, organizationId));
+
+      res.json({
+        message: "Payment method set as default",
+        payment_method_id: id,
+      });
+    } catch (error: any) {
+      console.error("Set default payment method error:", error);
+      res.status(500).json({ error: error.message || "Failed to set default payment method" });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/payment-methods/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Get payment method
+      const [method] = await db
+        .select()
+        .from(schema.paymentMethods)
+        .where(
+          and(
+            eq(schema.paymentMethods.id, id),
+            eq(schema.paymentMethods.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!method) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // If this was the default, clear it from subscription
+      if (method.isDefault) {
+        await db
+          .update(schema.platformSubscriptions)
+          .set({
+            defaultPaymentMethodId: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.platformSubscriptions.organizationId, organizationId));
+      }
+
+      // Delete payment method
+      await db
+        .delete(schema.paymentMethods)
+        .where(eq(schema.paymentMethods.id, id));
+
+      // Optionally delete token from Razorpay if we have customer ID and token ID
+      if (method.razorpayCustomerId && method.razorpayTokenId) {
+        try {
+          await razorpayService.deleteToken(method.razorpayCustomerId, method.razorpayTokenId);
+        } catch (error) {
+          console.error("Error deleting Razorpay token:", error);
+          // Don't fail the whole request if Razorpay deletion fails
+        }
+      }
+
+      res.json({
+        message: "Payment method deleted successfully",
+        payment_method_id: id,
+      });
+    } catch (error: any) {
+      console.error("Delete payment method error:", error);
+      res.status(500).json({ error: error.message || "Failed to delete payment method" });
+    }
+  });
+
   // ==================== Mobile App Download Routes ====================
 
   // Get mobile app download info
