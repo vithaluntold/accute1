@@ -12,10 +12,11 @@ Accute is the world's first AI-native accounting workflow automation platform fo
    - **Parity** - Automates data extraction from documents
    - **Echo** - Automates data validation and quality control
    - **Scribe** - Automates document drafting and content generation
-3. **Multi-Provider AI** - Never locked into single vendor (OpenAI, Anthropic, Azure)
-4. **AI Agent Marketplace** - Install and customize specialized agents like apps
-5. **Global Payment Coverage** - Razorpay for India, UAE, Turkey, USA markets
-6. **Native Mobile Apps** - React Native + Expo for iOS and Android
+3. **10,000+ Professional Templates** - Largest accounting template library covering questionnaires, engagement letters, email templates, message templates, and workflow templates across all entity types, industries, and jurisdictions
+4. **Multi-Provider AI** - Never locked into single vendor (OpenAI, Anthropic, Azure)
+5. **AI Agent Marketplace** - Install and customize specialized agents like apps
+6. **Global Payment Coverage** - Razorpay for India, UAE, Turkey, USA markets
+7. **Native Mobile Apps** - React Native + Expo for iOS and Android
 
 **Platform Capabilities:**
 Accute offers multi-role authentication, Forms (organizers), Workflows (pipelines), Email integration (inbox), Calendar scheduling, Mobile apps, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to be an "AI-native" solution where AI agents automate features that competitors require manual operation, enhancing efficiency, ensuring compliance, and significantly improving modern accounting practices.
