@@ -11717,6 +11717,208 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== PLATFORM SUBSCRIPTION MANAGEMENT ====================
+
+  // Get current platform subscription
+  app.get("/api/platform-subscriptions/current", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const organizationId = user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Get active subscription
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(
+          and(
+            eq(schema.platformSubscriptions.organizationId, organizationId),
+            eq(schema.platformSubscriptions.status, "active")
+          )
+        )
+        .limit(1);
+
+      if (!subscription) {
+        return res.status(404).json({ error: "No active subscription found" });
+      }
+
+      // Get user and client counts
+      const usersCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.users)
+        .where(eq(schema.users.organizationId, organizationId));
+
+      const clientsCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.clients)
+        .where(eq(schema.clients.organizationId, organizationId));
+
+      // Calculate storage usage (simple count for now)
+      const storageUsage = 0; // TODO: Implement actual storage calculation
+
+      res.json({
+        ...subscription,
+        currentUsers: usersCount[0]?.count || 0,
+        currentClients: clientsCount[0]?.count || 0,
+        currentStorage: storageUsage.toString(),
+      });
+    } catch (error: any) {
+      console.error("Get current subscription error:", error);
+      res.status(500).json({ error: "Failed to fetch subscription" });
+    }
+  });
+
+  // Switch subscription plan
+  app.post("/api/platform-subscriptions/switch-plan", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const { planSlug, billingCycle } = req.body;
+      const organizationId = user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      if (!planSlug || !billingCycle) {
+        return res.status(400).json({ error: "planSlug and billingCycle are required" });
+      }
+
+      // Validate billing cycle
+      const validBillingCycles = ["monthly", "yearly", "3year"];
+      if (!validBillingCycles.includes(billingCycle)) {
+        return res.status(400).json({ 
+          error: `Invalid billing cycle. Must be one of: ${validBillingCycles.join(", ")}` 
+        });
+      }
+
+      // Check if user has permission to switch plans (admin or super admin)
+      if (user.role !== "admin" && user.role !== "superadmin") {
+        return res.status(403).json({ error: "Only admins can switch subscription plans" });
+      }
+
+      // Get new plan
+      const [newPlan] = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(
+          and(
+            eq(schema.subscriptionPlans.slug, planSlug),
+            eq(schema.subscriptionPlans.isActive, true)
+          )
+        )
+        .limit(1);
+
+      if (!newPlan) {
+        return res.status(404).json({ error: "Subscription plan not found or inactive" });
+      }
+
+      // Get current subscription
+      const [currentSubscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(
+          and(
+            eq(schema.platformSubscriptions.organizationId, organizationId),
+            eq(schema.platformSubscriptions.status, "active")
+          )
+        )
+        .limit(1);
+
+      if (!currentSubscription) {
+        return res.status(404).json({ error: "No active subscription found to switch from" });
+      }
+
+      // Prevent no-op plan switches
+      if (currentSubscription.plan === newPlan.slug && currentSubscription.billingCycle === billingCycle) {
+        return res.status(400).json({ 
+          error: "You are already on this plan and billing cycle. Please select a different plan or billing cycle." 
+        });
+      }
+
+      // Calculate new pricing
+      const basePrice = billingCycle === "monthly"
+        ? parseFloat(newPlan.basePriceMonthly)
+        : parseFloat(newPlan.basePriceYearly);
+
+      const newMRR = billingCycle === "monthly"
+        ? basePrice
+        : basePrice / 12; // Yearly price converted to monthly for MRR
+
+      // Determine if this is an upgrade or downgrade
+      const planOrder = { free: 0, core: 1, ai: 2, edge: 3 };
+      const currentPlanOrder = planOrder[currentSubscription.plan as keyof typeof planOrder] || 0;
+      const newPlanOrder = planOrder[newPlan.slug as keyof typeof planOrder] || 0;
+      const isUpgrade = newPlanOrder > currentPlanOrder;
+
+      // Calculate new period dates
+      const currentPeriodStart = new Date();
+      const currentPeriodEnd = new Date(currentPeriodStart);
+      if (billingCycle === "monthly") {
+        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+      } else {
+        currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+      }
+
+      // Update subscription
+      const [updatedSubscription] = await db
+        .update(schema.platformSubscriptions)
+        .set({
+          plan: newPlan.slug,
+          billingCycle,
+          monthlyPrice: newPlan.basePriceMonthly,
+          yearlyPrice: newPlan.basePriceYearly,
+          mrr: newMRR.toString(),
+          maxUsers: newPlan.maxUsers,
+          maxClients: newPlan.maxClients,
+          maxStorage: newPlan.maxStorage || 10,
+          currentPeriodStart: isUpgrade ? currentPeriodStart : currentSubscription.currentPeriodStart,
+          currentPeriodEnd: isUpgrade ? currentPeriodEnd : currentSubscription.currentPeriodEnd,
+          nextBillingDate: isUpgrade ? currentPeriodEnd : currentSubscription.nextBillingDate,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.platformSubscriptions.id, currentSubscription.id))
+        .returning();
+
+      // Log the plan change event
+      await db.insert(schema.subscriptionEvents).values({
+        subscriptionId: currentSubscription.id,
+        eventType: isUpgrade ? "plan_upgraded" : "plan_downgraded",
+        eventData: {
+          oldPlan: currentSubscription.plan,
+          newPlan: newPlan.slug,
+          oldMRR: currentSubscription.mrr,
+          newMRR: newMRR.toString(),
+        },
+        createdAt: new Date(),
+      });
+
+      // Log activity
+      await db.insert(schema.activityLogs).values({
+        userId: user.id,
+        organizationId,
+        action: `subscription_${isUpgrade ? 'upgraded' : 'downgraded'}`,
+        entity: "platform_subscription",
+        entityId: currentSubscription.id,
+        details: `Switched from ${currentSubscription.plan} to ${newPlan.slug}`,
+        ipAddress: req.ip || "",
+        userAgent: req.get("user-agent") || "",
+        timestamp: new Date(),
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully ${isUpgrade ? 'upgraded' : 'downgraded'} to ${newPlan.name} plan`,
+        subscription: updatedSubscription,
+      });
+    } catch (error: any) {
+      console.error("Switch plan error:", error);
+      res.status(500).json({ error: "Failed to switch subscription plan" });
+    }
+  });
+
   // ==================== RAZORPAY INTEGRATION ====================
   
   // Import Razorpay service
