@@ -220,15 +220,35 @@ export default function Roles() {
       const res = await apiRequest("POST", `/api/roles/${roleId}/permissions/${permissionId}`, {});
       return res.json();
     },
-    onSuccess: () => {
-      refetchRolePermissions();
+    onMutate: async ({ permissionId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/roles", selectedRole, "permissions"] });
+      
+      // Snapshot previous value
+      const previousPermissions = queryClient.getQueryData(["/api/roles", selectedRole, "permissions"]);
+      
+      // Optimistically update
+      const permission = permissions.find(p => p.id === permissionId);
+      if (permission) {
+        queryClient.setQueryData(["/api/roles", selectedRole, "permissions"], (old: any[]) => {
+          return [...(old || []), permission];
+        });
+      }
+      
+      return { previousPermissions };
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context: any) => {
+      // Rollback on error
+      queryClient.setQueryData(["/api/roles", selectedRole, "permissions"], context.previousPermissions);
       toast({
         title: "Failed to assign permission",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Refetch to ensure sync
+      refetchRolePermissions();
     },
   });
 
@@ -237,15 +257,32 @@ export default function Roles() {
       const res = await apiRequest("DELETE", `/api/roles/${roleId}/permissions/${permissionId}`, {});
       return res.json();
     },
-    onSuccess: () => {
-      refetchRolePermissions();
+    onMutate: async ({ permissionId }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/roles", selectedRole, "permissions"] });
+      
+      // Snapshot previous value
+      const previousPermissions = queryClient.getQueryData(["/api/roles", selectedRole, "permissions"]);
+      
+      // Optimistically update
+      queryClient.setQueryData(["/api/roles", selectedRole, "permissions"], (old: any[]) => {
+        return (old || []).filter((p: any) => p.id !== permissionId);
+      });
+      
+      return { previousPermissions };
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context: any) => {
+      // Rollback on error
+      queryClient.setQueryData(["/api/roles", selectedRole, "permissions"], context.previousPermissions);
       toast({
         title: "Failed to remove permission",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Refetch to ensure sync
+      refetchRolePermissions();
     },
   });
 

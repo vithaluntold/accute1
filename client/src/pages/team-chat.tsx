@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { MessagesSquare, Plus, Send } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +15,9 @@ import { formatDistanceToNow } from "date-fns";
 export default function TeamChatPage() {
   const [selectedChannel, setSelectedChannel] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelDescription, setNewChannelDescription] = useState("");
   const { toast } = useToast();
 
   const { data: channels } = useQuery({
@@ -22,6 +27,29 @@ export default function TeamChatPage() {
   const { data: messages } = useQuery({
     queryKey: ["/api/chat/channels", selectedChannel?.id, "messages"],
     enabled: !!selectedChannel,
+  });
+
+  const createChannelMutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("POST", "/api/chat/channels", data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/channels"] });
+      setCreateDialogOpen(false);
+      setNewChannelName("");
+      setNewChannelDescription("");
+      setSelectedChannel(data);
+      toast({
+        title: "Success",
+        description: "Channel created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to create channel",
+        variant: "destructive",
+      });
+    },
   });
 
   const sendMessageMutation = useMutation({
@@ -34,6 +62,23 @@ export default function TeamChatPage() {
       setNewMessage("");
     },
   });
+
+  const handleCreateChannel = () => {
+    if (!newChannelName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Channel name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    createChannelMutation.mutate({
+      name: newChannelName,
+      description: newChannelDescription,
+      type: "group",
+    });
+  };
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedChannel) return;
@@ -49,8 +94,16 @@ export default function TeamChatPage() {
 
       <div className="grid grid-cols-4 gap-6 h-[calc(100vh-200px)]">
         <Card className="col-span-1">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-lg">Channels</CardTitle>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setCreateDialogOpen(true)}
+              data-testid="button-new-channel"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <ScrollArea className="h-[calc(100vh-300px)]">
@@ -130,6 +183,52 @@ export default function TeamChatPage() {
           )}
         </Card>
       </div>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent data-testid="dialog-create-channel">
+          <DialogHeader>
+            <DialogTitle>Create New Channel</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="channel-name">Channel Name</Label>
+              <Input
+                id="channel-name"
+                placeholder="e.g., general, random, team-updates"
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+                data-testid="input-channel-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="channel-description">Description (Optional)</Label>
+              <Textarea
+                id="channel-description"
+                placeholder="What's this channel about?"
+                value={newChannelDescription}
+                onChange={(e) => setNewChannelDescription(e.target.value)}
+                data-testid="input-channel-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}
+              data-testid="button-cancel-channel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateChannel}
+              disabled={createChannelMutation.isPending}
+              data-testid="button-create-channel"
+            >
+              {createChannelMutation.isPending ? "Creating..." : "Create Channel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

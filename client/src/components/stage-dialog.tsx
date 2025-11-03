@@ -119,10 +119,12 @@ export function StageDialog({ open, onOpenChange, workflowId, stage, stagesCount
       });
       onOpenChange(false);
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Stage update error:", error);
+      const errorMessage = error?.message || error?.details || "Failed to update stage";
       toast({
         title: "Error",
-        description: "Failed to update stage",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -130,6 +132,14 @@ export function StageDialog({ open, onOpenChange, workflowId, stage, stagesCount
 
   const onSubmit = (data: StageFormData) => {
     if (isEditing) {
+      if (!stage?.id) {
+        toast({
+          title: "Error",
+          description: "Invalid stage ID",
+          variant: "destructive",
+        });
+        return;
+      }
       updateMutation.mutate(data);
     } else {
       createMutation.mutate(data);
