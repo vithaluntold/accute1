@@ -4,6 +4,7 @@ import crypto from 'crypto';
 
 const ENCRYPTION_KEY = Buffer.from(process.env.JWT_SECRET?.slice(0, 32).padEnd(32, '0') || '0'.repeat(32));
 const ALGORITHM = 'aes-256-gcm';
+const AUTH_TAG_LENGTH = 16;
 
 export interface ImapConfig {
   host: string;
