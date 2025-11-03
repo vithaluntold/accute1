@@ -70,6 +70,7 @@ import { setupWebSocket } from "./websocket";
 import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import { setupTeamChatWebSocket } from "./team-chat-websocket";
 import path from "path";
+import fs from "fs";
 
 const app = express();
 
