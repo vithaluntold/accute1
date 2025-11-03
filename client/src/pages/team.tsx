@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, UserPlus, Mail, Phone, Copy, CheckCircle2, XCircle, Clock, AlertCircle, Users } from "lucide-react";
+import { Loader2, UserPlus, Mail, Phone, Copy, CheckCircle2, XCircle, Clock, AlertCircle, Users, Trash2 } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { GradientHero } from "@/components/gradient-hero";
 
@@ -41,9 +41,11 @@ export default function Team() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
-  const { data: users = [], isLoading: usersLoading } = useQuery<any[]>({
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery<any[]>({
     queryKey: ["/api/users"],
   });
+
+  const users = allUsers.filter((user: any) => user.roleName !== "Client");
 
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
     queryKey: ["/api/invitations"],
@@ -109,6 +111,27 @@ export default function Team() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/users/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Employee deleted",
+        description: "The employee has been removed from your organization",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete employee",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
   const copyInviteUrl = (token: string) => {
     const url = `${window.location.origin}/register?token=${token}`;
     navigator.clipboard.writeText(url);
@@ -147,8 +170,8 @@ export default function Team() {
     <div className="h-full overflow-auto">
       <GradientHero
         icon={Users}
-        title="Team Management"
-        description="Manage your team members and invitations"
+        title="Employee Management"
+        description="Manage your employees and invitations"
         testId="hero-team"
         actions={
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -329,7 +352,7 @@ export default function Team() {
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
           <TabsTrigger value="members" data-testid="tab-members">
-            Team Members ({users.length})
+            Employees ({users.length})
           </TabsTrigger>
           <TabsTrigger value="invitations" data-testid="tab-invitations">
             Invitations ({invitations.length})
@@ -339,9 +362,9 @@ export default function Team() {
         <TabsContent value="members" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Active Team Members</CardTitle>
+              <CardTitle>Active Employees</CardTitle>
               <CardDescription>
-                All users who have joined your organization
+                All employees who have joined your organization
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -364,6 +387,7 @@ export default function Team() {
                       <TableHead data-testid="table-header-username">Username</TableHead>
                       <TableHead data-testid="table-header-role">Role</TableHead>
                       <TableHead data-testid="table-header-status">Status</TableHead>
+                      <TableHead data-testid="table-header-actions">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -389,6 +413,21 @@ export default function Team() {
                               Inactive
                             </Badge>
                           )}
+                        </TableCell>
+                        <TableCell data-testid={`cell-actions-${user.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteUserMutation.mutate(user.id)}
+                            disabled={deleteUserMutation.isPending}
+                            data-testid={`button-delete-${user.id}`}
+                          >
+                            {deleteUserMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            )}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
