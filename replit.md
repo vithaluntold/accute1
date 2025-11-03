@@ -10,6 +10,66 @@ Accute is an enterprise-grade AI-powered accounting workflow automation platform
 - Clean, modern UI following design guidelines
 - Comprehensive audit trail for compliance
 
+### Persistent Seed Accounts (Roleplay Scenario)
+
+#### Organization: Sterling Accounting Firm
+- **Slug**: sterling-accounting
+- **Description**: A professional accounting firm serving technology companies
+
+#### Seed User Accounts
+
+**Super Admin (Platform-level)**
+- Email: superadmin@accute.com
+- Password: SuperAdmin123!
+- Name: Super Admin
+- Role: Super Admin (platform management)
+- Organization: None (platform-scoped)
+
+**Admin (Organization Owner)**
+- Email: admin@sterling.com
+- Password: Admin123!
+- Name: Sarah Sterling
+- Role: Admin
+- Organization: Sterling Accounting Firm
+- Description: Firm owner and administrator
+
+**Employee (Team Member)**
+- Email: employee@sterling.com
+- Password: Employee123!
+- Name: John Matthews
+- Role: Employee
+- Organization: Sterling Accounting Firm
+- Description: Senior accountant working at the firm
+
+**Client User (Client Portal Access)**
+- Email: david@technova.com
+- Password: Client123!
+- Name: David Chen
+- Role: Client
+- Organization: Sterling Accounting Firm
+- Description: CFO of TechNova Solutions with portal access
+
+#### Client Company
+- **Company**: TechNova Solutions
+- **Industry**: Technology
+- **Status**: Active
+- **Tax ID**: 94-7654321
+- **Assigned To**: Sarah Sterling (Admin)
+- **Description**: SaaS company requiring year-end tax preparation
+
+#### Contact (Point of Contact)
+- **Name**: David Chen
+- **Title**: CFO
+- **Email**: david@technova.com
+- **Primary Contact**: Yes
+- **Description**: Primary contact for all accounting matters
+
+This realistic roleplay scenario demonstrates the complete multi-tenant workflow where:
+1. Sarah Sterling (Admin) owns and manages Sterling Accounting Firm
+2. John Matthews (Employee) works as a team member at the firm
+3. TechNova Solutions is onboarded as a client of the firm
+4. David Chen serves as both the company contact and has portal access to track work
+
 ### System Architecture
 
 #### UI/UX Decisions

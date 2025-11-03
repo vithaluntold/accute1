@@ -1,6 +1,140 @@
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { storage } from "./storage";
+import { hashPassword } from "./auth";
+
+async function createPersistentSeedAccountsInline() {
+  // Get roles
+  const superAdminRole = await db.select().from(schema.roles).where(eq(schema.roles.name, "Super Admin")).then(r => r[0]);
+  const adminRole = await db.select().from(schema.roles).where(eq(schema.roles.name, "Admin")).then(r => r[0]);
+  const employeeRole = await db.select().from(schema.roles).where(eq(schema.roles.name, "Employee")).then(r => r[0]);
+  const clientRole = await db.select().from(schema.roles).where(eq(schema.roles.name, "Client")).then(r => r[0]);
+
+  // 1. Super Admin
+  let superAdmin = await db.select().from(schema.users).where(eq(schema.users.email, "superadmin@accute.com")).then(r => r[0]);
+  if (!superAdmin) {
+    superAdmin = await db.insert(schema.users).values({
+      email: "superadmin@accute.com",
+      username: "superadmin",
+      password: await hashPassword("SuperAdmin123!"),
+      firstName: "Super",
+      lastName: "Admin",
+      roleId: superAdminRole.id,
+      organizationId: null,
+      isActive: true,
+    }).returning().then(r => r[0]);
+    console.log("✓ Super Admin created");
+  }
+
+  // 2. Organization
+  let organization = await db.select().from(schema.organizations).where(eq(schema.organizations.slug, "sterling-accounting")).then(r => r[0]);
+  if (!organization) {
+    organization = await db.insert(schema.organizations).values({
+      name: "Sterling Accounting Firm",
+      slug: "sterling-accounting",
+    }).returning().then(r => r[0]);
+    console.log("✓ Organization created: Sterling Accounting Firm");
+  }
+
+  // 3. Admin
+  let admin = await db.select().from(schema.users).where(eq(schema.users.email, "admin@sterling.com")).then(r => r[0]);
+  if (!admin) {
+    admin = await db.insert(schema.users).values({
+      email: "admin@sterling.com",
+      username: "admin",
+      password: await hashPassword("Admin123!"),
+      firstName: "Sarah",
+      lastName: "Sterling",
+      roleId: adminRole.id,
+      organizationId: organization.id,
+      isActive: true,
+    }).returning().then(r => r[0]);
+    console.log("✓ Admin created: Sarah Sterling");
+  }
+
+  // 4. Employee
+  let employee = await db.select().from(schema.users).where(eq(schema.users.email, "employee@sterling.com")).then(r => r[0]);
+  if (!employee) {
+    employee = await db.insert(schema.users).values({
+      email: "employee@sterling.com",
+      username: "employee",
+      password: await hashPassword("Employee123!"),
+      firstName: "John",
+      lastName: "Matthews",
+      roleId: employeeRole.id,
+      organizationId: organization.id,
+      isActive: true,
+    }).returning().then(r => r[0]);
+    console.log("✓ Employee created: John Matthews");
+  }
+
+  // 5. Client Company
+  let client = await db.select().from(schema.clients)
+    .where(and(eq(schema.clients.companyName, "TechNova Solutions"), eq(schema.clients.organizationId, organization.id)))
+    .then(r => r[0]);
+  if (!client) {
+    client = await db.insert(schema.clients).values({
+      companyName: "TechNova Solutions",
+      contactName: "David Chen",
+      email: "david@technova.com",
+      phone: "+1-555-0199",
+      address: "456 Innovation Drive",
+      city: "San Francisco",
+      state: "CA",
+      zipCode: "94103",
+      country: "US",
+      taxId: "94-7654321",
+      organizationId: organization.id,
+      assignedTo: admin.id,
+      status: "active",
+      industry: "Technology",
+      notes: "SaaS company requiring year-end tax preparation",
+      metadata: {},
+      createdBy: admin.id,
+    }).returning().then(r => r[0]);
+    console.log("✓ Client Company created: TechNova Solutions");
+  }
+
+  // 6. Contact
+  let contact = await db.select().from(schema.contacts)
+    .where(and(eq(schema.contacts.email, "david@technova.com"), eq(schema.contacts.organizationId, organization.id)))
+    .then(r => r[0]);
+  if (!contact) {
+    contact = await db.insert(schema.contacts).values({
+      clientId: client.id,
+      firstName: "David",
+      lastName: "Chen",
+      email: "david@technova.com",
+      phone: "+1-555-0199",
+      title: "CFO",
+      department: "Finance",
+      isPrimary: true,
+      notes: "Primary contact for all accounting matters",
+      organizationId: organization.id,
+      createdBy: admin.id,
+    }).returning().then(r => r[0]);
+    console.log("✓ Contact created: David Chen (CFO)");
+  }
+
+  // 7. Client User
+  let clientUser = await db.select().from(schema.users).where(eq(schema.users.email, "david@technova.com")).then(r => r[0]);
+  if (!clientUser) {
+    clientUser = await db.insert(schema.users).values({
+      email: "david@technova.com",
+      username: "davidchen",
+      password: await hashPassword("Client123!"),
+      firstName: "David",
+      lastName: "Chen",
+      roleId: clientRole.id,
+      organizationId: organization.id,
+      isActive: true,
+    }).returning().then(r => r[0]);
+    console.log("✓ Client User created: David Chen");
+  }
+
+  console.log("✅ Persistent seed accounts ready for roleplay");
+}
 
 export async function initializeSystem() {
   try {
@@ -505,6 +639,14 @@ export async function initializeSystem() {
       }
     } catch (error) {
       console.log("⚠️  Client-contact migration may have already run or failed:", error);
+    }
+
+    // Create persistent seed accounts for roleplay
+    try {
+      console.log("🌱 Creating persistent seed accounts...");
+      await createPersistentSeedAccountsInline();
+    } catch (error) {
+      console.log("⚠️  Persistent seed accounts may already exist or failed to create:", error);
     }
 
     // Initialize Agent Registry
