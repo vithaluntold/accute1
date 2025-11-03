@@ -246,6 +246,7 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/subscription-pricing" component={SubscriptionPricing} />
       
       {/* Public route - NO authentication required */}
       <Route path="/public/:shareToken" component={PublicFormPage} />
