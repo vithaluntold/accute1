@@ -63,6 +63,7 @@ export const platformSubscriptions = pgTable("platform_subscriptions", {
   // Payment info
   paymentMethod: text("payment_method"), // 'credit_card', 'invoice', 'free'
   paymentGateway: text("payment_gateway").default("manual"), // 'stripe', 'razorpay', 'payu', 'payoneer', 'manual'
+  defaultPaymentMethodId: varchar("default_payment_method_id"), // Reference to saved payment method for auto-sweep
   lastPaymentDate: timestamp("last_payment_date"),
   lastPaymentAmount: numeric("last_payment_amount", { precision: 10, scale: 2 }),
   
@@ -2094,6 +2095,48 @@ export const payments = pgTable("payments", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Saved Payment Methods for Auto-Sweep
+export const paymentMethods = pgTable("payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Payment method details
+  type: text("type").notNull(), // credit_card, debit_card, upi, netbanking, bank_account
+  nickname: text("nickname"), // User-friendly name (e.g., "Business Visa")
+  isDefault: boolean("is_default").notNull().default(false),
+  
+  // Card details (if type is card)
+  cardLast4: text("card_last4"), // Last 4 digits
+  cardBrand: text("card_brand"), // visa, mastercard, amex, etc.
+  cardExpMonth: integer("card_exp_month"),
+  cardExpYear: integer("card_exp_year"),
+  cardholderName: text("cardholder_name"),
+  
+  // Bank account details (if type is bank_account)
+  bankName: text("bank_name"),
+  accountLast4: text("account_last4"),
+  accountHolderName: text("account_holder_name"),
+  
+  // UPI details (if type is upi)
+  upiId: text("upi_id"), // Masked UPI ID
+  
+  // Payment gateway tokens
+  razorpayTokenId: text("razorpay_token_id"), // Razorpay token for recurring payments
+  razorpayCustomerId: text("razorpay_customer_id"), // Razorpay customer ID
+  stripePaymentMethodId: text("stripe_payment_method_id"), // Stripe payment method ID
+  
+  // Metadata
+  status: text("status").notNull().default("active"), // active, expired, failed
+  lastUsedAt: timestamp("last_used_at"),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("payment_methods_org_idx").on(table.organizationId),
+  defaultIdx: index("payment_methods_default_idx").on(table.isDefault),
+}));
+
 // E-Signatures
 export const signatureRequests = pgTable("signature_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2668,6 +2711,7 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true });
 export const insertSubscriptionInvoiceSchema = createInsertSchema(subscriptionInvoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSignatureRequestSchema = createInsertSchema(signatureRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2723,6 +2767,8 @@ export type InsertSubscriptionInvoice = z.infer<typeof insertSubscriptionInvoice
 export type SubscriptionInvoice = typeof subscriptionInvoices.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
 export type InsertSignatureRequest = z.infer<typeof insertSignatureRequestSchema>;
 export type SignatureRequest = typeof signatureRequests.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
