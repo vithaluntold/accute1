@@ -309,9 +309,24 @@ app.use((req, res, next) => {
         console.warn('⚠️  Continuing without Vite dev server');
       }
     } else {
+      // PRODUCTION: Serve static files from dist/public
+      // DO NOT use serveStatic() from vite.ts - it has import.meta.dirname bug
       try {
-        serveStatic(app);
+        if (!fs.existsSync(distPath)) {
+          throw new Error(
+            `Could not find the build directory: ${distPath}, make sure to build the client first`,
+          );
+        }
+
+        app.use(express.static(distPath));
+        
+        // SPA fallback: serve index.html for all non-API routes
+        app.use("*", (_req, res) => {
+          res.sendFile(path.resolve(distPath, "index.html"));
+        });
+        
         console.log('✅ Static file serving initialized (production mode)');
+        console.log(`   Serving from: ${distPath}`);
       } catch (staticError) {
         console.error('❌ Static file setup failed:', staticError);
         console.warn('⚠️  Continuing without static file serving');
