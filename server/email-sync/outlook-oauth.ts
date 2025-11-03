@@ -111,7 +111,8 @@ export class OutlookOAuthService {
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
       ENCRYPTION_KEY,
-      Buffer.from(iv, 'hex')
+      Buffer.from(iv, 'hex'),
+      { authTagLength: 16 }
     );
     
     decipher.setAuthTag(Buffer.from(authTag, 'hex'));
