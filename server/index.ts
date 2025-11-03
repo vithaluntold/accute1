@@ -71,6 +71,10 @@ import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import { setupTeamChatWebSocket } from "./team-chat-websocket";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+
+// Node ESM compatible directory resolution (works in production after bundling)
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 
@@ -293,7 +297,7 @@ app.use((req, res, next) => {
     // Setup Vite (dev) or static file serving (production) BEFORE error handler
     // This ensures the catch-all route for the SPA works correctly
     // Check if dist/public exists to determine production vs development
-    const distPath = path.resolve(import.meta.dirname, "public");
+    const distPath = path.resolve(moduleDir, "public");
     const isProduction = fs.existsSync(distPath);
     
     if (!isProduction && app.get("env") === "development") {
