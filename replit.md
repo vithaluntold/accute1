@@ -128,24 +128,42 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
 
-### Payment Integration
+### Payment Integration & Subscription Billing
 - **Payment Gateway**: Razorpay
   - Supports India, UAE, Turkey, and USA markets
-  - Handles subscription billing (monthly/yearly)
-  - One-time payment support for invoices
-  - Secure webhook verification for payment events
   - PCI-compliant payment processing
   - Environment Variables Required:
     - `RAZORPAY_KEY_ID`: Razorpay API Key ID
     - `RAZORPAY_KEY_SECRET`: Razorpay API Key Secret
     - `RAZORPAY_WEBHOOK_SECRET`: Webhook signature verification secret (optional)
-  - Key Features:
-    - Customer creation and management
-    - Subscription plan creation
-    - Recurring billing automation
-    - Payment verification and signature validation
-    - Webhook handling for payment events
-    - Support for INR, USD, AED, and other currencies
+
+#### Subscription Invoice System
+- **Automatic Invoice Generation**: System generates invoices based on subscription billing cycle (monthly/yearly/3-year)
+- **Payment Methods Tracked**: UPI, Credit Card, Debit Card, Net Banking, Wallet
+  - Backend fetches actual payment method from Razorpay API (not client-supplied)
+  - Card payments differentiated between credit and debit cards
+  - Payment method normalization ensures consistent billing records
+- **Invoice Status Workflow**: 
+  - `pending` → Invoice generated, awaiting payment
+  - `paid` → Payment successfully completed
+  - `failed` → Payment failed
+  - `overdue` → Payment not received, within grace period
+- **Grace Period & Service Suspension**: 
+  - 2-day grace period after payment failure
+  - Services automatically suspended if payment not received within grace period
+  - Organizations can pay overdue invoices to restore services
+- **Payment Flow**:
+  1. System creates Razorpay order for invoice amount
+  2. User completes payment via Razorpay checkout (UPI/Cards/NetBanking)
+  3. Backend verifies payment signature for security
+  4. Backend fetches payment details from Razorpay to get actual payment method
+  5. Invoice marked as paid with accurate payment method recorded
+  6. Payment record created in payments table with Razorpay identifiers
+- **Database Schema**:
+  - `subscriptionInvoices`: Tracks platform subscription billing invoices
+  - `payments`: Records all payment transactions with Razorpay IDs
+  - Foreign key relationships ensure data integrity
+- **Payments Page**: Displays subscription invoices with status badges, billing periods, and "Pay Invoice" button for pending invoices
 
 ### Mobile Application
 - **Technology**: React Native with Expo (managed workflow, SDK 54)
