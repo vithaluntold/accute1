@@ -49,7 +49,7 @@ export default function EmailInbox() {
 
   // Fetch messages for selected account
   const { data: messages, isLoading: messagesLoading } = useQuery<EmailMessage[]>({
-    queryKey: ["/api/email-messages", selected Account],
+    queryKey: ["/api/email-messages", selectedAccount],
     enabled: !!selectedAccount,
   });
 
