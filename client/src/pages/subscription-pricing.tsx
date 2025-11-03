@@ -67,7 +67,7 @@ export default function SubscriptionPricing() {
         ? parseFloat(plan.basePriceMonthly)
         : billingCycle === "yearly"
         ? parseFloat(plan.basePriceYearly)
-        : parseFloat(plan.basePriceYearly) * 0.9; // 3-year gets 10% extra discount
+        : parseFloat(plan.basePriceYearly) * 3 * 0.9; // 3-year: 3 years total with 10% discount
 
       const amount = basePrice * parseFloat(region.priceMultiplier) * 100; // Convert to paise/cents
 
@@ -193,7 +193,7 @@ export default function SubscriptionPricing() {
       ? parseFloat(plan.basePriceMonthly)
       : billingCycle === "yearly"
       ? parseFloat(plan.basePriceYearly) / 12 // Show monthly equivalent
-      : (parseFloat(plan.basePriceYearly) * 0.9) / 12; // 3-year with extra discount
+      : (parseFloat(plan.basePriceYearly) * 3 * 0.9) / 12; // 3-year: 3 years with 10% discount, shown monthly
 
     return basePrice * parseFloat(region.priceMultiplier);
   };

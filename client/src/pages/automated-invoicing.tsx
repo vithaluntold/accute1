@@ -95,6 +95,20 @@ export default function AutomatedInvoicing() {
   };
 
   const handleCreate = () => {
+    // Validate form data
+    if (!newInvoice.clientId) {
+      toast({ title: "Error", description: "Please select a client", variant: "destructive" });
+      return;
+    }
+    if (!newInvoice.amount || isNaN(parseFloat(newInvoice.amount)) || parseFloat(newInvoice.amount) <= 0) {
+      toast({ title: "Error", description: "Please enter a valid amount greater than 0", variant: "destructive" });
+      return;
+    }
+    if (!newInvoice.dueDate) {
+      toast({ title: "Error", description: "Please select a due date", variant: "destructive" });
+      return;
+    }
+    
     createMutation.mutate(newInvoice);
   };
 
