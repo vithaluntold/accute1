@@ -12,8 +12,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { format, differenceInDays } from "date-fns";
-import { CreditCard, AlertTriangle, CheckCircle, Clock, FileText } from "lucide-react";
+import { CreditCard, AlertTriangle, CheckCircle, Clock, FileText, Plus, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -46,12 +47,31 @@ interface SubscriptionInvoice {
   }>;
 }
 
+interface PaymentMethod {
+  id: string;
+  type: string;
+  nickname: string | null;
+  isDefault: boolean;
+  cardLast4: string | null;
+  cardBrand: string | null;
+  cardExpMonth: number | null;
+  cardExpYear: number | null;
+  upiId: string | null;
+  status: string;
+  lastUsedAt: string | null;
+}
+
 export default function PaymentsPage() {
   const { toast } = useToast();
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [addingPaymentMethod, setAddingPaymentMethod] = useState(false);
 
   const { data: invoices, isLoading } = useQuery<SubscriptionInvoice[]>({
     queryKey: ["/api/subscription-invoices"],
+  });
+
+  const { data: paymentMethods, isLoading: loadingMethods } = useQuery<PaymentMethod[]>({
+    queryKey: ["/api/payment-methods"],
   });
 
   const payInvoiceMutation = useMutation({
@@ -176,6 +196,159 @@ export default function PaymentsPage() {
   const handlePayInvoice = (invoiceId: string) => {
     setPayingInvoiceId(invoiceId);
     payInvoiceMutation.mutate(invoiceId);
+  };
+
+  // Payment Methods Mutations
+  const setupPaymentMethodMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/payment-methods/setup", {
+        method: "POST",
+        body: JSON.stringify({ amount: 100 }), // ₹1 verification
+      });
+      return response;
+    },
+    onSuccess: (data) => {
+      loadRazorpayScript(() => {
+        openPaymentMethodSetup(data.order);
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to setup payment method",
+        variant: "destructive",
+      });
+      setAddingPaymentMethod(false);
+    },
+  });
+
+  const savePaymentMethodMutation = useMutation({
+    mutationFn: async (data: {
+      razorpay_payment_id: string;
+      razorpay_order_id: string;
+      razorpay_signature: string;
+      nickname?: string;
+    }) => {
+      return await apiRequest("/api/payment-methods/save", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Payment method saved successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+      setAddingPaymentMethod(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save payment method",
+        variant: "destructive",
+      });
+      setAddingPaymentMethod(false);
+    },
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: async (methodId: string) => {
+      return await apiRequest(`/api/payment-methods/${methodId}/set-default`, {
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Default payment method updated",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to set default payment method",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePaymentMethodMutation = useMutation({
+    mutationFn: async (methodId: string) => {
+      return await apiRequest(`/api/payment-methods/${methodId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Payment method deleted",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete payment method",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openPaymentMethodSetup = (order: any) => {
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
+      amount: order.amount,
+      currency: order.currency,
+      name: "Accute",
+      description: "Add Payment Method (₹1 verification)",
+      order_id: order.id,
+      handler: async function (response: any) {
+        savePaymentMethodMutation.mutate({
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_order_id: response.razorpay_order_id,
+          razorpay_signature: response.razorpay_signature,
+        });
+      },
+      modal: {
+        ondismiss: function () {
+          setAddingPaymentMethod(false);
+        },
+      },
+      theme: {
+        color: "#e5a660",
+      },
+      config: {
+        display: {
+          blocks: {
+            utib: {
+              name: "Save Payment Method",
+              instruments: [
+                {
+                  method: "card",
+                },
+                {
+                  method: "upi",
+                },
+              ],
+            },
+          },
+          sequence: ["block.utib"],
+          preferences: {
+            show_default_blocks: true,
+          },
+        },
+      },
+    };
+
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+  };
+
+  const handleAddPaymentMethod = () => {
+    setAddingPaymentMethod(true);
+    setupPaymentMethodMutation.mutate();
   };
 
   const getStatusColor = (status: string) => {
@@ -379,6 +552,113 @@ export default function PaymentsPage() {
                   })}
                 </TableBody>
               </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Payment Methods</CardTitle>
+              <CardDescription>
+                Save a payment method for automatic invoice payments (auto-sweep)
+              </CardDescription>
+            </div>
+            <Button
+              onClick={handleAddPaymentMethod}
+              disabled={addingPaymentMethod}
+              data-testid="button-add-payment-method"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {addingPaymentMethod ? "Processing..." : "Add Payment Method"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingMethods ? (
+            <div className="text-center text-muted-foreground py-8">Loading payment methods...</div>
+          ) : !paymentMethods || paymentMethods.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No payment methods saved</p>
+              <p className="text-sm mt-2">
+                Add a payment method to enable automatic invoice payments
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paymentMethods.map((method) => (
+                <div
+                  key={method.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
+                  data-testid={`payment-method-${method.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">
+                          {method.nickname || `${method.type} ending in ${method.cardLast4 || method.upiId || '****'}`}
+                        </p>
+                        {method.isDefault && (
+                          <Badge variant="default" className="text-xs">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Default
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {method.type === 'card' && method.cardBrand && (
+                          <span className="capitalize">{method.cardBrand} </span>
+                        )}
+                        {method.type === 'card' && method.cardExpMonth && method.cardExpYear && (
+                          <span>• Expires {method.cardExpMonth}/{method.cardExpYear}</span>
+                        )}
+                        {method.type === 'upi' && method.upiId && (
+                          <span>{method.upiId}</span>
+                        )}
+                        {method.lastUsedAt && (
+                          <span className="ml-2">
+                            • Last used {format(new Date(method.lastUsedAt), "MMM d, yyyy")}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!method.isDefault && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDefaultMutation.mutate(method.id)}
+                        disabled={setDefaultMutation.isPending}
+                        data-testid={`button-set-default-${method.id}`}
+                      >
+                        Set as Default
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this payment method?")) {
+                          deletePaymentMethodMutation.mutate(method.id);
+                        }
+                      }}
+                      disabled={deletePaymentMethodMutation.isPending}
+                      data-testid={`button-delete-${method.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
