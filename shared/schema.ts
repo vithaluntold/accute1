@@ -2022,16 +2022,71 @@ export const invoiceItems = pgTable("invoice_items", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Subscription Invoices - Platform subscription billing invoices (NOT client invoices)
+// IMPORTANT: Must be defined BEFORE payments table to avoid forward reference
+export const subscriptionInvoices = pgTable("subscription_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  subscriptionId: varchar("subscription_id").notNull().references(() => platformSubscriptions.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  
+  // Invoice details
+  status: text("status").notNull().default("pending"), // pending, paid, failed, overdue, cancelled
+  billingPeriodStart: timestamp("billing_period_start").notNull(),
+  billingPeriodEnd: timestamp("billing_period_end").notNull(),
+  
+  // Pricing breakdown
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxRate: numeric("tax_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  taxAmount: numeric("tax_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  
+  // Payment details
+  amountPaid: numeric("amount_paid", { precision: 10, scale: 2 }).notNull().default("0"),
+  paymentMethod: text("payment_method"), // upi, credit_card, debit_card, netbanking
+  paidAt: timestamp("paid_at"),
+  
+  // Dates
+  issueDate: timestamp("issue_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  
+  // Payment failure handling
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  gracePeriodEndsAt: timestamp("grace_period_ends_at"), // 2 days after due date for payment failure
+  servicesDisabledAt: timestamp("services_disabled_at"),
+  
+  // Razorpay integration
+  razorpayOrderId: text("razorpay_order_id"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  
+  // Invoice snapshot
+  lineItems: jsonb("line_items").notNull().default(sql`'[]'::jsonb`), // Array of {description, quantity, unitPrice, amount}
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("subscription_invoices_org_idx").on(table.organizationId),
+  subscriptionIdx: index("subscription_invoices_subscription_idx").on(table.subscriptionId),
+  statusIdx: index("subscription_invoices_status_idx").on(table.status),
+  dueDateIdx: index("subscription_invoices_due_date_idx").on(table.dueDate),
+}));
+
 export const payments = pgTable("payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   invoiceId: varchar("invoice_id").references(() => invoices.id),
-  clientId: varchar("client_id").notNull().references(() => clients.id),
+  subscriptionInvoiceId: varchar("subscription_invoice_id").references(() => subscriptionInvoices.id),
+  clientId: varchar("client_id").references(() => clients.id),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  method: text("method").notNull(), // card, ach, check, cash, other
+  method: text("method").notNull(), // upi, credit_card, debit_card, netbanking, card, ach, check, cash, other
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   stripePaymentId: text("stripe_payment_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  razorpayOrderId: text("razorpay_order_id"),
   transactionDate: timestamp("transaction_date").notNull(),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
@@ -2611,6 +2666,7 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true, createdAt: true });
+export const insertSubscriptionInvoiceSchema = createInsertSchema(subscriptionInvoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSignatureRequestSchema = createInsertSchema(signatureRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, updatedAt: true });
@@ -2663,6 +2719,8 @@ export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertSubscriptionInvoice = z.infer<typeof insertSubscriptionInvoiceSchema>;
+export type SubscriptionInvoice = typeof subscriptionInvoices.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertSignatureRequest = z.infer<typeof insertSignatureRequestSchema>;

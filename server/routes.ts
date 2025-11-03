@@ -12172,6 +12172,441 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Subscription Invoices (Platform Billing) ====================
+
+  // Get subscription invoices for current organization
+  app.get("/api/subscription-invoices", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const invoices = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(eq(schema.subscriptionInvoices.organizationId, organizationId))
+        .orderBy(desc(schema.subscriptionInvoices.issueDate));
+
+      res.json(invoices);
+    } catch (error: any) {
+      console.error("Get subscription invoices error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch invoices" });
+    }
+  });
+
+  // Get specific subscription invoice
+  app.get("/api/subscription-invoices/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const [invoice] = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(
+          and(
+            eq(schema.subscriptionInvoices.id, id),
+            eq(schema.subscriptionInvoices.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      res.json(invoice);
+    } catch (error: any) {
+      console.error("Get subscription invoice error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch invoice" });
+    }
+  });
+
+  // Generate invoice for subscription (manual trigger or auto-generation)
+  app.post("/api/subscription-invoices/generate", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { subscriptionId } = req.body;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      if (!subscriptionId) {
+        return res.status(400).json({ error: "subscriptionId is required" });
+      }
+
+      // Get subscription details
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(
+          and(
+            eq(schema.platformSubscriptions.id, subscriptionId),
+            eq(schema.platformSubscriptions.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Get subscription plan details
+      let planDetails = null;
+      if (subscription.planId) {
+        [planDetails] = await db
+          .select()
+          .from(schema.subscriptionPlans)
+          .where(eq(schema.subscriptionPlans.id, subscription.planId))
+          .limit(1);
+      }
+
+      // Calculate billing period
+      const billingPeriodStart = subscription.currentPeriodStart;
+      const billingPeriodEnd = subscription.currentPeriodEnd;
+      const issueDate = new Date();
+      const dueDate = new Date(issueDate.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days from issue
+      const gracePeriodEnds = new Date(dueDate.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days after due date
+
+      // Calculate pricing
+      let subtotal = 0;
+      const billingCycle = subscription.billingCycle || 'monthly';
+
+      if (billingCycle === 'monthly') {
+        subtotal = parseFloat(subscription.basePrice || subscription.monthlyPrice || '0');
+      } else if (billingCycle === 'yearly') {
+        subtotal = parseFloat(subscription.basePrice || subscription.yearlyPrice || '0');
+      }
+
+      const taxRate = 0; // TODO: Add tax calculation based on region
+      const taxAmount = subtotal * (taxRate / 100);
+      const total = subtotal + taxAmount;
+
+      // Generate invoice number
+      const invoiceCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.subscriptionInvoices)
+        .where(eq(schema.subscriptionInvoices.organizationId, organizationId));
+
+      const invoiceNumber = `INV-${organizationId.substring(0, 8).toUpperCase()}-${String(Number(invoiceCount[0].count) + 1).padStart(6, '0')}`;
+
+      // Create line items
+      const lineItems = [
+        {
+          description: `${planDetails?.name || subscription.plan} Plan - ${billingCycle === 'monthly' ? 'Monthly' : billingCycle === 'yearly' ? 'Yearly' : '3-Year'} Subscription`,
+          quantity: 1,
+          unitPrice: subtotal,
+          amount: subtotal,
+        }
+      ];
+
+      if (subscription.seatCount && subscription.seatCount > 1 && subscription.perSeatPrice) {
+        const additionalSeats = subscription.seatCount - (planDetails?.includedSeats || 1);
+        if (additionalSeats > 0) {
+          const seatPrice = parseFloat(subscription.perSeatPrice);
+          lineItems.push({
+            description: `Additional Seats (${additionalSeats} seats)`,
+            quantity: additionalSeats,
+            unitPrice: seatPrice,
+            amount: additionalSeats * seatPrice,
+          });
+        }
+      }
+
+      // Create invoice
+      const [invoice] = await db
+        .insert(schema.subscriptionInvoices)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId,
+          subscriptionId,
+          invoiceNumber,
+          status: 'pending',
+          billingPeriodStart,
+          billingPeriodEnd,
+          subtotal: String(subtotal),
+          taxRate: String(taxRate),
+          taxAmount: String(taxAmount),
+          total: String(total),
+          currency: subscription.currency || 'USD',
+          amountPaid: '0',
+          issueDate,
+          dueDate,
+          gracePeriodEndsAt: gracePeriodEnds,
+          attemptCount: 0,
+          lineItems: lineItems as any,
+          metadata: {
+            billingCycle,
+            planName: planDetails?.name || subscription.plan,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      res.json({ 
+        message: "Invoice generated successfully",
+        invoice 
+      });
+    } catch (error: any) {
+      console.error("Generate subscription invoice error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate invoice" });
+    }
+  });
+
+  // Pay subscription invoice via Razorpay
+  app.post("/api/subscription-invoices/:id/pay", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Get invoice
+      const [invoice] = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(
+          and(
+            eq(schema.subscriptionInvoices.id, id),
+            eq(schema.subscriptionInvoices.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ error: "Invoice already paid" });
+      }
+
+      // Create Razorpay order
+      const amountInPaise = Math.round(parseFloat(invoice.total) * 100);
+
+      const order = await razorpayService.createOrder({
+        amount: amountInPaise,
+        currency: invoice.currency,
+        receipt: invoice.invoiceNumber,
+        notes: {
+          invoice_id: invoice.id,
+          invoice_number: invoice.invoiceNumber,
+          subscription_id: invoice.subscriptionId,
+        },
+      });
+
+      // Update invoice with Razorpay order ID
+      await db
+        .update(schema.subscriptionInvoices)
+        .set({
+          razorpayOrderId: order.id,
+          lastAttemptAt: new Date(),
+          attemptCount: invoice.attemptCount + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.subscriptionInvoices.id, id));
+
+      res.json({
+        message: "Payment order created successfully",
+        order,
+        invoice,
+      });
+    } catch (error: any) {
+      console.error("Pay subscription invoice error:", error);
+      res.status(500).json({ error: error.message || "Failed to create payment order" });
+    }
+  });
+
+  // Complete payment for subscription invoice (after Razorpay verification)
+  app.post("/api/subscription-invoices/:id/complete-payment", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+      const organizationId = req.user!.organizationId;
+      const userId = req.user!.id;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Verify payment signature
+      const isValid = razorpayService.verifyPaymentSignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid payment signature" });
+      }
+
+      // Fetch payment details from Razorpay to get actual payment method
+      const paymentDetails = await razorpayService.fetchPayment(razorpay_payment_id);
+      
+      // Map Razorpay payment method to our schema
+      // Razorpay returns: "card", "netbanking", "wallet", "upi", "emi", etc.
+      let paymentMethod = paymentDetails.method || 'other';
+      
+      // More specific mapping for cards
+      if (paymentMethod === 'card') {
+        // Check if it's credit or debit card based on card type
+        if (paymentDetails.card && paymentDetails.card.type) {
+          paymentMethod = paymentDetails.card.type === 'credit' ? 'credit_card' : 'debit_card';
+        } else {
+          paymentMethod = 'card'; // Fallback if type not available
+        }
+      }
+
+      // Get invoice
+      const [invoice] = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(
+          and(
+            eq(schema.subscriptionInvoices.id, id),
+            eq(schema.subscriptionInvoices.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Update invoice as paid with actual payment method from Razorpay
+      await db
+        .update(schema.subscriptionInvoices)
+        .set({
+          status: 'paid',
+          amountPaid: invoice.total,
+          paidAt: new Date(),
+          paymentMethod: paymentMethod,
+          razorpayPaymentId: razorpay_payment_id,
+          razorpayOrderId: razorpay_order_id,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.subscriptionInvoices.id, id));
+
+      // Create payment record with actual payment method
+      await db
+        .insert(schema.payments)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId,
+          subscriptionInvoiceId: invoice.id,
+          amount: invoice.total,
+          method: paymentMethod,
+          status: 'completed',
+          razorpayPaymentId: razorpay_payment_id,
+          razorpayOrderId: razorpay_order_id,
+          transactionDate: new Date(),
+          notes: `Payment for invoice ${invoice.invoiceNumber} via ${paymentMethod}`,
+          createdBy: userId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+      // Update subscription last payment
+      await db
+        .update(schema.platformSubscriptions)
+        .set({
+          lastPaymentDate: new Date(),
+          lastPaymentAmount: invoice.total,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.platformSubscriptions.id, invoice.subscriptionId));
+
+      res.json({
+        message: "Payment completed successfully",
+        invoice_id: invoice.id,
+        invoice_number: invoice.invoiceNumber,
+        payment_method: paymentMethod,
+      });
+    } catch (error: any) {
+      console.error("Complete payment error:", error);
+      res.status(500).json({ error: error.message || "Failed to complete payment" });
+    }
+  });
+
+  // Mark invoice as failed (after payment failure)
+  app.post("/api/subscription-invoices/:id/mark-failed", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user!.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const [invoice] = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(
+          and(
+            eq(schema.subscriptionInvoices.id, id),
+            eq(schema.subscriptionInvoices.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      await db
+        .update(schema.subscriptionInvoices)
+        .set({
+          status: 'failed',
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.subscriptionInvoices.id, id));
+
+      // Check if grace period expired - disable services
+      const now = new Date();
+      if (invoice.gracePeriodEndsAt && now > invoice.gracePeriodEndsAt) {
+        await db
+          .update(schema.platformSubscriptions)
+          .set({
+            status: 'suspended',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.platformSubscriptions.id, invoice.subscriptionId));
+
+        await db
+          .update(schema.subscriptionInvoices)
+          .set({
+            servicesDisabledAt: now,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.subscriptionInvoices.id, id));
+
+        res.json({
+          message: "Invoice marked as failed and services suspended",
+          services_suspended: true,
+        });
+      } else {
+        res.json({
+          message: "Invoice marked as failed - grace period active",
+          services_suspended: false,
+          grace_period_ends: invoice.gracePeriodEndsAt,
+        });
+      }
+    } catch (error: any) {
+      console.error("Mark invoice failed error:", error);
+      res.status(500).json({ error: error.message || "Failed to mark invoice as failed" });
+    }
+  });
+
   // ==================== Mobile App Download Routes ====================
 
   // Get mobile app download info
