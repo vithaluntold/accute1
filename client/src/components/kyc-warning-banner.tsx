@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useLocation } from "wouter";
-import { calculateKycCompletion, getKycStatusMessage } from "@/../../shared/kycUtils";
+import { calculateKycCompletion, getKycStatusMessage } from "@shared/kycUtils";
 
 interface KycWarningBannerProps {
   user: any;

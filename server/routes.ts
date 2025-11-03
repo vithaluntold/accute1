@@ -10411,6 +10411,114 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Get all users with KYC information (admin only)
+  app.get("/api/admin/kyc/users", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Explicitly whitelist safe fields to prevent leaking sensitive data (password hashes, tokens, etc.)
+      const usersWithDetails = await Promise.all(
+        users.map(async (user) => {
+          const role = await storage.getRole(user.roleId);
+          const org = user.organizationId ? await storage.getOrganization(user.organizationId) : null;
+          
+          // SECURITY: Explicitly return only non-sensitive fields
+          return {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phone: user.phone,
+            phoneVerified: user.phoneVerified,
+            dateOfBirth: user.dateOfBirth,
+            nationalId: user.nationalId,
+            nationalIdType: user.nationalIdType,
+            address: user.address,
+            city: user.city,
+            state: user.state,
+            zipCode: user.zipCode,
+            country: user.country,
+            emergencyContactName: user.emergencyContactName,
+            emergencyContactPhone: user.emergencyContactPhone,
+            emergencyContactRelation: user.emergencyContactRelation,
+            idDocumentUrl: user.idDocumentUrl,
+            addressProofUrl: user.addressProofUrl,
+            kycStatus: user.kycStatus,
+            kycVerifiedAt: user.kycVerifiedAt,
+            kycRejectionReason: user.kycRejectionReason,
+            roleName: role?.name || "Unknown",
+            organization: org ? {
+              id: org.id,
+              name: org.name,
+              slug: org.slug,
+            } : null,
+          };
+        })
+      );
+
+      res.json(usersWithDetails);
+    } catch (error: any) {
+      console.error('Get KYC users error:', error);
+      res.status(500).json({ error: "Failed to fetch KYC users" });
+    }
+  });
+
+  // Update user KYC status (admin only)
+  app.patch("/api/admin/users/:id/kyc-status", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status, reason } = req.body;
+
+      // Validate status
+      const validStatuses = ["pending", "in_review", "verified", "rejected"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid KYC status" });
+      }
+
+      // If rejecting, require a reason
+      if (status === "rejected" && !reason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
+
+      const updateData: any = {
+        kycStatus: status,
+      };
+
+      // Set verification timestamp for verified status
+      if (status === "verified") {
+        updateData.kycVerifiedAt = new Date();
+        updateData.kycRejectionReason = null; // Clear any previous rejection reason
+      }
+
+      // Set rejection reason for rejected status
+      if (status === "rejected") {
+        updateData.kycRejectionReason = reason;
+        updateData.kycVerifiedAt = null; // Clear verification timestamp
+      }
+
+      // Clear rejection reason if status is not rejected
+      if (status !== "rejected") {
+        updateData.kycRejectionReason = null;
+      }
+
+      const user = await storage.updateUser(id, updateData);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "user", id, { 
+        action: "kyc_status_update", 
+        newStatus: status,
+        reason: reason || undefined
+      }, req);
+
+      res.json({ ...user, password: undefined });
+    } catch (error: any) {
+      console.error('Update KYC status error:', error);
+      res.status(500).json({ error: "Failed to update KYC status" });
+    }
+  });
+
   // Get all support tickets (across all organizations)
   app.get("/api/admin/tickets", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
