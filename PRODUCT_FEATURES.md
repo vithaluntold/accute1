@@ -295,7 +295,71 @@ async function checkAccess(userId, agentSlug, orgId, userRole) {
 
 ---
 
-### **11. Secure API Key Management with AES-256-GCM** 🔐
+### **11. Automated Invoicing System** 💰
+
+**UNIQUE TO ACCUTE:**
+
+**Automated Invoice Generation with AI Integration**
+
+**Invoice Automation Features:**
+- **Client-based invoice creation** - Select client and auto-populate company details
+- **Amount validation** - Ensure valid numeric amounts before submission
+- **Due date management** - Set invoice due dates with calendar picker
+- **Form validation** - Client-side validation prevents invalid submissions
+- **Real-time feedback** - Toast notifications for success/error states
+- **Multi-currency support** - Automatic currency conversion based on client region
+- **Integration with workflows** - Trigger invoices from workflow stages
+- **Payment tracking** - Monitor invoice status (draft, sent, paid, overdue)
+
+**How Automated Invoicing Works:**
+
+1. **Create Invoice**
+   - Select client from dropdown (auto-populated from client list)
+   - Enter amount (validates numeric input > 0)
+   - Set due date (calendar picker)
+   - Add description and line items
+
+2. **Validation**
+   ```typescript
+   // Client-side validation before submission
+   if (!formData.client) {
+     toast({ title: "Error", description: "Please select a client" });
+     return;
+   }
+   if (!formData.amount || parseFloat(formData.amount) <= 0) {
+     toast({ title: "Error", description: "Please enter a valid amount" });
+     return;
+   }
+   if (!formData.dueDate) {
+     toast({ title: "Error", description: "Please select a due date" });
+     return;
+   }
+   ```
+
+3. **Auto-population**
+   - Client company name, address, email auto-filled
+   - Tax rates calculated based on client jurisdiction
+   - Currency symbol adjusted for client region
+
+4. **AI Enhancement (via Scribe Agent)**
+   - Generate invoice descriptions automatically
+   - Suggest line items based on service history
+   - Draft payment reminder emails
+   - Create professional invoice templates
+
+**The Difference:**
+- ❌ Competitors: Manual invoice creation with static templates
+- ✅ Accute: Automated invoice generation with AI-powered suggestions and validation
+
+**Competitors:**
+- ⚠️ TaxDome: Basic invoicing, manual creation
+- ⚠️ Karbon: Invoice templates, manual population
+- ⚠️ Canopy: Limited invoicing features
+- ❌ SafeSend: No invoicing system
+
+---
+
+### **12. Secure API Key Management with AES-256-GCM** 🔐
 
 **UNIQUE TO ACCUTE:**
 - **Military-grade encryption** for all API keys
@@ -1147,46 +1211,114 @@ if (match && !match.usedAt && match.expiresAt > now) {
 
 ## 💰 PRICING STRATEGY
 
-### **Accute Pricing** (Estimated)
-- **Starter**: $30/user/month - Up to 50 clients
-- **Professional**: $50/user/month - Unlimited clients
-- **Enterprise**: Custom pricing - White-label, dedicated support
+### **Accute Global Pricing** (IMPLEMENTED)
+Accute offers transparent, region-specific pricing across 10 global markets with three subscription tiers and three billing cycles. All prices are calculated with regional multipliers based on purchasing power parity and market conditions.
+
+#### **Subscription Plans (All Regions):**
+
+| Region | Core Plan | AI Plan (Most Popular) | Edge Plan |
+|--------|-----------|------------------------|-----------|
+| 🇺🇸 **USA** | $35 / $29 / $26 | $75 / $59 / $54 | $125 / $99 / $89 |
+| 🇬🇧 **UK** | £32 / £26 / £24 | £68 / £54 / £49 | £114 / £90 / £81 |
+| 🇪🇺 **EU** | €33 / €27 / €24 | €71 / €55 / €51 | €118 / €93 / €84 |
+| 🇦🇪 **UAE** | AED 130 / 108 / 96 | AED 278 / 219 / 200 | AED 464 / 367 / 330 |
+| 🇮🇳 **India** | ₹1,299 / 1,076 / 965 | ₹2,783 / 2,189 / 2,004 | ₹4,639 / 3,673 / 3,303 |
+| 🇦🇺 **Australia** | A$39 / 32 / 29 | A$83 / 65 / 60 | A$139 / 110 / 99 |
+| 🇳🇿 **New Zealand** | NZ$42 / 35 / 31 | NZ$90 / 71 / 65 | NZ$150 / 119 / 107 |
+| 🇸🇬 **Singapore** | S$38 / 32 / 28 | S$82 / 64 / 59 | S$136 / 108 / 97 |
+| 🌏 **SE Asia** | $30 / 25 / 22 | $65 / 51 / 46 | $108 / 85 / 77 |
+| 🇿🇦 **Africa** | $28 / 23 / 21 | $60 / 47 / 43 | $100 / 79 / 71 |
+
+*Prices shown as: Monthly / Yearly / 3-Year (per month equivalent)*
+
+**Plan Features:**
+
+**Core Plan** - Essential workflow automation
+- Multi-tenant architecture
+- Role-based access control (RBAC)
+- Forms with conditional logic
+- Workflows with 6-level hierarchy
+- Document management with PKI signatures
+- Client portal access
+
+**AI Plan** - AI-powered automation (Most Popular)
+- Everything in Core, plus:
+- 6 AI Agents (Cadence, Forma, Relay, Echo, Scribe, Parity)
+- AI Agent Marketplace access
+- Multi-provider AI (OpenAI, Anthropic, Azure)
+- Email integration with Relay automation
+- Calendar scheduling with AI suggestions
+
+**Edge Plan** - Enterprise-grade with all features
+- Everything in AI, plus:
+- Roundtable multi-agent orchestration
+- Priority support (24/7)
+- White-label options
+- Custom integrations
+- Dedicated account manager
+- Advanced security features
+
+#### **Regional Coverage:**
+- 🇺🇸 USA (USD)
+- 🇬🇧 UK (GBP)
+- 🇪🇺 EU (EUR)
+- 🇦🇪 UAE (AED)
+- 🇮🇳 India (INR)
+- 🇦🇺 Australia (AUD)
+- 🇳🇿 New Zealand (NZD)
+- 🇸🇬 Singapore (SGD)
+- 🌏 SE Asia (USD)
+- 🇿🇦 Africa (USD)
+
+#### **Billing Cycles:**
+- Monthly (standard pricing)
+- Yearly (Save 20%)
+- 3-Year (Save 30%)
 
 ### **Competitor Pricing**
-- **TaxDome**: $50-70/user/month
-- **Karbon**: $59-99/user/month
-- **Canopy**: $99/month base + per-user fees
+- **TaxDome**: $50-70/user/month (US only)
+- **Karbon**: $59-99/user/month (limited regions)
+- **Canopy**: $99/month base + per-user fees (US only)
 
-**Accute's Advantage:** 20-40% cheaper while offering superior AI capabilities
+**Accute's Advantage:** 
+- ✅ 20-40% cheaper with superior AI capabilities
+- ✅ Global pricing across 10 regions (competitors focus on US/UK only)
+- ✅ Flexible billing with multi-year discounts
+- ✅ Razorpay integration for emerging markets (India, UAE, SE Asia, Africa)
 
 ---
 
 ## 📈 FEATURE PARITY ROADMAP
 
-### **Q1 2025 - Tax Season Ready**
-- ✅ AI Provider Settings (DONE)
-- ✅ Landing Page (DONE)
-- ✅ Razorpay Integration (DONE)
-- ⏳ Client Questionnaires/Organizers
-- ⏳ Enhanced Invoicing
+### **Q1 2025 - Tax Season Ready** ✅ COMPLETED
+- ✅ AI Provider Settings (DONE - Multi-provider LLM configuration with AES-256-GCM encryption)
+- ✅ Landing Page (DONE - Modern, responsive design with hero section)
+- ✅ Razorpay Integration (DONE - Global payment gateway for 11 regions)
+- ✅ Global Subscription Pricing (DONE - 3 plans, 11 regions, 3 billing cycles)
+- ✅ Automated Invoicing (DONE - AI-powered invoice generation and tracking)
+- ✅ Client Questionnaires/Organizers (DONE - Forms with conditional logic)
+- ✅ Email Integration (DONE - Gmail/Outlook/IMAP inbox with conversation threading)
+- ✅ Calendar & Scheduling (DONE - Integrated calendar with appointment booking)
+- ✅ Advanced Analytics (DONE - Comprehensive dashboard with charts and metrics)
 
-### **Q2 2025 - Integration Focus**
-- Gmail/Outlook Email Integration
-- Google Calendar/Outlook Sync
-- QuickBooks Online Integration
-- Enhanced Time Tracking
+### **Q2 2025 - Integration Focus** 🎯 IN PROGRESS
+- ✅ Gmail/Outlook Email Integration (DONE)
+- ✅ Google Calendar/Outlook Sync (DONE)
+- ⏳ QuickBooks Online Integration (PLANNED)
+- ⏳ Enhanced Time Tracking (PLANNED)
+- ⏳ Xero Integration (PLANNED)
 
-### **Q3 2025 - Mobile & Tax Software**
-- Mobile Apps (iOS/Android via React Native)
-- Tax Software Export (Drake, Lacerte, ProSeries)
-- Advanced Workflow Builder UI
-- Bank Feed Integration (Plaid)
+### **Q3 2025 - Mobile & Tax Software** 🚀 STARTED
+- ✅ Mobile Apps (DONE - React Native + Expo for iOS/Android with full feature parity)
+- ⏳ Tax Software Export (PLANNED - Drake, Lacerte, ProSeries)
+- ⏳ Advanced Workflow Builder UI (PLANNED - Visual drag-drop canvas)
+- ⏳ Bank Feed Integration (PLANNED - Plaid)
 
-### **Q4 2025 - Enterprise Features**
-- Advanced Analytics & Reporting
-- Marketing Automation
-- White-label Options
-- Advanced API Features
+### **Q4 2025 - Enterprise Features** 📋 PLANNED
+- ⏳ Marketing Automation (PLANNED)
+- ⏳ White-label Options (PLANNED)
+- ⏳ Advanced API Features (PLANNED)
+- ⏳ Custom Domain Support (PLANNED)
 
 ---
 
@@ -1203,11 +1335,17 @@ if (match && !match.usedAt && match.expiresAt > now) {
 8. ✅ **Flexibility** - Not locked into single vendor
 
 ### **Where Competitors Lead:**
-1. ⚠️ **Email Integration** - Mature Gmail/Outlook sync
-2. ⚠️ **Tax-Specific Features** - Pre-built organizers, IRS integration
-3. ⚠️ **Mobile Apps** - Native iOS/Android (Accute: in dev)
-4. ⚠️ **Maturity** - Years of refinement and user feedback
-5. ⚠️ **Accounting Software Integration** - QuickBooks/Xero sync
+1. ⚠️ **Tax-Specific Features** - Pre-built IRS organizers, direct e-filing integration
+2. ⚠️ **Maturity** - Years of refinement and user feedback
+3. ⚠️ **Accounting Software Integration** - Deep QuickBooks/Xero sync (Accute: planned)
+4. ⚠️ **Brand Recognition** - Established market presence
+
+### **Parity Achieved (Previously Behind):**
+1. ✅ **Email Integration** - Gmail/Outlook/IMAP sync with AI automation (now superior to competitors)
+2. ✅ **Mobile Apps** - React Native iOS/Android with full feature parity (now on par)
+3. ✅ **Advanced Analytics** - Comprehensive dashboard with charts and metrics (now on par)
+4. ✅ **Calendar & Scheduling** - Integrated scheduling with appointment booking (now on par)
+5. ✅ **Invoicing** - Automated AI-powered invoice generation (now superior to competitors)
 
 ---
 
@@ -1233,6 +1371,92 @@ if (match && !match.usedAt && match.expiresAt > now) {
 
 ---
 
-**Last Updated:** January 2025  
-**Version:** 2.0  
-**Next Review:** April 2025
+## 🔧 TROUBLESHOOTING GUIDE
+
+### **AI API 500 Error - LLM Credentials Not Configured**
+
+**Symptom:**
+- AI agents return 500 Internal Server Error
+- AI features (Luca chat, Cadence, Forma, Relay, Echo, Scribe, Parity) don't work
+- Error message: "LLM configuration not found" or similar
+
+**Root Cause:**
+The AI API requires LLM (Large Language Model) credentials to be configured in the system. Accute uses encrypted database storage (not environment variables) for API keys to ensure maximum security with AES-256-GCM encryption.
+
+**Solution:**
+
+**Step 1: Verify ENCRYPTION_KEY is Set**
+The `ENCRYPTION_KEY` environment variable must be at least 32 characters. This key is used to encrypt/decrypt API keys stored in the database.
+
+```bash
+# Check if ENCRYPTION_KEY exists
+echo $ENCRYPTION_KEY
+
+# If not set, generate a new one:
+node -e "console.log(crypto.randomBytes(32).toString('base64'))"
+
+# Add to your environment variables
+export ENCRYPTION_KEY="your-generated-key-here"
+```
+
+**Step 2: Configure LLM Credentials via Settings Page**
+
+1. **Log in to Accute** with Admin or Super Admin account
+2. **Navigate to Settings** (`/settings` route)
+3. **Scroll to "LLM Provider Configuration" section**
+4. **Click "Add LLM Configuration" button**
+5. **Fill in the form:**
+   - **Name**: e.g., "Production OpenAI" or "Development Anthropic"
+   - **Provider**: Select from OpenAI, Azure OpenAI, or Anthropic
+   - **Model**: 
+     - OpenAI: `gpt-4`, `gpt-4-turbo-preview`, `gpt-3.5-turbo`
+     - Anthropic: `claude-3-opus-20240229`, `claude-3-sonnet-20240229`, `claude-3-haiku-20240307`
+     - Azure: Your deployment name (e.g., `gpt-4-deployment`)
+   - **API Key**: Your provider's API key
+     - OpenAI: Get from https://platform.openai.com/api-keys
+     - Anthropic: Get from https://console.anthropic.com/settings/keys
+     - Azure: Get from Azure Portal
+   - **Azure Endpoint** (Azure only): e.g., `https://your-resource.openai.azure.com`
+   - **Azure API Version** (Azure only): e.g., `2024-12-01-preview`
+   - **Set as Default**: Check this box for your primary AI provider
+
+6. **Click "Test Connection"** to verify credentials work
+7. **Click "Save Configuration"** to encrypt and store
+
+**Step 3: Verify Configuration**
+
+After saving, you should see your LLM configuration listed in the Settings page. The API key is encrypted and stored securely in the database with AES-256-GCM encryption.
+
+**Step 4: Test AI Features**
+
+Try using any AI feature:
+- Open Luca chat widget (bottom-right corner)
+- Ask a question like "Hello, can you help me?"
+- If configured correctly, Luca will respond
+
+**Security Notes:**
+- ✅ API keys are encrypted with AES-256-GCM before storage
+- ✅ Each encrypted key uses a unique initialization vector (IV)
+- ✅ Authentication tags prevent tampering
+- ✅ Keys are never stored in plaintext
+- ✅ Per-organization isolation ensures multi-tenant security
+- ✅ ENCRYPTION_KEY is stored as environment variable (not in database)
+
+**Multi-Provider Setup:**
+You can configure multiple LLM providers and switch between them:
+- Primary: OpenAI GPT-4 (high quality, higher cost)
+- Backup: Anthropic Claude Sonnet (good quality, moderate cost)
+- Development: OpenAI GPT-3.5 Turbo (faster, lower cost)
+
+Set one as "Default" for general use. Specific AI agents can be configured to use specific providers based on their needs.
+
+**Additional Resources:**
+- OpenAI API Documentation: https://platform.openai.com/docs
+- Anthropic Claude Documentation: https://docs.anthropic.com/
+- Azure OpenAI Documentation: https://learn.microsoft.com/en-us/azure/ai-services/openai/
+
+---
+
+**Last Updated:** November 2025  
+**Version:** 2.1  
+**Next Review:** February 2026
