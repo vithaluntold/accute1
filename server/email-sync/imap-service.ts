@@ -44,7 +44,8 @@ export class ImapEmailService {
     const decipher = crypto.createDecipheriv(
       ALGORITHM,
       ENCRYPTION_KEY,
-      Buffer.from(iv, 'hex')
+      Buffer.from(iv, 'hex'),
+      { authTagLength: AUTH_TAG_LENGTH }
     );
     
     decipher.setAuthTag(authTagBuffer);
