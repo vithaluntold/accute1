@@ -668,6 +668,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
+    await db.delete(schema.activityLogs).where(eq(schema.activityLogs.userId, id));
     await db.delete(schema.users).where(eq(schema.users.id, id));
   }
 
