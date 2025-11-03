@@ -45,6 +45,12 @@ export default function Inbox() {
     queryKey: ["/api/email-messages"],
   });
 
+  const { data: installedAgents = [] } = useQuery<any[]>({
+    queryKey: ["/api/ai-agents/installed"],
+  });
+
+  const hasRelay = installedAgents.some(agent => agent.agent?.name === "Relay");
+
   // Derive selectedMessage from messages query to keep it fresh
   const selectedMessage = messages.find(m => m.id === selectedMessageId) || null;
 
@@ -162,14 +168,25 @@ export default function Inbox() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="default"
-            onClick={() => setLocation('/ai-agents/relay')}
-            data-testid="button-open-relay"
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Open Relay AI
-          </Button>
+          {hasRelay ? (
+            <Button
+              variant="default"
+              onClick={() => setLocation('/ai-agents/relay')}
+              data-testid="button-open-relay"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Open Relay AI
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/marketplace?category=ai-agents')}
+              data-testid="button-install-relay"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Install Relay AI
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => batchProcessMutation.mutate()}
