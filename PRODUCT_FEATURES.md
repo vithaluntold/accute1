@@ -1249,14 +1249,12 @@ Accute offers transparent, region-specific pricing across 10 global markets with
 - Email integration with Relay automation
 - Calendar scheduling with AI suggestions
 
-**Edge Plan** - Enterprise-grade with all features
+**Edge Plan** - Roundtable Orchestration
 - Everything in AI, plus:
-- Roundtable multi-agent orchestration
-- Priority support (24/7)
-- White-label options
-- Custom integrations
-- Dedicated account manager
-- Advanced security features
+- **Roundtable multi-agent orchestration** (exclusive feature)
+  - Coordinates all 6 AI agents simultaneously
+  - Handles complex multi-step accounting workflows
+  - 2 years ahead of market competition
 
 #### **Regional Coverage:**
 - 🇺🇸 USA (USD)
