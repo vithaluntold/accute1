@@ -196,7 +196,10 @@ export default function Assignments() {
       });
       return;
     }
-    createAssignmentMutation.mutate(newAssignment);
+    createAssignmentMutation.mutate({
+      ...newAssignment,
+      assignedTo: newAssignment.assignedTo === "unassigned" ? null : newAssignment.assignedTo || null,
+    });
   };
 
   const handleDeleteAssignment = (id: string, name: string) => {
@@ -549,7 +552,7 @@ export default function Assignments() {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}

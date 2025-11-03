@@ -59,10 +59,11 @@ export default function CalendarPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const clientId = formData.get("clientId") as string;
     createAppointmentMutation.mutate({
       title: formData.get("title"),
       description: formData.get("description"),
-      clientId: formData.get("clientId") || null,
+      clientId: clientId === "none" ? null : clientId || null,
       startTime: new Date(formData.get("startTime") as string),
       endTime: new Date(formData.get("endTime") as string),
       location: formData.get("location"),
@@ -119,7 +120,7 @@ export default function CalendarPage() {
                     } />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Client</SelectItem>
+                    <SelectItem value="none">No Client</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}

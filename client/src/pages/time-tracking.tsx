@@ -76,8 +76,9 @@ export default function TimeTrackingPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const clientId = formData.get("clientId") as string;
     const data = {
-      clientId: formData.get("clientId") || null,
+      clientId: clientId === "none" ? null : clientId || null,
       description: formData.get("description"),
       hours: parseFloat(formData.get("hours") as string),
       hourlyRate: parseFloat(formData.get("hourlyRate") as string),
@@ -116,12 +117,12 @@ export default function TimeTrackingPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label>Client</Label>
-                <Select name="clientId" defaultValue={editingEntry?.clientId || ""}>
+                <Select name="clientId" defaultValue={editingEntry?.clientId || "none"}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Select client (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Client</SelectItem>
+                    <SelectItem value="none">No Client</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}

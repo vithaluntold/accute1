@@ -3830,11 +3830,11 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       // Call LLM
       let answer;
 
-      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure') {
+      if (llmConfig.provider === 'openai' || llmConfig.provider === 'azure' || llmConfig.provider === 'azure_openai') {
         const OpenAI = (await import('openai')).default;
         const openai = new OpenAI({
           apiKey: apiKey,
-          ...(llmConfig.provider === 'azure' && llmConfig.azureEndpoint && {
+          ...((llmConfig.provider === 'azure' || llmConfig.provider === 'azure_openai') && llmConfig.azureEndpoint && {
             baseURL: `${llmConfig.azureEndpoint}/openai/deployments/${llmConfig.model}`,
             defaultQuery: { 'api-version': llmConfig.modelVersion || '2024-12-01-preview' },
             defaultHeaders: { 'api-key': apiKey },
@@ -3865,7 +3865,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
         answer = message.content[0].type === 'text' ? message.content[0].text : "I couldn't generate a response.";
       } else {
-        return res.status(400).json({ error: `Unsupported LLM provider: ${llmConfig.provider}. Supported providers: openai, azure, anthropic` });
+        return res.status(400).json({ error: `Unsupported LLM provider: ${llmConfig.provider}. Supported providers: openai, azure, azure_openai, anthropic` });
       }
 
       // Extract metadata from AI response (if present)

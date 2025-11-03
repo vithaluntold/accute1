@@ -97,11 +97,12 @@ export default function SignaturesPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
+                const documentId = formData.get("documentId") as string;
                 createRequestMutation.mutate({
                   title: formData.get("title"),
                   message: formData.get("message"),
                   clientId: formData.get("clientId"),
-                  documentId: formData.get("documentId") || null,
+                  documentId: documentId === "none" ? null : documentId || null,
                   expiresAt: formData.get("expiresAt") ? new Date(formData.get("expiresAt") as string) : null,
                 });
               }}
@@ -133,7 +134,7 @@ export default function SignaturesPage() {
                     <SelectValue placeholder="Select document" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Document</SelectItem>
+                    <SelectItem value="none">No Document</SelectItem>
                     {documents?.map((doc: any) => (
                       <SelectItem key={doc.id} value={doc.id}>
                         {doc.name}
