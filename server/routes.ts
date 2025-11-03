@@ -11172,6 +11172,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
     stripePublicKey: process.env.VITE_STRIPE_PUBLIC_KEY || "",
     stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID || "",
+    razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || "",
+    razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || "",
   };
 
   // Get platform settings (Super Admin only)
@@ -11182,6 +11185,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
         stripePublicKey: platformSettings.stripePublicKey,
         stripeSecretKey: platformSettings.stripeSecretKey ? "***" + platformSettings.stripeSecretKey.slice(-4) : "",
         stripeWebhookSecret: platformSettings.stripeWebhookSecret ? "***" + platformSettings.stripeWebhookSecret.slice(-4) : "",
+        razorpayKeyId: platformSettings.razorpayKeyId,
+        razorpayKeySecret: platformSettings.razorpayKeySecret ? "***" + platformSettings.razorpayKeySecret.slice(-4) : "",
+        razorpayWebhookSecret: platformSettings.razorpayWebhookSecret ? "***" + platformSettings.razorpayWebhookSecret.slice(-4) : "",
       });
     } catch (error: any) {
       console.error("Error fetching platform settings:", error);
@@ -11192,9 +11198,16 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // Update platform settings (Super Admin only)
   app.patch("/api/platform-settings", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const { stripePublicKey, stripeSecretKey, stripeWebhookSecret } = req.body;
+      const { 
+        stripePublicKey, 
+        stripeSecretKey, 
+        stripeWebhookSecret,
+        razorpayKeyId,
+        razorpayKeySecret,
+        razorpayWebhookSecret
+      } = req.body;
 
-      // Update only provided values
+      // Update Stripe settings only if provided
       if (stripePublicKey !== undefined) {
         platformSettings.stripePublicKey = stripePublicKey;
       }
@@ -11203,6 +11216,17 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
       if (stripeWebhookSecret !== undefined && !stripeWebhookSecret.startsWith("***")) {
         platformSettings.stripeWebhookSecret = stripeWebhookSecret;
+      }
+
+      // Update Razorpay settings only if provided
+      if (razorpayKeyId !== undefined) {
+        platformSettings.razorpayKeyId = razorpayKeyId;
+      }
+      if (razorpayKeySecret !== undefined && !razorpayKeySecret.startsWith("***")) {
+        platformSettings.razorpayKeySecret = razorpayKeySecret;
+      }
+      if (razorpayWebhookSecret !== undefined && !razorpayWebhookSecret.startsWith("***")) {
+        platformSettings.razorpayWebhookSecret = razorpayWebhookSecret;
       }
 
       res.json({ success: true, message: "Settings updated successfully" });

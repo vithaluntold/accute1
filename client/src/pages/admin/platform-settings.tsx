@@ -20,7 +20,14 @@ const stripeSettingsSchema = z.object({
   stripeWebhookSecret: z.string().optional(),
 });
 
+const razorpaySettingsSchema = z.object({
+  razorpayKeyId: z.string().optional(),
+  razorpayKeySecret: z.string().optional(),
+  razorpayWebhookSecret: z.string().optional(),
+});
+
 type StripeSettings = z.infer<typeof stripeSettingsSchema>;
+type RazorpaySettings = z.infer<typeof razorpaySettingsSchema>;
 
 // Utility function to mask a value showing only last 4 characters
 function maskValue(value: string | undefined): string {
@@ -43,16 +50,34 @@ export default function PlatformSettingsPage() {
     },
   });
 
-  const { data: settings, isLoading } = useQuery<StripeSettings>({
+  const razorpayForm = useForm<RazorpaySettings>({
+    resolver: zodResolver(razorpaySettingsSchema),
+    defaultValues: {
+      razorpayKeyId: "",
+      razorpayKeySecret: "",
+      razorpayWebhookSecret: "",
+    },
+  });
+
+  const { data: settings, isLoading } = useQuery<StripeSettings & RazorpaySettings>({
     queryKey: ["/api/platform-settings"],
   });
 
   // Reset form when settings are loaded
   useEffect(() => {
     if (settings) {
-      form.reset(settings);
+      form.reset({
+        stripePublicKey: settings.stripePublicKey,
+        stripeSecretKey: settings.stripeSecretKey,
+        stripeWebhookSecret: settings.stripeWebhookSecret,
+      });
+      razorpayForm.reset({
+        razorpayKeyId: settings.razorpayKeyId,
+        razorpayKeySecret: settings.razorpayKeySecret,
+        razorpayWebhookSecret: settings.razorpayWebhookSecret,
+      });
     }
-  }, [settings, form]);
+  }, [settings, form, razorpayForm]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: StripeSettings) => {
@@ -78,8 +103,35 @@ export default function PlatformSettingsPage() {
     },
   });
 
+  const updateRazorpayMutation = useMutation({
+    mutationFn: async (data: RazorpaySettings) => {
+      const payload: RazorpaySettings = {
+        razorpayKeyId: data.razorpayKeyId,
+        razorpayKeySecret: data.razorpayKeySecret && !data.razorpayKeySecret.startsWith("***") 
+          ? data.razorpayKeySecret 
+          : undefined,
+        razorpayWebhookSecret: data.razorpayWebhookSecret && !data.razorpayWebhookSecret.startsWith("***")
+          ? data.razorpayWebhookSecret
+          : undefined,
+      };
+      return await apiRequest("PATCH", "/api/platform-settings", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/platform-settings"] });
+      toast({ title: "Razorpay settings updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update Razorpay settings", description: error.message, variant: "destructive" });
+      razorpayForm.setError("root", { message: error.message });
+    },
+  });
+
   const onSubmit = (data: StripeSettings) => {
     updateMutation.mutate(data);
+  };
+
+  const onRazorpaySubmit = (data: RazorpaySettings) => {
+    updateRazorpayMutation.mutate(data);
   };
 
   if (isLoading) {
@@ -99,17 +151,195 @@ export default function PlatformSettingsPage() {
       />
 
       <div className="container mx-auto p-6 max-w-4xl">
-        <Tabs defaultValue="stripe" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2" data-testid="tabs-settings">
+        <Tabs defaultValue="razorpay" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3" data-testid="tabs-settings">
+            <TabsTrigger value="razorpay" data-testid="tab-razorpay">
+              <Key className="w-4 h-4 mr-2" />
+              Razorpay (Primary)
+            </TabsTrigger>
             <TabsTrigger value="stripe" data-testid="tab-stripe">
               <Key className="w-4 h-4 mr-2" />
-              Stripe Integration
+              Stripe (Optional)
             </TabsTrigger>
             <TabsTrigger value="general" data-testid="tab-general">
               <Globe className="w-4 h-4 mr-2" />
               General Settings
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="razorpay" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="w-5 h-5" />
+                  Razorpay API Configuration
+                </CardTitle>
+                <CardDescription>
+                  Configure your Razorpay API keys for payment processing in India, UAE, Turkey, and USA. Keys are stored securely and encrypted.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="mb-6">
+                  <AlertDescription>
+                    <strong>How to get your Razorpay API keys:</strong>
+                    <ol className="list-decimal list-inside mt-2 space-y-1">
+                      <li>Go to <a href="https://dashboard.razorpay.com/app/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Razorpay Dashboard → API Keys</a></li>
+                      <li>Generate new keys if you don't have them</li>
+                      <li>Copy your Key ID (starts with <code className="bg-muted px-1 rounded">rzp_test_</code> or <code className="bg-muted px-1 rounded">rzp_live_</code>)</li>
+                      <li>Copy your Key Secret (click "Show" to reveal)</li>
+                      <li>For webhooks, go to Webhooks section and create a webhook endpoint</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
+
+                <Form {...razorpayForm}>
+                  <form onSubmit={razorpayForm.handleSubmit(onRazorpaySubmit)} className="space-y-6">
+                    <FormField
+                      control={razorpayForm.control}
+                      name="razorpayKeyId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Key ID (RAZORPAY_KEY_ID)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              type="text"
+                              placeholder="rzp_test_... or rzp_live_..."
+                              data-testid="input-razorpay-key-id"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Your Razorpay Key ID - used for identifying your account
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={razorpayForm.control}
+                      name="razorpayKeySecret"
+                      render={({ field }) => {
+                        const isServerMasked = field.value?.startsWith("***");
+                        return (
+                          <FormItem>
+                            <FormLabel>Key Secret (RAZORPAY_KEY_SECRET)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                type={showSecrets && !isServerMasked ? "text" : "password"}
+                                placeholder={isServerMasked ? "●●●●●●●●●●●●" : "Enter your key secret"}
+                                data-testid="input-razorpay-key-secret"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  if (!isServerMasked) {
+                                    setEditedKeys((prev) => new Set(prev).add("razorpayKeySecret"));
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Your Razorpay Key Secret - keep this secure and never share publicly
+                              {isServerMasked && " (already configured - leave blank to keep existing)"}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <FormField
+                      control={razorpayForm.control}
+                      name="razorpayWebhookSecret"
+                      render={({ field }) => {
+                        const isServerMasked = field.value?.startsWith("***");
+                        return (
+                          <FormItem>
+                            <FormLabel>Webhook Secret (RAZORPAY_WEBHOOK_SECRET) - Optional</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                type={showSecrets && !isServerMasked ? "text" : "password"}
+                                placeholder={isServerMasked ? "●●●●●●●●●●●●" : "Enter webhook secret"}
+                                data-testid="input-razorpay-webhook-secret"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  if (!isServerMasked) {
+                                    setEditedKeys((prev) => new Set(prev).add("razorpayWebhookSecret"));
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Your Razorpay webhook signing secret - used to verify webhook signatures
+                              {isServerMasked && " (already configured - leave blank to keep existing)"}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+
+                    <div className="flex items-center gap-4 pt-4">
+                      <Button
+                        type="submit"
+                        disabled={updateRazorpayMutation.isPending}
+                        data-testid="button-save-razorpay"
+                      >
+                        {updateRazorpayMutation.isPending ? "Saving..." : "Save Razorpay Configuration"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowSecrets(!showSecrets)}
+                        data-testid="button-toggle-secrets"
+                      >
+                        {showSecrets ? "Hide" : "Show"} Secrets
+                      </Button>
+                    </div>
+
+                    {razorpayForm.formState.errors.root && (
+                      <Alert variant="destructive">
+                        <AlertDescription>
+                          {razorpayForm.formState.errors.root.message}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Supported Countries & Currencies</CardTitle>
+                <CardDescription>Razorpay supports the following markets</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <strong>🇮🇳 India</strong>
+                    <p className="text-muted-foreground">INR (₹)</p>
+                  </div>
+                  <div>
+                    <strong>🇦🇪 UAE</strong>
+                    <p className="text-muted-foreground">AED (د.إ)</p>
+                  </div>
+                  <div>
+                    <strong>🇹🇷 Turkey</strong>
+                    <p className="text-muted-foreground">TRY (₺)</p>
+                  </div>
+                  <div>
+                    <strong>🇺🇸 USA</strong>
+                    <p className="text-muted-foreground">USD ($)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="stripe" className="space-y-6">
             <Card>
