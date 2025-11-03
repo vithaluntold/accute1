@@ -60,12 +60,96 @@
   - Capability declarations (what each agent can do)
   - Per-organization installations (control access)
   - Version management for agents
+  - Subscription tier gating (free, starter, professional, enterprise)
+  - Multiple pricing models (free, monthly, yearly, per-instance, per-token, one-time, hybrid)
+
+**How Agent Foundry Works:**
+
+1. **Create Agent Directory**
+```
+agents/
+  ├─ my-custom-agent/
+  │   ├─ manifest.json          # Agent configuration
+  │   ├─ backend/
+  │   │   └─ index.ts           # Backend logic
+  │   └─ frontend/
+  │       └─ AgentUI.tsx        # Frontend interface
+```
+
+2. **Define Manifest** (JSON-based configuration)
+```json
+{
+  "slug": "my-custom-agent",
+  "name": "My Custom Agent",
+  "description": "Automates custom accounting workflows",
+  "category": "automation",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/AgentUI.tsx",
+  "backendEntry": "./backend/index.ts",
+  "capabilities": [
+    "extract_data",
+    "validate_entries",
+    "generate_reports"
+  ],
+  "subscriptionMinPlan": "professional",
+  "pricingModel": "per_token",
+  "pricePerToken": 0.001,
+  "version": "1.0.0"
+}
+```
+
+3. **Agent Auto-Discovery**
+- On server startup, Accute scans `/agents` directory
+- Loads all agents with valid `manifest.json` files
+- Registers agent routes dynamically
+- Makes agents available in marketplace
+
+4. **Install & Execute**
+- Organizations browse marketplace
+- Click "Install" → Agent enabled for organization
+- Access control enforced via RBAC
+- Execute via API: `POST /api/agents/my-custom-agent/execute`
+
+**Subscription Tier Gating:**
+- Free agents: Available to all users
+- Starter agents: Require "starter" plan or higher
+- Professional agents: Require "professional" plan or higher
+- Enterprise agents: Require "enterprise" plan
+
+**Agent Access Control:**
+```typescript
+// Check if user can access agent
+async function checkAccess(userId, agentSlug, orgId, userRole) {
+  const agent = getAgent(agentSlug);
+  const userPlan = await getUserSubscriptionPlan(orgId);
+  
+  // Check subscription requirement
+  if (!meetsSubscriptionRequirement(userPlan, agent.subscriptionMinPlan)) {
+    return false;
+  }
+  
+  // Check organization installation
+  const installation = await getAgentInstallation(agentSlug, orgId);
+  if (!installation) {
+    return false;
+  }
+  
+  return true;
+}
+```
+
+**Benefits:**
+- **No code deployment** to add new agents
+- **Hot-reload capabilities** - Update agents without server restart
+- **Multi-vendor support** - Mix OpenAI, Anthropic, Azure agents
+- **Monetization ready** - Built-in pricing models
+- **Community extensibility** - Third-party developers can create agents
 
 **Competitors:**
-- ❌ TaxDome: Single general-purpose AI assistant only
-- ❌ Karbon: No AI agent system
-- ❌ Canopy: No AI agents
-- ❌ SafeSend: No AI capabilities
+- ❌ TaxDome: Single general-purpose AI assistant only, no extensibility
+- ❌ Karbon: No AI agent system whatsoever
+- ❌ Canopy: No AI agents or automation capabilities
+- ❌ SafeSend: No AI capabilities at all
 
 ---
 
@@ -328,6 +412,282 @@ Workflow: "Annual Tax Return"
 - ⚠️ Karbon: Limited roles
 - ⚠️ Canopy: Basic permissions
 - ❌ SafeSend: Minimal permission system
+
+---
+
+### **13. Advanced Subscription Billing with PPP Pricing** 💰
+
+**UNIQUE TO ACCUTE:**
+- **Purchasing Power Parity (PPP) Pricing** - Regional price adjustments based on economic conditions
+- **Country-specific pricing multipliers** - Fair pricing for different regions
+- **Volume discounts** - Tiered discounts based on seat count (10+, 25+, 50+, 100+ seats)
+- **Coupon system** - Percentage-based and fixed-amount discounts with advanced rules
+- **Seat-based pricing** - Base price + per-seat pricing with included seats
+- **Multi-currency support** - INR, USD, AED, EUR, GBP with proper symbols
+- **Intelligent pricing calculator** - Real-time calculation with all factors
+
+**Pricing Features:**
+```typescript
+// Example: Professional plan for India vs USA
+India:    ₹2,499/month (0.4x multiplier for PPP)
+USA:      $99/month (1.0x standard pricing)
+UAE:      د.إ364/month (1.0x multiplier)
+
+Volume Discounts:
+1-10 seats:   Full price
+11-25 seats:  10% discount per seat
+26-50 seats:  15% discount per seat
+51-100 seats: 20% discount per seat
+100+ seats:   25% discount per seat
+
+Coupon Rules:
+- Active/expiry dates
+- Redemption limits (total + per-organization)
+- Plan applicability
+- Minimum seat requirements
+- Duration (first month, 3 months, forever)
+```
+
+**Competitors:**
+- ⚠️ TaxDome: Fixed USD pricing, no PPP
+- ⚠️ Karbon: Fixed pricing, limited discounts
+- ⚠️ Canopy: Complex bundled pricing
+- ❌ SafeSend: Basic pricing only
+
+---
+
+### **14. Team Hierarchy & Supervision System** 👥
+
+**UNIQUE TO ACCUTE:**
+- **Multi-level supervisor relationships** - Define reporting structures across teams
+- **Direct and indirect reports** - Track hierarchy depth
+- **Cross-team supervision** - Supervisors can manage across multiple teams
+- **Team roles** - Manager vs. Member within teams
+- **Real-time team chat** - WebSocket-powered team communication
+- **Team performance tracking** - Monitor team metrics and productivity
+
+**Hierarchy Structure:**
+```
+Organization
+  ├─ Teams (Sales, Tax, Audit, etc.)
+  │   ├─ Team Manager
+  │   └─ Team Members
+  └─ Supervision Hierarchy
+      ├─ Partner (level 3)
+      │   ├─ Senior Manager (level 2)
+      │   │   ├─ Manager (level 1)
+      │   │   │   ├─ Senior Associate
+      │   │   │   └─ Associate
+```
+
+**Supervision Features:**
+- Create/delete supervisor-reportee relationships
+- Fetch all direct reports for a user
+- Fetch supervisor chain for a user
+- Track supervision level (1 = direct, 2+ = indirect)
+- Organization-scoped supervision
+
+**Competitors:**
+- ⚠️ TaxDome: Basic team assignment, no hierarchy
+- ⚠️ Karbon: Team structures but limited hierarchy
+- ❌ Canopy: No supervision system
+- ❌ SafeSend: No team features
+
+---
+
+### **15. Comprehensive Activity Logging** 📜
+
+**UNIQUE TO ACCUTE:**
+- **Complete audit trail** - Every action tracked across entire platform
+- **IP address tracking** - Security and compliance monitoring
+- **Timestamp precision** - Millisecond-accurate action timing
+- **Metadata capture** - Full context of each action
+- **User attribution** - Who did what, when, where
+- **Organization scoping** - Filter by organization
+- **Entity type tracking** - Track actions on any resource type
+- **Before/after state** - Changes captured in metadata
+
+**What's tracked:**
+- User actions (login, logout, profile updates)
+- Role and permission changes
+- Workflow creation, execution, updates
+- Document uploads, downloads, deletions
+- AI agent installations and executions
+- Payment transactions
+- Subscription changes
+- Invitation sends and acceptances
+- Team member additions/removals
+- And 50+ other action types
+
+**Log structure:**
+```typescript
+{
+  userId: "user-123",
+  organizationId: "org-456",
+  action: "create",
+  entityType: "workflow",
+  entityId: "workflow-789",
+  metadata: {
+    name: "Annual Tax Return",
+    category: "tax_preparation"
+  },
+  ipAddress: "203.0.113.45",
+  timestamp: "2025-01-15T10:30:45.123Z"
+}
+```
+
+**Competitors:**
+- ⚠️ TaxDome: Basic activity logs
+- ⚠️ Karbon: Limited audit trail
+- ⚠️ Canopy: Basic logging
+- ❌ SafeSend: Minimal activity tracking
+
+---
+
+### **16. Organization-Isolated Cryptography** 🔒
+
+**UNIQUE TO ACCUTE:**
+- **RSA-2048 key pairs per organization** - Complete cryptographic isolation
+- **Automatic key generation** on organization creation
+- **Secure key storage** - Encrypted private keys
+- **Public key distribution** - Safe to share publicly
+- **Document signing** - Each org signs with its own keys
+- **Signature verification** - Cross-organization verification possible
+- **Key backup** - Encrypted key export for disaster recovery
+
+**Security benefits:**
+- Complete tenant isolation at cryptographic level
+- Even if database is compromised, documents remain tamper-evident
+- Cross-organization document verification
+- Compliance with data sovereignty requirements
+- No shared cryptographic infrastructure
+
+**Implementation:**
+```typescript
+// Each organization gets unique RSA key pair
+Organization A: {
+  privateKey: "-----BEGIN RSA PRIVATE KEY----- ...",
+  publicKey: "-----BEGIN PUBLIC KEY----- ..."
+}
+
+Organization B: {
+  privateKey: "-----BEGIN RSA PRIVATE KEY----- ...",
+  publicKey: "-----BEGIN PUBLIC KEY----- ..."
+}
+
+// Documents signed with org-specific key
+Document.signature = sign(documentHash, Organization.privateKey)
+```
+
+**Competitors:**
+- ❌ TaxDome: Shared encryption infrastructure
+- ❌ Karbon: No per-org cryptography
+- ❌ Canopy: Standard security model
+- ❌ SafeSend: No advanced cryptography
+
+---
+
+### **17. Marketplace with Multiple Pricing Models** 🏬
+
+**UNIQUE TO ACCUTE:**
+- **Template marketplace** - Documents, forms, workflows, AI agents
+- **Multiple pricing models**:
+  - Free templates
+  - One-time purchase
+  - Monthly subscription
+  - Yearly subscription
+  - Per-instance pricing
+  - Per-token pricing (for AI agents)
+  - Hybrid pricing models
+  
+- **Global and organization-scoped templates**
+- **Installation tracking** - Who installed what, when
+- **Featured items** - Highlight popular templates
+- **Rating and reviews** - Community feedback
+- **Search and filtering** - By category, price, rating
+- **Purchase history** - Track all transactions
+- **Automatic workflow creation** from templates
+
+**Marketplace Categories:**
+```
+Documents:
+  - Engagement letters
+  - Audit request letters
+  - Tax organizers
+  - Client proposals
+
+Forms:
+  - Tax questionnaires (1040, 1120, 1065, 990)
+  - Client intake forms
+  - Service request forms
+
+Workflows:
+  - Tax return workflows
+  - Audit workflows
+  - Bookkeeping workflows
+  - Advisory workflows
+
+AI Agents:
+  - Document extraction
+  - Data validation
+  - Communication automation
+  - Workflow optimization
+```
+
+**Competitors:**
+- ⚠️ TaxDome: Basic template library, no marketplace
+- ⚠️ Karbon: Pre-built templates included
+- ❌ Canopy: Limited templates
+- ❌ SafeSend: No marketplace
+
+---
+
+### **18. SHA-256 Token Security** 🔑
+
+**UNIQUE TO ACCUTE:**
+- **Cryptographically secure token generation** - 256-bit random tokens (64 hex characters)
+- **SHA-256 hashing** for token storage - Never store plaintext tokens
+- **One-time use enforcement** - Tokens invalidated after use
+- **Expiration tracking** - Time-based token validity
+- **Revocation support** - Manually revoke tokens
+- **Usage tracking** - Who used which token, when
+
+**Token types:**
+- Super Admin registration keys
+- Invitation tokens (email/SMS)
+- Session tokens (JWT)
+- Password reset tokens
+- Email verification tokens
+
+**Security implementation:**
+```typescript
+// Generate 256-bit secure token
+const token = crypto.randomBytes(32).toString('hex');
+// → 64-character hex string
+
+// Hash for database storage
+const tokenHash = crypto
+  .createHash('sha256')
+  .update(token)
+  .digest('hex');
+
+// Store hash, send original token once
+Database.store({ tokenHash, expiresAt, status: 'pending' });
+Email.send({ token }); // Only sent once, never stored
+
+// Verification
+const providedHash = hash(providedToken);
+const match = Database.find({ tokenHash: providedHash });
+if (match && !match.usedAt && match.expiresAt > now) {
+  // Valid token
+}
+```
+
+**Competitors:**
+- ⚠️ TaxDome: Standard token security
+- ⚠️ Karbon: Basic invitation system
+- ⚠️ Canopy: Standard security
+- ❌ SafeSend: Basic tokens
 
 ---
 
