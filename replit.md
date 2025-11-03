@@ -105,9 +105,29 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Anthropic Claude API**: AI model integration.
 - **Resend**: Transactional email service for user invitations and notifications.
 - **Twilio**: SMS service for mobile verification (OTP) and notifications.
+- **Razorpay**: Payment gateway for subscription billing and one-time payments (India, UAE, Turkey, USA).
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+### Payment Integration
+- **Payment Gateway**: Razorpay
+  - Supports India, UAE, Turkey, and USA markets
+  - Handles subscription billing (monthly/yearly)
+  - One-time payment support for invoices
+  - Secure webhook verification for payment events
+  - PCI-compliant payment processing
+  - Environment Variables Required:
+    - `RAZORPAY_KEY_ID`: Razorpay API Key ID
+    - `RAZORPAY_KEY_SECRET`: Razorpay API Key Secret
+    - `RAZORPAY_WEBHOOK_SECRET`: Webhook signature verification secret (optional)
+  - Key Features:
+    - Customer creation and management
+    - Subscription plan creation
+    - Recurring billing automation
+    - Payment verification and signature validation
+    - Webhook handling for payment events
+    - Support for INR, USD, AED, and other currencies
 
 ### Mobile Application
 - **Technology**: React Native with Expo (managed workflow, SDK 54)
