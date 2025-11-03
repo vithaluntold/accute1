@@ -250,8 +250,45 @@ app.use((req, res, next) => {
       throw listenError;
     }
     
-    // Now do heavy initialization AFTER server is listening
-    // This allows health checks to pass while initialization completes
+    // Setup static file serving IMMEDIATELY before initialization
+    // This ensures the app responds to requests even if initialization hangs
+    const distPath = path.resolve(moduleDir, "public");
+    const isProduction = fs.existsSync(distPath);
+    
+    if (!isProduction && app.get("env") === "development") {
+      try {
+        await setupVite(app, server);
+        console.log('✅ Vite dev server initialized');
+      } catch (viteError) {
+        console.error('❌ Vite setup failed:', viteError);
+        console.warn('⚠️  Continuing without Vite dev server');
+      }
+    } else {
+      // PRODUCTION: Serve static files from dist/public
+      try {
+        if (!fs.existsSync(distPath)) {
+          throw new Error(
+            `Could not find the build directory: ${distPath}, make sure to build the client first`,
+          );
+        }
+
+        app.use(express.static(distPath));
+        
+        // SPA fallback: serve index.html for all non-API routes
+        app.use("*", (_req, res) => {
+          res.sendFile(path.resolve(distPath, "index.html"));
+        });
+        
+        console.log('✅ Static file serving initialized (production mode)');
+        console.log(`   Serving from: ${distPath}`);
+      } catch (staticError) {
+        console.error('❌ Static file setup failed:', staticError);
+        console.warn('⚠️  Continuing without static file serving');
+      }
+    }
+    
+    // Now do heavy initialization AFTER server is listening AND routes are set up
+    // This allows the app to serve pages even while initialization completes
     console.log('🔧 Initializing system...');
     
     try {
@@ -292,45 +329,6 @@ app.use((req, res, next) => {
     } catch (wsError) {
       console.error('❌ Team Chat WebSocket initialization failed:', wsError);
       console.warn('⚠️  Continuing without Team Chat WebSocket support');
-    }
-
-    // Setup Vite (dev) or static file serving (production) BEFORE error handler
-    // This ensures the catch-all route for the SPA works correctly
-    // Check if dist/public exists to determine production vs development
-    const distPath = path.resolve(moduleDir, "public");
-    const isProduction = fs.existsSync(distPath);
-    
-    if (!isProduction && app.get("env") === "development") {
-      try {
-        await setupVite(app, server);
-        console.log('✅ Vite dev server initialized');
-      } catch (viteError) {
-        console.error('❌ Vite setup failed:', viteError);
-        console.warn('⚠️  Continuing without Vite dev server');
-      }
-    } else {
-      // PRODUCTION: Serve static files from dist/public
-      // DO NOT use serveStatic() from vite.ts - it has import.meta.dirname bug
-      try {
-        if (!fs.existsSync(distPath)) {
-          throw new Error(
-            `Could not find the build directory: ${distPath}, make sure to build the client first`,
-          );
-        }
-
-        app.use(express.static(distPath));
-        
-        // SPA fallback: serve index.html for all non-API routes
-        app.use("*", (_req, res) => {
-          res.sendFile(path.resolve(distPath, "index.html"));
-        });
-        
-        console.log('✅ Static file serving initialized (production mode)');
-        console.log(`   Serving from: ${distPath}`);
-      } catch (staticError) {
-        console.error('❌ Static file setup failed:', staticError);
-        console.warn('⚠️  Continuing without static file serving');
-      }
     }
 
     // Error handler MUST be registered AFTER static file serving
