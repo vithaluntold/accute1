@@ -291,7 +291,11 @@ app.use((req, res, next) => {
 
     // Setup Vite (dev) or static file serving (production) BEFORE error handler
     // This ensures the catch-all route for the SPA works correctly
-    if (app.get("env") === "development") {
+    // Check if dist/public exists to determine production vs development
+    const distPath = path.resolve(import.meta.dirname, "public");
+    const isProduction = fs.existsSync(distPath);
+    
+    if (!isProduction && app.get("env") === "development") {
       try {
         await setupVite(app, server);
         console.log('✅ Vite dev server initialized');
@@ -302,7 +306,7 @@ app.use((req, res, next) => {
     } else {
       try {
         serveStatic(app);
-        console.log('✅ Static file serving initialized');
+        console.log('✅ Static file serving initialized (production mode)');
       } catch (staticError) {
         console.error('❌ Static file setup failed:', staticError);
         console.warn('⚠️  Continuing without static file serving');
