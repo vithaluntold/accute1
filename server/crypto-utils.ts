@@ -204,3 +204,45 @@ export function verifyDocumentIntegrity(originalHash: string, currentBuffer: Buf
   const currentHash = generateDocumentHash(currentBuffer);
   return originalHash === currentHash;
 }
+
+/**
+ * AES-256-GCM Encryption for sensitive credentials
+ * Encrypts data using AES-256-GCM algorithm
+ * @param text Plain text to encrypt
+ * @returns Encrypted string in format: iv:encryptedData:authTag
+ */
+export function encrypt(text: string): string {
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'default-encryption-key-change-in-production';
+  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+  
+  return `${iv.toString('hex')}:${encrypted}:${authTag.toString('hex')}`;
+}
+
+/**
+ * AES-256-GCM Decryption for sensitive credentials
+ * Decrypts data encrypted with encrypt() function
+ * @param encryptedText Encrypted string in format: iv:encryptedData:authTag
+ * @returns Decrypted plain text
+ */
+export function decrypt(encryptedText: string): string {
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'default-encryption-key-change-in-production';
+  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+  const parts = encryptedText.split(':');
+  const iv = Buffer.from(parts[0], 'hex');
+  const encrypted = parts[1];
+  const authTag = Buffer.from(parts[2], 'hex');
+  
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
