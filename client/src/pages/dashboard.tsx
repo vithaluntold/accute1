@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import type { WorkflowTask } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
+import { KycWarningBanner } from "@/components/kyc-warning-banner";
 
 interface TaskStats {
   total: number;
@@ -67,6 +68,11 @@ export default function Dashboard() {
     localStorage.setItem('mobile-app-banner-dismissed', 'true');
     setShowMobileAppBanner(false);
   };
+
+  // Fetch full user profile for KYC status
+  const { data: currentUserProfile } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
 
   const { data: myStats, isLoading: myStatsLoading } = useQuery<TaskStats>({
     queryKey: ['/api/dashboard/my-stats'],
@@ -157,6 +163,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* KYC Verification Status Banner */}
+      {currentUserProfile && <KycWarningBanner user={currentUserProfile} />}
 
       {/* My Task Statistics */}
       <div>

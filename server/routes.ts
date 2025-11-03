@@ -16,6 +16,7 @@ import {
   requireAdmin,
   requirePermission,
   requirePlatform,
+  requireKyc,
   rateLimit,
   logActivity,
   encrypt,

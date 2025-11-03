@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
+import { calculateKycCompletion } from "@shared/kycUtils";
 
 const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
@@ -139,6 +140,41 @@ export async function requirePlatform(req: AuthRequest, res: Response, next: Nex
   }
 
   next();
+}
+
+// KYC completion middleware - require minimum profile completion
+export function requireKyc(minCompletionPercentage: number = 80) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Get full user profile to check KYC status
+    const fullUser = await storage.getUser(req.userId!);
+    if (!fullUser) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    const kycCheck = calculateKycCompletion(fullUser);
+
+    // Only bypass percentage check if KYC is officially verified by admin
+    if (fullUser.kycStatus === "verified") {
+      return next();
+    }
+
+    // Check minimum completion percentage
+    if (kycCheck.completionPercentage < minCompletionPercentage) {
+      return res.status(403).json({
+        error: "Profile verification required",
+        kycRequired: true,
+        completionPercentage: kycCheck.completionPercentage,
+        missingFields: kycCheck.missingFields,
+        message: `Please complete your profile (${kycCheck.completionPercentage}% complete). Required: ${minCompletionPercentage}% completion.`,
+      });
+    }
+
+    next();
+  };
 }
 
 // Admin access middleware (Organization Admin or Platform Admin)
