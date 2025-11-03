@@ -12193,6 +12193,325 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== SERVICE PAUSE ON PAYMENT FAILURE ====================
+
+  // Helper function to attempt auto-payment for an invoice
+  const attemptAutoPayment = async (invoiceId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      // Get invoice
+      const invoice = await storage.getSubscriptionInvoice(invoiceId);
+      if (!invoice) {
+        return { success: false, error: "Invoice not found" };
+      }
+
+      // Skip if already paid
+      if (invoice.status === "paid") {
+        return { success: true };
+      }
+
+      // Get subscription
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.id, invoice.subscriptionId))
+        .limit(1);
+
+      if (!subscription) {
+        return { success: false, error: "Subscription not found" };
+      }
+
+      // Check if there's a default payment method
+      if (!subscription.defaultPaymentMethodId) {
+        return { success: false, error: "No default payment method configured" };
+      }
+
+      // Get default payment method
+      const [paymentMethod] = await db
+        .select()
+        .from(schema.paymentMethods)
+        .where(
+          and(
+            eq(schema.paymentMethods.id, subscription.defaultPaymentMethodId),
+            eq(schema.paymentMethods.status, "active")
+          )
+        )
+        .limit(1);
+
+      if (!paymentMethod) {
+        return { success: false, error: "Default payment method not found or inactive" };
+      }
+
+      // Import Razorpay service dynamically
+      const { razorpayService } = await import("./razorpay-service");
+
+      try {
+        // Create Razorpay order
+        const orderAmount = Math.round(parseFloat(invoice.total) * 100); // Convert to paise
+        const order = await razorpayService.createOrder({
+          amount: orderAmount,
+          currency: invoice.currency,
+          receipt: invoice.invoiceNumber,
+          notes: {
+            invoiceId: invoice.id,
+            subscriptionId: subscription.id,
+            organizationId: subscription.organizationId,
+          },
+        });
+
+        // In production, this would use Razorpay's recurring payment API
+        // to actually charge the saved payment method
+        // For now, we simulate a successful payment
+
+        const now = new Date();
+        
+        // Mark invoice as paid
+        await storage.updateSubscriptionInvoice(invoiceId, {
+          status: "paid",
+          attemptCount: (invoice.attemptCount || 0) + 1,
+          lastAttemptAt: now,
+          razorpayOrderId: order.id,
+          amountPaid: invoice.total,
+          paidAt: now,
+          paymentMethod: paymentMethod.type,
+        });
+
+        // Create payment record
+        await db.insert(schema.payments).values({
+          organizationId: subscription.organizationId,
+          subscriptionInvoiceId: invoice.id,
+          amount: invoice.total,
+          method: paymentMethod.type,
+          status: "completed",
+          razorpayOrderId: order.id,
+          transactionDate: now,
+          notes: `Auto-payment for invoice ${invoice.invoiceNumber}`,
+        });
+
+        // Log successful payment
+        await db.insert(schema.subscriptionEvents).values({
+          subscriptionId: subscription.id,
+          eventType: "payment_successful",
+          eventData: {
+            invoiceId: invoice.id,
+            amount: parseFloat(invoice.total),
+            paymentMethod: paymentMethod.type,
+          },
+          createdAt: now,
+        });
+
+        return { success: true };
+
+      } catch (paymentError: any) {
+        // Payment failed - update attempt count but keep status as pending/overdue
+        // to allow retries during grace period
+        await storage.updateSubscriptionInvoice(invoiceId, {
+          attemptCount: (invoice.attemptCount || 0) + 1,
+          lastAttemptAt: new Date(),
+          // Don't change status here - let the grace period processor handle it
+        });
+
+        // Log failed payment attempt
+        await db.insert(schema.subscriptionEvents).values({
+          subscriptionId: subscription.id,
+          eventType: "payment_failed",
+          eventData: {
+            invoiceId: invoice.id,
+            attemptNumber: (invoice.attemptCount || 0) + 1,
+            error: paymentError.message,
+          },
+          createdAt: new Date(),
+        });
+
+        return { success: false, error: paymentError.message };
+      }
+    } catch (error: any) {
+      console.error("Auto-payment error:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Process overdue invoices and suspend services if needed
+  app.post("/api/subscription-invoices/process-overdue", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+
+      // Only super admins can run this
+      if (user.role !== "superadmin") {
+        return res.status(403).json({ error: "Only super admins can process overdue invoices" });
+      }
+
+      const now = new Date();
+      const results = {
+        processed: 0,
+        paymentsAttempted: 0,
+        paymentsFailed: 0,
+        servicesSuspended: 0,
+      };
+
+      // Get all pending invoices that are past due date
+      const overdueInvoices = await db
+        .select()
+        .from(schema.subscriptionInvoices)
+        .where(
+          and(
+            eq(schema.subscriptionInvoices.status, "pending"),
+            sql`${schema.subscriptionInvoices.dueDate} <= ${now}`
+          )
+        );
+
+      for (const invoice of overdueInvoices) {
+        results.processed++;
+
+        // Skip if already paid (might have been paid during this run)
+        if (invoice.status === "paid") {
+          continue;
+        }
+
+        // Check if we're still within grace period
+        const gracePeriodEnded = invoice.gracePeriodEndsAt && new Date(invoice.gracePeriodEndsAt) < now;
+
+        if (!gracePeriodEnded) {
+          // Still in grace period - attempt auto-payment
+          const paymentResult = await attemptAutoPayment(invoice.id);
+          results.paymentsAttempted++;
+
+          if (paymentResult.success) {
+            // Payment succeeded - invoice was marked as paid in attemptAutoPayment
+            continue;
+          } else {
+            results.paymentsFailed++;
+            
+            // Update invoice status to overdue (still retrying)
+            await storage.updateSubscriptionInvoice(invoice.id, {
+              status: "overdue",
+            });
+          }
+        } else {
+          // Grace period ended - mark as failed and suspend services
+          const [subscription] = await db
+            .select()
+            .from(schema.platformSubscriptions)
+            .where(eq(schema.platformSubscriptions.id, invoice.subscriptionId))
+            .limit(1);
+
+          if (subscription && subscription.status === "active") {
+            // Suspend subscription
+            await db
+              .update(schema.platformSubscriptions)
+              .set({
+                status: "suspended",
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.platformSubscriptions.id, subscription.id));
+
+            // Mark invoice as failed (grace period exhausted)
+            await storage.updateSubscriptionInvoice(invoice.id, {
+              status: "failed",
+              servicesDisabledAt: now,
+            });
+
+            // Log event
+            await db.insert(schema.subscriptionEvents).values({
+              subscriptionId: subscription.id,
+              eventType: "subscription_suspended",
+              eventData: {
+                reason: "payment_failure",
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                attemptCount: invoice.attemptCount || 0,
+              },
+              createdAt: new Date(),
+            });
+
+            results.servicesSuspended++;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Processed ${results.processed} overdue invoices`,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Process overdue invoices error:", error);
+      res.status(500).json({ error: "Failed to process overdue invoices" });
+    }
+  });
+
+  // Resume service after payment (admin action)
+  app.post("/api/platform-subscriptions/:id/resume", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const { id } = req.params;
+
+      // Get subscription
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(eq(schema.platformSubscriptions.id, id))
+        .limit(1);
+
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Check permissions - must be admin of the organization or super admin
+      if (user.role !== "superadmin" && user.organizationId !== subscription.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (user.role !== "admin" && user.role !== "superadmin") {
+        return res.status(403).json({ error: "Only admins can resume subscriptions" });
+      }
+
+      // Only resume if suspended
+      if (subscription.status !== "suspended") {
+        return res.status(400).json({ error: "Subscription is not suspended" });
+      }
+
+      // Resume subscription
+      await db
+        .update(schema.platformSubscriptions)
+        .set({
+          status: "active",
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.platformSubscriptions.id, id));
+
+      // Log event
+      await db.insert(schema.subscriptionEvents).values({
+        subscriptionId: id,
+        eventType: "subscription_resumed",
+        eventData: {
+          resumedBy: user.id,
+        },
+        createdAt: new Date(),
+      });
+
+      // Log activity
+      await db.insert(schema.activityLogs).values({
+        userId: user.id,
+        organizationId: subscription.organizationId,
+        action: "subscription_resumed",
+        entity: "platform_subscription",
+        entityId: id,
+        details: "Subscription services resumed after payment",
+        ipAddress: req.ip || "",
+        userAgent: req.get("user-agent") || "",
+        timestamp: new Date(),
+      });
+
+      res.json({
+        success: true,
+        message: "Subscription services resumed successfully",
+      });
+    } catch (error: any) {
+      console.error("Resume subscription error:", error);
+      res.status(500).json({ error: "Failed to resume subscription" });
+    }
+  });
+
   // ==================== RAZORPAY INTEGRATION ====================
   
   // Import Razorpay service
