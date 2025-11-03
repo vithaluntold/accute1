@@ -931,6 +931,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current user's profile
+  app.get("/api/users/me", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ ...user, password: undefined });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch user profile" });
+    }
+  });
+
+  // Update current user's profile (self-service)
+  app.patch("/api/users/me", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // Whitelist of allowed fields for self-service update
+      // Users CANNOT change: roleId, organizationId, isActive, phoneVerified, phoneVerifiedAt, kycStatus, kycVerifiedAt
+      const allowedFields = [
+        'firstName',
+        'lastName',
+        'phone',
+        'dateOfBirth',
+        'nationalId',
+        'nationalIdType',
+        'address',
+        'city',
+        'state',
+        'zipCode',
+        'country',
+        'emergencyContactName',
+        'emergencyContactPhone',
+        'emergencyContactRelation',
+        'idDocumentUrl',
+        'addressProofUrl',
+      ];
+
+      // Filter request body to only include allowed fields
+      const updateData: any = {};
+      for (const field of allowedFields) {
+        if (req.body.hasOwnProperty(field)) {
+          updateData[field] = req.body[field];
+        }
+      }
+
+      // Handle password update separately with hashing
+      if (req.body.password) {
+        updateData.password = await hashPassword(req.body.password);
+      }
+
+      // Ensure there's something to update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const user = await storage.updateUser(req.userId!, updateData);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "user", user.id, { action: "self_update", fields: Object.keys(updateData) }, req);
+      res.json({ ...user, password: undefined });
+    } catch (error: any) {
+      console.error("Failed to update user profile:", error);
+      res.status(500).json({ error: "Failed to update user profile" });
+    }
+  });
+
   app.post("/api/users", requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {
     try {
       const { password, roleId, ...userData } = req.body;

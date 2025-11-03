@@ -105,6 +105,7 @@ import TeamHierarchyPage from "@/pages/team-hierarchy";
 import ManagerDashboardPage from "@/pages/manager-dashboard";
 import AutomatedInvoicing from "@/pages/automated-invoicing";
 import SubscriptionPricing from "@/pages/subscription-pricing";
+import EmployeeProfile from "@/pages/employee-profile";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -264,6 +265,13 @@ function Router() {
             <Settings />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute>
+          <AppLayout>
+            <EmployeeProfile />
+          </AppLayout>
+        </ProtectedRoute>
       </Route>
       <Route path="/subscription">
         <ProtectedRoute>
