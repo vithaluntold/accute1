@@ -11919,6 +11919,280 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== SUBSCRIPTION INVOICE MANAGEMENT ====================
+
+  // Helper function to generate invoice number
+  const generateInvoiceNumber = async (): Promise<string> => {
+    const year = new Date().getFullYear();
+    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    
+    // Get last invoice number for this month
+    const lastInvoice = await db
+      .select()
+      .from(schema.subscriptionInvoices)
+      .where(sql`${schema.subscriptionInvoices.invoiceNumber} LIKE ${`INV-${year}${month}-%`}`)
+      .orderBy(desc(schema.subscriptionInvoices.invoiceNumber))
+      .limit(1);
+
+    let sequence = 1;
+    if (lastInvoice.length > 0) {
+      const lastNumber = lastInvoice[0].invoiceNumber.split('-')[2];
+      sequence = parseInt(lastNumber) + 1;
+    }
+
+    return `INV-${year}${month}-${String(sequence).padStart(4, '0')}`;
+  };
+
+  // Helper function to generate subscription invoice
+  const generateSubscriptionInvoice = async (subscriptionId: string): Promise<schema.SubscriptionInvoice> => {
+    // Get subscription details
+    const [subscription] = await db
+      .select()
+      .from(schema.platformSubscriptions)
+      .where(eq(schema.platformSubscriptions.id, subscriptionId))
+      .limit(1);
+
+    if (!subscription) {
+      throw new Error("Subscription not found");
+    }
+
+    // Calculate billing period
+    const billingPeriodStart = subscription.currentPeriodStart || new Date();
+    const billingPeriodEnd = subscription.currentPeriodEnd || new Date();
+
+    // IDEMPOTENCY CHECK: Check if invoice already exists for this billing period
+    const existingInvoice = await db
+      .select()
+      .from(schema.subscriptionInvoices)
+      .where(
+        and(
+          eq(schema.subscriptionInvoices.subscriptionId, subscriptionId),
+          eq(schema.subscriptionInvoices.billingPeriodStart, billingPeriodStart),
+          eq(schema.subscriptionInvoices.billingPeriodEnd, billingPeriodEnd)
+        )
+      )
+      .limit(1);
+
+    if (existingInvoice.length > 0) {
+      return existingInvoice[0];
+    }
+
+    // Get plan details
+    const [plan] = await db
+      .select()
+      .from(schema.subscriptionPlans)
+      .where(eq(schema.subscriptionPlans.slug, subscription.plan))
+      .limit(1);
+
+    if (!plan) {
+      throw new Error("Plan not found");
+    }
+
+    // Calculate amounts using actual subscription pricing fields
+    let subtotal = 0;
+    const lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number }> = [];
+
+    // Use basePrice if available (already includes regional multiplier)
+    if (subscription.basePrice) {
+      const baseAmount = parseFloat(subscription.basePrice);
+      subtotal += baseAmount;
+      lineItems.push({
+        description: `${plan.name} Plan - ${subscription.billingCycle} billing (base)`,
+        quantity: 1,
+        unitPrice: baseAmount,
+        amount: baseAmount,
+      });
+    } else {
+      // Fallback to monthlyPrice/yearlyPrice
+      const baseAmount = subscription.billingCycle === "monthly"
+        ? parseFloat(subscription.monthlyPrice || "0")
+        : parseFloat(subscription.yearlyPrice || "0");
+      subtotal += baseAmount;
+      lineItems.push({
+        description: `${plan.name} Plan - ${subscription.billingCycle} billing`,
+        quantity: 1,
+        unitPrice: baseAmount,
+        amount: baseAmount,
+      });
+    }
+
+    // Add per-seat pricing if applicable
+    if (subscription.perSeatPrice && subscription.seatCount > 1) {
+      const perSeatAmount = parseFloat(subscription.perSeatPrice);
+      const additionalSeats = subscription.seatCount - (plan.includedSeats || 1);
+      
+      if (additionalSeats > 0) {
+        const seatTotal = perSeatAmount * additionalSeats;
+        subtotal += seatTotal;
+        lineItems.push({
+          description: `Additional seats (${additionalSeats} × ${subscription.currency} ${perSeatAmount.toFixed(2)})`,
+          quantity: additionalSeats,
+          unitPrice: perSeatAmount,
+          amount: seatTotal,
+        });
+      }
+    }
+
+    // Apply discount if available
+    let totalDiscount = 0;
+    if (subscription.totalDiscount) {
+      totalDiscount = parseFloat(subscription.totalDiscount);
+      if (totalDiscount > 0) {
+        lineItems.push({
+          description: `Discount applied`,
+          quantity: 1,
+          unitPrice: -totalDiscount,
+          amount: -totalDiscount,
+        });
+        subtotal -= totalDiscount;
+      }
+    }
+
+    const taxRate = 0; // TODO: Get tax rate based on organization location
+    const taxAmount = (subtotal * taxRate) / 100;
+    const total = subtotal + taxAmount;
+
+    // Generate invoice number
+    const invoiceNumber = await generateInvoiceNumber();
+
+    // Set due date (7 days from issue date)
+    const issueDate = new Date();
+    const dueDate = new Date(issueDate);
+    dueDate.setDate(dueDate.getDate() + 7);
+
+    // Set grace period (2 days after due date)
+    const gracePeriodEndsAt = new Date(dueDate);
+    gracePeriodEndsAt.setDate(gracePeriodEndsAt.getDate() + 2);
+
+    // Create invoice
+    const invoice = await storage.createSubscriptionInvoice({
+      organizationId: subscription.organizationId,
+      subscriptionId: subscription.id,
+      invoiceNumber,
+      status: "pending",
+      billingPeriodStart,
+      billingPeriodEnd,
+      subtotal: subtotal.toString(),
+      taxRate: taxRate.toString(),
+      taxAmount: taxAmount.toString(),
+      total: total.toString(),
+      currency: subscription.currency || "USD",
+      issueDate,
+      dueDate,
+      gracePeriodEndsAt,
+      lineItems: lineItems as any,
+      metadata: {
+        plan: plan.slug,
+        billingCycle: subscription.billingCycle,
+        seatCount: subscription.seatCount,
+        regionCode: subscription.regionCode,
+        couponId: subscription.couponId,
+      },
+    });
+
+    // Log invoice generation
+    await db.insert(schema.subscriptionEvents).values({
+      subscriptionId: subscription.id,
+      eventType: "invoice_generated",
+      eventData: {
+        invoiceId: invoice.id,
+        invoiceNumber,
+        amount: total,
+        currency: subscription.currency || "USD",
+      },
+      createdAt: new Date(),
+    });
+
+    return invoice;
+  };
+
+  // Get all subscription invoices for the organization
+  app.get("/api/subscription-invoices", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const organizationId = user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      const invoices = await storage.getSubscriptionInvoicesByOrganization(organizationId);
+      res.json(invoices);
+    } catch (error: any) {
+      console.error("Get subscription invoices error:", error);
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  // Get a specific subscription invoice
+  app.get("/api/subscription-invoices/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const { id } = req.params;
+
+      const invoice = await storage.getSubscriptionInvoice(id);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Check if user has access to this invoice
+      if (invoice.organizationId !== user.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(invoice);
+    } catch (error: any) {
+      console.error("Get subscription invoice error:", error);
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // Manually generate an invoice for the current subscription
+  app.post("/api/subscription-invoices/generate", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const organizationId = user.organizationId;
+
+      if (!organizationId) {
+        return res.status(400).json({ error: "User must belong to an organization" });
+      }
+
+      // Check if user is admin
+      if (user.role !== "admin" && user.role !== "superadmin") {
+        return res.status(403).json({ error: "Only admins can generate invoices" });
+      }
+
+      // Get active subscription
+      const [subscription] = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(
+          and(
+            eq(schema.platformSubscriptions.organizationId, organizationId),
+            eq(schema.platformSubscriptions.status, "active")
+          )
+        )
+        .limit(1);
+
+      if (!subscription) {
+        return res.status(404).json({ error: "No active subscription found" });
+      }
+
+      // Generate invoice
+      const invoice = await generateSubscriptionInvoice(subscription.id);
+
+      res.json({
+        success: true,
+        message: "Invoice generated successfully",
+        invoice,
+      });
+    } catch (error: any) {
+      console.error("Generate invoice error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate invoice" });
+    }
+  });
+
   // ==================== RAZORPAY INTEGRATION ====================
   
   // Import Razorpay service

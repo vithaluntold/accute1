@@ -371,6 +371,14 @@ export interface IStorage {
   getPaymentsByClient(clientId: string): Promise<schema.Payment[]>;
   updatePayment(id: string, payment: Partial<schema.InsertPayment>): Promise<schema.Payment | undefined>;
   
+  // Platform Subscription Invoices
+  createSubscriptionInvoice(invoice: schema.InsertSubscriptionInvoice): Promise<schema.SubscriptionInvoice>;
+  getSubscriptionInvoice(id: string): Promise<schema.SubscriptionInvoice | undefined>;
+  getSubscriptionInvoicesByOrganization(organizationId: string): Promise<schema.SubscriptionInvoice[]>;
+  getSubscriptionInvoicesBySubscription(subscriptionId: string): Promise<schema.SubscriptionInvoice[]>;
+  updateSubscriptionInvoice(id: string, invoice: Partial<schema.InsertSubscriptionInvoice>): Promise<schema.SubscriptionInvoice | undefined>;
+  getDueSubscriptionInvoices(): Promise<schema.SubscriptionInvoice[]>;
+  
   createExpense(expense: schema.InsertExpense): Promise<schema.Expense>;
   getExpense(id: string): Promise<schema.Expense | undefined>;
   getExpensesByOrganization(organizationId: string): Promise<schema.Expense[]>;
@@ -3400,6 +3408,50 @@ export class DbStorage implements IStorage {
       .where(eq(schema.payments.id, id))
       .returning();
     return result[0];
+  }
+
+  // Platform Subscription Invoices
+  async createSubscriptionInvoice(invoice: schema.InsertSubscriptionInvoice): Promise<schema.SubscriptionInvoice> {
+    const result = await db.insert(schema.subscriptionInvoices).values(invoice).returning();
+    return result[0];
+  }
+
+  async getSubscriptionInvoice(id: string): Promise<schema.SubscriptionInvoice | undefined> {
+    const result = await db.select().from(schema.subscriptionInvoices)
+      .where(eq(schema.subscriptionInvoices.id, id));
+    return result[0];
+  }
+
+  async getSubscriptionInvoicesByOrganization(organizationId: string): Promise<schema.SubscriptionInvoice[]> {
+    return await db.select().from(schema.subscriptionInvoices)
+      .where(eq(schema.subscriptionInvoices.organizationId, organizationId))
+      .orderBy(desc(schema.subscriptionInvoices.createdAt));
+  }
+
+  async getSubscriptionInvoicesBySubscription(subscriptionId: string): Promise<schema.SubscriptionInvoice[]> {
+    return await db.select().from(schema.subscriptionInvoices)
+      .where(eq(schema.subscriptionInvoices.subscriptionId, subscriptionId))
+      .orderBy(desc(schema.subscriptionInvoices.createdAt));
+  }
+
+  async updateSubscriptionInvoice(id: string, invoice: Partial<schema.InsertSubscriptionInvoice>): Promise<schema.SubscriptionInvoice | undefined> {
+    const result = await db.update(schema.subscriptionInvoices)
+      .set({ ...invoice, updatedAt: new Date() })
+      .where(eq(schema.subscriptionInvoices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getDueSubscriptionInvoices(): Promise<schema.SubscriptionInvoice[]> {
+    const now = new Date();
+    return await db.select().from(schema.subscriptionInvoices)
+      .where(
+        and(
+          eq(schema.subscriptionInvoices.status, "pending"),
+          sql`${schema.subscriptionInvoices.dueDate} <= ${now}`
+        )
+      )
+      .orderBy(schema.subscriptionInvoices.dueDate);
   }
 
   async createExpense(expense: schema.InsertExpense): Promise<schema.Expense> {
