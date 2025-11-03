@@ -14,29 +14,7 @@ import { GradientHero } from "@/components/gradient-hero";
 import { Check, CreditCard, Sparkles, Zap, Crown, AlertCircle, Tag } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { SubscriptionPlan, PricingRegion, Coupon } from "@shared/schema";
-
-type PriceCalculation = {
-  basePricePerMonth: number;
-  regionalMultiplier: number;
-  regionalPrice: number;
-  seatCount: number;
-  totalSeatsPrice: number;
-  volumeDiscount: number;
-  volumeDiscountAmount: number;
-  subtotal: number;
-  couponDiscount: number;
-  couponDiscountAmount: number;
-  finalPrice: number;
-  currency: string;
-  currencySymbol: string;
-  billingCycle: string;
-  breakdown: {
-    basePlanPrice: string;
-    regionalAdjustment: string;
-    volumeDiscountApplied: string;
-    couponDiscountApplied: string;
-  };
-};
+import type { PriceCalculation } from "@shared/pricing-service";
 
 export default function SubscriptionSelectPage() {
   const { toast } = useToast();
@@ -386,28 +364,36 @@ export default function SubscriptionSelectPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Base Plan Price ({billingCycle})</span>
-                      <span data-testid="price-base">{priceCalculation.breakdown.basePlanPrice}</span>
+                      <span data-testid="price-base">{priceCalculation.currencySymbol}{priceCalculation.snapshot.basePrice.toFixed(2)}</span>
                     </div>
-                    {priceCalculation.regionalMultiplier !== 1 && (
+                    {priceCalculation.regionMultiplier !== 1 && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Regional Adjustment ({(priceCalculation.regionalMultiplier * 100).toFixed(0)}%)</span>
-                        <span data-testid="price-regional">{priceCalculation.breakdown.regionalAdjustment}</span>
+                        <span className="text-muted-foreground">Regional Adjustment ({((priceCalculation.regionMultiplier - 1) * 100).toFixed(0)}%)</span>
+                        <span data-testid="price-regional">
+                          {priceCalculation.currencySymbol}
+                          {(priceCalculation.snapshot.basePrice - priceCalculation.snapshot.basePriceUSD).toFixed(2)}
+                        </span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Seats ({priceCalculation.seatCount})</span>
-                      <span data-testid="price-seats">{priceCalculation.currencySymbol}{priceCalculation.totalSeatsPrice.toFixed(2)}</span>
-                    </div>
+                    {priceCalculation.additionalSeats > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Additional Seats ({priceCalculation.additionalSeats} × {priceCalculation.currencySymbol}{priceCalculation.snapshot.perSeatPrice.toFixed(2)})</span>
+                        <span data-testid="price-seats">
+                          {priceCalculation.currencySymbol}
+                          {(priceCalculation.additionalSeats * priceCalculation.snapshot.perSeatPrice).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                     {priceCalculation.volumeDiscount > 0 && (
                       <div className="flex justify-between text-green-600 dark:text-green-400">
-                        <span>Volume Discount ({priceCalculation.volumeDiscount}%)</span>
-                        <span data-testid="price-volume-discount">-{priceCalculation.currencySymbol}{priceCalculation.volumeDiscountAmount.toFixed(2)}</span>
+                        <span>Volume Discount</span>
+                        <span data-testid="price-volume-discount">-{priceCalculation.currencySymbol}{priceCalculation.volumeDiscount.toFixed(2)}</span>
                       </div>
                     )}
                     {priceCalculation.couponDiscount > 0 && (
                       <div className="flex justify-between text-green-600 dark:text-green-400">
                         <span>Coupon Discount</span>
-                        <span data-testid="price-coupon-discount">-{priceCalculation.currencySymbol}{priceCalculation.couponDiscountAmount.toFixed(2)}</span>
+                        <span data-testid="price-coupon-discount">-{priceCalculation.currencySymbol}{priceCalculation.couponDiscount.toFixed(2)}</span>
                       </div>
                     )}
                     <Separator />

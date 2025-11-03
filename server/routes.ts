@@ -11352,7 +11352,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
         line_items: [
           {
             price_data: {
-              currency: region?.currencyCode.toLowerCase() || 'usd',
+              currency: (region?.currencyCode || 'USD').toLowerCase(),
               product_data: {
                 name: `${plan.name} - ${plan.tier} Plan`,
                 description: `${seatCount} seat${seatCount > 1 ? 's' : ''} • ${billingCycle === 'monthly' ? 'Monthly' : 'Yearly'} billing`,
