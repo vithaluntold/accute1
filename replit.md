@@ -1,7 +1,24 @@
-# Accute - AI-Powered Accounting Workflow Automation Platform
+# Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an enterprise-grade AI-powered accounting workflow automation platform designed to streamline financial operations. It offers multi-role authentication, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to be an "AI-first" solution, enhancing efficiency, ensuring compliance, and significantly improving modern accounting practices. It aims to provide an advanced, secure, and user-friendly environment for financial professionals to automate and manage their workflows effectively.
+Accute is the world's first AI-native accounting workflow automation platform for modern accounting firms. Unlike legacy competitors (TaxDome, Karbon, Canopy) that have forms, workflows, and inbox features requiring **manual operation**, Accute has specialized AI agents that **AUTOMATE** these features.
+
+**Core Differentiators:**
+1. **Roundtable AI Multi-Agent Orchestration** (2 years ahead of market) - Coordinates multiple AI agents to complete complex tasks automatically
+2. **Six Specialized AI Agents for Automation:**
+   - **Cadence** - Automates workflow creation, assignment, and progression
+   - **Forma** - Automates intelligent form generation and population
+   - **Relay** - Automates email drafting, follow-ups, and communication
+   - **Parity** - Automates data extraction from documents
+   - **Echo** - Automates data validation and quality control
+   - **Scribe** - Automates document drafting and content generation
+3. **Multi-Provider AI** - Never locked into single vendor (OpenAI, Anthropic, Azure)
+4. **AI Agent Marketplace** - Install and customize specialized agents like apps
+5. **Global Payment Coverage** - Razorpay for India, UAE, Turkey, USA markets
+6. **Native Mobile Apps** - React Native + Expo for iOS and Android
+
+**Platform Capabilities:**
+Accute offers multi-role authentication, Forms (organizers), Workflows (pipelines), Email integration (inbox), Calendar scheduling, Mobile apps, custom workflow building, an AI agent marketplace, and secure document management. The platform's core purpose is to be an "AI-native" solution where AI agents automate features that competitors require manual operation, enhancing efficiency, ensuring compliance, and significantly improving modern accounting practices.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory

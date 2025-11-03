@@ -2,7 +2,15 @@
 
 ## Executive Summary
 
-**Accute** is the world's first AI-native accounting workflow automation platform. Unlike legacy competitors that added AI as an afterthought, Accute was architected from day one with artificial intelligence as its foundation, enabling unprecedented automation capabilities and intelligent decision-making that fundamentally transforms how accounting firms operate.
+**Accute** is the world's first AI-native accounting workflow automation platform. Unlike legacy competitors (TaxDome, Karbon, Canopy) that have forms, workflows, and inbox features that require **manual operation**, Accute has specialized AI agents (Cadence, Forma, Echo, Scribe, Parity, Relay) that **AUTOMATE** these features.
+
+**The Key Differentiator:**
+- ❌ TaxDome has organizers → ✅ Accute has **Forms** + **Forma agent** that intelligently creates and populates them
+- ❌ TaxDome has pipelines → ✅ Accute has **Workflows** + **Cadence agent** that automates execution
+- ❌ TaxDome has inbox integration → ✅ Accute has **Email integration** + **Relay agent** that automates communication
+- ❌ Competitors have manual features → ✅ Accute has **Roundtable orchestration** (2 years ahead) that coordinates multiple agents
+
+Accute was architected from day one with artificial intelligence as its foundation, enabling unprecedented automation capabilities and intelligent decision-making that fundamentally transforms how accounting firms operate.
 
 ---
 
@@ -10,12 +18,12 @@
 
 **Accute is the ONLY platform that offers:**
 
-1. **Multi-Provider AI Flexibility** - Never locked into a single AI vendor
-2. **Extensible AI Agent Marketplace** - Install, customize, and deploy specialized agents
-3. **AI-Native Architecture** - Every feature designed for intelligent automation
-4. **Developer-First Design** - Full REST APIs, webhooks, and open architecture
-5. **Global Payment Coverage** - Built for emerging markets (India, UAE, Turkey, USA)
-6. **Modern Technology Stack** - React, Express, PostgreSQL for performance and reliability
+1. **Roundtable Multi-Agent Orchestration** - 2 years ahead of market, coordinate multiple AI agents to complete complex tasks
+2. **Specialized AI Agents for Automation** - Cadence (workflows), Forma (forms), Relay (email), Echo (validation), Scribe (documents), Parity (analysis)
+3. **Multi-Provider AI Flexibility** - Never locked into a single AI vendor (OpenAI, Anthropic, Azure)
+4. **Extensible AI Agent Marketplace** - Install, customize, and deploy specialized agents
+5. **Developer-First Design** - Full REST APIs, webhooks, and open architecture
+6. **Global Payment Coverage** - Built for emerging markets (India, UAE, Turkey, USA) with Razorpay
 
 ---
 
@@ -153,30 +161,140 @@ async function checkAccess(userId, agentSlug, orgId, userRole) {
 
 ---
 
-### **3. Workflow Automation with AI Integration** ⚙️
+### **3. Workflows + Cadence AI Agent (Intelligent Automation)** ⚙️
 
-**UNIQUE TO ACCUTE:**
-- **AI-powered workflow nodes** - Run AI agents as workflow steps
-- **Intelligent task assignment** - AI recommends best team member based on skills/workload
-- **Smart auto-progression** - AI determines when to advance workflow stages
-- **Context-aware automation** - Pass data between workflow stages with AI enrichment
-- **Natural language workflow queries** - "Show me all workflows waiting on client response"
+**YES, ACCUTE HAS WORKFLOWS (like TaxDome's "Pipelines"):**
+- **6-level hierarchy**: Workflows → Stages → Steps → Tasks → Subtasks → Checklists
+- **Unlimited nesting** - Model any complexity
+- **Auto-progression** - Configure when to auto-advance stages
+- **Assignment cloning** - Each client gets their own workflow instance
+- **Visual canvas schema** - JSON-based for future drag-drop UI
+
+**BUT WHERE ACCUTE DOMINATES: Cadence AI Agent AUTOMATES Workflows**
+
+**Cadence Agent Capabilities:**
+- **Intelligent task assignment** - AI recommends best team member based on skills/workload/availability
+- **Smart auto-progression** - AI determines when to advance workflow stages based on completion criteria
+- **Workflow generation** - "Create a workflow for 1120S tax return" → Cadence builds it automatically
+- **Context-aware automation** - AI passes data between workflow stages with enrichment
+- **Exception handling** - AI detects blockers and suggests resolutions
+- **Natural language queries** - "Show me all workflows waiting on client response"
 
 **Workflow Actions Including:**
-- Run AI agent (extract data, analyze document, draft email)
+- Run AI agents (Parity extracts data, Echo validates, Scribe drafts documents)
 - HTTP requests (integrate any external system)
 - Conditional logic based on AI predictions
 - Data transformations with AI assistance
 
+**The Difference:**
+- ❌ TaxDome: Manual pipelines - humans create, assign, and progress workflows
+- ✅ Accute: Cadence agent **automates** workflow creation, assignment, progression, and exception handling
+
 **Competitors:**
-- ⚠️ TaxDome: Basic workflow automation, no AI integration
-- ⚠️ Karbon: Strong workflows but no AI capabilities
+- ⚠️ TaxDome: Pipelines exist but 100% manual operation
+- ⚠️ Karbon: Strong workflow engine but no AI automation
 - ❌ Canopy: Manual workflows only
-- ❌ SafeSend: No workflow automation
+- ❌ SafeSend: No workflow system
 
 ---
 
-### **4. Secure API Key Management with AES-256-GCM** 🔐
+### **8. Document Analysis + Parity AI Agent (Data Extraction)** 📄
+
+**UNIQUE TO ACCUTE:**
+- **Document upload and storage** - Secure cloud storage for client documents
+- **PKI digital signatures** - RSA-2048 signatures for tamper detection
+- **Version control** - Track document revisions
+- **Access control** - Permission-based document access
+
+**BUT WHERE ACCUTE DOMINATES: Parity AI Agent AUTOMATES Data Extraction**
+
+**Parity Agent Capabilities:**
+- **Intelligent data extraction** - Extract structured data from W2s, 1099s, K-1s, bank statements
+- **Multi-format support** - PDF, images, scanned documents, Excel spreadsheets
+- **Entity recognition** - Identify names, addresses, SSNs, EINs, dollar amounts
+- **Table extraction** - Extract data from complex tables and forms
+- **Validation** - Cross-reference extracted data for accuracy
+- **Auto-population** - Send extracted data directly to tax software or workflows
+
+**Example:**
+- Upload 50 client W2s → Parity extracts all wage/tax data → Auto-populates tax returns
+
+**The Difference:**
+- ❌ Competitors: Manual data entry - staff types every number from documents
+- ✅ Accute: Parity agent **automatically extracts** all data in seconds
+
+**Competitors:**
+- ❌ TaxDome: Manual document review and data entry
+- ❌ Karbon: No document AI capabilities
+- ❌ Canopy: No data extraction
+- ❌ SafeSend: No AI extraction
+
+---
+
+### **9. Data Validation + Echo AI Agent (Quality Control)** ✓
+
+**UNIQUE TO ACCUTE:**
+
+**Echo AI Agent AUTOMATES Data Validation & Quality Control**
+
+**Echo Agent Capabilities:**
+- **Intelligent validation** - Check data for accuracy, completeness, consistency
+- **Cross-reference checking** - Verify data across multiple documents
+- **Error detection** - Find discrepancies, missing values, outliers
+- **Compliance checking** - Ensure data meets regulatory requirements
+- **Real-time feedback** - Alert users to issues as they work
+- **Suggested corrections** - AI proposes fixes for detected errors
+
+**Examples:**
+- Validate W2 wages match employer's payroll records
+- Check that all required tax forms are present
+- Verify SSNs are valid and match IRS database format
+- Ensure dates are logical and within acceptable ranges
+
+**The Difference:**
+- ❌ Competitors: Manual review - staff checks every field by eye
+- ✅ Accute: Echo agent **automatically validates** all data and flags errors
+
+**Competitors:**
+- ❌ TaxDome: Manual quality control
+- ❌ Karbon: No AI validation
+- ❌ Canopy: No data validation
+- ❌ SafeSend: No AI quality control
+
+---
+
+### **10. Document Drafting + Scribe AI Agent (Content Generation)** ✍️
+
+**UNIQUE TO ACCUTE:**
+
+**Scribe AI Agent AUTOMATES Document Drafting & Content Creation**
+
+**Scribe Agent Capabilities:**
+- **Intelligent document drafting** - Generate engagement letters, tax memos, client communications
+- **Template creation** - Build reusable templates from natural language
+- **Context-aware writing** - Customize content based on client type, services, jurisdiction
+- **Multi-language support** - Draft documents in client's preferred language
+- **Citation checking** - Verify tax code references and regulations
+- **Formatting** - Professional formatting with letterhead, signatures
+
+**Examples:**
+- "Draft engagement letter for 1120S return for Acme Corp" → Complete professional letter
+- "Create tax planning memo explaining R&D credit eligibility" → Detailed memo with citations
+- "Write client explanation of estimated tax requirements" → Clear, client-friendly letter
+
+**The Difference:**
+- ❌ Competitors: Manual drafting - staff writes every document from scratch or templates
+- ✅ Accute: Scribe agent **automatically generates** custom documents in seconds
+
+**Competitors:**
+- ❌ TaxDome: Manual document creation, basic templates
+- ❌ Karbon: Template library but manual customization
+- ❌ Canopy: No AI document generation
+- ❌ SafeSend: No document drafting
+
+---
+
+### **11. Secure API Key Management with AES-256-GCM** 🔐
 
 **UNIQUE TO ACCUTE:**
 - **Military-grade encryption** for all API keys
@@ -204,7 +322,7 @@ const authTag = cipher.getAuthTag();
 
 ---
 
-### **5. PKI Digital Signatures for Document Integrity** 📝
+### **12. PKI Digital Signatures for Document Integrity** 📝
 
 **UNIQUE TO ACCUTE:**
 - **RSA-2048 digital signatures** on every uploaded document
@@ -228,7 +346,7 @@ const authTag = cipher.getAuthTag();
 
 ---
 
-### **6. Developer-Friendly REST APIs & Webhooks** 👨‍💻
+### **13. Developer-Friendly REST APIs & Webhooks** 👨‍💻
 
 **UNIQUE TO ACCUTE:**
 - **Full RESTful API** for every feature
@@ -255,7 +373,7 @@ const authTag = cipher.getAuthTag();
 
 ---
 
-### **7. Global Payment Support (Razorpay)** 💳
+### **14. Global Payment Support (Razorpay)** 💳
 
 **UNIQUE TO ACCUTE:**
 - **Razorpay integration** - India's leading payment gateway
@@ -281,40 +399,119 @@ const authTag = cipher.getAuthTag();
 
 ---
 
-### **8. Hierarchical Workflow System** 📊
+### **4. Forms + Forma AI Agent (Intelligent Form Creation)** 📋
 
-**UNIQUE TO ACCUTE:**
-- **6-level hierarchy**: Workflows → Stages → Steps → Tasks → Subtasks → Checklists
-- **Unlimited nesting** - Model any complexity
-- **Auto-progression at each level** - Configure when to auto-advance
-- **Context propagation** - Pass data down the hierarchy
-- **Version control** - Track workflow template changes
-- **Assignment-specific cloning** - Each client engagement gets its own workflow instance
-- **Visual canvas schema** - JSON-based for future drag-drop UI
+**YES, ACCUTE HAS FORMS (like TaxDome's "Organizers"):**
+- **Custom form builder** - Create intake forms, questionnaires, checklists
+- **Conditional logic** - Show/hide fields based on responses
+- **Field validation** - Ensure data quality at input
+- **Pre-filled data** - Auto-populate from client records
+- **Digital signatures** - E-sign support for forms
+- **Multi-page forms** - Complex questionnaires with navigation
 
-**Example:**
-```
-Workflow: "Annual Tax Return"
-  ├─ Stage: "Client Onboarding"
-  │   ├─ Step: "Collect Documents"
-  │   │   ├─ Task: "Request W2s"
-  │   │   │   ├─ Subtask: "Send email request"
-  │   │   │   ├─ Subtask: "Follow up in 3 days"
-  │   │   │   └─ Checklist: ☑ Verified all W2s received
-  │   │   └─ Task: "Request 1099s"
-  ├─ Stage: "Tax Preparation" (auto-starts when Stage 1 complete)
-  └─ Stage: "Review & Filing"
-```
+**BUT WHERE ACCUTE DOMINATES: Forma AI Agent AUTOMATES Form Creation**
+
+**Forma Agent Capabilities:**
+- **Intelligent form generation** - "Create a 1040 tax organizer" → Forma builds complete form automatically
+- **Entity-aware customization** - Different forms for C-Corp, S-Corp, Partnership, Individual
+- **Smart field suggestions** - AI recommends fields based on client type and services
+- **Auto-population** - AI extracts data from previous years or uploaded documents to pre-fill forms
+- **Validation rules** - AI creates intelligent validation rules based on form purpose
+- **Multi-language support** - Generate forms in client's preferred language
+
+**The Difference:**
+- ❌ TaxDome: Manual organizers - staff must create every field, rule, and logic
+- ✅ Accute: Forma agent **automatically generates** entire forms based on natural language requests
 
 **Competitors:**
-- ⚠️ TaxDome: 2-3 level hierarchy only
-- ⚠️ Karbon: 2-3 level hierarchy
-- ❌ Canopy: Basic task lists
-- ❌ SafeSend: No workflow system
+- ⚠️ TaxDome: Organizers exist but require manual creation
+- ⚠️ Karbon: Basic forms, manual setup
+- ❌ Canopy: Limited form capabilities
+- ❌ SafeSend: Returns-focused forms only
 
 ---
 
-### **9. Real-Time Collaboration (WebSocket)** ⚡
+### **5. Email Integration + Relay AI Agent (Communication Automation)** 📧
+
+**YES, ACCUTE HAS EMAIL INTEGRATION (like TaxDome's "Inbox"):**
+- **Email sync** - Connect Gmail, Outlook, IMAP accounts
+- **Conversation threading** - Group related messages
+- **Assignment linking** - Connect emails to client engagements
+- **Attachment handling** - Auto-save attachments to document storage
+- **Send/receive** - Full email client functionality
+
+**BUT WHERE ACCUTE DOMINATES: Relay AI Agent AUTOMATES Communication**
+
+**Relay Agent Capabilities:**
+- **Smart email drafting** - "Draft follow-up email for missing W2s" → Relay writes professional email
+- **Context-aware responses** - AI understands conversation history and suggests replies
+- **Automated follow-ups** - Schedule and send reminder emails based on triggers
+- **Template generation** - Create email templates from natural language descriptions
+- **Sentiment analysis** - Detect urgent/frustrated clients and prioritize
+- **Multi-channel coordination** - Sync communications across email, SMS, and in-app messages
+
+**The Difference:**
+- ❌ TaxDome: Inbox integration - staff must manually read, compose, and send every email
+- ✅ Accute: Relay agent **automates** email drafting, follow-ups, responses, and prioritization
+
+**Competitors:**
+- ⚠️ TaxDome: Inbox integration but 100% manual operation
+- ⚠️ Karbon: Email integration, manual responses
+- ❌ Canopy: Limited email features
+- ❌ SafeSend: No inbox management
+
+---
+
+### **6. Calendar Scheduling & Meeting Management** 📅
+
+**UNIQUE TO ACCUTE:**
+- **Integrated calendar** - Schedule appointments, meetings, deadlines
+- **Multi-calendar sync** - Google Calendar, Outlook, iCal
+- **Client booking** - Share availability for client self-scheduling
+- **Team calendar views** - See team availability and conflicts
+- **Recurring events** - Weekly meetings, monthly check-ins
+- **Reminder notifications** - Email/SMS/in-app reminders
+- **Meeting rooms** - Book conference rooms and resources
+- **Time zone support** - Handle international clients
+
+**Competitors:**
+- ⚠️ TaxDome: Basic calendar features
+- ⚠️ Karbon: Calendar integration
+- ❌ Canopy: Limited scheduling
+- ❌ SafeSend: No calendar system
+
+---
+
+### **7. Native Mobile Apps (React Native + Expo)** 📱
+
+**UNIQUE TO ACCUTE:**
+- **iOS and Android apps** - Native mobile experience
+- **Full feature parity** - Access all platform features on mobile
+- **Offline support** - Work without internet, sync when connected
+- **Push notifications** - Real-time updates for messages, tasks, deadlines
+- **Camera integration** - Scan and upload documents from phone
+- **Biometric authentication** - Face ID, Touch ID, fingerprint login
+- **Mobile-optimized UI** - Designed for small screens and touch
+- **React Native + Expo** - Modern, performant architecture
+
+**Mobile Features:**
+- View and update assignments
+- Chat with team members
+- Upload documents
+- Review and approve workflows
+- Respond to client messages
+- Check calendar and schedule meetings
+- Receive push notifications
+
+**Competitors:**
+- ⚠️ TaxDome: Mobile apps available
+- ⚠️ Karbon: Mobile apps available
+- ❌ Canopy: Limited mobile support
+- ❌ SafeSend: No mobile apps
+
+---
+
+### **15. Real-Time Collaboration (WebSocket)** ⚡
 
 **UNIQUE TO ACCUTE:**
 - **WebSocket-powered** real-time updates
@@ -334,7 +531,7 @@ Workflow: "Annual Tax Return"
 
 ---
 
-### **10. Modern Technology Stack** 💻
+### **16. Modern Technology Stack** 💻
 
 **UNIQUE TO ACCUTE:**
 - **React 18** - Modern, performant frontend
@@ -362,7 +559,60 @@ Workflow: "Annual Tax Return"
 
 ---
 
-### **11. AI-Powered Assignment Status Bot** 🤖
+### **17. Roundtable AI - Multi-Agent Orchestration** 🎯
+
+**UNIQUE TO ACCUTE - 2 YEARS AHEAD:**
+- **Multi-agent collaboration system** - Orchestrate multiple AI agents working together
+- **Agent-to-agent communication** - Agents coordinate to solve complex tasks
+- **Objective-driven execution** - Define high-level goals, agents determine steps
+- **Context sharing** - Agents pass information seamlessly between each other
+- **Parallel execution** - Multiple agents work simultaneously
+- **Intelligent routing** - System determines which agents to use for each task
+
+**How Roundtable Works:**
+```typescript
+// User defines objective
+Objective: "Prepare annual tax return for Client ABC"
+
+// Roundtable orchestrates multiple agents:
+1. Parity → Extracts data from uploaded documents
+2. Echo → Validates extracted data for accuracy
+3. Forma → Generates tax questionnaire based on client type
+4. Cadence → Creates workflow stages for tax preparation
+5. Scribe → Drafts engagement letter
+6. Relay → Sends communications to client
+
+// All coordinated automatically, with context flowing between agents
+```
+
+**Real-world scenario:**
+- User: "Process new client onboarding for Acme Corp"
+- Roundtable:
+  1. **Forma** creates custom intake forms
+  2. **Relay** sends forms to client via email
+  3. **Parity** extracts data when forms return
+  4. **Echo** validates all submitted information
+  5. **Cadence** sets up appropriate workflow
+  6. **Scribe** drafts engagement letter
+  7. **Relay** sends letter for signature
+
+**Why this is revolutionary:**
+- **No manual coordination** - Agents work together automatically
+- **Complex task automation** - Multi-step processes fully automated
+- **Adaptive execution** - Agents adjust based on intermediate results
+- **Unprecedented efficiency** - What takes hours manually happens in minutes
+
+**Competitors:**
+- ❌ TaxDome: No multi-agent orchestration - single AI assistant only
+- ❌ Karbon: No AI agents at all
+- ❌ Canopy: No AI capabilities
+- ❌ SafeSend: No AI whatsoever
+
+**Market Position:** This feature alone puts Accute 2+ years ahead of any competitor in AI automation.
+
+---
+
+### **18. AI-Powered Assignment Status Bot** 🤖
 
 **UNIQUE TO ACCUTE:**
 - **Natural language queries** - "Show me all work for Acme Corp"
@@ -386,7 +636,7 @@ Workflow: "Annual Tax Return"
 
 ---
 
-### **12. Comprehensive RBAC with 50+ Permissions** 🔐
+### **19. Comprehensive RBAC with 50+ Permissions** 🔐
 
 **UNIQUE TO ACCUTE:**
 - **Granular permissions** - 50+ individual permissions
@@ -415,7 +665,7 @@ Workflow: "Annual Tax Return"
 
 ---
 
-### **13. Advanced Subscription Billing with PPP Pricing** 💰
+### **20. Advanced Subscription Billing with PPP Pricing** 💰
 
 **UNIQUE TO ACCUTE:**
 - **Purchasing Power Parity (PPP) Pricing** - Regional price adjustments based on economic conditions
@@ -456,7 +706,7 @@ Coupon Rules:
 
 ---
 
-### **14. Team Hierarchy & Supervision System** 👥
+### **21. Team Hierarchy & Supervision System** 👥
 
 **UNIQUE TO ACCUTE:**
 - **Multi-level supervisor relationships** - Define reporting structures across teams
@@ -495,7 +745,7 @@ Organization
 
 ---
 
-### **15. Comprehensive Activity Logging** 📜
+### **22. Comprehensive Activity Logging** 📜
 
 **UNIQUE TO ACCUTE:**
 - **Complete audit trail** - Every action tracked across entire platform
@@ -544,7 +794,7 @@ Organization
 
 ---
 
-### **16. Organization-Isolated Cryptography** 🔒
+### **23. Organization-Isolated Cryptography** 🔒
 
 **UNIQUE TO ACCUTE:**
 - **RSA-2048 key pairs per organization** - Complete cryptographic isolation
@@ -587,7 +837,7 @@ Document.signature = sign(documentHash, Organization.privateKey)
 
 ---
 
-### **17. Marketplace with Multiple Pricing Models** 🏬
+### **24. Marketplace with Multiple Pricing Models** 🏬
 
 **UNIQUE TO ACCUTE:**
 - **Template marketplace** - Documents, forms, workflows, AI agents
@@ -642,7 +892,7 @@ AI Agents:
 
 ---
 
-### **18. SHA-256 Token Security** 🔑
+### **25. SHA-256 Token Security** 🔑
 
 **UNIQUE TO ACCUTE:**
 - **Cryptographically secure token generation** - 256-bit random tokens (64 hex characters)
