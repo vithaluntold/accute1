@@ -62,6 +62,7 @@ validateEnvironment();
 
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
@@ -89,6 +90,40 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// SECURITY: HTTPS Enforcement in Production
+// Prevents man-in-the-middle attacks on payment data
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production' && !req.secure && req.get('x-forwarded-proto') !== 'https') {
+    return res.status(403).json({ 
+      error: 'HTTPS required for secure payment processing',
+      code: 'HTTPS_REQUIRED' 
+    });
+  }
+  next();
+});
+
+// SECURITY: Rate limiting for payment endpoints
+// Prevents brute-force attacks and payment fraud attempts
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per 15-minute window
+  message: { 
+    error: 'Too many payment attempts. Please try again later.',
+    code: 'RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting in development
+    return process.env.NODE_ENV === 'development';
+  }
+});
+
+// Apply rate limiting to payment-related routes
+app.use('/api/payment-methods', paymentLimiter);
+app.use('/api/subscription-invoices/:id/pay', paymentLimiter);
+app.use('/api/subscription-invoices/:id/complete-payment', paymentLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();

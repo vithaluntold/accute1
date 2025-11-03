@@ -37,14 +37,19 @@ async function generateAndPersistKeyPair(organizationId: string): Promise<KeyPai
     },
   });
   
-  // Persist to database
+  // SECURITY: Encrypt private key before storing in database
+  // This protects against database compromise
+  const encryptedPrivateKey = encrypt(privateKey);
+  
+  // Persist to database with encrypted private key
   await db.insert(schema.organizationKeys).values({
     organizationId,
     publicKey,
-    privateKey, // In production, encrypt this with ENCRYPTION_KEY
+    privateKey: encryptedPrivateKey, // Encrypted with AES-256-GCM
     algorithm: 'RSA-2048',
   }).onConflictDoNothing(); // Prevent race condition
   
+  // Cache the decrypted keys in memory
   const keyPair = { publicKey, privateKey };
   keyCache.set(organizationId, keyPair);
   
@@ -70,9 +75,11 @@ async function getOrganizationKeyPair(organizationId: string): Promise<KeyPair> 
     .limit(1);
   
   if (existingKeys.length > 0) {
+    // SECURITY: Safely decrypt private key (handles both encrypted and legacy plaintext)
+    const decryptedPrivateKey = safeDecryptRazorpay(existingKeys[0].privateKey) || existingKeys[0].privateKey;
     const keyPair = {
       publicKey: existingKeys[0].publicKey,
-      privateKey: existingKeys[0].privateKey,
+      privateKey: decryptedPrivateKey,
     };
     keyCache.set(organizationId, keyPair);
     return keyPair;
@@ -106,9 +113,11 @@ async function loadOrganizationKeyPair(organizationId: string): Promise<KeyPair>
     throw new Error(`Cryptographic keys not found for organization ${organizationId}. Cannot verify signature.`);
   }
   
+  // SECURITY: Safely decrypt private key (handles both encrypted and legacy plaintext)
+  const decryptedPrivateKey = safeDecryptRazorpay(existingKeys[0].privateKey) || existingKeys[0].privateKey;
   const keyPair = {
     publicKey: existingKeys[0].publicKey,
-    privateKey: existingKeys[0].privateKey,
+    privateKey: decryptedPrivateKey,
   };
   keyCache.set(organizationId, keyPair);
   return keyPair;
@@ -252,4 +261,34 @@ export function decrypt(encryptedText: string): string {
   decrypted += decipher.final('utf8');
   
   return decrypted;
+}
+
+/**
+ * SECURITY: Safely decrypt Razorpay credentials with backward compatibility
+ * Handles both encrypted (new) and plaintext (legacy) values
+ * @param value Potentially encrypted Razorpay credential
+ * @returns Decrypted credential (or original if plaintext)
+ */
+export function safeDecryptRazorpay(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  
+  // Check if value is encrypted (format: iv:encryptedData:authTag)
+  // Encrypted values always have exactly 2 colons separating 3 parts
+  const parts = value.split(':');
+  if (parts.length === 3 && parts.every(p => p.length > 0)) {
+    try {
+      // Attempt decryption - if it works, it was encrypted
+      return decrypt(value);
+    } catch (error) {
+      // If decryption fails, it might be plaintext that happens to have colons
+      // Fall through to return plaintext
+      console.warn('Failed to decrypt Razorpay credential, treating as plaintext:', error);
+      return value;
+    }
+  }
+  
+  // Value is plaintext (legacy data) - return as-is
+  return value;
 }

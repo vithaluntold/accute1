@@ -11840,6 +11840,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
       const mrr = basePrice + (additionalSeats * perSeatPrice);
 
       // Create platform subscription record
+      // SECURITY: Encrypt Razorpay customer ID before storing
       const [platformSubscription] = await db
         .insert(schema.platformSubscriptions)
         .values({
@@ -11857,7 +11858,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
           maxStorage: plan.maxStorage,
           seatCount: totalSeats,
           paymentGateway: "razorpay",
-          razorpayCustomerId,
+          razorpayCustomerId: cryptoUtils.encrypt(razorpayCustomerId),
           razorpaySubscriptionId: subscription.id,
           currentPeriodStart,
           currentPeriodEnd,
@@ -12691,7 +12692,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
 
       // Create or get Razorpay customer
-      let razorpayCustomerId = subscription.razorpayCustomerId;
+      // SECURITY: Safely decrypt customer ID (handles both encrypted and legacy plaintext)
+      let razorpayCustomerId = cryptoUtils.safeDecryptRazorpay(subscription.razorpayCustomerId);
       
       if (!razorpayCustomerId) {
         const customer = await razorpayService.createCustomer({
@@ -12706,11 +12708,11 @@ ${msg.bodyText || msg.bodyHtml || ''}
         
         razorpayCustomerId = customer.id;
         
-        // Update subscription with customer ID
+        // SECURITY: Encrypt customer ID before storing in database
         await db
           .update(schema.platformSubscriptions)
           .set({
-            razorpayCustomerId: customer.id,
+            razorpayCustomerId: cryptoUtils.encrypt(customer.id),
             updatedAt: new Date(),
           })
           .where(eq(schema.platformSubscriptions.id, subscription.id));
@@ -12778,6 +12780,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
 
       // Create payment method record
+      // SECURITY: Encrypt sensitive Razorpay tokens before storing in database
       const [paymentMethod] = await db
         .insert(schema.paymentMethods)
         .values({
@@ -12792,8 +12795,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
           cardExpYear,
           cardholderName,
           upiId,
-          razorpayTokenId: razorpay_payment_id, // Store payment ID as token reference
-          razorpayCustomerId: paymentDetails.customer_id,
+          razorpayTokenId: cryptoUtils.encrypt(razorpay_payment_id), // Encrypted token
+          razorpayCustomerId: cryptoUtils.encrypt(paymentDetails.customer_id), // Encrypted customer ID
           status: 'active',
           lastUsedAt: new Date(),
           createdBy: userId,
@@ -12801,6 +12804,17 @@ ${msg.bodyText || msg.bodyHtml || ''}
           updatedAt: new Date(),
         })
         .returning();
+
+      // Audit log for payment method addition
+      await logActivity(
+        userId, 
+        organizationId, 
+        "create", 
+        "payment_method", 
+        paymentMethod.id, 
+        { type, last4: cardLast4 || upiId }, 
+        req
+      );
 
       res.json({
         message: "Payment method saved successfully",
@@ -12859,6 +12873,17 @@ ${msg.bodyText || msg.bodyHtml || ''}
         })
         .where(eq(schema.platformSubscriptions.organizationId, organizationId));
 
+      // Audit log for setting default payment method
+      await logActivity(
+        req.user!.id, 
+        organizationId, 
+        "update", 
+        "payment_method", 
+        id, 
+        { action: "set_default", type: method.type }, 
+        req
+      );
+
       res.json({
         message: "Payment method set as default",
         payment_method_id: id,
@@ -12912,14 +12937,28 @@ ${msg.bodyText || msg.bodyHtml || ''}
         .where(eq(schema.paymentMethods.id, id));
 
       // Optionally delete token from Razorpay if we have customer ID and token ID
+      // SECURITY: Safely decrypt tokens (handles both encrypted and legacy plaintext)
       if (method.razorpayCustomerId && method.razorpayTokenId) {
         try {
-          await razorpayService.deleteToken(method.razorpayCustomerId, method.razorpayTokenId);
+          const decryptedCustomerId = cryptoUtils.safeDecryptRazorpay(method.razorpayCustomerId);
+          const decryptedTokenId = cryptoUtils.safeDecryptRazorpay(method.razorpayTokenId);
+          await razorpayService.deleteToken(decryptedCustomerId!, decryptedTokenId!);
         } catch (error) {
           console.error("Error deleting Razorpay token:", error);
           // Don't fail the whole request if Razorpay deletion fails
         }
       }
+
+      // Audit log for payment method deletion
+      await logActivity(
+        req.user!.id, 
+        organizationId, 
+        "delete", 
+        "payment_method", 
+        id, 
+        { type: method.type, was_default: method.isDefault }, 
+        req
+      );
 
       res.json({
         message: "Payment method deleted successfully",
