@@ -137,6 +137,19 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
     - `RAZORPAY_KEY_SECRET`: Razorpay API Key Secret
     - `RAZORPAY_WEBHOOK_SECRET`: Webhook signature verification secret (optional)
 
+#### Payment Methods & Auto-Sweep
+- **Saved Payment Methods**: Admins can save payment methods (cards, UPI) for automatic recurring billing
+  - ₹1 verification charge via Razorpay tokenization to save payment instruments
+  - Supports credit cards, debit cards, and UPI IDs
+  - Stores card last 4 digits, brand, expiry date, and Razorpay tokens for recurring charges
+  - Set default payment method for automatic invoice payments (auto-sweep)
+  - Payment methods management available in **Settings → Payments** page
+- **Auto-Sweep Functionality**: Organizations can enable automatic subscription billing
+  - Default payment method automatically charged when new invoices generated
+  - Reduces manual payment intervention for recurring subscriptions
+  - 2-day grace period if auto-charge fails
+  - Services suspended if payment not received within grace period
+
 #### Subscription Invoice System
 - **Automatic Invoice Generation**: System generates invoices based on subscription billing cycle (monthly/yearly/3-year)
 - **Payment Methods Tracked**: UPI, Credit Card, Debit Card, Net Banking, Wallet
