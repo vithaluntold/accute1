@@ -83,6 +83,12 @@ export default function EmailTemplatesPage() {
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
+
+  const { data: installedAgents = [] } = useQuery<any[]>({
+    queryKey: ["/api/ai-agents/installed"],
+  });
+
+  const hasScribe = installedAgents.some(agent => agent.agent?.name === "Scribe");
   
   // Check for marketplace template ID and metadata in URL
   const params = new URLSearchParams(location.split('?')[1]);
@@ -362,14 +368,26 @@ export default function EmailTemplatesPage() {
         description="Customize email templates with branding and placeholders"
         actions={
           <div className="flex gap-2">
-            <Button 
-              onClick={() => setLocation('/ai-agents/scribe')} 
-              className="bg-white text-primary"
-              data-testid="button-create-with-scribe"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Create with Scribe AI
-            </Button>
+            {hasScribe ? (
+              <Button 
+                onClick={() => setLocation('/ai-agents/scribe')} 
+                className="bg-white text-primary"
+                data-testid="button-create-with-scribe"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Create with Scribe AI
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => setLocation('/marketplace?category=ai-agents')} 
+                variant="outline"
+                className="bg-white/10 text-white border-white/20"
+                data-testid="button-install-scribe"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Install Scribe AI
+              </Button>
+            )}
             <Button onClick={() => handleOpenDialog()} variant="outline" className="bg-white/10 text-white border-white/20" data-testid="button-new-template">
               <Plus className="w-4 h-4 mr-2" />
               New Template
