@@ -404,6 +404,141 @@ export class RazorpayService {
       throw new Error(`Failed to create invoice: ${error.message}`);
     }
   }
+
+  /**
+   * Create a token (saved payment method) from payment ID
+   * This allows reusing the payment method for future charges
+   */
+  async createToken(data: {
+    customerId: string;
+    method: 'card' | 'emandate' | 'upi';
+    card?: {
+      number: string;
+      name: string;
+      expiry_month: string;
+      expiry_year: string;
+      cvv: string;
+    };
+    upi?: {
+      flow: string;
+      vpa?: string;
+    };
+    bank_account?: {
+      name: string;
+      ifsc: string;
+      account_number: string;
+    };
+    recurring?: boolean;
+    notes?: Record<string, string>;
+  }): Promise<any> {
+    try {
+      const token = await this.getRazorpayInstance().tokens.create({
+        customer_id: data.customerId,
+        method: data.method,
+        card: data.card,
+        upi: data.upi,
+        bank_account: data.bank_account,
+        recurring: data.recurring ?? true,
+        notes: data.notes,
+      });
+      return token;
+    } catch (error: any) {
+      console.error('Error creating Razorpay token:', error);
+      throw new Error(`Failed to create token: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch a token by ID
+   */
+  async fetchToken(customerId: string, tokenId: string): Promise<any> {
+    try {
+      const token = await this.getRazorpayInstance().customers.fetchToken(customerId, tokenId);
+      return token;
+    } catch (error: any) {
+      console.error('Error fetching Razorpay token:', error);
+      throw new Error(`Failed to fetch token: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch all tokens for a customer
+   */
+  async fetchCustomerTokens(customerId: string): Promise<any> {
+    try {
+      const tokens = await this.getRazorpayInstance().customers.fetchTokens(customerId);
+      return tokens;
+    } catch (error: any) {
+      console.error('Error fetching customer tokens:', error);
+      throw new Error(`Failed to fetch tokens: ${error.message}`);
+    }
+  }
+
+  /**
+   * Delete a token
+   */
+  async deleteToken(customerId: string, tokenId: string): Promise<any> {
+    try {
+      const result = await this.getRazorpayInstance().customers.deleteToken(customerId, tokenId);
+      return result;
+    } catch (error: any) {
+      console.error('Error deleting Razorpay token:', error);
+      throw new Error(`Failed to delete token: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a recurring payment using saved token
+   */
+  async createRecurringPayment(data: {
+    customerId: string;
+    tokenId: string;
+    amount: number;
+    currency: string;
+    receipt?: string;
+    notes?: Record<string, string>;
+  }): Promise<any> {
+    try {
+      // Create an order first
+      const order = await this.createOrder({
+        amount: data.amount,
+        currency: data.currency,
+        receipt: data.receipt,
+        notes: data.notes,
+      });
+
+      // Create payment using the token
+      const payment = await this.getRazorpayInstance().payments.createRecurring({
+        email: '', // Will be fetched from customer
+        contact: '', // Will be fetched from customer
+        amount: data.amount,
+        currency: data.currency,
+        order_id: order.id,
+        customer_id: data.customerId,
+        token: data.tokenId,
+        recurring: '1',
+        notes: data.notes,
+      });
+
+      return { order, payment };
+    } catch (error: any) {
+      console.error('Error creating recurring payment:', error);
+      throw new Error(`Failed to create recurring payment: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch customer details
+   */
+  async fetchCustomer(customerId: string): Promise<any> {
+    try {
+      const customer = await this.getRazorpayInstance().customers.fetch(customerId);
+      return customer;
+    } catch (error: any) {
+      console.error('Error fetching Razorpay customer:', error);
+      throw new Error(`Failed to fetch customer: ${error.message}`);
+    }
+  }
 }
 
 // Export a singleton instance
