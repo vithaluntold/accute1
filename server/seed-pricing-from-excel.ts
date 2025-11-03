@@ -52,16 +52,12 @@ const EXCEL_PRICING_DATA = {
     {
       slug: "edge",
       name: "Edge",
-      description: "AI + Roundtable Multi-Agent Orchestration",
+      description: "AI + Roundtable Multi-Agent Orchestration (Exclusive)",
       features: [
         "Everything in AI",
-        "Roundtable AI Orchestration (2 years ahead)",
-        "Unlimited AI Agents",
-        "Custom AI Agent Development",
-        "10,000+ Templates",
-        "White-Label Options",
-        "Priority Support",
-        "Dedicated Account Manager"
+        "Roundtable AI Orchestration (exclusive feature)",
+        "Coordinates all 6 AI agents simultaneously",
+        "Handles complex multi-step workflows automatically"
       ],
       maxUsers: -1, // Unlimited
       maxClients: -1,
