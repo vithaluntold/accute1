@@ -238,7 +238,14 @@ export function decrypt(encryptedText: string): string {
   const encrypted = parts[1];
   const authTag = Buffer.from(parts[2], 'hex');
   
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  // Validate authentication tag length (must be 16 bytes for AES-GCM)
+  if (authTag.length !== 16) {
+    throw new Error('Invalid authentication tag length');
+  }
+  
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv, {
+    authTagLength: 16
+  });
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
