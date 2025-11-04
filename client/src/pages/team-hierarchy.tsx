@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Trash2, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -62,7 +63,7 @@ import type { User, SupervisorRelationship } from "@shared/schema";
 
 const supervisionSchema = z.object({
   supervisorId: z.string().min(1, "Please select a supervisor"),
-  reporteeId: z.string().min(1, "Please select a reportee"),
+  reporteeIds: z.array(z.string()).min(1, "Please select at least one reportee"),
   level: z.coerce.number().min(1).max(5).default(1),
 });
 
@@ -98,7 +99,7 @@ export default function TeamHierarchyPage() {
     resolver: zodResolver(supervisionSchema),
     defaultValues: {
       supervisorId: "",
-      reporteeId: "",
+      reporteeIds: [],
       level: 1,
     },
   });
@@ -107,22 +108,53 @@ export default function TeamHierarchyPage() {
 
   const addMutation = useMutation({
     mutationFn: async (data: SupervisionFormValues) => {
-      return await apiRequest("POST", "/api/supervision", data);
+      // Create supervision relationships for each selected reportee
+      const promises = data.reporteeIds.map((reporteeId) =>
+        apiRequest("POST", "/api/supervision", {
+          supervisorId: data.supervisorId,
+          reporteeId: reporteeId,
+          level: data.level,
+        }).then((result) => ({ status: 'fulfilled', value: result }))
+          .catch((error) => ({ status: 'rejected', reason: error }))
+      );
+      const results = await Promise.all(promises);
+      
+      const successes = results.filter(r => r.status === 'fulfilled');
+      const failures = results.filter(r => r.status === 'rejected');
+      
+      return { successes, failures, total: data.reporteeIds.length };
     },
-    onSuccess: () => {
+    onSuccess: (results, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/supervision/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setIsAddOpen(false);
       addForm.reset();
-      toast({
-        title: "Relationship added",
-        description: "Supervision relationship has been created successfully",
-      });
+      
+      const successCount = results.successes.length;
+      const failureCount = results.failures.length;
+      
+      if (failureCount === 0) {
+        toast({
+          title: "Relationships added",
+          description: `${successCount} supervision relationship${successCount > 1 ? 's' : ''} created successfully`,
+        });
+      } else if (successCount > 0) {
+        toast({
+          title: "Partial success",
+          description: `${successCount} relationship${successCount > 1 ? 's' : ''} created, ${failureCount} already existed or failed`,
+        });
+      } else {
+        toast({
+          title: "No relationships created",
+          description: "All selected reportees may already have this supervisor",
+          variant: "destructive",
+        });
+      }
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create supervision relationship",
+        description: "Failed to create supervision relationships",
         variant: "destructive",
       });
     },
@@ -151,7 +183,7 @@ export default function TeamHierarchyPage() {
   });
 
   const handleAdd = (data: SupervisionFormValues) => {
-    if (data.supervisorId === data.reporteeId) {
+    if (data.reporteeIds.includes(data.supervisorId)) {
       toast({
         title: "Invalid relationship",
         description: "A user cannot supervise themselves",
@@ -175,7 +207,15 @@ export default function TeamHierarchyPage() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const availableReportees = users.filter((user) => user.id !== selectedSupervisorId);
+  // Get existing reportees for the selected supervisor
+  const existingReporteeIds = selectedSupervisorId
+    ? allSupervisors.find((s) => s.user.id === selectedSupervisorId)?.reportees.map((r) => r.id) || []
+    : [];
+
+  // Filter out the supervisor themselves AND users already assigned to this supervisor
+  const availableReportees = users.filter(
+    (user) => user.id !== selectedSupervisorId && !existingReporteeIds.includes(user.id)
+  );
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -228,27 +268,44 @@ export default function TeamHierarchyPage() {
                 />
                 <FormField
                   control={addForm.control}
-                  name="reporteeId"
+                  name="reporteeIds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Reportee</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-reportee">
-                            <SelectValue placeholder="Select a reportee" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableReportees.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.firstName} {user.lastName} ({user.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Reportees</FormLabel>
                       <FormDescription>
-                        Who reports to the supervisor
+                        Select one or more employees who report to the supervisor
                       </FormDescription>
+                      <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-4">
+                        {availableReportees.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No available employees to select
+                          </p>
+                        ) : (
+                          availableReportees.map((user) => (
+                            <FormItem
+                              key={user.id}
+                              className="flex items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  data-testid={`checkbox-reportee-${user.id}`}
+                                  checked={field.value?.includes(user.id)}
+                                  onCheckedChange={(checked) => {
+                                    const currentValue = field.value || [];
+                                    const newValue = checked
+                                      ? [...currentValue, user.id]
+                                      : currentValue.filter((id) => id !== user.id);
+                                    field.onChange(newValue);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal cursor-pointer">
+                                {user.firstName} {user.lastName} ({user.email})
+                              </FormLabel>
+                            </FormItem>
+                          ))
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

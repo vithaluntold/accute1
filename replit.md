@@ -34,7 +34,7 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Projects Management**: Comprehensive client engagement tracking.
 - **AI Agent Foundry**: System for onboarding and deployment of custom AI agents.
 - **Template Scoping System**: Dual-scope architecture for global and organization-specific templates.
-- **Subscription Management System**: Four-tier subscription model (FREE, CORE, AI, EDGE) with regional pricing, prorated upgrades/downgrades, auto-payment, and service pause on payment failure.
+- **Subscription Management System**: Four-tier subscription model (FREE, CORE, AI, EDGE) with regional pricing, prorated upgrades/downgrades, auto-payment, and service pause on payment failure. **User Counting**: Employees (Admin, Employee roles) count toward maxUsers subscription limits. Clients do NOT count toward maxUsers limits.
 - **Invoice Generation System**: Auto-generates invoices for subscription events with detailed breakdowns and status tracking.
 - **Payment Security**: AES-256-GCM encryption for credentials, HTTPS enforcement, rate limiting, comprehensive security headers, and payment audit logging.
 
