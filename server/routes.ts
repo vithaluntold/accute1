@@ -1355,8 +1355,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? await storage.getLlmConfigurationsByOrganization(req.user!.organizationId)
         : [];
       // Don't send back the encrypted API keys in the list
+      // Map modelVersion → azureApiVersion for UI compatibility
       const sanitized = configs.map(c => ({
         ...c,
+        azureApiVersion: c.modelVersion, // Map DB field to UI field
         apiKeyEncrypted: '[ENCRYPTED]'
       }));
       res.json(sanitized);
@@ -1368,13 +1370,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/llm-configurations", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { encrypt } = await import('./llm-service');
-      const { apiKey, ...rest } = req.body;
+      const { apiKey, azureApiVersion, ...rest } = req.body;
       
       // Encrypt the API key before storing
       const encryptedKey = encrypt(apiKey);
       
+      // Map azureApiVersion → modelVersion for database storage
       const config = await storage.createLlmConfiguration({
         ...rest,
+        modelVersion: azureApiVersion, // Map UI field to DB field
         apiKeyEncrypted: encryptedKey,
         organizationId: req.user!.organizationId!,
         createdBy: req.user!.id
@@ -1398,8 +1402,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "LLM configuration not found" });
       }
       
-      const { apiKey, ...rest } = req.body;
+      const { apiKey, azureApiVersion, ...rest } = req.body;
       const updates: any = rest;
+      
+      // Map azureApiVersion → modelVersion for database storage
+      if (azureApiVersion !== undefined) {
+        updates.modelVersion = azureApiVersion;
+      }
       
       // If a new API key is provided, encrypt it
       if (apiKey && apiKey !== '[ENCRYPTED]') {
