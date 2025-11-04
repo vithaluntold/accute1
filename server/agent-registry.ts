@@ -7,6 +7,7 @@
 
 import { promises as fs } from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 import type { Express } from "express";
 import { db } from "./db";
 import { aiAgents, organizationAgents, userAgentAccess } from "@shared/schema";
@@ -163,7 +164,9 @@ class AgentRegistry {
       const agentDir = path.join(this.agentsDir, slug);
       const backendPath = path.join(agentDir, manifest.backendEntry);
       
-      const handler = await import(backendPath);
+      // Convert file path to URL for ESM compatibility with TypeScript
+      const backendUrl = pathToFileURL(backendPath).href;
+      const handler = await import(backendUrl);
       
       if (typeof handler.registerRoutes !== "function") {
         throw new Error(`Agent ${slug} backend must export a registerRoutes function`);
