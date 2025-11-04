@@ -251,8 +251,25 @@ app.use((req, res, next) => {
       throw listenError;
     }
     
-    // Setup static file serving IMMEDIATELY before initialization
-    // This ensures the app responds to requests even if initialization hangs
+    // Do heavy initialization FIRST (including agent route registration)
+    // This must happen BEFORE Vite middleware to ensure agent routes are registered
+    console.log('🔧 Initializing system...');
+    
+    try {
+      await initializeSystem(app);
+      console.log('✅ System initialized successfully');
+      setInitializationStatus(true, null);
+    } catch (initError) {
+      const errorMsg = initError instanceof Error ? initError.message : String(initError);
+      console.error('❌ System initialization failed:', initError);
+      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
+      setInitializationStatus(false, errorMsg);
+      // Don't exit - server can still handle health checks
+      console.warn('⚠️  Server running with limited functionality');
+    }
+    
+    // Setup static file serving AFTER initialization
+    // This ensures agent routes are registered before the catch-all middleware
     const distPath = path.resolve(moduleDir, "public");
     const isProduction = fs.existsSync(distPath);
     
@@ -286,23 +303,6 @@ app.use((req, res, next) => {
         console.error('❌ Static file setup failed:', staticError);
         console.warn('⚠️  Continuing without static file serving');
       }
-    }
-    
-    // Now do heavy initialization AFTER server is listening AND routes are set up
-    // This allows the app to serve pages even while initialization completes
-    console.log('🔧 Initializing system...');
-    
-    try {
-      await initializeSystem();
-      console.log('✅ System initialized successfully');
-      setInitializationStatus(true, null);
-    } catch (initError) {
-      const errorMsg = initError instanceof Error ? initError.message : String(initError);
-      console.error('❌ System initialization failed:', initError);
-      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
-      setInitializationStatus(false, errorMsg);
-      // Don't exit - server can still handle health checks
-      console.warn('⚠️  Server running with limited functionality');
     }
     
     // Setup WebSocket server for streaming AI agents

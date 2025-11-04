@@ -1,3 +1,4 @@
+import type { Express } from "express";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -136,7 +137,7 @@ async function createPersistentSeedAccountsInline() {
   console.log("✅ Persistent seed accounts ready for roleplay");
 }
 
-export async function initializeSystem() {
+export async function initializeSystem(app: Express) {
   try {
     console.log("🔧 Initializing system...");
 
@@ -655,6 +656,26 @@ export async function initializeSystem() {
     const { agentRegistry } = await import("./agent-registry");
     await agentRegistry.initialize();
     console.log("✅ Agent Foundry initialized successfully");
+
+    // Register agent routes AFTER agents are loaded
+    console.log("🔧 Registering agent routes...");
+    try {
+      const agents = agentRegistry.getAllAgents();
+      console.log(`📋 Found ${agents.length} agents to register routes for`);
+      
+      for (const agent of agents) {
+        console.log(`  → Registering routes for: ${agent.slug}`);
+        try {
+          await agentRegistry.registerAgentRoutes(app, agent.slug);
+          console.log(`  ✓ Successfully registered: ${agent.slug}`);
+        } catch (error) {
+          console.error(`  ✗ Failed to register routes for agent ${agent.slug}:`, error);
+        }
+      }
+      console.log("✅ Agent route registration complete");
+    } catch (error) {
+      console.error("❌ Failed to register agent routes:", error);
+    }
 
     console.log("✅ System initialized successfully");
   } catch (error) {
