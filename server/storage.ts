@@ -192,7 +192,14 @@ export interface IStorage {
 
   // Activity Logs
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
-  getActivityLogsByOrganization(organizationId: string, limit?: number): Promise<ActivityLog[]>;
+  getActivityLogsByOrganization(organizationId: string, options?: {
+    limit?: number;
+    offset?: number;
+    resource?: string;
+    resourceId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<ActivityLog[]>;
   getActivityLogsByUser(userId: string, limit?: number): Promise<ActivityLog[]>;
 
   // Super Admin Keys
@@ -2329,11 +2336,40 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getActivityLogsByOrganization(organizationId: string, limit: number = 100): Promise<ActivityLog[]> {
-    return await db.select().from(schema.activityLogs)
-      .where(eq(schema.activityLogs.organizationId, organizationId))
+  async getActivityLogsByOrganization(
+    organizationId: string, 
+    options?: {
+      limit?: number;
+      offset?: number;
+      resource?: string;
+      resourceId?: string;
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ): Promise<ActivityLog[]> {
+    const { limit = 100, offset = 0, resource, resourceId, startDate, endDate } = options || {};
+    
+    let query = db.select().from(schema.activityLogs)
+      .where(eq(schema.activityLogs.organizationId, organizationId));
+
+    // Apply filters
+    if (resource) {
+      query = query.where(eq(schema.activityLogs.resource, resource)) as any;
+    }
+    if (resourceId) {
+      query = query.where(eq(schema.activityLogs.resourceId, resourceId)) as any;
+    }
+    if (startDate) {
+      query = query.where(gte(schema.activityLogs.createdAt, startDate)) as any;
+    }
+    if (endDate) {
+      query = query.where(lte(schema.activityLogs.createdAt, endDate)) as any;
+    }
+
+    return await query
       .orderBy(desc(schema.activityLogs.createdAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   }
 
   async getActivityLogsByUser(userId: string, limit: number = 100): Promise<ActivityLog[]> {

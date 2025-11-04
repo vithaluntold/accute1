@@ -56,7 +56,17 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 
 ### AI Agent Configuration
 - **Default LLM Provider**: Azure OpenAI configured per organization
-- **AI Agents**: All 8 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, Work Status Bot) use organization's default LLM configuration
+- **AI Agents**: All 9 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, OmniSpectra, Radar) use organization's default LLM configuration
 - **Setup**: Run `tsx server/seed-default-llm.ts` to create default Azure OpenAI config for Sterling organization
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
 - **Session Management**: All agents support persistent chat sessions with conversation history
+- **Agent Details**:
+  - **Forma**: Form builder for client intake and data collection
+  - **Cadence**: Workflow automation designer
+  - **Parity**: Document generation specialist
+  - **Echo**: Message template creator
+  - **Relay**: Inbox intelligence for email-to-task conversion
+  - **Scribe**: Writing and content creation assistant
+  - **Luca**: Accounting, finance & taxation expert
+  - **OmniSpectra**: Work status tracking and team availability
+  - **Radar**: Comprehensive activity logger for legal evidence and client accountability

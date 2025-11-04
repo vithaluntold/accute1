@@ -11,9 +11,9 @@ interface Message {
 
 export const registerRoutes = (app: any) => {
   // Register session management routes
-  registerAgentSessionRoutes(app, "work-status-bot");
+  registerAgentSessionRoutes(app, "omnispectra");
 
-  app.post("/api/agents/work-status-bot/chat", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/agents/omnispectra/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const { message, history, context } = req.body;
       
@@ -29,7 +29,7 @@ export const registerRoutes = (app: any) => {
       // Initialize LLM service
       const llmService = new LLMService(llmConfig);
       
-      const systemPrompt = `You are the Work Status Bot, an AI assistant that helps users manage work status updates and team availability.
+      const systemPrompt = `You are OmniSpectra, an AI assistant that helps users manage work status updates and team availability.
 
 **Your Capabilities:**
 1. Help users update their work status (Available, In Meeting, Busy, Away, Out of Office)
@@ -79,7 +79,7 @@ ${context ? `User context: ${JSON.stringify(context)}` : 'No additional context'
       
       res.json(response);
     } catch (error) {
-      console.error("Work Status Bot error:", error);
+      console.error("OmniSpectra error:", error);
       res.status(500).json({ 
         error: "Failed to process message",
         details: error instanceof Error ? error.message : "Unknown error"

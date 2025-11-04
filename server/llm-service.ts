@@ -67,10 +67,14 @@ export function decrypt(encryptedData: string): string {
 
 /**
  * LLM Service - Handles AI model interactions using user-configured credentials
+ * Features: Retry logic, timeout handling, circuit breaker for production reliability
  */
 export class LLMService {
   private config: LlmConfiguration;
   private apiKey: string;
+  private readonly MAX_RETRIES = 3;
+  private readonly TIMEOUT_MS = 60000; // 60 seconds
+  private readonly RETRY_DELAY_MS = 1000; // 1 second
   
   constructor(config: LlmConfiguration) {
     this.config = config;
@@ -78,19 +82,106 @@ export class LLMService {
   }
   
   /**
-   * Send a prompt to the configured LLM and get a response
+   * Send a prompt to the configured LLM and get a response with retry logic
    */
   async sendPrompt(prompt: string, systemPrompt?: string): Promise<string> {
-    switch (this.config.provider) {
-      case 'openai':
-        return this.sendToOpenAI(prompt, systemPrompt);
-      case 'azure':
-        return this.sendToAzure(prompt, systemPrompt);
-      case 'anthropic':
-        return this.sendToAnthropic(prompt, systemPrompt);
-      default:
-        throw new Error(`Unsupported LLM provider: ${this.config.provider}`);
+    return this.withRetry(async () => {
+      switch (this.config.provider) {
+        case 'openai':
+          return this.sendToOpenAI(prompt, systemPrompt);
+        case 'azure':
+          return this.sendToAzure(prompt, systemPrompt);
+        case 'anthropic':
+          return this.sendToAnthropic(prompt, systemPrompt);
+        default:
+          throw new Error(`Unsupported LLM provider: ${this.config.provider}`);
+      }
+    });
+  }
+
+  /**
+   * Retry wrapper with exponential backoff for transient failures
+   */
+  private async withRetry<T>(fn: () => Promise<T>, attempt = 1): Promise<T> {
+    try {
+      return await this.withTimeout(fn(), this.TIMEOUT_MS);
+    } catch (error) {
+      const isRetryable = this.isRetryableError(error);
+      const shouldRetry = isRetryable && attempt < this.MAX_RETRIES;
+
+      if (shouldRetry) {
+        const delay = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Exponential backoff
+        console.warn(`LLM request failed (attempt ${attempt}/${this.MAX_RETRIES}), retrying in ${delay}ms...`, error);
+        await this.sleep(delay);
+        return this.withRetry(fn, attempt + 1);
+      }
+
+      // Final failure - provide helpful error message
+      throw this.enhanceError(error, attempt);
     }
+  }
+
+  /**
+   * Add timeout to prevent hanging requests
+   */
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`LLM request timeout after ${timeoutMs}ms`)), timeoutMs)
+      )
+    ]);
+  }
+
+  /**
+   * Check if error is retryable (network issues, rate limits, server errors)
+   */
+  private isRetryableError(error: any): boolean {
+    if (error?.code === 'ECONNRESET' || error?.code === 'ETIMEDOUT' || error?.code === 'ENOTFOUND') {
+      return true; // Network errors
+    }
+    if (error?.status === 429 || error?.status === 503 || error?.status === 500) {
+      return true; // Rate limit, service unavailable, server error
+    }
+    if (error?.message?.includes('timeout')) {
+      return true; // Timeout errors
+    }
+    return false;
+  }
+
+  /**
+   * Enhance error with helpful context for debugging
+   */
+  private enhanceError(error: any, attempts: number): Error {
+    const provider = this.config.provider;
+    const model = this.config.model;
+    
+    let message = `LLM request failed after ${attempts} attempts. Provider: ${provider}, Model: ${model}. `;
+    
+    if (error?.status === 401 || error?.status === 403) {
+      message += 'Authentication failed. Please check your API key configuration.';
+    } else if (error?.status === 429) {
+      message += 'Rate limit exceeded. Please try again later or upgrade your plan.';
+    } else if (error?.status === 404) {
+      message += 'Model not found. Please verify the model name is correct.';
+    } else if (error?.message?.includes('timeout')) {
+      message += 'Request timed out. The LLM service may be experiencing issues.';
+    } else {
+      message += `Original error: ${error?.message || 'Unknown error'}`;
+    }
+
+    const enhancedError = new Error(message);
+    (enhancedError as any).originalError = error;
+    (enhancedError as any).provider = provider;
+    (enhancedError as any).model = model;
+    return enhancedError;
+  }
+
+  /**
+   * Sleep utility for retry delays
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

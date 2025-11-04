@@ -1,0 +1,15 @@
+{
+  "slug": "radar",
+  "name": "Radar",
+  "description": "Comprehensive activity logger for assignments and projects. Tracks every task, subtask, communication, delay, and action with timestamps for legal evidence and client accountability",
+  "category": "compliance",
+  "provider": "openai",
+  "frontendEntry": "./frontend/Radar.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["logging", "compliance", "analytics", "evidence-trail"],
+  "subscriptionMinPlan": "core",
+  "defaultScope": "organization",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["compliance", "audit", "logging", "legal", "accountability"]
+}

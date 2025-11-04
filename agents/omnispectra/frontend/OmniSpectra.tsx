@@ -14,12 +14,12 @@ interface Message {
   timestamp: string;
 }
 
-export default function WorkStatusBot() {
+export default function OmniSpectra() {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your Work Status Bot. I can help you manage your work status, check team availability, and coordinate with your colleagues. How can I help you today?",
+      content: "Hi! I'm OmniSpectra. I can help you manage your work status, check team availability, and coordinate with your colleagues. How can I help you today?",
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -33,7 +33,7 @@ export default function WorkStatusBot() {
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
-      const res = await fetch("/api/agents/work-status-bot/chat", {
+      const res = await fetch("/api/agents/omnispectra/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -91,7 +91,7 @@ export default function WorkStatusBot() {
       <Card className="flex-1 flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Work Status Bot
+            OmniSpectra
             <Badge variant="secondary">AI Assistant</Badge>
           </CardTitle>
         </CardHeader>

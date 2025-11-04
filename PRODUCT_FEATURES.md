@@ -61,7 +61,7 @@ Accute was architected from day one with artificial intelligence as its foundati
   - **Scribe** - Document drafting and template creation
   - **Relay** - Communication automation
   - **Echo** - Data validation and quality control
-  - **Work Status Bot** - Natural language assignment queries
+  - **OmniSpectra** - Work status tracking and team availability
   
 - **AI Agent Foundry** - Dynamic agent registration system:
   - Add custom agents without code changes
