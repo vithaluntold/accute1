@@ -10553,6 +10553,109 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Get single admin ticket with details
+  app.get("/api/admin/tickets/:id", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getSupportTicket(id);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      const org = await storage.getOrganization(ticket.organizationId);
+      const createdBy = await storage.getUser(ticket.createdBy);
+      const assignedTo = ticket.assignedTo ? await storage.getUser(ticket.assignedTo) : null;
+      const resolvedBy = ticket.resolvedBy ? await storage.getUser(ticket.resolvedBy) : null;
+
+      const ticketWithDetails = {
+        ...ticket,
+        organization: org,
+        createdBy: createdBy ? {
+          id: createdBy.id,
+          firstName: createdBy.firstName,
+          lastName: createdBy.lastName,
+          email: createdBy.email,
+        } : null,
+        assignedTo: assignedTo ? {
+          id: assignedTo.id,
+          firstName: assignedTo.firstName,
+          lastName: assignedTo.lastName,
+          email: assignedTo.email,
+        } : null,
+        resolvedBy: resolvedBy ? {
+          id: resolvedBy.id,
+          firstName: resolvedBy.firstName,
+          lastName: resolvedBy.lastName,
+        } : null,
+      };
+
+      res.json(ticketWithDetails);
+    } catch (error: any) {
+      console.error('Get ticket error:', error);
+      res.status(500).json({ error: "Failed to fetch ticket" });
+    }
+  });
+
+  // Get comments for admin ticket
+  app.get("/api/admin/tickets/:id/comments", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getSupportTicket(id);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      const comments = await storage.getTicketComments(id);
+      const commentsWithDetails = await Promise.all(
+        comments.map(async (comment) => {
+          const createdBy = await storage.getUser(comment.createdBy);
+          return {
+            ...comment,
+            createdBy: createdBy ? {
+              id: createdBy.id,
+              firstName: createdBy.firstName,
+              lastName: createdBy.lastName,
+              email: createdBy.email,
+            } : null,
+          };
+        })
+      );
+
+      res.json(commentsWithDetails);
+    } catch (error: any) {
+      console.error('Get ticket comments error:', error);
+      res.status(500).json({ error: "Failed to fetch ticket comments" });
+    }
+  });
+
+  // Add comment to admin ticket
+  app.post("/api/admin/tickets/:id/comments", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getSupportTicket(id);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      const comment = await storage.createSupportTicketComment({
+        ticketId: id,
+        content: req.body.content,
+        createdBy: req.userId!,
+        isInternal: req.body.isInternal || false,
+        attachments: req.body.attachments || []
+      });
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "comment", "support_ticket", id, {}, req);
+      res.status(201).json(comment);
+    } catch (error: any) {
+      console.error('Add comment error:', error);
+      res.status(500).json({ error: "Failed to add comment" });
+    }
+  });
+
   // Create platform subscription
   app.post("/api/admin/subscriptions", requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
