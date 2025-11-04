@@ -49,12 +49,14 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Resend**: Transactional email service.
 - **MSG91**: SMS service for OTP verification (India-optimized, supports international).
 - **Razorpay**: Payment gateway for subscription billing and one-time payments (India, UAE, Turkey, USA).
+- **Gmail API**: Per-user OAuth integration for email account connectivity. System-wide OAuth app credentials (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`) enable each user to connect their own Gmail account. User tokens encrypted with AES-256-GCM. Redirect URI: `https://accute.io/api/email-accounts/oauth/gmail/callback`.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
 
 ### AI Agent Configuration
 - **Default LLM Provider**: Azure OpenAI configured per organization
-- **AI Agents**: Forma, Cadence, Parity, Echo, Relay, Scribe, Luca all use organization's default LLM configuration
+- **AI Agents**: All 8 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, Work Status Bot) use organization's default LLM configuration
 - **Setup**: Run `tsx server/seed-default-llm.ts` to create default Azure OpenAI config for Sterling organization
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
+- **Session Management**: All agents support persistent chat sessions with conversation history
