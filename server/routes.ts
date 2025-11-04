@@ -381,10 +381,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Phone number is required" });
       }
 
-      // Validate phone format (basic validation)
-      const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 format
-      if (!phoneRegex.test(phone.replace(/[\s()-]/g, ''))) {
-        return res.status(400).json({ error: "Invalid phone number format" });
+      // Validate phone format (E.164 international format)
+      // Accepts: +<country code><number> where total digits can be 7-15
+      // Examples: +919876543210 (India), +14155551234 (USA), +442071234567 (UK)
+      const phoneRegex = /^\+?[1-9]\d{6,14}$/; // E.164 format: + followed by 7-15 digits
+      const cleanedPhone = phone.replace(/[\s()-]/g, '');
+      if (!phoneRegex.test(cleanedPhone)) {
+        return res.status(400).json({ error: "Invalid phone number format. Please include country code (e.g., +91 for India, +1 for USA)" });
       }
 
       // Import SMS utilities

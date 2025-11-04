@@ -1,19 +1,18 @@
 /**
- * SMS Helper Module for OTP verification via Twilio
+ * SMS Helper Module for OTP verification via MSG91
  * 
  * Sends 6-digit OTP codes for mobile number verification during account setup.
- * Uses "Accute" as the alphanumeric sender ID for international messages.
- * Automatically falls back to TWILIO_PHONE_NUMBER for USA/Canada (where alphanumeric IDs are not supported)
+ * Uses MSG91 for reliable international SMS delivery with strong India support.
  * 
  * To enable SMS functionality:
- * 1. Configure TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in Replit Secrets
- * 2. Register "Accute" as your alphanumeric sender ID in Twilio console
- * 3. (Optional) Set TWILIO_PHONE_NUMBER for USA/Canada support
+ * 1. Configure MSG91_AUTH_KEY in Replit Secrets (from MSG91 dashboard)
+ * 2. Configure MSG91_SENDER_ID (default: "ACCUTE" - register this in MSG91 console)
+ * 3. Configure MSG91_TEMPLATE_ID (from registered DLT template in MSG91)
  */
 
 import crypto from 'crypto';
 
-const BRANDED_SENDER_ID = "Accute";
+const DEFAULT_SENDER_ID = "ACCUTE";
 const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 10;
 
@@ -34,79 +33,86 @@ export function getOTPExpiry(): Date {
 }
 
 /**
- * Check if phone number is from USA or Canada
+ * Format phone number for international SMS (E.164 format)
+ * Ensures phone number has country code for MSG91
  */
-function isUSAOrCanada(phone: string): boolean {
-  // Remove all non-digit characters
-  const cleaned = phone.replace(/\D/g, '');
+function formatPhoneNumber(phone: string): string {
+  // Remove all non-digit characters except +
+  let cleaned = phone.replace(/[^\d+]/g, '');
   
-  // Check if it's a US/Canada number
-  // Case 1: Starts with country code 1 and is 11 digits (1XXXXXXXXXX)
-  // Case 2: 10-digit number without country code (XXXXXXXXXX)
-  // NANP (North American Numbering Plan) numbers are 10 digits after country code
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    return true;
+  // If it doesn't start with +, add it
+  if (!cleaned.startsWith('+')) {
+    cleaned = '+' + cleaned;
   }
   
-  if (cleaned.length === 10) {
-    // 10-digit number without country code - assume USA/Canada
-    return true;
-  }
-  
-  return false;
+  return cleaned;
 }
 
 /**
- * Send OTP verification code via SMS
+ * Send OTP verification code via SMS using MSG91 OTP API
  */
 export async function sendOTP(phone: string, otp: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Check if Twilio is configured
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+    // Check if MSG91 is configured
+    const authKey = process.env.MSG91_AUTH_KEY;
+    const templateId = process.env.MSG91_TEMPLATE_ID;
 
-    if (!accountSid || !authToken) {
-      console.warn("Twilio not configured. SMS functionality disabled. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.");
+    if (!authKey) {
+      console.warn("MSG91 not configured. SMS functionality disabled. Please set MSG91_AUTH_KEY.");
       return { 
         success: false, 
-        error: "SMS functionality not configured. Please set up Twilio credentials." 
+        error: "SMS functionality not configured. Please set up MSG91 credentials." 
       };
     }
 
-    // Determine sender ID based on destination
-    const isNorthAmerica = isUSAOrCanada(phone);
-    let senderId: string;
-
-    if (isNorthAmerica) {
-      // USA/Canada: Must use a phone number
-      if (!twilioPhone) {
-        console.warn(`Cannot send SMS to USA/Canada number ${phone} without TWILIO_PHONE_NUMBER configured.`);
-        return {
-          success: false,
-          error: "SMS to USA/Canada requires TWILIO_PHONE_NUMBER to be configured."
-        };
-      }
-      senderId = twilioPhone;
-    } else {
-      // Rest of world: Use branded sender ID
-      senderId = BRANDED_SENDER_ID;
+    if (!templateId) {
+      console.warn("MSG91_TEMPLATE_ID not configured. Required for OTP sending.");
+      return {
+        success: false,
+        error: "MSG91 template ID required. Please configure MSG91_TEMPLATE_ID in your environment."
+      };
     }
 
-    // Dynamic import of Twilio SDK (only loads if configured)
-    const twilio = await import('twilio');
-    const client = twilio.default(accountSid, authToken);
+    // Format phone number to E.164
+    const formattedPhone = formatPhoneNumber(phone);
+    
+    // Remove + prefix for MSG91 API (it expects just digits with country code)
+    const phoneForAPI = formattedPhone.replace('+', '');
 
-    const message = await client.messages.create({
-      body: `Your Accute verification code is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes. Do not share this code with anyone.`,
-      from: senderId,
-      to: phone,
+    // Prepare request payload for MSG91 OTP API
+    // Use template_id for DLT compliance and structured OTP sending
+    const payload: any = {
+      template_id: templateId,
+      mobile: phoneForAPI,
+      otp: otp, // Send our pre-generated OTP
+      otp_length: OTP_LENGTH,
+      otp_expiry: OTP_EXPIRY_MINUTES
+    };
+
+    // Send OTP via MSG91 OTP API (v5)
+    const response = await fetch('https://control.msg91.com/api/v5/otp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authkey': authKey
+      },
+      body: JSON.stringify(payload)
     });
 
-    console.log(`OTP sent successfully to ${phone} from ${senderId}. SID: ${message.sid}`);
+    const result = await response.json();
+
+    if (!response.ok || result.type === 'error') {
+      console.error('MSG91 OTP API error:', result);
+      return {
+        success: false,
+        error: result.message || 'Failed to send OTP via MSG91'
+      };
+    }
+
+    console.log(`OTP sent successfully to ${phone} via MSG91. Type: ${result.type}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to send OTP SMS:", error.message);
+    console.error("Failed to send OTP SMS via MSG91:", error.message);
     return { 
       success: false, 
       error: error.message || "Failed to send OTP SMS" 
@@ -118,8 +124,5 @@ export async function sendOTP(phone: string, otp: string): Promise<{ success: bo
  * Check if SMS service is configured
  */
 export function isSMSConfigured(): boolean {
-  return !!(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN
-  );
+  return !!process.env.MSG91_AUTH_KEY;
 }

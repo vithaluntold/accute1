@@ -44,11 +44,17 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 ### External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
 - **OpenAI API**: AI model integration.
-- **Azure OpenAI API**: AI model integration.
+- **Azure OpenAI API**: AI model integration (default for AI agents).
 - **Anthropic Claude API**: AI model integration.
 - **Resend**: Transactional email service.
-- **Twilio**: SMS service.
+- **MSG91**: SMS service for OTP verification (India-optimized, supports international).
 - **Razorpay**: Payment gateway for subscription billing and one-time payments (India, UAE, Turkey, USA).
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+### AI Agent Configuration
+- **Default LLM Provider**: Azure OpenAI configured per organization
+- **AI Agents**: Forma, Cadence, Parity, Echo, Relay, Scribe, Luca all use organization's default LLM configuration
+- **Setup**: Run `tsx server/seed-default-llm.ts` to create default Azure OpenAI config for Sterling organization
+- **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization

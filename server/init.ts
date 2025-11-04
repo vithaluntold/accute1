@@ -313,6 +313,7 @@ export async function initializeSystem() {
       
       // Team Chat
       { name: "chat.view", resource: "chat", action: "view", description: "View team chat" },
+      { name: "chat.create", resource: "chat", action: "create", description: "Create team chat channels" },
       { name: "chat.send", resource: "chat", action: "send", description: "Send chat messages" },
       
       // Appointments
