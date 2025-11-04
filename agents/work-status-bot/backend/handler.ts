@@ -1,10 +1,33 @@
-import type { Request, Response } from "express";
-import type { Express } from "express";
+import type { Response } from "express";
+import { requireAuth, type AuthRequest } from "../../../server/auth";
+import { storage } from "../../../server/storage";
+import { LLMService } from "../../../server/llm-service";
+import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 
-export const registerRoutes = (app: Express) => {
-  app.post("/api/agents/work-status-bot/chat", async (req: Request, res: Response) => {
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export const registerRoutes = (app: any) => {
+  // Register session management routes
+  registerAgentSessionRoutes(app, "work-status-bot");
+
+  app.post("/api/agents/work-status-bot/chat", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const { message, history, context } = req.body;
+      
+      // Get default LLM configuration for the organization
+      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+      
+      if (!llmConfig) {
+        return res.status(400).json({ 
+          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
+        });
+      }
+
+      // Initialize LLM service
+      const llmService = new LLMService(llmConfig);
       
       const systemPrompt = `You are the Work Status Bot, an AI assistant that helps users manage work status updates and team availability.
 
@@ -21,26 +44,30 @@ export const registerRoutes = (app: Express) => {
 - Remind users to update their status when going into meetings or leaving
 - Provide team availability insights when asked
 - Help coordinate meetings by checking team availability
+- Provide actionable suggestions
 
 **Context:**
-${context ? `User context: ${JSON.stringify(context)}` : 'No additional context'}
+${context ? `User context: ${JSON.stringify(context)}` : 'No additional context'}`;
 
-**Conversation History:**
-${history && history.length > 0 ? history.map((msg: any) => `${msg.role}: ${msg.content}`).join('\n') : 'No previous messages'}
+      // Build conversation context from history
+      let conversationContext = '';
+      if (history && history.length > 0) {
+        conversationContext = history
+          .slice(-4) // Last 4 messages for context
+          .map((msg: Message) => `${msg.role}: ${msg.content}`)
+          .join('\n\n');
+      }
+      
+      // Combine context with current message
+      const fullPrompt = conversationContext 
+        ? `${conversationContext}\n\nuser: ${message}`
+        : message;
 
-User: ${message}
-
-Respond naturally and helpfully as the Work Status Bot.`;
+      // Call LLM service
+      const responseText = await llmService.sendPrompt(fullPrompt, systemPrompt);
 
       const response = {
-        response: `Work Status Bot: I can help you manage work status! Here are some things I can do:
-
-1. **Update your status** - Just tell me what you're doing (e.g., "I'm in a meeting")
-2. **Check team availability** - Ask "Who's available on my team?"
-3. **Status summaries** - "Give me a status summary of the Tax Team"
-4. **Set status reminders** - "Remind me to update my status"
-
-What would you like to do?`,
+        response: responseText,
         suggestions: [
           "Update my status to In Meeting",
           "Who's available on my team?",
@@ -53,7 +80,10 @@ What would you like to do?`,
       res.json(response);
     } catch (error) {
       console.error("Work Status Bot error:", error);
-      res.status(500).json({ error: "Failed to process message" });
+      res.status(500).json({ 
+        error: "Failed to process message",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 };
