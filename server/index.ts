@@ -217,39 +217,8 @@ app.use((req, res, next) => {
     console.log(`   Port: ${port}`);
     console.log(`   Host: ${host}`);
     
-    // Create HTTP server first
+    // Create HTTP server first (but don't listen yet)
     const server = await registerRoutes(app);
-    
-    // Start listening IMMEDIATELY to respond to health checks
-    // Do this BEFORE heavy initialization to pass deployment health checks
-    // Wrap in try-catch to handle any synchronous listen errors
-    try {
-      await new Promise<void>((resolve, reject) => {
-        server.listen(port, host, () => {
-          console.log(`✅ Server listening on ${host}:${port}`);
-          console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-          log(`serving on port ${port}`);
-          resolve();
-        }).on('error', (err: Error) => {
-          console.error('❌ Server failed to start:', err);
-          console.error('Error name:', err.name);
-          console.error('Error message:', err.message);
-          console.error('Error stack:', err.stack);
-          
-          if ('code' in err) {
-            console.error('Error code:', (err as any).code);
-          }
-          if ('syscall' in err) {
-            console.error('System call:', (err as any).syscall);
-          }
-          
-          reject(err);
-        });
-      });
-    } catch (listenError) {
-      console.error('❌ Failed to bind to port:', listenError);
-      throw listenError;
-    }
     
     // Do heavy initialization FIRST (including agent route registration)
     // This must happen BEFORE Vite middleware to ensure agent routes are registered
@@ -364,7 +333,26 @@ app.use((req, res, next) => {
       // Don't throw - just log and respond
     });
     
-    console.log('🎉 Application fully initialized and ready!');
+    console.log('🎉 Application fully initialized!');
+    
+    // NOW start listening - only after everything is ready
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.listen(port, host, () => {
+          console.log(`✅ Server listening on ${host}:${port}`);
+          console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+          console.log(`🌐 Access your app at: https://${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}`);
+          log(`serving on port ${port}`);
+          resolve();
+        }).on('error', (err: Error) => {
+          console.error('❌ Server failed to start:', err);
+          reject(err);
+        });
+      });
+    } catch (listenError) {
+      console.error('❌ Failed to bind to port:', listenError);
+      throw listenError;
+    }
     
   } catch (error) {
     console.error('❌ Fatal error during application startup:', error);
