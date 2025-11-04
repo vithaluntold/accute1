@@ -69,6 +69,7 @@ import { initializeSystem } from "./init";
 import { setupWebSocket } from "./websocket";
 import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import { setupTeamChatWebSocket } from "./team-chat-websocket";
+import { setupLiveChatWebSocket } from "./live-chat-websocket";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -329,6 +330,15 @@ app.use((req, res, next) => {
     } catch (wsError) {
       console.error('❌ Team Chat WebSocket initialization failed:', wsError);
       console.warn('⚠️  Continuing without Team Chat WebSocket support');
+    }
+    
+    // Setup WebSocket server for Live Chat Support (Edge subscription)
+    try {
+      const liveChatWss = setupLiveChatWebSocket(server);
+      console.log('🔌 Live Chat Support WebSocket server initialized at /ws/live-chat');
+    } catch (wsError) {
+      console.error('❌ Live Chat Support WebSocket initialization failed:', wsError);
+      console.warn('⚠️  Continuing without Live Chat Support WebSocket');
     }
 
     // Error handler MUST be registered AFTER static file serving

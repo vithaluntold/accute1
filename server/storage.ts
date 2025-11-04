@@ -643,6 +643,25 @@ export interface IStorage {
   getDefaultMessageTemplate(category: string): Promise<schema.MessageTemplate | undefined>;
   updateMessageTemplate(id: string, organizationId: string, template: Partial<schema.InsertMessageTemplate>): Promise<schema.MessageTemplate | undefined>;
   deleteMessageTemplate(id: string, organizationId: string): Promise<void>;
+  
+  // Live Chat Support (Edge Subscription)
+  createLiveChatConversation(conversation: schema.InsertLiveChatConversation): Promise<schema.LiveChatConversation>;
+  getLiveChatConversation(id: string): Promise<schema.LiveChatConversation | undefined>;
+  getLiveChatConversationsByOrganization(organizationId: string): Promise<schema.LiveChatConversation[]>;
+  getLiveChatConversationsByUser(userId: string): Promise<schema.LiveChatConversation[]>;
+  getLiveChatConversationsByAgent(agentId: string): Promise<schema.LiveChatConversation[]>;
+  updateLiveChatConversation(id: string, conversation: Partial<schema.InsertLiveChatConversation>): Promise<schema.LiveChatConversation | undefined>;
+  
+  createLiveChatMessage(message: schema.InsertLiveChatMessage): Promise<schema.LiveChatMessage>;
+  getLiveChatMessage(id: string): Promise<schema.LiveChatMessage | undefined>;
+  getLiveChatMessages(conversationId: string): Promise<schema.LiveChatMessage[]>;
+  markLiveChatMessagesAsRead(conversationId: string, userId: string): Promise<void>;
+  
+  createAgentAvailability(availability: schema.InsertAgentAvailability): Promise<schema.AgentAvailability>;
+  getAgentAvailability(userId: string): Promise<schema.AgentAvailability | undefined>;
+  getAllAgentAvailability(): Promise<schema.AgentAvailability[]>;
+  updateAgentAvailability(userId: string, availability: Partial<schema.InsertAgentAvailability>): Promise<schema.AgentAvailability | undefined>;
+  getAvailableAgents(): Promise<schema.AgentAvailability[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -4581,6 +4600,108 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.supportTicketComments)
       .where(eq(schema.supportTicketComments.ticketId, ticketId))
       .orderBy(schema.supportTicketComments.createdAt);
+  }
+
+  // ========================================
+  // LIVE CHAT SUPPORT (EDGE SUBSCRIPTION)
+  // ========================================
+
+  async createLiveChatConversation(conversation: schema.InsertLiveChatConversation): Promise<schema.LiveChatConversation> {
+    const result = await db.insert(schema.liveChatConversations).values(conversation).returning();
+    return result[0];
+  }
+
+  async getLiveChatConversation(id: string): Promise<schema.LiveChatConversation | undefined> {
+    const result = await db.select().from(schema.liveChatConversations).where(eq(schema.liveChatConversations.id, id));
+    return result[0];
+  }
+
+  async getLiveChatConversationsByOrganization(organizationId: string): Promise<schema.LiveChatConversation[]> {
+    return await db.select().from(schema.liveChatConversations)
+      .where(eq(schema.liveChatConversations.organizationId, organizationId))
+      .orderBy(desc(schema.liveChatConversations.lastMessageAt));
+  }
+
+  async getLiveChatConversationsByUser(userId: string): Promise<schema.LiveChatConversation[]> {
+    return await db.select().from(schema.liveChatConversations)
+      .where(eq(schema.liveChatConversations.userId, userId))
+      .orderBy(desc(schema.liveChatConversations.lastMessageAt));
+  }
+
+  async getLiveChatConversationsByAgent(agentId: string): Promise<schema.LiveChatConversation[]> {
+    return await db.select().from(schema.liveChatConversations)
+      .where(eq(schema.liveChatConversations.assignedAgentId, agentId))
+      .orderBy(desc(schema.liveChatConversations.lastMessageAt));
+  }
+
+  async updateLiveChatConversation(id: string, conversation: Partial<schema.InsertLiveChatConversation>): Promise<schema.LiveChatConversation | undefined> {
+    const result = await db.update(schema.liveChatConversations)
+      .set({ ...conversation, updatedAt: new Date() })
+      .where(eq(schema.liveChatConversations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createLiveChatMessage(message: schema.InsertLiveChatMessage): Promise<schema.LiveChatMessage> {
+    const result = await db.insert(schema.liveChatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getLiveChatMessage(id: string): Promise<schema.LiveChatMessage | undefined> {
+    const result = await db.select().from(schema.liveChatMessages).where(eq(schema.liveChatMessages.id, id));
+    return result[0];
+  }
+
+  async getLiveChatMessages(conversationId: string): Promise<schema.LiveChatMessage[]> {
+    return await db.select().from(schema.liveChatMessages)
+      .where(eq(schema.liveChatMessages.conversationId, conversationId))
+      .orderBy(schema.liveChatMessages.createdAt);
+  }
+
+  async markLiveChatMessagesAsRead(conversationId: string, userId: string): Promise<void> {
+    await db.update(schema.liveChatMessages)
+      .set({ isRead: true, readAt: new Date() })
+      .where(
+        and(
+          eq(schema.liveChatMessages.conversationId, conversationId),
+          ne(schema.liveChatMessages.senderId, userId),
+          eq(schema.liveChatMessages.isRead, false)
+        )
+      );
+  }
+
+  async createAgentAvailability(availability: schema.InsertAgentAvailability): Promise<schema.AgentAvailability> {
+    const result = await db.insert(schema.agentAvailability).values(availability).returning();
+    return result[0];
+  }
+
+  async getAgentAvailability(userId: string): Promise<schema.AgentAvailability | undefined> {
+    const result = await db.select().from(schema.agentAvailability).where(eq(schema.agentAvailability.userId, userId));
+    return result[0];
+  }
+
+  async getAllAgentAvailability(): Promise<schema.AgentAvailability[]> {
+    return await db.select().from(schema.agentAvailability);
+  }
+
+  async updateAgentAvailability(userId: string, availability: Partial<schema.InsertAgentAvailability>): Promise<schema.AgentAvailability | undefined> {
+    const result = await db.update(schema.agentAvailability)
+      .set({ ...availability, updatedAt: new Date() })
+      .where(eq(schema.agentAvailability.userId, userId))
+      .returning();
+    return result[0];
+  }
+
+  async getAvailableAgents(): Promise<schema.AgentAvailability[]> {
+    return await db.select().from(schema.agentAvailability)
+      .where(
+        and(
+          eq(schema.agentAvailability.status, 'online'),
+          eq(schema.agentAvailability.isAcceptingChats, true),
+          sql`${schema.agentAvailability.currentChatCount} < ${schema.agentAvailability.maxConcurrentChats}`
+        )
+      )
+      .orderBy(schema.agentAvailability.currentChatCount);
   }
 }
 
