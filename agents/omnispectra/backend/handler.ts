@@ -1,8 +1,8 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
-import { LLMService } from "../../../server/llm-service";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
+import { OmniSpectraAgent } from "./index";
 
 interface Message {
   role: "user" | "assistant";
@@ -26,58 +26,15 @@ export const registerRoutes = (app: any) => {
         });
       }
 
-      // Initialize LLM service
-      const llmService = new LLMService(llmConfig);
-      
-      const systemPrompt = `You are OmniSpectra, an AI assistant that helps users manage work status updates and team availability.
+      // Use OmniSpectraAgent class
+      const agent = new OmniSpectraAgent(llmConfig);
+      const result = await agent.execute({ message, history, context });
 
-**Your Capabilities:**
-1. Help users update their work status (Available, In Meeting, Busy, Away, Out of Office)
-2. Check the status of team members and managers
-3. Provide status summaries for teams or departments
-4. Remind users about status update best practices
-5. Suggest status messages based on context
-
-**Guidelines:**
-- Be concise and professional
-- Suggest specific, helpful status messages
-- Remind users to update their status when going into meetings or leaving
-- Provide team availability insights when asked
-- Help coordinate meetings by checking team availability
-- Provide actionable suggestions
-
-**Context:**
-${context ? `User context: ${JSON.stringify(context)}` : 'No additional context'}`;
-
-      // Build conversation context from history
-      let conversationContext = '';
-      if (history && history.length > 0) {
-        conversationContext = history
-          .slice(-4) // Last 4 messages for context
-          .map((msg: Message) => `${msg.role}: ${msg.content}`)
-          .join('\n\n');
-      }
-      
-      // Combine context with current message
-      const fullPrompt = conversationContext 
-        ? `${conversationContext}\n\nuser: ${message}`
-        : message;
-
-      // Call LLM service
-      const responseText = await llmService.sendPrompt(fullPrompt, systemPrompt);
-
-      const response = {
-        response: responseText,
-        suggestions: [
-          "Update my status to In Meeting",
-          "Who's available on my team?",
-          "Show me team status",
-          "Set my status to Away for 1 hour"
-        ],
+      res.json({
+        response: result.response,
+        suggestions: result.suggestions,
         timestamp: new Date().toISOString(),
-      };
-      
-      res.json(response);
+      });
     } catch (error) {
       console.error("OmniSpectra error:", error);
       res.status(500).json({ 

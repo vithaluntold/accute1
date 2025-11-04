@@ -247,31 +247,19 @@ async function handleAgentExecution(
           ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
         });
       }
-    } else if (agentSupportsStreaming(normalizedAgentName) && normalizedAgentName === 'parity') {
-      // Streaming agents (e.g., Parity)
+    } else if (agentSupportsStreaming(normalizedAgentName)) {
+      // All streaming-enabled agents (Parity, Cadence, Forma, Echo, Relay, Scribe, OmniSpectra, Radar)
       console.log(`[WebSocket] Starting ${normalizedAgentName} streaming...`);
       fullResponse = await agent.executeStream(input, (chunk: string) => {
         console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
         ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
       });
     } else {
-      // Structured response agents (e.g., Cadence, Forma, Kanban)
-      console.log(`[WebSocket] Starting ${normalizedAgentName} execution...`);
+      // Legacy non-streaming agents (fallback)
+      console.log(`[WebSocket] Starting ${normalizedAgentName} execution (non-streaming)...`);
       
-      // Prepare input based on agent type
-      let agentInput: any;
-      if (normalizedAgentName === 'cadence') {
-        agentInput = { type: 'workflow', data: input };
-      } else if (normalizedAgentName === 'forma') {
-        agentInput = { data: input, targetFormat: 'json' };
-      } else if (normalizedAgentName === 'kanban' || normalizedAgentName === 'kanbanview') {
-        agentInput = { type: 'workflow', data: input, organizationId: ws.organizationId! };
-      } else {
-        agentInput = input;
-      }
-      
-      const result = await agent.execute(agentInput);
-      fullResponse = JSON.stringify(result, null, 2);
+      const result = await agent.execute(input);
+      fullResponse = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
       ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
     }
     
