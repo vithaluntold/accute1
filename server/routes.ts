@@ -10763,6 +10763,12 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(404).json({ error: "User not found" });
       }
       
+      // Fetch subscription data
+      let subscription = null;
+      if (user.organizationId) {
+        subscription = await storage.getPlatformSubscriptionByOrganization(user.organizationId);
+      }
+      
       // Check access using shared utility
       const { canAccessLiveChat } = await import("../shared/accessControl");
       const accessCheck = canAccessLiveChat({
@@ -10770,11 +10776,11 @@ ${msg.bodyText || msg.bodyHtml || ''}
         isActive: user.isActive,
         createdAt: user.createdAt,
         kycStatus: user.kycStatus,
-        subscription: user.subscription
+        subscription: subscription ? { plan: subscription.plan, status: subscription.status } : null
       });
       
       // Agents always have access
-      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      const isAgent = user.role === 'superadmin' || user.role === 'admin';
       
       if (!accessCheck.allowed && !isAgent) {
         return res.status(403).json({ error: accessCheck.reason || "Access denied" });
@@ -10811,18 +10817,29 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(404).json({ error: "User or organization not found" });
       }
       
-      // Check access
-      const { canAccessLiveChat } = await import("../shared/accessControl");
-      const accessCheck = canAccessLiveChat({
-        id: user.id,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        kycStatus: user.kycStatus,
-        subscription: user.subscription
-      });
+      // Agents always have access
+      const isAgent = user.role === 'superadmin' || user.role === 'admin';
       
-      if (!accessCheck.allowed) {
-        return res.status(403).json({ error: accessCheck.reason || "Access denied" });
+      if (!isAgent) {
+        // Fetch subscription data for non-agents
+        let subscription = null;
+        if (user.organizationId) {
+          subscription = await storage.getPlatformSubscriptionByOrganization(user.organizationId);
+        }
+        
+        // Check access
+        const { canAccessLiveChat } = await import("../shared/accessControl");
+        const accessCheck = canAccessLiveChat({
+          id: user.id,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          kycStatus: user.kycStatus,
+          subscription: subscription ? { plan: subscription.plan, status: subscription.status } : null
+        });
+        
+        if (!accessCheck.allowed) {
+          return res.status(403).json({ error: accessCheck.reason || "Access denied" });
+        }
       }
       
       const { subject, priority } = req.body;
@@ -10869,6 +10886,12 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(404).json({ error: "User not found" });
       }
       
+      // Fetch subscription data
+      let subscription = null;
+      if (user.organizationId) {
+        subscription = await storage.getPlatformSubscriptionByOrganization(user.organizationId);
+      }
+      
       // Check access to live chat
       const { canAccessLiveChat } = await import("../shared/accessControl");
       const accessCheck = canAccessLiveChat({
@@ -10876,10 +10899,10 @@ ${msg.bodyText || msg.bodyHtml || ''}
         isActive: user.isActive,
         createdAt: user.createdAt,
         kycStatus: user.kycStatus,
-        subscription: user.subscription
+        subscription: subscription ? { plan: subscription.plan, status: subscription.status } : null
       });
       
-      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      const isAgent = user.role === 'superadmin' || user.role === 'admin';
       
       if (!accessCheck.allowed && !isAgent) {
         return res.status(403).json({ error: accessCheck.reason || "Access denied" });

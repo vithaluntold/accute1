@@ -107,6 +107,7 @@ import ManagerDashboardPage from "@/pages/manager-dashboard";
 import AutomatedInvoicing from "@/pages/automated-invoicing";
 import SubscriptionPricing from "@/pages/subscription-pricing";
 import EmployeeProfile from "@/pages/employee-profile";
+import LiveChat from "@/pages/live-chat";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -743,6 +744,13 @@ function Router() {
             <TeamChat />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/live-chat">
+        <ProtectedRoute>
+          <AppLayout>
+            <LiveChat />
+          </AppLayout>
+        </ProtectedRoute>
       </Route>
       <Route path="/calendar">
         <OrganizationRoute>

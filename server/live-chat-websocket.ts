@@ -140,17 +140,23 @@ export function setupLiveChatWebSocket(httpServer: Server): WebSocketServer {
         return;
       }
 
+      // Fetch subscription data if user has an organization
+      let subscription = null;
+      if (user.organizationId) {
+        subscription = await storage.getPlatformSubscriptionByOrganization(user.organizationId);
+      }
+
       // Check if user has access to live chat (Edge subscription or test user)
       const accessCheck = canAccessLiveChat({
         id: user.id,
         isActive: user.isActive,
         createdAt: user.createdAt,
         kycStatus: user.kycStatus,
-        subscription: user.subscription
+        subscription: subscription ? { plan: subscription.plan, status: subscription.status } : null
       });
 
       // Agents (Admin/Super Admin) always have access
-      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      const isAgent = user.role === 'superadmin' || user.role === 'admin';
       
       if (!accessCheck.allowed && !isAgent) {
         console.log(`[Live Chat WS] Access denied: ${accessCheck.reason}`);
