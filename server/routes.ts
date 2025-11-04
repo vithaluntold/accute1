@@ -10750,6 +10750,228 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // ============================================================================
+  // Live Chat Support Routes (Edge Subscription)
+  // ============================================================================
+
+  // Get all live chat conversations for the current user
+  app.get("/api/live-chat/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Check access using shared utility
+      const { canAccessLiveChat } = await import("../shared/accessControl");
+      const accessCheck = canAccessLiveChat({
+        id: user.id,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        kycStatus: user.kycStatus,
+        subscription: user.subscription
+      });
+      
+      // Agents always have access
+      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      
+      if (!accessCheck.allowed && !isAgent) {
+        return res.status(403).json({ error: accessCheck.reason || "Access denied" });
+      }
+      
+      // Get conversations based on user role
+      let conversations;
+      if (isAgent) {
+        // Agents can see conversations they're assigned to or all from their org
+        if (user.organizationId) {
+          conversations = await storage.getLiveChatConversationsByOrganization(user.organizationId);
+        } else {
+          conversations = await storage.getLiveChatConversationsByAgent(userId);
+        }
+      } else {
+        // Regular users can only see their own conversations
+        conversations = await storage.getLiveChatConversationsByUser(userId);
+      }
+      
+      res.json({ conversations });
+    } catch (error: any) {
+      console.error('Get live chat conversations error:', error);
+      res.status(500).json({ error: "Failed to get conversations" });
+    }
+  });
+
+  // Create a new live chat conversation
+  app.post("/api/live-chat/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.organizationId) {
+        return res.status(404).json({ error: "User or organization not found" });
+      }
+      
+      // Check access
+      const { canAccessLiveChat } = await import("../shared/accessControl");
+      const accessCheck = canAccessLiveChat({
+        id: user.id,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        kycStatus: user.kycStatus,
+        subscription: user.subscription
+      });
+      
+      if (!accessCheck.allowed) {
+        return res.status(403).json({ error: accessCheck.reason || "Access denied" });
+      }
+      
+      const { subject, priority } = req.body;
+      
+      // Find an available agent
+      const availableAgents = await storage.getAvailableAgents();
+      const assignedAgent = availableAgents.length > 0 ? availableAgents[0] : null;
+      
+      const conversation = await storage.createLiveChatConversation({
+        organizationId: user.organizationId,
+        userId,
+        subject: subject || "Support Request",
+        status: "active",
+        priority: priority || "normal",
+        assignedAgentId: assignedAgent?.userId || null,
+        assignedAt: assignedAgent ? new Date() : null,
+        messageCount: 0,
+        tags: [],
+        metadata: {}
+      });
+      
+      // Update agent availability if assigned
+      if (assignedAgent) {
+        await storage.updateAgentAvailability(assignedAgent.userId, {
+          currentChatCount: assignedAgent.currentChatCount + 1
+        });
+      }
+      
+      res.json({ conversation });
+    } catch (error: any) {
+      console.error('Create live chat conversation error:', error);
+      res.status(500).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Get messages for a conversation
+  app.get("/api/live-chat/conversations/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Check access to live chat
+      const { canAccessLiveChat } = await import("../shared/accessControl");
+      const accessCheck = canAccessLiveChat({
+        id: user.id,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        kycStatus: user.kycStatus,
+        subscription: user.subscription
+      });
+      
+      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      
+      if (!accessCheck.allowed && !isAgent) {
+        return res.status(403).json({ error: accessCheck.reason || "Access denied" });
+      }
+      
+      // Verify user has access to this conversation
+      const conversation = await storage.getLiveChatConversation(id);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      const canAccess = conversation.userId === userId || 
+                       conversation.assignedAgentId === userId || 
+                       isAgent;
+      
+      if (!canAccess) {
+        return res.status(403).json({ error: "Access denied to this conversation" });
+      }
+      
+      const messages = await storage.getLiveChatMessages(id);
+      res.json({ messages });
+    } catch (error: any) {
+      console.error('Get live chat messages error:', error);
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  // Get agent availability status
+  app.get("/api/live-chat/agents/availability", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = req.user!;
+      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      
+      if (!isAgent) {
+        return res.status(403).json({ error: "Access denied - agents only" });
+      }
+      
+      const availability = await storage.getAllAgentAvailability();
+      res.json({ availability });
+    } catch (error: any) {
+      console.error('Get agent availability error:', error);
+      res.status(500).json({ error: "Failed to get agent availability" });
+    }
+  });
+
+  // Update conversation status (assign, resolve, close)
+  app.patch("/api/live-chat/conversations/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const isAgent = user.role === 'admin' || user.role === 'superadmin';
+      
+      if (!isAgent) {
+        return res.status(403).json({ error: "Only agents can update conversations" });
+      }
+      
+      const { status, assignedAgentId, priority } = req.body;
+      const updates: any = {};
+      
+      if (status) updates.status = status;
+      if (priority) updates.priority = priority;
+      if (assignedAgentId !== undefined) {
+        updates.assignedAgentId = assignedAgentId;
+        updates.assignedAt = assignedAgentId ? new Date() : null;
+      }
+      
+      if (status === 'resolved') {
+        updates.resolvedAt = new Date();
+      } else if (status === 'closed') {
+        updates.closedAt = new Date();
+      }
+      
+      const conversation = await storage.updateLiveChatConversation(id, updates);
+      
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      res.json({ conversation });
+    } catch (error: any) {
+      console.error('Update live chat conversation error:', error);
+      res.status(500).json({ error: "Failed to update conversation" });
+    }
+  });
+
+  // ============================================================================
   // AI Agent Foundry Routes
   // ============================================================================
 
