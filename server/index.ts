@@ -271,14 +271,18 @@ app.use((req, res, next) => {
     // Setup static file serving AFTER initialization
     // This ensures agent routes are registered before the catch-all middleware
     const distPath = path.resolve(moduleDir, "public");
-    const isProduction = fs.existsSync(distPath);
+    const isDevelopment = app.get("env") === "development";
     
-    if (!isProduction && app.get("env") === "development") {
+    // ALWAYS use Vite in development, even if dist exists
+    if (isDevelopment) {
       try {
+        console.log('🔧 Setting up Vite dev server...');
         await setupVite(app, server);
         console.log('✅ Vite dev server initialized');
+        console.log('🔍 Middleware stack size:', app._router.stack.length);
       } catch (viteError) {
         console.error('❌ Vite setup failed:', viteError);
+        console.error('Error stack:', viteError instanceof Error ? viteError.stack : 'N/A');
         console.warn('⚠️  Continuing without Vite dev server');
       }
     } else {
