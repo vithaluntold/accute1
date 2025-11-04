@@ -2640,6 +2640,99 @@ export const supportTicketComments = pgTable("support_ticket_comments", {
   ticketIdx: index("support_ticket_comments_ticket_idx").on(table.ticketId),
 }));
 
+// Live Chat Conversations - Priority support chat sessions (Edge subscription only)
+export const liveChatConversations = pgTable("live_chat_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Conversation details
+  subject: text("subject"),
+  status: text("status").notNull().default("active"), // 'active', 'waiting', 'resolved', 'closed'
+  priority: text("priority").notNull().default("normal"), // 'low', 'normal', 'high', 'urgent'
+  
+  // Agent assignment
+  assignedAgentId: varchar("assigned_agent_id").references(() => users.id),
+  assignedAt: timestamp("assigned_at"),
+  
+  // Timestamps
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+  
+  // Metrics
+  firstResponseTime: integer("first_response_time"), // seconds until first agent response
+  avgResponseTime: integer("avg_response_time"), // average agent response time
+  messageCount: integer("message_count").notNull().default(0),
+  
+  // Metadata
+  tags: jsonb("tags").default(sql`'[]'::jsonb`),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("live_chat_conversations_org_idx").on(table.organizationId),
+  userIdx: index("live_chat_conversations_user_idx").on(table.userId),
+  statusIdx: index("live_chat_conversations_status_idx").on(table.status),
+  agentIdx: index("live_chat_conversations_agent_idx").on(table.assignedAgentId),
+  lastMessageIdx: index("live_chat_conversations_last_message_idx").on(table.lastMessageAt),
+}));
+
+// Live Chat Messages - Messages in chat conversations
+export const liveChatMessages = pgTable("live_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => liveChatConversations.id, { onDelete: "cascade" }),
+  
+  // Message details
+  content: text("content").notNull(),
+  senderType: text("sender_type").notNull(), // 'user', 'agent', 'system'
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  
+  // Metadata
+  isInternal: boolean("is_internal").notNull().default(false), // Internal agent notes
+  attachments: jsonb("attachments").default(sql`'[]'::jsonb`),
+  
+  // Read tracking
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  conversationIdx: index("live_chat_messages_conversation_idx").on(table.conversationId),
+  senderIdx: index("live_chat_messages_sender_idx").on(table.senderId),
+  createdIdx: index("live_chat_messages_created_idx").on(table.createdAt),
+}));
+
+// Agent Availability - Track support agent online status for live chat
+export const agentAvailability = pgTable("agent_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id),
+  
+  // Status
+  status: text("status").notNull().default("offline"), // 'online', 'away', 'busy', 'offline'
+  statusMessage: text("status_message"),
+  
+  // Capacity management
+  maxConcurrentChats: integer("max_concurrent_chats").notNull().default(3),
+  currentChatCount: integer("current_chat_count").notNull().default(0),
+  isAcceptingChats: boolean("is_accepting_chats").notNull().default(true),
+  
+  // Timestamps
+  lastOnlineAt: timestamp("last_online_at"),
+  lastActivityAt: timestamp("last_activity_at"),
+  
+  // Auto-away settings
+  autoAwayMinutes: integer("auto_away_minutes").default(10),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("agent_availability_status_idx").on(table.status),
+  acceptingIdx: index("agent_availability_accepting_idx").on(table.isAcceptingChats),
+}));
+
 // Email Accounts - For inbox integration (OAuth/IMAP)
 export const emailAccounts = pgTable("email_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3142,6 +3235,32 @@ export const insertRoundtableKnowledgeEntrySchema = createInsertSchema(roundtabl
 });
 export type InsertRoundtableKnowledgeEntry = z.infer<typeof insertRoundtableKnowledgeEntrySchema>;
 export type RoundtableKnowledgeEntry = typeof roundtableKnowledgeEntries.$inferSelect;
+
+// Zod schemas and types for Live Chat
+export const insertLiveChatConversationSchema = createInsertSchema(liveChatConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  startedAt: true,
+  lastMessageAt: true,
+});
+export type InsertLiveChatConversation = z.infer<typeof insertLiveChatConversationSchema>;
+export type LiveChatConversation = typeof liveChatConversations.$inferSelect;
+
+export const insertLiveChatMessageSchema = createInsertSchema(liveChatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertLiveChatMessage = z.infer<typeof insertLiveChatMessageSchema>;
+export type LiveChatMessage = typeof liveChatMessages.$inferSelect;
+
+export const insertAgentAvailabilitySchema = createInsertSchema(agentAvailability).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAgentAvailability = z.infer<typeof insertAgentAvailabilitySchema>;
+export type AgentAvailability = typeof agentAvailability.$inferSelect;
 
 export const defaultPlanFormValues: SubscriptionPlanFormData = {
   name: "",
