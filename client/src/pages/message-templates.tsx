@@ -30,7 +30,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
+import { DataTable, type ColumnDef } from "@/components/data-table";
 import { formatDistance } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
@@ -63,6 +63,12 @@ export default function MessageTemplatesPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<MessageTemplate | null>(null);
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
+
+  const isAdmin = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Super Admin";
 
   const { data: installedAgents = [] } = useQuery<any[]>({
     queryKey: ["/api/ai-agents/installed"],
@@ -211,53 +217,7 @@ export default function MessageTemplatesPage() {
     form.reset();
   };
 
-  const renderPreview = (template: MessageTemplate, viewMode: ViewMode) => {
-    if (viewMode === "compact") {
-      return (
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Category</p>
-            <Badge variant="outline">{template.category}</Badge>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Status</p>
-            <div className="flex gap-1">
-              {template.isDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}
-              {!template.isActive && <Badge variant="destructive" className="text-xs">Inactive</Badge>}
-              {template.scope === 'global' && <Badge variant="secondary" className="text-xs">Global</Badge>}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Variables</p>
-            <p className="text-sm">{template.variables?.length || 0} variable(s)</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (viewMode === "preview") {
-      return (
-        <div className="space-y-4">
-          <div className="bg-muted p-4 rounded-md">
-            <p className="text-sm whitespace-pre-wrap">{template.content}</p>
-          </div>
-          {template.variables && template.variables.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Available Variables:</p>
-              <div className="flex flex-wrap gap-1">
-                {template.variables.map((variable) => (
-                  <Badge key={variable} variant="secondary" className="font-mono text-xs">
-                    {`{{${variable}}}`}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // Details view (default)
+  const renderPreview = (template: MessageTemplate) => {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -412,34 +372,41 @@ export default function MessageTemplatesPage() {
             selectedRow={previewTemplate}
             renderPreview={renderPreview}
             previewTitle={(template) => template.name}
-            actions={(template) => (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setPreviewTemplate(template)}
-                  data-testid={`button-preview-${template.id}`}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleEdit(template)}
-                  data-testid={`button-edit-${template.id}`}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteConfirmTemplate(template)}
-                  data-testid={`button-delete-${template.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </>
-            )}
+            actions={(template) => {
+              const canEdit = isAdmin || template.organizationId !== null;
+              return (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPreviewTemplate(template)}
+                    data-testid={`button-preview-${template.id}`}
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  {canEdit && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(template)}
+                        data-testid={`button-edit-${template.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteConfirmTemplate(template)}
+                        data-testid={`button-delete-${template.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </>
+              );
+            }}
             emptyState={
               <div className="flex flex-col items-center justify-center py-12">
                 <MessageSquare className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />

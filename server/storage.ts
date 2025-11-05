@@ -674,8 +674,17 @@ export interface IStorage {
 export class DbStorage implements IStorage {
   // Users
   async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(schema.users).where(eq(schema.users.id, id));
-    return result[0];
+    const result = await db
+      .select({
+        ...Object.fromEntries(
+          Object.keys(schema.users).map(key => [key, schema.users[key as keyof typeof schema.users]])
+        ),
+        role: schema.roles
+      })
+      .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.roleId, schema.roles.id))
+      .where(eq(schema.users.id, id));
+    return result[0] as any;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {

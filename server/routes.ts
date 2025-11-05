@@ -3159,11 +3159,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Document not found" });
       }
       
-      // Check ownership: Super Admin can delete global documents, regular users can delete their org's documents
-      const isSuperAdmin = !req.user!.organizationId;
-      const isOwnOrganizationDocument = document.organizationId === req.user!.organizationId;
-      
-      if (!isSuperAdmin && !isOwnOrganizationDocument) {
+      // Check if user is trying to delete a global document
+      if (document.organizationId === null) {
+        // Only admins can delete global documents
+        const user = await storage.getUser(req.user!.id);
+        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+        
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only admins can delete global documents" });
+        }
+      } else if (document.organizationId !== req.user!.organizationId) {
+        // Users can only delete documents from their own organization
         return res.status(403).json({ error: "Access denied" });
       }
       
@@ -6744,9 +6750,15 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(404).json({ error: "Email template not found" });
       }
       
-      // System templates cannot be updated by users
+      // Check if user is trying to edit a global template
       if (existing.organizationId === null) {
-        return res.status(403).json({ error: "Cannot modify system templates" });
+        // Only admins can modify global templates
+        const user = await storage.getUser(req.user!.id);
+        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+        
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only admins can modify global templates" });
+        }
       }
 
       // Validate partial update
@@ -6770,9 +6782,15 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(404).json({ error: "Email template not found" });
       }
       
-      // System templates cannot be deleted
+      // Check if user is trying to delete a global template
       if (existing.organizationId === null) {
-        return res.status(403).json({ error: "Cannot delete system templates" });
+        // Only admins can delete global templates
+        const user = await storage.getUser(req.user!.id);
+        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+        
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only admins can delete global templates" });
+        }
       }
 
       await storage.deleteEmailTemplate(req.params.id, req.user!.organizationId!);
@@ -6844,8 +6862,15 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(404).json({ error: "Message template not found" });
       }
       
+      // Check if user is trying to edit a global template
       if (existing.organizationId === null) {
-        return res.status(403).json({ error: "Cannot modify system templates" });
+        // Only admins can edit global templates
+        const user = await storage.getUser(req.user!.id);
+        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+        
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only admins can modify global templates" });
+        }
       }
 
       const validatedData = insertMessageTemplateSchema.partial().parse(req.body);
@@ -6868,8 +6893,15 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(404).json({ error: "Message template not found" });
       }
       
+      // Check if user is trying to delete a global template
       if (existing.organizationId === null) {
-        return res.status(403).json({ error: "Cannot delete system templates" });
+        // Only admins can delete global templates
+        const user = await storage.getUser(req.user!.id);
+        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+        
+        if (!isAdmin) {
+          return res.status(403).json({ error: "Only admins can delete global templates" });
+        }
       }
 
       await storage.deleteMessageTemplate(req.params.id, req.user!.organizationId!);

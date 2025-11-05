@@ -39,7 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
+import { DataTable, type ColumnDef } from "@/components/data-table";
 import { formatDistance } from "date-fns";
 
 type EmailTemplate = {
@@ -85,6 +85,12 @@ export default function EmailTemplatesPage() {
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null);
   const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<EmailTemplate | null>(null);
   const { toast } = useToast();
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
+
+  const isAdmin = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Super Admin";
 
   const { data: installedAgents = [] } = useQuery<any[]>({
     queryKey: ["/api/ai-agents/installed"],
@@ -366,72 +372,7 @@ export default function EmailTemplatesPage() {
     },
   ];
 
-  const renderPreview = (template: EmailTemplate, viewMode: ViewMode) => {
-    if (viewMode === "compact") {
-      return (
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Category</p>
-            <Badge variant="outline" className="capitalize">{template.category}</Badge>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Status</p>
-            <div className="flex gap-1">
-              <Badge variant={template.isActive ? "default" : "secondary"}>
-                {template.isActive ? "Active" : "Inactive"}
-              </Badge>
-              {template.scope === 'global' && <Badge variant="secondary" className="text-xs">Global</Badge>}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (viewMode === "preview") {
-      let renderedBody = template.body;
-      let renderedSubject = template.subject;
-
-      // Replace common placeholders with example values
-      const exampleData: Record<string, string> = {
-        '{{client_name}}': 'John Doe',
-        '{{contact_name}}': 'John Doe',
-        '{{company_name}}': 'Acme Corporation',
-        '{{portal_link}}': 'https://example.com/portal',
-        '{{assignment_name}}': 'Q4 Tax Filing',
-        '{{document_name}}': 'Tax Return 2024',
-      };
-
-      Object.entries(exampleData).forEach(([placeholder, value]) => {
-        renderedBody = renderedBody.replace(new RegExp(placeholder, 'g'), value);
-        renderedSubject = renderedSubject.replace(new RegExp(placeholder, 'g'), value);
-      });
-
-      return (
-        <div className="border rounded-lg p-6 bg-background">
-          <div className="mb-4">
-            <p className="text-sm font-medium text-muted-foreground">Subject:</p>
-            <p className="text-lg font-semibold">{renderedSubject}</p>
-          </div>
-          <Separator className="my-4" />
-          <div className="space-y-4">
-            {template.logoUrl && (
-              <div className="flex justify-center mb-6">
-                <div className="w-32 h-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
-                  Logo Image
-                </div>
-              </div>
-            )}
-            <div className="prose prose-sm max-w-none">
-              {renderedBody.split('\n').map((line, i) => (
-                <p key={i}>{line || '\u00A0'}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Details view (default)
+  const renderPreview = (template: EmailTemplate) => {
     let renderedBody = template.body;
     let renderedSubject = template.subject;
 
@@ -574,38 +515,41 @@ export default function EmailTemplatesPage() {
                 searchKeys={["name", "subject", "category"]}
                 onRowClick={setPreviewTemplate}
                 selectedRow={previewTemplate}
-                actions={(template) => (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setPreviewTemplate(template)}
-                      data-testid={`button-preview-${template.id}`}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    {template.organizationId !== null && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(template)}
-                          data-testid={`button-edit-${template.id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteConfirmTemplate(template)}
-                          data-testid={`button-delete-${template.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )}
+                actions={(template) => {
+                  const canEdit = isAdmin || template.organizationId !== null;
+                  return (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPreviewTemplate(template)}
+                        data-testid={`button-preview-${template.id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {canEdit && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog(template)}
+                            data-testid={`button-edit-${template.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteConfirmTemplate(template)}
+                            data-testid={`button-delete-${template.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  );
+                }}
                 emptyState={
                   <div className="flex flex-col items-center justify-center py-12">
                     <Mail className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />

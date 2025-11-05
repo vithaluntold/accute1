@@ -29,6 +29,22 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - **Message Templates Sidebar Navigation**: Added "Message Templates" to the Communication section of sidebar navigation for easier access to the message template workspace.
 - **AI Agent Installation Flow**: Fixed "Install Echo AI" button on Message Templates page to correctly redirect to `/ai-agents` page instead of `/marketplace`.
 - **AI Agent Footer Overlap Fix**: Added bottom padding (`pb-20`) to all AI agent interfaces (Echo, Cadence, Forma, Parity, Scribe, Relay, Radar, OmniSpectra) to prevent the "Powered by FinACEverse" footer from covering the chat input box.
+- **Template & Document List View with Preview Panel** (November 2025):
+  - Converted Message Templates, Documents, and Email Templates from card view to Windows/macOS-style list view
+  - Implemented reusable DataTable component with sortable columns, search, and collapsible preview panel
+  - Preview panel toggle button (Show/Hide Preview) similar to Windows File Explorer
+  - Simplified preview panel shows full content details without view mode complexity
+  - List views include: sortable columns, search functionality, row selection, and action buttons
+  - Empty states provide helpful guidance and quick actions
+- **Admin RBAC Enhancement**:
+  - Admin and Super Admin users can now edit/delete ALL templates and documents, including global ones
+  - **Frontend**: Role-based permission checks added to Message Templates, Documents, and Email Templates pages
+    - Edit/Delete buttons only show for: Admins (all items) or non-admins (organization-scoped items only)
+    - Preview/Download buttons always visible for all users
+  - **Backend**: Server-side authorization enforces admin-only access to global resources
+    - Updated `getUser()` method to include role relation via LEFT JOIN
+    - Added admin checks on PATCH/DELETE endpoints for message templates, email templates, and documents
+    - Non-admin users receive 403 error when attempting to modify global templates/documents via API
 
 ### System Architecture
 

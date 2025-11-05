@@ -12,10 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye, PanelRightClose, PanelRight, LayoutList, FileText, AlignJustify } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye, PanelRightClose, PanelRight } from "lucide-react";
 
 type SortDirection = "asc" | "desc" | null;
-export type ViewMode = "details" | "preview" | "compact";
 
 export type ColumnDef<T> = {
   id: string;
@@ -36,7 +35,7 @@ type DataTableProps<T> = {
   selectedRow?: T | null;
   actions?: (row: T) => React.ReactNode;
   emptyState?: React.ReactNode;
-  renderPreview?: (row: T, viewMode: ViewMode) => React.ReactNode;
+  renderPreview?: (row: T) => React.ReactNode;
   previewTitle?: (row: T) => string;
 };
 
@@ -56,7 +55,6 @@ export function DataTable<T extends Record<string, any>>({
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [showPreview, setShowPreview] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("details");
 
   // Filter data based on search
   const filteredData = useMemo(() => {
@@ -282,43 +280,9 @@ export function DataTable<T extends Record<string, any>>({
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
                 </Button>
               </div>
-              <Separator className="mt-3" />
-              {/* View Mode Selector */}
-              <div className="flex gap-1 mt-3">
-                <Button
-                  variant={viewMode === "details" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("details")}
-                  data-testid="button-view-details"
-                  className="flex-1"
-                >
-                  <LayoutList className="w-4 h-4 mr-1" />
-                  Details
-                </Button>
-                <Button
-                  variant={viewMode === "preview" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("preview")}
-                  data-testid="button-view-preview"
-                  className="flex-1"
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  Preview
-                </Button>
-                <Button
-                  variant={viewMode === "compact" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setViewMode("compact")}
-                  data-testid="button-view-compact"
-                  className="flex-1"
-                >
-                  <AlignJustify className="w-4 h-4 mr-1" />
-                  Compact
-                </Button>
-              </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              {renderPreview(selectedRow, viewMode)}
+              {renderPreview(selectedRow)}
             </CardContent>
           </Card>
         )}

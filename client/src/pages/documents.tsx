@@ -30,7 +30,7 @@ import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
 import type { InstalledAgentView } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
+import { DataTable, type ColumnDef } from "@/components/data-table";
 
 export default function Documents() {
   const [location, setLocation] = useLocation();
@@ -57,6 +57,12 @@ export default function Documents() {
   const { data: documents = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/documents"],
   });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
+
+  const isAdmin = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Super Admin";
 
   // Check if Parity copilot is installed
   const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
@@ -174,61 +180,7 @@ export default function Documents() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  const renderPreview = (doc: any, viewMode: ViewMode) => {
-    if (viewMode === "compact") {
-      return (
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Type</p>
-            <Badge variant="outline">{doc.type.split('/').pop()?.toUpperCase() || 'FILE'}</Badge>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Size</p>
-            <p className="text-sm">{formatFileSize(doc.size)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Status</p>
-            <Badge variant={doc.status === "pending" ? "outline" : "default"}>
-              {doc.status}
-            </Badge>
-          </div>
-        </div>
-      );
-    }
-
-    if (viewMode === "preview") {
-      return (
-        <div className="space-y-4">
-          <div className="flex justify-center p-6 bg-muted rounded-md">
-            {getFileIcon(doc.type)}
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground mb-1">Type</p>
-              <Badge variant="outline">{doc.type.split('/').pop()?.toUpperCase()}</Badge>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">Size</p>
-              <p className="font-medium">{formatFileSize(doc.size)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">Status</p>
-              <Badge variant={doc.status === "pending" ? "outline" : "default"}>
-                {doc.status}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-muted-foreground mb-1">Uploaded</p>
-              <p className="text-sm">
-                {formatDistance(new Date(doc.createdAt), new Date(), { addSuffix: true })}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Details view (default)
+  const renderPreview = (doc: any) => {
     return (
       <div className="space-y-4">
         <div className="flex justify-center p-6 bg-muted rounded-md">
@@ -441,56 +393,61 @@ export default function Documents() {
           selectedRow={previewDocument}
           renderPreview={renderPreview}
           previewTitle={(doc) => doc.name}
-          actions={(doc) => (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setPreviewDocument(doc)}
-                data-testid={`button-preview-${doc.id}`}
-              >
-                <Eye className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`/api/documents/${doc.id}/download`, {
-                      credentials: "include",
-                    });
-                    if (!response.ok) throw new Error("Download failed");
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = doc.name;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                  } catch (error) {
-                    toast({
-                      title: "Error",
-                      description: "Failed to download document",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-                data-testid={`button-download-${doc.id}`}
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteTarget(doc.id)}
-                data-testid={`button-delete-${doc.id}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </>
-          )}
+          actions={(doc) => {
+            const canEdit = isAdmin || doc.organizationId !== null;
+            return (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPreviewDocument(doc)}
+                  data-testid={`button-preview-${doc.id}`}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/documents/${doc.id}/download`, {
+                        credentials: "include",
+                      });
+                      if (!response.ok) throw new Error("Download failed");
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = doc.name;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to download document",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  data-testid={`button-download-${doc.id}`}
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteTarget(doc.id)}
+                    data-testid={`button-delete-${doc.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </>
+            );
+          }}
           emptyState={
             <div className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
