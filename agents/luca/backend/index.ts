@@ -8,6 +8,7 @@
 import type { LlmConfiguration } from "../../../shared/schema";
 import { LLMService } from "../../../server/llm-service";
 import { getAgentTools, executeTool, type ToolExecutionContext } from "../../../server/agent-tools";
+import { storage } from "../../../server/storage";
 
 export interface LucaInput {
   query: string;
@@ -18,6 +19,7 @@ export interface LucaInput {
     organizationId?: string;
     userId?: string;
     req?: any;
+    documents?: any[];  // Pre-loaded documents for context
   };
 }
 
@@ -29,13 +31,38 @@ export class LucaAgent {
   }
   
   /**
+   * Load available documents for the user's organization
+   */
+  private async loadDocumentContext(organizationId?: string): Promise<any[]> {
+    if (!organizationId) return [];
+    
+    try {
+      const documents = await storage.getDocumentsByOrganization(organizationId);
+      return documents || [];
+    } catch (error) {
+      console.error('[Luca] Error loading documents:', error);
+      return [];
+    }
+  }
+  
+  /**
    * Execute Luca agent in conversational mode
    */
   async execute(input: LucaInput | string): Promise<string> {
     const query = typeof input === 'string' ? input : input.query;
     const context = typeof input === 'string' ? undefined : input.context;
     
-    const systemPrompt = this.buildSystemPrompt(context);
+    // Load documents if context has organizationId
+    let documents: any[] = [];
+    if (context?.organizationId) {
+      documents = await this.loadDocumentContext(context.organizationId);
+      if (context.documents) {
+        // Use pre-loaded documents if provided
+        documents = context.documents;
+      }
+    }
+    
+    const systemPrompt = this.buildSystemPrompt(context, documents);
     
     try {
       const response = await this.llmService.sendPrompt(query, systemPrompt);
@@ -56,7 +83,16 @@ export class LucaAgent {
     const query = typeof input === 'string' ? input : input.query;
     const context = typeof input === 'string' ? undefined : input.context;
     
-    const systemPrompt = this.buildSystemPrompt(context);
+    // Load documents if context has organizationId
+    let documents: any[] = [];
+    if (context?.organizationId) {
+      documents = await this.loadDocumentContext(context.organizationId);
+      if (context.documents) {
+        documents = context.documents;
+      }
+    }
+    
+    const systemPrompt = this.buildSystemPrompt(context, documents);
     
     try {
       const response = await this.llmService.sendPromptStream(query, systemPrompt, onChunk);
@@ -152,8 +188,12 @@ Your response (one word only):`;
   /**
    * Build context-aware system prompt
    */
-  private buildSystemPrompt(context?: any): string {
+  private buildSystemPrompt(context?: any, documents?: any[]): string {
     let prompt = `You are Luca, an expert AI assistant specializing in accounting, finance, and taxation. You are part of the Accute practice management platform, helping accounting professionals and their clients with comprehensive financial guidance.
+
+## Document Access
+
+You have access to the organization's document library. When users ask about specific documents, financial reports, or uploaded files, you can reference the documents available in the system.
 
 ## Your Expertise
 
@@ -215,6 +255,27 @@ When a user needs help with a complex issue that requires licensed professional 
 - Users should consult with licensed CPAs or tax attorneys for their specific situations
 - Tax laws vary by jurisdiction and change frequently - always verify current regulations
 - I can help prepare and organize information, but final tax returns should be reviewed by qualified professionals`;
+
+    // Add available documents to context
+    if (documents && documents.length > 0) {
+      prompt += `\n\n## Available Documents\n\nThe following documents are available in the organization's library:\n\n`;
+      documents.slice(0, 50).forEach((doc: any, index: number) => {
+        prompt += `${index + 1}. **${doc.title}** (${doc.category || 'Uncategorized'})`;
+        if (doc.description) {
+          prompt += ` - ${doc.description}`;
+        }
+        prompt += `\n   - Uploaded: ${new Date(doc.uploadedAt || doc.createdAt).toLocaleDateString()}\n`;
+        if (doc.fileSize) {
+          prompt += `   - Size: ${(doc.fileSize / 1024).toFixed(2)} KB\n`;
+        }
+      });
+      
+      if (documents.length > 50) {
+        prompt += `\n...and ${documents.length - 50} more documents. Ask the user if they need a specific document.\n`;
+      }
+      
+      prompt += `\nWhen users ask about documents, you can reference these by name. If they need specific information from a document, let them know you can see what's available but recommend they view the document directly in the system for detailed analysis.`;
+    }
 
     if (context?.clientId) {
       prompt += `\n\nContext: You are assisting with matters related to a specific client (ID: ${context.clientId}).`;

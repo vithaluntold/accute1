@@ -22,10 +22,21 @@ interface StreamMessage {
   contextData?: any;
 }
 
+// Lazy WebSocket initialization - only creates when first connection is made
+let wssInstance: WebSocketServer | null = null;
+
 /**
- * Setup WebSocket server for streaming AI agent responses
+ * Setup WebSocket server on-demand for streaming AI agent responses
+ * This is called automatically when the first WebSocket connection is made
  */
 export function setupWebSocket(httpServer: Server): WebSocketServer {
+  // Return existing instance if already initialized
+  if (wssInstance) {
+    console.log('[WebSocket] Returning existing WebSocket server instance');
+    return wssInstance;
+  }
+  
+  console.log('[WebSocket] Initializing WebSocket server on-demand...');
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws/ai-stream'
@@ -137,6 +148,10 @@ export function setupWebSocket(httpServer: Server): WebSocketServer {
     }
   });
 
+  // Store instance for reuse
+  wssInstance = wss;
+  console.log('[WebSocket] WebSocket server initialized and ready');
+  
   return wss;
 }
 
@@ -223,6 +238,16 @@ async function handleAgentExecution(
     // Load agent dynamically
     const agent = await createAgentInstance(normalizedAgentName, llmConfig) as any;
     
+    // Prepare input with context for agents
+    const agentInput = {
+      query: input,
+      context: {
+        organizationId: ws.organizationId,
+        userId: ws.userId,
+        conversationId: conversation.id,
+      }
+    };
+    
     // Handle agent execution based on capabilities
     if (agentRequiresToolExecution(normalizedAgentName)) {
       // Agent with tool execution (e.g., Luca)
@@ -234,7 +259,7 @@ async function handleAgentExecution(
         req: { user: { organizationId: ws.organizationId, id: ws.userId } } as any
       };
       
-      const toolResult = await agent.executeWithTools(input, executionContext);
+      const toolResult = await agent.executeWithTools(agentInput, executionContext);
       
       if (toolResult.usedTool) {
         // Tool was executed - send instant response
@@ -242,7 +267,7 @@ async function handleAgentExecution(
         ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
       } else {
         // No tool needed - use streaming mode
-        fullResponse = await agent.executeStream(input, (chunk: string) => {
+        fullResponse = await agent.executeStream(agentInput, (chunk: string) => {
           console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
           ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
         });
@@ -250,7 +275,7 @@ async function handleAgentExecution(
     } else if (agentSupportsStreaming(normalizedAgentName)) {
       // All streaming-enabled agents (Parity, Cadence, Forma, Echo, Relay, Scribe, OmniSpectra, Radar)
       console.log(`[WebSocket] Starting ${normalizedAgentName} streaming...`);
-      fullResponse = await agent.executeStream(input, (chunk: string) => {
+      fullResponse = await agent.executeStream(agentInput, (chunk: string) => {
         console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));
         ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
       });
@@ -258,7 +283,7 @@ async function handleAgentExecution(
       // Legacy non-streaming agents (fallback)
       console.log(`[WebSocket] Starting ${normalizedAgentName} execution (non-streaming)...`);
       
-      const result = await agent.execute(input);
+      const result = await agent.execute(agentInput);
       fullResponse = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
       ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
     }

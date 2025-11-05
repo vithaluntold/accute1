@@ -6,6 +6,7 @@ import fs from "fs";
 import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
+import { setupWebSocket } from "./websocket";
 import * as schema from "@shared/schema";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
@@ -14433,5 +14434,10 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   const httpServer = createServer(app);
+  
+  // Initialize WebSocket on-demand - will be set up when first connection is made
+  setupWebSocket(httpServer);
+  console.log('[Server] WebSocket handler attached - will initialize on first connection');
+  
   return httpServer;
 }
