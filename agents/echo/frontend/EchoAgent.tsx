@@ -337,7 +337,7 @@ export default function EchoAgent() {
   };
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup direction="horizontal" className="h-full pb-20">
       {/* Session Sidebar */}
       <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
         <Card className="flex flex-col h-full mr-2">

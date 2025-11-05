@@ -403,7 +403,7 @@ export default function ParityAgent() {
 
   return (
     <>
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup direction="horizontal" className="h-full pb-20">
       {/* Session Sidebar */}
       {showSessionSidebar && (
         <>

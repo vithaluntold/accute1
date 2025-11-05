@@ -87,7 +87,7 @@ export default function OmniSpectra() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto p-6 gap-4">
+    <div className="flex flex-col h-full max-w-4xl mx-auto p-6 pb-20 gap-4">
       <Card className="flex-1 flex flex-col">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

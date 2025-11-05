@@ -103,7 +103,7 @@ export default function Radar() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-6xl mx-auto p-6 gap-4">
+    <div className="flex flex-col h-full max-w-6xl mx-auto p-6 pb-20 gap-4">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

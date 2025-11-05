@@ -26,6 +26,9 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
   - `/admin/pricing-regions` removed
   - `/admin/coupons` removed
   - Backend API endpoints remain for future use if needed
+- **Message Templates Sidebar Navigation**: Added "Message Templates" to the Communication section of sidebar navigation for easier access to the message template workspace.
+- **AI Agent Installation Flow**: Fixed "Install Echo AI" button on Message Templates page to correctly redirect to `/ai-agents` page instead of `/marketplace`.
+- **AI Agent Footer Overlap Fix**: Added bottom padding (`pb-20`) to all AI agent interfaces (Echo, Cadence, Forma, Parity, Scribe, Relay, Radar, OmniSpectra) to prevent the "Powered by FinACEverse" footer from covering the chat input box.
 
 ### System Architecture
 
