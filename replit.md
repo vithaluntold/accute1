@@ -98,11 +98,17 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
 - **Session Management**: All agents support persistent chat sessions with conversation history
 - **Agent Details**:
-  - **Forma**: Intelligent form builder for client intake and data collection
-    - Supports 30+ field types (text, select, multi-select, radio, email, phone, date, currency, signature, etc.)
-    - Smart field type selection based on data requirements
-    - Single choice lists → dropdown, Multiple choices → multi-select, Yes/No/NA → radio buttons
-    - Never defaults to text fields when more specific types are appropriate
+  - **Forma**: RAG-Enhanced Intelligent Form Builder
+    - **Architecture**: Full RAG (Retrieval-Augmented Generation) with semantic intelligence
+    - **Field Catalog**: 30+ field types with semantic metadata, use cases, and UX heuristics
+    - **Form Exemplars**: Curated high-quality forms from multiple industries demonstrating intelligent field selection
+    - **Semantic Retrieval**: Context-aware retrieval of relevant field types and patterns based on user intent
+    - **Reasoning Chains**: Uses 4-step reasoning process (Understand Intent → Infer Semantics → Select Best Fit → Validate UX)
+    - **Organization Context**: Adapts field selection based on organization industry and compliance needs
+    - **Self-Critique**: Generates explanations for field type choices with reasoning
+    - **Dynamic Tools**: Can query field catalog and exemplars during inference for up-to-date information
+    - **Seamless Intelligence**: No hardcoded rules - uses principles-based reasoning with retrieved context
+    - Example behaviors: Single choice → select, Multiple choices → multi_select, Yes/No/NA → radio, Money → currency
   - **Cadence**: Workflow automation designer
   - **Parity**: Document generation specialist
   - **Echo**: Message template creator

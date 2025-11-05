@@ -61,7 +61,10 @@ export class FormaAgent {
   }
   
   private async executeConversational(message: string): Promise<FormatResult> {
-    // STEP 1: Retrieve relevant context from field catalog and exemplars
+    // STEP 1: Analyze query and pre-execute relevant tool calls for comprehensive context
+    const toolResults = await this.preExecuteRelevantTools(message);
+    
+    // STEP 2: Retrieve relevant context from field catalog and exemplars
     const retrievalContext: RetrievalContext = {
       userQuery: message,
       organizationIndustry: this.organizationContext?.industry,
@@ -71,10 +74,10 @@ export class FormaAgent {
     const retrievedContext = retrieveRelevantContext(retrievalContext);
     const fieldRecommendations = extractFieldTypeRecommendations(retrievedContext);
     
-    // STEP 2: Build reasoning-based system prompt with retrieved context
-    const systemPrompt = this.buildReasoningPrompt(retrievedContext, fieldRecommendations);
+    // STEP 3: Build reasoning-based system prompt with retrieved context + tool results
+    const systemPrompt = this.buildReasoningPrompt(retrievedContext, fieldRecommendations, toolResults);
     
-    // STEP 3: Send to LLM for intelligent reasoning
+    // STEP 4: Send to LLM for intelligent reasoning
     try {
       const response = await this.llmService.sendPrompt(message, systemPrompt);
       
@@ -87,7 +90,7 @@ export class FormaAgent {
       
       const formatResult = JSON.parse(jsonStr);
       
-      // STEP 4: Add self-critique reasoning
+      // STEP 5: Add self-critique reasoning
       if (formatResult.formattedData?.fields) {
         formatResult.reasoning = this.generateFieldReasoningExplanation(formatResult.formattedData.fields);
       }
@@ -113,10 +116,76 @@ export class FormaAgent {
   }
   
   /**
-   * Build reasoning-based prompt with retrieved context
+   * Pre-execute relevant tools based on intelligent query analysis
+   * This provides context-enrichment without requiring LLM function calling infrastructure
    */
-  private buildReasoningPrompt(retrievedContext: any, fieldRecommendations: string): string {
+  private async preExecuteRelevantTools(query: string): Promise<string> {
+    const lowerQuery = query.toLowerCase();
+    const toolOutputs: Map<string, any> = new Map(); // Deduplicate results
+    
+    // Always search field catalog for form-building queries
+    try {
+      const catalogResult = executeFormaTool('search_field_catalog', { 
+        query: query,
+        industry: this.organizationContext?.industry 
+      });
+      
+      // Only include if we got useful results
+      if (catalogResult.relevantFieldTypes?.length > 0 || catalogResult.exampleFields?.length > 0) {
+        toolOutputs.set('catalog_search', {
+          type: 'Catalog Search',
+          data: {
+            topFieldTypes: catalogResult.relevantFieldTypes?.slice(0, 3),
+            exampleFields: catalogResult.exampleFields?.slice(0, 3)
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Field catalog search failed:', error);
+    }
+    
+    // Industry-specific exemplars if applicable
+    if (this.organizationContext?.industry) {
+      try {
+        const industryResult = executeFormaTool('get_industry_exemplars', { 
+          industry: this.organizationContext.industry 
+        });
+        if (industryResult.exemplarCount > 0) {
+          toolOutputs.set('industry_exemplars', {
+            type: 'Industry Examples',
+            data: {
+              industry: this.organizationContext.industry,
+              examples: industryResult.exemplars?.slice(0, 2).map((ex: any) => ({
+                name: ex.name,
+                keyDecisions: ex.keyDecisions?.slice(0, 3),
+                sampleFields: ex.sampleFields?.slice(0, 3)
+              }))
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Industry exemplars fetch failed:', error);
+      }
+    }
+    
+    // Format tool outputs concisely
+    if (toolOutputs.size === 0) {
+      return '';
+    }
+    
+    const formattedOutputs = Array.from(toolOutputs.values()).map(output => {
+      return `\n**${output.type}**:\n${JSON.stringify(output.data, null, 2)}`;
+    });
+    
+    return `\n\n=== Context from Knowledge Base ===\n${formattedOutputs.join('\n')}\n=== End Context ===\n`;
+  }
+  
+  /**
+   * Build reasoning-based prompt with retrieved context and tool results
+   */
+  private buildReasoningPrompt(retrievedContext: any, fieldRecommendations: string, toolResults?: string): string {
     return `You are Forma, an intelligent form building assistant with expertise in user experience and data collection design.
+${toolResults || ''}
 
 Your approach to form building:
 1. **Understand Intent**: Analyze what data the user needs to collect and why
