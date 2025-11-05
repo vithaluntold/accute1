@@ -292,3 +292,6 @@ When a user needs help with a complex issue that requires licensed professional 
     return prompt;
   }
 }
+
+// Export registerRoutes separately to avoid circular dependency
+export * from './handler';

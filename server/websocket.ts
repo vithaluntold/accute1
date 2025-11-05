@@ -24,19 +24,23 @@ interface StreamMessage {
 
 // Lazy WebSocket initialization - only creates when first connection is made
 let wssInstance: WebSocketServer | null = null;
+let isInitializing = false;
 
 /**
- * Setup WebSocket server on-demand for streaming AI agent responses
- * This is called automatically when the first WebSocket connection is made
+ * Initialize WebSocket server on-demand (called on first upgrade request)
  */
-export function setupWebSocket(httpServer: Server): WebSocketServer {
-  // Return existing instance if already initialized
+function initializeWebSocketServer(httpServer: Server): WebSocketServer {
   if (wssInstance) {
-    console.log('[WebSocket] Returning existing WebSocket server instance');
     return wssInstance;
   }
   
-  console.log('[WebSocket] Initializing WebSocket server on-demand...');
+  if (isInitializing) {
+    throw new Error('WebSocket server is already being initialized');
+  }
+  
+  isInitializing = true;
+  console.log('[WebSocket] Initializing WebSocket server on first connection...');
+  
   const wss = new WebSocketServer({ 
     server: httpServer,
     path: '/ws/ai-stream'
@@ -150,9 +154,38 @@ export function setupWebSocket(httpServer: Server): WebSocketServer {
 
   // Store instance for reuse
   wssInstance = wss;
+  isInitializing = false;
   console.log('[WebSocket] WebSocket server initialized and ready');
   
   return wss;
+}
+
+/**
+ * Setup lazy WebSocket initialization on HTTP server
+ * WebSocket will only be initialized when first upgrade request is received
+ */
+export function setupWebSocket(httpServer: Server): void {
+  console.log('[WebSocket] Attaching lazy initialization handler to HTTP server');
+  
+  // Intercept upgrade requests to initialize WebSocket on-demand
+  httpServer.on('upgrade', (request, socket, head) => {
+    // Check if this is a WebSocket upgrade for our path
+    if (request.url === '/ws/ai-stream') {
+      console.log('[WebSocket] Upgrade request received for WebSocket connection');
+      
+      // Initialize WebSocket server on first upgrade request
+      if (!wssInstance) {
+        console.log('[WebSocket] First connection detected - initializing WebSocket server');
+        const wss = initializeWebSocketServer(httpServer);
+        
+        // Handle this first upgrade request explicitly
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      }
+      // Subsequent requests are handled automatically by the WebSocketServer
+    }
+  });
 }
 
 /**

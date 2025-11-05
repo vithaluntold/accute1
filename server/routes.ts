@@ -14435,9 +14435,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   const httpServer = createServer(app);
   
-  // Initialize WebSocket on-demand - will be set up when first connection is made
+  // Setup lazy WebSocket initialization - will initialize on first upgrade request
   setupWebSocket(httpServer);
-  console.log('[Server] WebSocket handler attached - will initialize on first connection');
   
   return httpServer;
 }
