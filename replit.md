@@ -33,6 +33,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
   - Converted Message Templates, Documents, and Email Templates from card view to Windows/macOS-style list view
   - Implemented reusable DataTable component with sortable columns, search, and collapsible preview panel
   - Preview panel toggle button (Show/Hide Preview) similar to Windows File Explorer
+  - **Preview content only shows in side panel** - removed Preview column from main table
   - Simplified preview panel shows full content details without view mode complexity
   - List views include: sortable columns, search functionality, row selection, and action buttons
   - Empty states provide helpful guidance and quick actions

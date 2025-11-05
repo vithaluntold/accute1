@@ -273,17 +273,6 @@ export default function MessageTemplatesPage() {
       width: "150px",
     },
     {
-      id: "preview",
-      header: "Preview",
-      accessorKey: "content",
-      cell: (template) => (
-        <div className="text-sm text-muted-foreground truncate max-w-md">
-          {template.content}
-        </div>
-      ),
-      sortable: false,
-    },
-    {
       id: "status",
       header: "Status",
       cell: (template) => (
