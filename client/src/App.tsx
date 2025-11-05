@@ -78,15 +78,16 @@ import Inbox from "@/pages/inbox";
 import NotFound from "@/pages/not-found";
 import MobileApps from "@/pages/mobile-apps";
 import OrganizationsPage from "@/pages/admin/organizations";
-import SubscriptionsPage from "@/pages/admin/subscriptions";
-import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
-import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
-import PricingRegionsPage from "@/pages/admin/pricing-regions";
-import CouponsPage from "@/pages/admin/coupons";
+// DISABLED: Subscription features removed per user request
+// import SubscriptionsPage from "@/pages/admin/subscriptions";
+// import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
+// import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
+// import PricingRegionsPage from "@/pages/admin/pricing-regions";
+// import CouponsPage from "@/pages/admin/coupons";
 import PlatformSettingsPage from "@/pages/admin/platform-settings";
 import AllUsersPage from "@/pages/admin/users";
 import KycVerificationPage from "@/pages/admin/kyc-verification";
-import SubscriptionSelectPage from "@/pages/subscription-select";
+// import SubscriptionSelectPage from "@/pages/subscription-select";
 import AdminTicketsPage from "@/pages/admin/tickets";
 import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
 import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
@@ -105,7 +106,8 @@ import TeamDetailPage from "@/pages/team-detail";
 import TeamHierarchyPage from "@/pages/team-hierarchy";
 import ManagerDashboardPage from "@/pages/manager-dashboard";
 import AutomatedInvoicing from "@/pages/automated-invoicing";
-import SubscriptionPricing from "@/pages/subscription-pricing";
+// DISABLED: Subscription pricing removed
+// import SubscriptionPricing from "@/pages/subscription-pricing";
 import EmployeeProfile from "@/pages/employee-profile";
 import LiveChat from "@/pages/live-chat";
 
@@ -249,7 +251,8 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      <Route path="/subscription-pricing" component={SubscriptionPricing} />
+      {/* DISABLED: Subscription pricing removed */}
+      {/* <Route path="/subscription-pricing" component={SubscriptionPricing} /> */}
       
       {/* Public route - NO authentication required */}
       <Route path="/public/:shareToken" component={PublicFormPage} />
@@ -275,7 +278,8 @@ function Router() {
           </AppLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/subscription">
+      {/* DISABLED: Subscription select removed */}
+      {/* <Route path="/subscription">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin", "Admin"]}>
             <AppLayout>
@@ -283,7 +287,7 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
-      </Route>
+      </Route> */}
       <Route path="/mobile-apps">
         <OrganizationRoute>
           <AppLayout>
@@ -310,7 +314,8 @@ function Router() {
           </RoleGuard>
         </ProtectedRoute>
       </Route>
-      <Route path="/admin/subscriptions">
+      {/* DISABLED: All subscription admin pages removed */}
+      {/* <Route path="/admin/subscriptions">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin"]}>
             <AppLayout>
@@ -354,7 +359,7 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
-      </Route>
+      </Route> */}
       <Route path="/admin/platform-settings">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin"]}>

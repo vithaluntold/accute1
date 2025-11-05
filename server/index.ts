@@ -66,10 +66,11 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
-import { setupWebSocket } from "./websocket";
-import { setupRoundtableWebSocket } from "./roundtable-websocket";
-import { setupTeamChatWebSocket } from "./team-chat-websocket";
-import { setupLiveChatWebSocket } from "./live-chat-websocket";
+// DISABLED: WebSockets now lazy-load with chat sessions, not at server startup
+// import { setupWebSocket } from "./websocket";
+// import { setupRoundtableWebSocket } from "./roundtable-websocket";
+// import { setupTeamChatWebSocket } from "./team-chat-websocket";
+// import { setupLiveChatWebSocket } from "./live-chat-websocket";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -278,41 +279,11 @@ app.use((req, res, next) => {
       }
     }
     
-    // Setup WebSocket server for streaming AI agents
-    try {
-      const wss = setupWebSocket(server);
-      console.log('🔌 WebSocket server initialized at /ws/ai-stream');
-    } catch (wsError) {
-      console.error('❌ WebSocket initialization failed:', wsError);
-      console.warn('⚠️  Continuing without WebSocket support');
-    }
-    
-    // Setup WebSocket server for AI Roundtable collaboration
-    try {
-      const roundtableWss = setupRoundtableWebSocket(server);
-      console.log('🔌 Roundtable WebSocket server initialized at /ws/roundtable');
-    } catch (wsError) {
-      console.error('❌ Roundtable WebSocket initialization failed:', wsError);
-      console.warn('⚠️  Continuing without Roundtable WebSocket support');
-    }
-    
-    // Setup WebSocket server for Team Chat
-    try {
-      const teamChatWss = setupTeamChatWebSocket(server);
-      console.log('🔌 Team Chat WebSocket server initialized at /ws/team-chat');
-    } catch (wsError) {
-      console.error('❌ Team Chat WebSocket initialization failed:', wsError);
-      console.warn('⚠️  Continuing without Team Chat WebSocket support');
-    }
-    
-    // Setup WebSocket server for Live Chat Support (Edge subscription)
-    try {
-      const liveChatWss = setupLiveChatWebSocket(server);
-      console.log('🔌 Live Chat Support WebSocket server initialized at /ws/live-chat');
-    } catch (wsError) {
-      console.error('❌ Live Chat Support WebSocket initialization failed:', wsError);
-      console.warn('⚠️  Continuing without Live Chat Support WebSocket');
-    }
+    // DISABLED: WebSocket initialization removed from server startup
+    // WebSockets now lazy-load when chat sessions start to prevent startup errors
+    // See: server/websocket.ts, server/roundtable-websocket.ts, etc.
+    // They will be initialized on-demand when first chat connection is made
+    console.log('ℹ️  WebSockets disabled at startup - will initialize on-demand');
 
     // Error handler MUST be registered AFTER static file serving
     // so it only catches actual errors, not SPA routes
