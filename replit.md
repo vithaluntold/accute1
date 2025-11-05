@@ -9,6 +9,20 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - Multi-provider AI support essential
 - Clean, modern UI following design guidelines
 - Comprehensive audit trail for compliance
+- **WebSocket Management**: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
+- **Subscription System**: Subscription pricing UI and routes disabled per user request
+
+### Recent Changes (November 2025)
+- **WebSocket Initialization**: Removed WebSocket setup from server startup. WebSockets will now initialize on-demand when first chat connection is made. This prevents startup errors and reduces initial load time.
+- **Subscription Features Disabled**: All subscription-related UI routes and pages removed from App.tsx per user request:
+  - `/subscription-pricing` route removed
+  - `/subscription` (select plan) route removed  
+  - `/admin/subscriptions` admin pages removed
+  - `/admin/subscription-analytics` removed
+  - `/admin/subscription-plans` removed
+  - `/admin/pricing-regions` removed
+  - `/admin/coupons` removed
+  - Backend API endpoints remain for future use if needed
 
 ### System Architecture
 
