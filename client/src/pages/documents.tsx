@@ -30,7 +30,7 @@ import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
 import type { InstalledAgentView } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef } from "@/components/data-table";
+import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
 
 export default function Documents() {
   const [location, setLocation] = useLocation();
@@ -172,6 +172,96 @@ export default function Documents() {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const renderPreview = (doc: any, viewMode: ViewMode) => {
+    if (viewMode === "compact") {
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Type</p>
+            <Badge variant="outline">{doc.type.split('/').pop()?.toUpperCase() || 'FILE'}</Badge>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Size</p>
+            <p className="text-sm">{formatFileSize(doc.size)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Status</p>
+            <Badge variant={doc.status === "pending" ? "outline" : "default"}>
+              {doc.status}
+            </Badge>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === "preview") {
+      return (
+        <div className="space-y-4">
+          <div className="flex justify-center p-6 bg-muted rounded-md">
+            {getFileIcon(doc.type)}
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-muted-foreground mb-1">Type</p>
+              <Badge variant="outline">{doc.type.split('/').pop()?.toUpperCase()}</Badge>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Size</p>
+              <p className="font-medium">{formatFileSize(doc.size)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Status</p>
+              <Badge variant={doc.status === "pending" ? "outline" : "default"}>
+                {doc.status}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-muted-foreground mb-1">Uploaded</p>
+              <p className="text-sm">
+                {formatDistance(new Date(doc.createdAt), new Date(), { addSuffix: true })}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Details view (default)
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-center p-6 bg-muted rounded-md">
+          {getFileIcon(doc.type)}
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-muted-foreground mb-1">Type</p>
+            <Badge variant="outline">{doc.type.split('/').pop()?.toUpperCase()}</Badge>
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1">Size</p>
+            <p className="font-medium">{formatFileSize(doc.size)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1">Status</p>
+            <Badge variant={doc.status === "pending" ? "outline" : "default"}>
+              {doc.status}
+            </Badge>
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-1">Uploaded</p>
+            <p className="text-sm">
+              {formatDistance(new Date(doc.createdAt), new Date(), { addSuffix: true })}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-medium mb-2">Tags</p>
+          <TagSelector resourceType="document" resourceId={doc.id} />
+        </div>
+      </div>
+    );
   };
 
   const columns: ColumnDef<any>[] = [
@@ -342,141 +432,85 @@ export default function Documents() {
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex gap-6">
-          {/* Main List */}
-          <div className={previewDocument ? "flex-1" : "w-full"}>
-            <DataTable
-              data={documents}
-              columns={columns}
-              searchPlaceholder="Search documents..."
-              searchKeys={["name", "type"]}
-              onRowClick={setPreviewDocument}
-              selectedRow={previewDocument}
-              actions={(doc) => (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setPreviewDocument(doc)}
-                    data-testid={`button-preview-${doc.id}`}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(`/api/documents/${doc.id}/download`, {
-                          credentials: "include",
-                        });
-                        if (!response.ok) throw new Error("Download failed");
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = doc.name;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                      } catch (error) {
-                        toast({
-                          title: "Error",
-                          description: "Failed to download document",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    data-testid={`button-download-${doc.id}`}
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteTarget(doc.id)}
-                    data-testid={`button-delete-${doc.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-              emptyState={
-                <div className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                  <p className="text-lg font-medium mb-1" data-testid="text-no-documents">
-                    {documents.length === 0 ? "No documents yet" : "No matching documents"}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {documents.length === 0
-                      ? "Upload your first document to get started"
-                      : "Try adjusting your search"}
-                  </p>
-                  {documents.length === 0 && (
-                    <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-upload-first">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Document
-                    </Button>
-                  )}
-                </div>
-              }
-            />
-          </div>
-
-          {/* Preview Panel */}
-          {previewDocument && (
-            <Card className="w-96 h-fit sticky top-6">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {getFileIcon(previewDocument.type)}
-                    <CardTitle className="text-lg">{previewDocument.name}</CardTitle>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setPreviewDocument(null)}
-                    data-testid="button-close-preview"
-                  >
-                    <span className="sr-only">Close</span>
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-muted-foreground mb-1">Type</p>
-                    <Badge variant="outline">{previewDocument.type.split('/').pop()?.toUpperCase()}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Size</p>
-                    <p className="font-medium" data-testid={`document-size-${previewDocument.id}`}>
-                      {formatFileSize(previewDocument.size)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Status</p>
-                    <Badge variant={previewDocument.status === "pending" ? "outline" : "default"} data-testid={`document-status-${previewDocument.id}`}>
-                      {previewDocument.status}
-                    </Badge>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Uploaded</p>
-                    <p className="text-sm">
-                      {formatDistance(new Date(previewDocument.createdAt), new Date(), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium mb-2">Tags</p>
-                  <TagSelector resourceType="document" resourceId={previewDocument.id} />
-                </div>
-              </CardContent>
-            </Card>
+        <DataTable
+          data={documents}
+          columns={columns}
+          searchPlaceholder="Search documents..."
+          searchKeys={["name", "type"]}
+          onRowClick={setPreviewDocument}
+          selectedRow={previewDocument}
+          renderPreview={renderPreview}
+          previewTitle={(doc) => doc.name}
+          actions={(doc) => (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPreviewDocument(doc)}
+                data-testid={`button-preview-${doc.id}`}
+              >
+                <Eye className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/documents/${doc.id}/download`, {
+                      credentials: "include",
+                    });
+                    if (!response.ok) throw new Error("Download failed");
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = doc.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to download document",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                data-testid={`button-download-${doc.id}`}
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteTarget(doc.id)}
+                data-testid={`button-delete-${doc.id}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </>
           )}
-        </div>
+          emptyState={
+            <div className="flex flex-col items-center justify-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-1" data-testid="text-no-documents">
+                {documents.length === 0 ? "No documents yet" : "No matching documents"}
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {documents.length === 0
+                  ? "Upload your first document to get started"
+                  : "Try adjusting your search"}
+              </p>
+              {documents.length === 0 && (
+                <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-upload-first">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document
+                </Button>
+              )}
+            </div>
+          }
+        />
       </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

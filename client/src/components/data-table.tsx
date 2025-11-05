@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -10,9 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Eye, PanelRightClose, PanelRight, LayoutList, FileText, AlignJustify } from "lucide-react";
 
 type SortDirection = "asc" | "desc" | null;
+export type ViewMode = "details" | "preview" | "compact";
 
 export type ColumnDef<T> = {
   id: string;
@@ -33,6 +36,8 @@ type DataTableProps<T> = {
   selectedRow?: T | null;
   actions?: (row: T) => React.ReactNode;
   emptyState?: React.ReactNode;
+  renderPreview?: (row: T, viewMode: ViewMode) => React.ReactNode;
+  previewTitle?: (row: T) => string;
 };
 
 export function DataTable<T extends Record<string, any>>({
@@ -44,10 +49,14 @@ export function DataTable<T extends Record<string, any>>({
   selectedRow,
   actions,
   emptyState,
+  renderPreview,
+  previewTitle,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [showPreview, setShowPreview] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("details");
 
   // Filter data based on search
   const filteredData = useMemo(() => {
@@ -143,90 +152,176 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder={searchPlaceholder}
-          className="pl-9"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          data-testid="input-search"
-        />
-      </div>
-
-      {/* Table */}
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              {columns.map((column) => (
-                <TableHead
-                  key={column.id}
-                  style={{ width: column.width }}
-                  className={column.sortable !== false ? "cursor-pointer select-none" : ""}
-                  onClick={() => column.sortable !== false && handleSort(column.id)}
-                  data-testid={`column-header-${column.id}`}
-                >
-                  <div className="flex items-center">
-                    {column.header}
-                    {column.sortable !== false && getSortIcon(column.id)}
-                  </div>
-                </TableHead>
-              ))}
-              {actions && <TableHead className="w-[120px]">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-32">
-                  {emptyState || (
-                    <div className="flex flex-col items-center justify-center text-muted-foreground">
-                      <Search className="h-8 w-8 mb-2 opacity-50" />
-                      <p>No results found</p>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
+      {/* Search Bar and Preview Toggle */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={searchPlaceholder}
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search"
+          />
+        </div>
+        {renderPreview && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPreview(!showPreview)}
+            data-testid="button-toggle-preview"
+          >
+            {showPreview ? (
+              <>
+                <PanelRightClose className="w-4 h-4 mr-2" />
+                Hide Preview
+              </>
             ) : (
-              sortedData.map((row) => (
-                <TableRow
-                  key={getRowId(row)}
-                  className={`${
-                    onRowClick ? "cursor-pointer" : ""
-                  } ${
-                    isRowSelected(row) ? "bg-muted" : ""
-                  }`}
-                  onClick={() => onRowClick?.(row)}
-                  data-testid={`table-row-${getRowId(row)}`}
-                >
-                  {columns.map((column) => (
-                    <TableCell key={column.id} data-testid={`cell-${column.id}-${getRowId(row)}`}>
-                      {column.cell
-                        ? column.cell(row)
-                        : column.accessorFn
-                        ? column.accessorFn(row)
-                        : column.accessorKey
-                        ? row[column.accessorKey]
-                        : null}
-                    </TableCell>
-                  ))}
-                  {actions && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1">{actions(row)}</div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
+              <>
+                <PanelRight className="w-4 h-4 mr-2" />
+                Show Preview
+              </>
             )}
-          </TableBody>
-        </Table>
+          </Button>
+        )}
       </div>
 
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {sortedData.length} of {data.length} {data.length === 1 ? "item" : "items"}
+      {/* Main Content Area */}
+      <div className="flex gap-6">
+        {/* Table Section */}
+        <div className={showPreview && selectedRow && renderPreview ? "flex-1" : "w-full"}>
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  {columns.map((column) => (
+                    <TableHead
+                      key={column.id}
+                      style={{ width: column.width }}
+                      className={column.sortable !== false ? "cursor-pointer select-none" : ""}
+                      onClick={() => column.sortable !== false && handleSort(column.id)}
+                      data-testid={`column-header-${column.id}`}
+                    >
+                      <div className="flex items-center">
+                        {column.header}
+                        {column.sortable !== false && getSortIcon(column.id)}
+                      </div>
+                    </TableHead>
+                  ))}
+                  {actions && <TableHead className="w-[120px]">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-32">
+                      {emptyState || (
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <Search className="h-8 w-8 mb-2 opacity-50" />
+                          <p>No results found</p>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedData.map((row) => (
+                    <TableRow
+                      key={getRowId(row)}
+                      className={`${
+                        onRowClick ? "cursor-pointer" : ""
+                      } ${
+                        isRowSelected(row) ? "bg-muted" : ""
+                      }`}
+                      onClick={() => onRowClick?.(row)}
+                      data-testid={`table-row-${getRowId(row)}`}
+                    >
+                      {columns.map((column) => (
+                        <TableCell key={column.id} data-testid={`cell-${column.id}-${getRowId(row)}`}>
+                          {column.cell
+                            ? column.cell(row)
+                            : column.accessorFn
+                            ? column.accessorFn(row)
+                            : column.accessorKey
+                            ? row[column.accessorKey]
+                            : null}
+                        </TableCell>
+                      ))}
+                      {actions && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-1">{actions(row)}</div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Results count */}
+          <div className="text-sm text-muted-foreground mt-4">
+            Showing {sortedData.length} of {data.length} {data.length === 1 ? "item" : "items"}
+          </div>
+        </div>
+
+        {/* Preview Panel */}
+        {showPreview && selectedRow && renderPreview && (
+          <Card className="w-96 h-fit sticky top-6 max-h-[calc(100vh-200px)] overflow-hidden flex flex-col">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <CardTitle className="text-lg">
+                  {previewTitle ? previewTitle(selectedRow) : "Preview"}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRowClick?.(null as any)}
+                  data-testid="button-close-preview"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                </Button>
+              </div>
+              <Separator className="mt-3" />
+              {/* View Mode Selector */}
+              <div className="flex gap-1 mt-3">
+                <Button
+                  variant={viewMode === "details" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("details")}
+                  data-testid="button-view-details"
+                  className="flex-1"
+                >
+                  <LayoutList className="w-4 h-4 mr-1" />
+                  Details
+                </Button>
+                <Button
+                  variant={viewMode === "preview" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("preview")}
+                  data-testid="button-view-preview"
+                  className="flex-1"
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  Preview
+                </Button>
+                <Button
+                  variant={viewMode === "compact" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode("compact")}
+                  data-testid="button-view-compact"
+                  className="flex-1"
+                >
+                  <AlignJustify className="w-4 h-4 mr-1" />
+                  Compact
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto">
+              {renderPreview(selectedRow, viewMode)}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

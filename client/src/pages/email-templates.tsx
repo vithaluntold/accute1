@@ -39,7 +39,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef } from "@/components/data-table";
+import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
 import { formatDistance } from "date-fns";
 
 type EmailTemplate = {
@@ -366,11 +366,75 @@ export default function EmailTemplatesPage() {
     },
   ];
 
-  const renderPreview = (template: EmailTemplate) => {
+  const renderPreview = (template: EmailTemplate, viewMode: ViewMode) => {
+    if (viewMode === "compact") {
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Category</p>
+            <Badge variant="outline" className="capitalize">{template.category}</Badge>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Status</p>
+            <div className="flex gap-1">
+              <Badge variant={template.isActive ? "default" : "secondary"}>
+                {template.isActive ? "Active" : "Inactive"}
+              </Badge>
+              {template.scope === 'global' && <Badge variant="secondary" className="text-xs">Global</Badge>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === "preview") {
+      let renderedBody = template.body;
+      let renderedSubject = template.subject;
+
+      // Replace common placeholders with example values
+      const exampleData: Record<string, string> = {
+        '{{client_name}}': 'John Doe',
+        '{{contact_name}}': 'John Doe',
+        '{{company_name}}': 'Acme Corporation',
+        '{{portal_link}}': 'https://example.com/portal',
+        '{{assignment_name}}': 'Q4 Tax Filing',
+        '{{document_name}}': 'Tax Return 2024',
+      };
+
+      Object.entries(exampleData).forEach(([placeholder, value]) => {
+        renderedBody = renderedBody.replace(new RegExp(placeholder, 'g'), value);
+        renderedSubject = renderedSubject.replace(new RegExp(placeholder, 'g'), value);
+      });
+
+      return (
+        <div className="border rounded-lg p-6 bg-background">
+          <div className="mb-4">
+            <p className="text-sm font-medium text-muted-foreground">Subject:</p>
+            <p className="text-lg font-semibold">{renderedSubject}</p>
+          </div>
+          <Separator className="my-4" />
+          <div className="space-y-4">
+            {template.logoUrl && (
+              <div className="flex justify-center mb-6">
+                <div className="w-32 h-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                  Logo Image
+                </div>
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none">
+              {renderedBody.split('\n').map((line, i) => (
+                <p key={i}>{line || '\u00A0'}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Details view (default)
     let renderedBody = template.body;
     let renderedSubject = template.subject;
 
-    // Replace common placeholders with example values
     const exampleData: Record<string, string> = {
       '{{client_name}}': 'John Doe',
       '{{contact_name}}': 'John Doe',
@@ -386,42 +450,73 @@ export default function EmailTemplatesPage() {
     });
 
     return (
-      <div className="border rounded-lg p-6 bg-background">
-        <div className="mb-4">
-          <p className="text-sm font-medium text-muted-foreground">Subject:</p>
-          <p className="text-lg font-semibold">{renderedSubject}</p>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="capitalize">{template.category}</Badge>
+          <Badge variant={template.isActive ? "default" : "secondary"}>
+            {template.isActive ? "Active" : "Inactive"}
+          </Badge>
+          {template.scope === 'global' && <Badge variant="secondary">Global</Badge>}
         </div>
-        <Separator className="my-4" />
-        <div className="space-y-4">
-          {template.logoUrl && (
-            <div className="flex justify-center mb-6">
-              <div className="w-32 h-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
-                Logo Image
-              </div>
-            </div>
-          )}
-          <div className="prose prose-sm max-w-none">
-            {renderedBody.split('\n').map((line, i) => (
-              <p key={i}>{line || '\u00A0'}</p>
-            ))}
+        <Separator />
+        <div className="border rounded-lg p-6 bg-background">
+          <div className="mb-4">
+            <p className="text-sm font-medium text-muted-foreground">Subject:</p>
+            <p className="text-lg font-semibold">{renderedSubject}</p>
           </div>
-          {template.footerText && (
-            <>
-              <Separator className="my-6" />
-              <div className="text-center text-xs text-muted-foreground">
-                <p>{template.footerText}</p>
-              </div>
-            </>
-          )}
-          {template.socialLinks && Object.keys(template.socialLinks).length > 0 && (
-            <div className="flex justify-center gap-4 mt-4">
-              {Object.entries(template.socialLinks).map(([platform]) => (
-                <div key={platform} className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                  <Link2 className="w-4 h-4" />
+          <Separator className="my-4" />
+          <div className="space-y-4">
+            {template.logoUrl && (
+              <div className="flex justify-center mb-6">
+                <div className="w-32 h-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                  Logo Image
                 </div>
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none">
+              {renderedBody.split('\n').map((line, i) => (
+                <p key={i}>{line || '\u00A0'}</p>
               ))}
             </div>
-          )}
+            {template.footerText && (
+              <>
+                <Separator className="my-6" />
+                <div className="text-center text-xs text-muted-foreground">
+                  <p>{template.footerText}</p>
+                </div>
+              </>
+            )}
+            {template.socialLinks && Object.keys(template.socialLinks).length > 0 && (
+              <div className="flex justify-center gap-4 mt-4">
+                {Object.entries(template.socialLinks).map(([platform]) => (
+                  <div key={platform} className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                    <Link2 className="w-4 h-4" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        {template.brandingColors && Object.keys(template.brandingColors).length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <p className="text-sm font-medium mb-2">Brand Colors</p>
+              <div className="flex gap-2">
+                {Object.entries(template.brandingColors).map(([name, color]) => (
+                  <div key={name} className="flex items-center gap-1">
+                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: color }}></div>
+                    <span className="text-xs capitalize">{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <Separator />
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <p>Created {formatDistance(new Date(template.createdAt), new Date(), { addSuffix: true })}</p>
+          <p>Updated {formatDistance(new Date(template.updatedAt), new Date(), { addSuffix: true })}</p>
         </div>
       </div>
     );

@@ -30,8 +30,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
-import { DataTable, type ColumnDef } from "@/components/data-table";
+import { DataTable, type ColumnDef, type ViewMode } from "@/components/data-table";
 import { formatDistance } from "date-fns";
+import { Separator } from "@/components/ui/separator";
 
 type MessageTemplate = {
   id: string;
@@ -210,6 +211,89 @@ export default function MessageTemplatesPage() {
     form.reset();
   };
 
+  const renderPreview = (template: MessageTemplate, viewMode: ViewMode) => {
+    if (viewMode === "compact") {
+      return (
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Category</p>
+            <Badge variant="outline">{template.category}</Badge>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Status</p>
+            <div className="flex gap-1">
+              {template.isDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}
+              {!template.isActive && <Badge variant="destructive" className="text-xs">Inactive</Badge>}
+              {template.scope === 'global' && <Badge variant="secondary" className="text-xs">Global</Badge>}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Variables</p>
+            <p className="text-sm">{template.variables?.length || 0} variable(s)</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === "preview") {
+      return (
+        <div className="space-y-4">
+          <div className="bg-muted p-4 rounded-md">
+            <p className="text-sm whitespace-pre-wrap">{template.content}</p>
+          </div>
+          {template.variables && template.variables.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Available Variables:</p>
+              <div className="flex flex-wrap gap-1">
+                {template.variables.map((variable) => (
+                  <Badge key={variable} variant="secondary" className="font-mono text-xs">
+                    {`{{${variable}}}`}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Details view (default)
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">{template.category}</Badge>
+          {template.isDefault && <Badge variant="secondary">Default</Badge>}
+          {!template.isActive && <Badge variant="destructive">Inactive</Badge>}
+          {template.scope === 'global' && <Badge variant="secondary">Global</Badge>}
+        </div>
+        <Separator />
+        <div>
+          <p className="text-sm font-medium mb-2">Message Content</p>
+          <div className="bg-muted p-4 rounded-md text-sm whitespace-pre-wrap">
+            {template.content}
+          </div>
+        </div>
+        {template.variables && template.variables.length > 0 && (
+          <div>
+            <p className="text-sm font-medium mb-2">Variables</p>
+            <div className="flex flex-wrap gap-2">
+              {template.variables.map((variable) => (
+                <Badge key={variable} variant="secondary" className="font-mono text-xs">
+                  {`{{${variable}}}`}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        <Separator />
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <p>Created {formatDistance(new Date(template.createdAt), new Date(), { addSuffix: true })}</p>
+          <p>Updated {formatDistance(new Date(template.updatedAt), new Date(), { addSuffix: true })}</p>
+        </div>
+      </div>
+    );
+  };
+
   const columns: ColumnDef<MessageTemplate>[] = [
     {
       id: "name",
@@ -314,125 +398,67 @@ export default function MessageTemplatesPage() {
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex gap-6">
-          {/* Main List */}
-          <div className={previewTemplate ? "flex-1" : "w-full"}>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <DataTable
-                data={templates || []}
-                columns={columns}
-                searchPlaceholder="Search templates..."
-                searchKeys={["name", "category", "content"]}
-                onRowClick={setPreviewTemplate}
-                selectedRow={previewTemplate}
-                actions={(template) => (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setPreviewTemplate(template)}
-                      data-testid={`button-preview-${template.id}`}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(template)}
-                      data-testid={`button-edit-${template.id}`}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteConfirmTemplate(template)}
-                      data-testid={`button-delete-${template.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-                emptyState={
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-1">No templates found</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {templates?.length === 0 
-                        ? "Create your first message template to get started"
-                        : "Try adjusting your search"}
-                    </p>
-                    {templates?.length === 0 && (
-                      <Button onClick={() => setDialogOpen(true)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Template
-                      </Button>
-                    )}
-                  </div>
-                }
-              />
-            )}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
-
-          {/* Preview Panel */}
-          {previewTemplate && (
-            <Card className="w-96 h-fit sticky top-6">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg">{previewTemplate.name}</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setPreviewTemplate(null)}
-                    data-testid="button-close-preview"
-                  >
-                    <span className="sr-only">Close</span>
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+        ) : (
+          <DataTable
+            data={templates || []}
+            columns={columns}
+            searchPlaceholder="Search templates..."
+            searchKeys={["name", "category", "content"]}
+            onRowClick={setPreviewTemplate}
+            selectedRow={previewTemplate}
+            renderPreview={renderPreview}
+            previewTitle={(template) => template.name}
+            actions={(template) => (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPreviewTemplate(template)}
+                  data-testid={`button-preview-${template.id}`}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEdit(template)}
+                  data-testid={`button-edit-${template.id}`}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeleteConfirmTemplate(template)}
+                  data-testid={`button-delete-${template.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+            emptyState={
+              <div className="flex flex-col items-center justify-center py-12">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-1">No templates found</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {templates?.length === 0 
+                    ? "Create your first message template to get started"
+                    : "Try adjusting your search"}
+                </p>
+                {templates?.length === 0 && (
+                  <Button onClick={() => setDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Template
                   </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="outline">{previewTemplate.category}</Badge>
-                  {previewTemplate.isDefault && (
-                    <Badge variant="secondary">Default</Badge>
-                  )}
-                  {!previewTemplate.isActive && (
-                    <Badge variant="destructive">Inactive</Badge>
-                  )}
-                  {previewTemplate.scope === 'global' && (
-                    <Badge variant="secondary">Global</Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium mb-2">Message Content</p>
-                  <div className="bg-muted p-4 rounded-md text-sm whitespace-pre-wrap">
-                    {previewTemplate.content}
-                  </div>
-                </div>
-                {previewTemplate.variables && previewTemplate.variables.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium mb-2">Variables</p>
-                    <div className="flex flex-wrap gap-2">
-                      {previewTemplate.variables.map((variable) => (
-                        <Badge key={variable} variant="secondary" className="font-mono text-xs">
-                          {`{{${variable}}}`}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
                 )}
-                <div className="text-xs text-muted-foreground">
-                  Created {formatDistance(new Date(previewTemplate.createdAt), new Date(), { addSuffix: true })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            }
+          />
+        )}
       </div>
 
       {/* Create/Edit Dialog */}
