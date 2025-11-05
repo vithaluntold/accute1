@@ -482,7 +482,7 @@ export default function EmailTemplatesPage() {
               </Button>
             ) : (
               <Button 
-                onClick={() => setLocation('/marketplace?category=ai-agents')} 
+                onClick={() => setLocation('/ai-agents')} 
                 variant="outline"
                 className="bg-white/10 text-white border-white/20"
                 data-testid="button-install-scribe"

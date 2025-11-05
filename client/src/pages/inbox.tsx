@@ -180,7 +180,7 @@ export default function Inbox() {
           ) : (
             <Button
               variant="outline"
-              onClick={() => setLocation('/marketplace?category=ai-agents')}
+              onClick={() => setLocation('/ai-agents')}
               data-testid="button-install-relay"
             >
               <Sparkles className="w-4 h-4 mr-2" />

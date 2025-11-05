@@ -162,7 +162,7 @@ export function DataTable<T extends Record<string, any>>({
             data-testid="input-search"
           />
         </div>
-        {renderPreview && (
+        {renderPreview && selectedRow && (
           <Button
             variant="outline"
             size="sm"
