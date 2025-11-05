@@ -98,7 +98,11 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
 - **Session Management**: All agents support persistent chat sessions with conversation history
 - **Agent Details**:
-  - **Forma**: Form builder for client intake and data collection
+  - **Forma**: Intelligent form builder for client intake and data collection
+    - Supports 30+ field types (text, select, multi-select, radio, email, phone, date, currency, signature, etc.)
+    - Smart field type selection based on data requirements
+    - Single choice lists → dropdown, Multiple choices → multi-select, Yes/No/NA → radio buttons
+    - Never defaults to text fields when more specific types are appropriate
   - **Cadence**: Workflow automation designer
   - **Parity**: Document generation specialist
   - **Echo**: Message template creator

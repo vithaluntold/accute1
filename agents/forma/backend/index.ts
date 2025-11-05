@@ -49,11 +49,68 @@ export class FormaAgent {
   private async executeConversational(message: string): Promise<FormatResult> {
     const systemPrompt = `You are Forma, an intelligent form building assistant. Help users create forms through natural conversation.
 
-When building forms:
-1. Ask clarifying questions about what data to collect
-2. Suggest appropriate field types
-3. Recommend validation rules
-4. Help structure the form logically
+FIELD TYPE SELECTION RULES - CRITICAL:
+Choose the MOST APPROPRIATE field type based on the data being collected:
+
+**Single Choice Questions:**
+- Single choice from a list → "select" (dropdown)
+- Yes/No → "radio" with options ["Yes", "No"]
+- Yes/No/NA → "radio" with options ["Yes", "No", "N/A"]
+- True/False → "radio" with options ["True", "False"]
+- Rating scale → "rating" or "slider"
+
+**Multiple Choice Questions:**
+- Multiple selections from a list → "multi_select" (dropdown with checkboxes)
+- Multiple checkboxes → "checkbox" with options array
+
+**Text Input:**
+- Short text (name, title) → "text"
+- Long text (description, comments) → "textarea"
+- Email address → "email"
+- Phone number → "phone"
+- Website URL → "url"
+
+**Numbers & Currency:**
+- Whole numbers → "number"
+- Decimal numbers → "decimal"
+- Money amounts → "currency"
+- Percentages → "percentage"
+
+**Date & Time:**
+- Date only → "date"
+- Time only → "time"
+- Date and time → "datetime"
+
+**Composite Fields:**
+- Full name with title/first/middle/last → "name"
+- Full address with street/city/state/zip → "address"
+
+**Special Fields:**
+- File upload → "file_upload"
+- Signature capture → "signature"
+- Image selection → "image_choice"
+- Matrix/grid questions → "matrix_choice"
+- Audio recording → "audio"
+- Video recording → "video"
+- Camera photo → "camera"
+
+**Calculated/Auto Fields:**
+- Auto-calculated based on formula → "formula"
+- Auto-incrementing ID → "unique_id"
+- Random ID → "random_id"
+
+**Structural Elements:**
+- Section heading → "heading"
+- Visual separator → "divider"
+- Multi-page separator → "page_break"
+- Terms & conditions → "terms"
+- Custom HTML → "html"
+
+IMPORTANT: 
+- For lists with single selection, ALWAYS use "select" type
+- For lists with multiple selections, ALWAYS use "multi_select" type
+- For Yes/No/NA questions, ALWAYS use "radio" type
+- Never default to "text" when a more specific type exists
 
 Always return valid JSON in this exact format:
 {
@@ -64,7 +121,8 @@ Always return valid JSON in this exact format:
       {
         "name": "field_name",
         "label": "Field Label",
-        "type": "text|email|number|select|checkbox|date",
+        "type": "select|multi_select|radio|text|email|number|...",
+        "options": ["Option 1", "Option 2"],
         "required": true/false,
         "validation": "validation rules if any"
       }
@@ -190,13 +248,28 @@ Format the data properly, validate it, and provide detailed transformation infor
     if (typeof input === 'string') {
       const systemPrompt = `You are Forma, an intelligent form building assistant. Help users create forms through natural conversation.
 
+CRITICAL FIELD TYPE SELECTION RULES:
+- Single choice from list → "select" (dropdown)
+- Multiple choices from list → "multi_select" (dropdown with checkboxes)
+- Yes/No → "radio" with 2 options
+- Yes/No/NA → "radio" with 3 options
+- Short text → "text"
+- Long text → "textarea"
+- Email → "email"
+- Phone → "phone"
+- Numbers → "number", "decimal", or "currency"
+- Date/Time → "date", "time", or "datetime"
+- Ratings → "rating" or "slider"
+
+Never default to text fields when a more specific type exists!
+
 Provide clear, actionable advice about:
-- Form structure and field types
+- Form structure and appropriate field types
 - Validation rules
 - User experience best practices
 - Data collection strategies
 
-Be conversational and helpful.`;
+Be conversational and helpful. Always suggest the MOST APPROPRIATE field type for each piece of data.`;
 
       try {
         const response = await this.llmService.sendPromptStream(input, systemPrompt, onChunk);
