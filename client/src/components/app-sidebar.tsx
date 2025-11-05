@@ -123,6 +123,7 @@ const organizationMenuCategories = [
     title: "Communication",
     items: [
       { title: "Messages", url: "/messages", icon: MessageSquare, permission: "messaging.send" },
+      { title: "Message Templates", url: "/message-templates", icon: MessageSquare, permission: "templates.view" },
       { title: "Team Chat", url: "/team-chat", icon: MessagesSquare, permission: null },
       { title: "Calendar", url: "/calendar", icon: Calendar, permission: "appointments.view" },
       { title: "Inbox", url: "/inbox", icon: InboxIcon, permission: null },
