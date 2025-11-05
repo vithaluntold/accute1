@@ -712,9 +712,10 @@ function Router() {
           </AppLayout>
         </OrganizationRoute>
       </Route>
-      <Route path="/pricing">
+      {/* DISABLED: Subscription pricing route removed */}
+      {/* <Route path="/pricing">
         <SubscriptionPricing />
-      </Route>
+      </Route> */}
       <Route path="/payments">
         <OrganizationRoute>
           <AppLayout>
