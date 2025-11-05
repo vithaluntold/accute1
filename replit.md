@@ -98,16 +98,27 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
 - **Session Management**: All agents support persistent chat sessions with conversation history
 - **Agent Details**:
-  - **Forma**: RAG-Enhanced Intelligent Form Builder
-    - **Architecture**: Full RAG (Retrieval-Augmented Generation) with semantic intelligence
+  - **Forma**: RAG-Enhanced Intelligent Form Builder with Function Calling
+    - **Architecture**: Full RAG (Retrieval-Augmented Generation) with LLM function calling for dynamic tool usage
+    - **FormaLLMService**: Standalone LLM service exclusive to Forma with function calling support
+      - Isolated from base LLMService - zero impact on other 8 agents
+      - Supports OpenAI and Azure OpenAI function calling
+      - Max 5 tool iterations with safety guards
+      - Graceful fallback to base service on errors
+      - Tool execution logging and error handling
     - **Field Catalog**: 30+ field types with semantic metadata, use cases, and UX heuristics
     - **Form Exemplars**: Curated high-quality forms from multiple industries demonstrating intelligent field selection
     - **Semantic Retrieval**: Context-aware retrieval of relevant field types and patterns based on user intent
+    - **Dynamic Tool Calling**: LLM autonomously calls 5 tools during inference:
+      - `search_field_catalog`: Find relevant field types based on query
+      - `get_field_type_details`: Deep dive on specific field types
+      - `get_industry_exemplars`: Retrieve industry-specific examples
+      - `get_available_field_types`: List all available field types
+      - `get_full_field_catalog`: Access complete field reference
     - **Reasoning Chains**: Uses 4-step reasoning process (Understand Intent → Infer Semantics → Select Best Fit → Validate UX)
     - **Organization Context**: Adapts field selection based on organization industry and compliance needs
     - **Self-Critique**: Generates explanations for field type choices with reasoning
-    - **Dynamic Tools**: Can query field catalog and exemplars during inference for up-to-date information
-    - **Seamless Intelligence**: No hardcoded rules - uses principles-based reasoning with retrieved context
+    - **Seamless Intelligence**: No hardcoded rules - uses principles-based reasoning with retrieved context and dynamic tool calls
     - Example behaviors: Single choice → select, Multiple choices → multi_select, Yes/No/NA → radio, Money → currency
   - **Cadence**: Workflow automation designer
   - **Parity**: Document generation specialist
