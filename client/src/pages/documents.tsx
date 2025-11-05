@@ -30,15 +30,16 @@ import { formatDistance } from "date-fns";
 import { TagSelector } from "@/components/tag-selector";
 import type { InstalledAgentView } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
+import { DataTable, type ColumnDef } from "@/components/data-table";
 
 export default function Documents() {
   const [location, setLocation] = useLocation();
   const { toast} = useToast();
-  const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<any | null>(null);
   
   // Check for marketplace template ID in URL
   const params = new URLSearchParams(location.split('?')[1]);
@@ -173,9 +174,63 @@ export default function Documents() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  const filteredDocuments = documents.filter((doc: any) =>
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const columns: ColumnDef<any>[] = [
+    {
+      id: "name",
+      header: "Name",
+      accessorKey: "name",
+      cell: (doc) => (
+        <div className="flex items-center gap-3">
+          {getFileIcon(doc.type)}
+          <div className="font-medium">{doc.name}</div>
+        </div>
+      ),
+    },
+    {
+      id: "type",
+      header: "Type",
+      accessorFn: (doc) => doc.type.split('/').pop() || doc.type,
+      cell: (doc) => (
+        <Badge variant="outline" className="text-xs">
+          {doc.type.split('/').pop()?.toUpperCase() || 'FILE'}
+        </Badge>
+      ),
+      width: "120px",
+    },
+    {
+      id: "size",
+      header: "Size",
+      accessorKey: "size",
+      cell: (doc) => (
+        <div className="text-sm text-muted-foreground">
+          {formatFileSize(doc.size)}
+        </div>
+      ),
+      width: "100px",
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "status",
+      cell: (doc) => (
+        <Badge variant={doc.status === "pending" ? "outline" : "default"}>
+          {doc.status}
+        </Badge>
+      ),
+      width: "100px",
+    },
+    {
+      id: "createdAt",
+      header: "Uploaded",
+      accessorKey: "createdAt",
+      cell: (doc) => (
+        <div className="text-sm text-muted-foreground">
+          {formatDistance(new Date(doc.createdAt), new Date(), { addSuffix: true })}
+        </div>
+      ),
+      width: "150px",
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -286,76 +341,30 @@ export default function Documents() {
         }
       />
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-      <div className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search documents..."
-            className="pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            data-testid="input-search-documents"
-          />
-        </div>
-      </div>
-
-      {filteredDocuments.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2" data-testid="text-no-documents">
-              {documents.length === 0 ? "No documents yet" : "No matching documents"}
-            </h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
-              {documents.length === 0
-                ? "Upload your first document to get started"
-                : "Try adjusting your search"}
-            </p>
-            {documents.length === 0 && (
-              <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-upload-first">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Document
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocuments.map((doc: any) => (
-            <Card key={doc.id} className="hover-elevate" data-testid={`document-card-${doc.id}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    {getFileIcon(doc.type)}
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base truncate" data-testid={`document-name-${doc.id}`}>
-                        {doc.name}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-2 text-xs mt-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDistance(new Date(doc.createdAt), new Date(), { addSuffix: true })}
-                      </CardDescription>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Size:</span>
-                  <span data-testid={`document-size-${doc.id}`}>{formatFileSize(doc.size)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Badge variant={doc.status === "pending" ? "outline" : "default"} data-testid={`document-status-${doc.id}`}>
-                    {doc.status}
-                  </Badge>
-                </div>
-                <TagSelector resourceType="document" resourceId={doc.id} />
-                <div className="flex gap-2">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex gap-6">
+          {/* Main List */}
+          <div className={previewDocument ? "flex-1" : "w-full"}>
+            <DataTable
+              data={documents}
+              columns={columns}
+              searchPlaceholder="Search documents..."
+              searchKeys={["name", "type"]}
+              onRowClick={setPreviewDocument}
+              selectedRow={previewDocument}
+              actions={(doc) => (
+                <>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPreviewDocument(doc)}
+                    data-testid={`button-preview-${doc.id}`}
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={async () => {
                       try {
                         const response = await fetch(`/api/documents/${doc.id}/download`, {
@@ -381,23 +390,94 @@ export default function Documents() {
                     }}
                     data-testid={`button-download-${doc.id}`}
                   >
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
+                    <Download className="w-4 h-4" />
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setDeleteTarget(doc.id)}
                     data-testid={`button-delete-${doc.id}`}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
+                </>
+              )}
+              emptyState={
+                <div className="flex flex-col items-center justify-center py-12">
+                  <FileText className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-1" data-testid="text-no-documents">
+                    {documents.length === 0 ? "No documents yet" : "No matching documents"}
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {documents.length === 0
+                      ? "Upload your first document to get started"
+                      : "Try adjusting your search"}
+                  </p>
+                  {documents.length === 0 && (
+                    <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-upload-first">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Document
+                    </Button>
+                  )}
+                </div>
+              }
+            />
+          </div>
+
+          {/* Preview Panel */}
+          {previewDocument && (
+            <Card className="w-96 h-fit sticky top-6">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    {getFileIcon(previewDocument.type)}
+                    <CardTitle className="text-lg">{previewDocument.name}</CardTitle>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPreviewDocument(null)}
+                    data-testid="button-close-preview"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Type</p>
+                    <Badge variant="outline">{previewDocument.type.split('/').pop()?.toUpperCase()}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Size</p>
+                    <p className="font-medium" data-testid={`document-size-${previewDocument.id}`}>
+                      {formatFileSize(previewDocument.size)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Status</p>
+                    <Badge variant={previewDocument.status === "pending" ? "outline" : "default"} data-testid={`document-status-${previewDocument.id}`}>
+                      {previewDocument.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Uploaded</p>
+                    <p className="text-sm">
+                      {formatDistance(new Date(previewDocument.createdAt), new Date(), { addSuffix: true })}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Tags</p>
+                  <TagSelector resourceType="document" resourceId={previewDocument.id} />
                 </div>
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
-      )}
+      </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
@@ -426,7 +506,6 @@ export default function Documents() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
     </div>
   );
 }
