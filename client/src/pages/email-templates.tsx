@@ -39,6 +39,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
+import { DataTable, type ColumnDef } from "@/components/data-table";
+import { formatDistance } from "date-fns";
 
 type EmailTemplate = {
   id: string;
@@ -299,6 +301,71 @@ export default function EmailTemplatesPage() {
     }
   };
 
+  const columns: ColumnDef<EmailTemplate>[] = [
+    {
+      id: "name",
+      header: "Template Name",
+      accessorKey: "name",
+      cell: (template) => (
+        <div className="font-medium">{template.name}</div>
+      ),
+    },
+    {
+      id: "subject",
+      header: "Subject",
+      accessorKey: "subject",
+      cell: (template) => (
+        <div className="text-sm text-muted-foreground max-w-md truncate">
+          {template.subject}
+        </div>
+      ),
+    },
+    {
+      id: "category",
+      header: "Category",
+      accessorKey: "category",
+      cell: (template) => (
+        <Badge variant="outline" className="capitalize">
+          {template.category}
+        </Badge>
+      ),
+      width: "120px",
+    },
+    {
+      id: "status",
+      header: "Status",
+      accessorKey: "isActive",
+      cell: (template) => (
+        <Badge variant={template.isActive ? "default" : "secondary"}>
+          {template.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+      width: "100px",
+    },
+    {
+      id: "scope",
+      header: "Scope",
+      accessorKey: "scope",
+      cell: (template) => (
+        <Badge variant={template.scope === 'global' ? "secondary" : "outline"}>
+          {template.scope === 'global' ? "Global" : "Organization"}
+        </Badge>
+      ),
+      width: "120px",
+    },
+    {
+      id: "createdAt",
+      header: "Created",
+      accessorKey: "createdAt",
+      cell: (template) => (
+        <div className="text-sm text-muted-foreground">
+          {formatDistance(new Date(template.createdAt), new Date(), { addSuffix: true })}
+        </div>
+      ),
+      width: "150px",
+    },
+  ];
+
   const renderPreview = (template: EmailTemplate) => {
     let renderedBody = template.body;
     let renderedSubject = template.subject;
@@ -396,45 +463,24 @@ export default function EmailTemplatesPage() {
         }
       />
       
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-
-      <div className="grid grid-cols-1 gap-6">
-        {isLoading ? (
-          <Card>
-            <CardContent className="flex items-center justify-center h-32">
-              <p className="text-muted-foreground">Loading templates...</p>
-            </CardContent>
-          </Card>
-        ) : templates?.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center h-64">
-              <Mail className="w-16 h-16 mb-4 opacity-50" />
-              <p className="text-muted-foreground">No email templates yet. Create one to get started!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          templates?.map((template) => (
-            <Card key={template.id} data-testid={`card-template-${template.id}`}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <CardTitle>{template.name}</CardTitle>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className="capitalize">{template.category}</Badge>
-                        {template.scope === 'global' && (
-                          <Badge variant="secondary" className="text-xs">Global</Badge>
-                        )}
-                        <Badge variant={template.isActive ? "default" : "secondary"}>
-                          {template.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <CardDescription className="mt-2">
-                      Subject: {template.subject}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex gap-6">
+          {/* Main List */}
+          <div className={previewTemplate ? "flex-1" : "w-full"}>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <p className="text-muted-foreground">Loading templates...</p>
+              </div>
+            ) : (
+              <DataTable
+                data={templates || []}
+                columns={columns}
+                searchPlaceholder="Search email templates..."
+                searchKeys={["name", "subject", "category"]}
+                onRowClick={setPreviewTemplate}
+                selectedRow={previewTemplate}
+                actions={(template) => (
+                  <>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -463,40 +509,59 @@ export default function EmailTemplatesPage() {
                         </Button>
                       </>
                     )}
+                  </>
+                )}
+                emptyState={
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Mail className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-1">No email templates yet</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Create one to get started!
+                    </p>
+                    <Button onClick={() => handleOpenDialog()} data-testid="button-create-first">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Template
+                    </Button>
                   </div>
+                }
+              />
+            )}
+          </div>
+
+          {/* Preview Panel */}
+          {previewTemplate && (
+            <Card className="w-96 h-fit sticky top-6 max-h-[calc(100vh-200px)] overflow-auto">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <CardTitle className="text-lg">{previewTemplate.name}</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPreviewTemplate(null)}
+                    data-testid="button-close-preview"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                  </Button>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Badge variant="outline" className="capitalize">
+                    {previewTemplate.category}
+                  </Badge>
+                  {previewTemplate.scope === 'global' && (
+                    <Badge variant="secondary" className="text-xs">Global</Badge>
+                  )}
+                  <Badge variant={previewTemplate.isActive ? "default" : "secondary"}>
+                    {previewTemplate.isActive ? "Active" : "Inactive"}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium mb-1">Body Preview:</p>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{template.body}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {template.logoUrl && (
-                      <Badge variant="outline" className="gap-1">
-                        <Image className="w-3 h-3" />
-                        Logo
-                      </Badge>
-                    )}
-                    {template.brandingColors && (
-                      <Badge variant="outline" className="gap-1">
-                        <Palette className="w-3 h-3" />
-                        Custom Colors
-                      </Badge>
-                    )}
-                    {template.socialLinks && Object.keys(template.socialLinks).length > 0 && (
-                      <Badge variant="outline" className="gap-1">
-                        <Link2 className="w-3 h-3" />
-                        Social Links
-                      </Badge>
-                    )}
-                  </div>
-                </div>
+                {renderPreview(previewTemplate)}
               </CardContent>
             </Card>
-          ))
-        )}
+          )}
+        </div>
       </div>
 
       {/* Create/Edit Dialog */}
@@ -768,7 +833,6 @@ export default function EmailTemplatesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
     </div>
   );
 }
