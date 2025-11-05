@@ -1,5 +1,7 @@
 import type { LlmConfiguration } from '../../../shared/schema';
 import { LLMService } from '../../../server/llm-service';
+import { retrieveRelevantContext, extractFieldTypeRecommendations, type RetrievalContext } from '../retrieval-service';
+import { executeFormaTool, getFormaToolsForLLM } from '../tools';
 
 export interface FormatResult {
   success: boolean;
@@ -16,6 +18,7 @@ export interface FormatResult {
     action: string;
   }[];
   suggestions: string[];
+  reasoning?: string;
 }
 
 export interface FormaInput {
@@ -23,17 +26,23 @@ export interface FormaInput {
   targetFormat?: 'json' | 'csv' | 'xml' | 'accounting' | 'custom';
   formatRules?: string[];
   validationRules?: string[];
+  organizationContext?: {
+    industry?: string;
+    name?: string;
+  };
 }
 
 /**
- * Forma AI Agent
- * Formats and validates documents and data according to specified rules
+ * Forma AI Agent - RAG-Enhanced Intelligent Form Builder
+ * Uses retrieval-augmented generation with field catalog and exemplars
  */
 export class FormaAgent {
   private llmService: LLMService;
+  private organizationContext?: { industry?: string; name?: string };
   
-  constructor(llmConfig: LlmConfiguration) {
+  constructor(llmConfig: LlmConfiguration, organizationContext?: { industry?: string; name?: string }) {
     this.llmService = new LLMService(llmConfig);
+    this.organizationContext = organizationContext;
   }
   
   async execute(input: FormaInput | string): Promise<FormatResult> {
@@ -42,101 +51,30 @@ export class FormaAgent {
       return this.executeConversational(input);
     }
     
+    // Merge organization context
+    if (input.organizationContext) {
+      this.organizationContext = input.organizationContext;
+    }
+    
     // Handle structured input
     return this.executeStructured(input);
   }
   
   private async executeConversational(message: string): Promise<FormatResult> {
-    const systemPrompt = `You are Forma, an intelligent form building assistant. Help users create forms through natural conversation.
-
-FIELD TYPE SELECTION RULES - CRITICAL:
-Choose the MOST APPROPRIATE field type based on the data being collected:
-
-**Single Choice Questions:**
-- Single choice from a list → "select" (dropdown)
-- Yes/No → "radio" with options ["Yes", "No"]
-- Yes/No/NA → "radio" with options ["Yes", "No", "N/A"]
-- True/False → "radio" with options ["True", "False"]
-- Rating scale → "rating" or "slider"
-
-**Multiple Choice Questions:**
-- Multiple selections from a list → "multi_select" (dropdown with checkboxes)
-- Multiple checkboxes → "checkbox" with options array
-
-**Text Input:**
-- Short text (name, title) → "text"
-- Long text (description, comments) → "textarea"
-- Email address → "email"
-- Phone number → "phone"
-- Website URL → "url"
-
-**Numbers & Currency:**
-- Whole numbers → "number"
-- Decimal numbers → "decimal"
-- Money amounts → "currency"
-- Percentages → "percentage"
-
-**Date & Time:**
-- Date only → "date"
-- Time only → "time"
-- Date and time → "datetime"
-
-**Composite Fields:**
-- Full name with title/first/middle/last → "name"
-- Full address with street/city/state/zip → "address"
-
-**Special Fields:**
-- File upload → "file_upload"
-- Signature capture → "signature"
-- Image selection → "image_choice"
-- Matrix/grid questions → "matrix_choice"
-- Audio recording → "audio"
-- Video recording → "video"
-- Camera photo → "camera"
-
-**Calculated/Auto Fields:**
-- Auto-calculated based on formula → "formula"
-- Auto-incrementing ID → "unique_id"
-- Random ID → "random_id"
-
-**Structural Elements:**
-- Section heading → "heading"
-- Visual separator → "divider"
-- Multi-page separator → "page_break"
-- Terms & conditions → "terms"
-- Custom HTML → "html"
-
-IMPORTANT: 
-- For lists with single selection, ALWAYS use "select" type
-- For lists with multiple selections, ALWAYS use "multi_select" type
-- For Yes/No/NA questions, ALWAYS use "radio" type
-- Never default to "text" when a more specific type exists
-
-Always return valid JSON in this exact format:
-{
-  "success": true,
-  "formattedData": {
-    "formName": "Name of the form",
-    "fields": [
-      {
-        "name": "field_name",
-        "label": "Field Label",
-        "type": "select|multi_select|radio|text|email|number|...",
-        "options": ["Option 1", "Option 2"],
-        "required": true/false,
-        "validation": "validation rules if any"
-      }
-    ]
-  },
-  "validationResults": {
-    "isValid": true,
-    "errors": [],
-    "warnings": []
-  },
-  "transformations": [],
-  "suggestions": ["Suggestion 1", "Suggestion 2"]
-}`;
-
+    // STEP 1: Retrieve relevant context from field catalog and exemplars
+    const retrievalContext: RetrievalContext = {
+      userQuery: message,
+      organizationIndustry: this.organizationContext?.industry,
+      organizationContext: this.organizationContext?.name
+    };
+    
+    const retrievedContext = retrieveRelevantContext(retrievalContext);
+    const fieldRecommendations = extractFieldTypeRecommendations(retrievedContext);
+    
+    // STEP 2: Build reasoning-based system prompt with retrieved context
+    const systemPrompt = this.buildReasoningPrompt(retrievedContext, fieldRecommendations);
+    
+    // STEP 3: Send to LLM for intelligent reasoning
     try {
       const response = await this.llmService.sendPrompt(message, systemPrompt);
       
@@ -148,6 +86,12 @@ Always return valid JSON in this exact format:
       }
       
       const formatResult = JSON.parse(jsonStr);
+      
+      // STEP 4: Add self-critique reasoning
+      if (formatResult.formattedData?.fields) {
+        formatResult.reasoning = this.generateFieldReasoningExplanation(formatResult.formattedData.fields);
+      }
+      
       return formatResult;
     } catch (error) {
       console.error('Forma conversational mode failed:', error);
@@ -166,6 +110,102 @@ Always return valid JSON in this exact format:
         suggestions: ['Tell me what data you need to collect', 'Describe the purpose of this form', 'What fields should it have?']
       };
     }
+  }
+  
+  /**
+   * Build reasoning-based prompt with retrieved context
+   */
+  private buildReasoningPrompt(retrievedContext: any, fieldRecommendations: string): string {
+    return `You are Forma, an intelligent form building assistant with expertise in user experience and data collection design.
+
+Your approach to form building:
+1. **Understand Intent**: Analyze what data the user needs to collect and why
+2. **Infer Semantics**: Determine the nature and type of each data point
+3. **Select Best Fit**: Choose field types that match data semantics and optimize user experience
+4. **Validate UX**: Ensure the form is intuitive, accessible, and minimizes user error
+
+${this.organizationContext ? `Organization Context:
+- Organization: ${this.organizationContext.name || 'Unknown'}
+- Industry: ${this.organizationContext.industry || 'General'}
+` : ''}
+
+${retrievedContext.semanticGuidance}
+
+${fieldRecommendations}
+
+Key Principles:
+- Match field types to data semantics (use email fields for emails, currency for money, etc.)
+- Use dropdowns (select) when there's a single choice from predefined options
+- Use multi-select when users may choose multiple items from a list
+- Use radio buttons when you want all options visible immediately (best for 2-5 mutually exclusive choices)
+- Use text areas for multi-line content, not single-line inputs
+- Consider mobile UX - appropriate keyboards and input methods
+- Prioritize data quality through appropriate field types and validation
+
+When building forms, reason through:
+1. What is the purpose of each field?
+2. What type of data does it collect?
+3. How will users interact with it?
+4. What field type best serves these needs?
+
+Always return valid JSON in this exact format:
+{
+  "success": true,
+  "formattedData": {
+    "formName": "Name of the form",
+    "fields": [
+      {
+        "name": "field_name",
+        "label": "Field Label",
+        "type": "select|multi_select|radio|text|email|number|currency|date|etc",
+        "options": ["Option 1", "Option 2"],
+        "required": true/false,
+        "validation": "validation rules if any"
+      }
+    ]
+  },
+  "validationResults": {
+    "isValid": true,
+    "errors": [],
+    "warnings": []
+  },
+  "transformations": [],
+  "suggestions": ["Suggestion 1", "Suggestion 2"]
+}`;
+  }
+  
+  /**
+   * Generate explanation of field type choices
+   */
+  private generateFieldReasoningExplanation(fields: any[]): string {
+    const explanations = fields.slice(0, 5).map(field => {
+      return `- "${field.label}" (${field.type}): Chosen for ${this.explainFieldTypeChoice(field.type, field.label)}`;
+    });
+    
+    return `Field Type Decisions:\n${explanations.join('\n')}`;
+  }
+  
+  /**
+   * Explain why a field type was chosen
+   */
+  private explainFieldTypeChoice(type: string, label: string): string {
+    const explanations: Record<string, string> = {
+      'select': 'single selection from predefined options',
+      'multi_select': 'allowing multiple selections from a list',
+      'radio': 'mutually exclusive choices with immediate visibility',
+      'checkbox': 'independent yes/no options',
+      'text': 'short freeform text entry',
+      'textarea': 'multi-line detailed responses',
+      'email': 'email validation and mobile keyboard optimization',
+      'phone': 'phone number formatting and numeric keyboard',
+      'number': 'whole number input',
+      'currency': 'monetary values with proper formatting',
+      'date': 'date selection with calendar picker',
+      'signature': 'legal signature capture',
+      'file_upload': 'document or file submission'
+    };
+    
+    return explanations[type] || 'appropriate data semantics';
   }
   
   private async executeStructured(input: FormaInput): Promise<FormatResult> {
@@ -241,35 +281,46 @@ Format the data properly, validate it, and provide detailed transformation infor
   }
 
   /**
-   * Execute in streaming mode for real-time responses
+   * Execute in streaming mode for real-time responses with RAG
    */
   async executeStream(input: FormaInput | string, onChunk: (chunk: string) => void): Promise<string> {
     // Handle string input for conversational streaming
     if (typeof input === 'string') {
-      const systemPrompt = `You are Forma, an intelligent form building assistant. Help users create forms through natural conversation.
+      // STEP 1: Retrieve relevant context
+      const retrievalContext: RetrievalContext = {
+        userQuery: input,
+        organizationIndustry: this.organizationContext?.industry,
+        organizationContext: this.organizationContext?.name
+      };
+      
+      const retrievedContext = retrieveRelevantContext(retrievalContext);
+      const fieldRecommendations = extractFieldTypeRecommendations(retrievedContext);
+      
+      // STEP 2: Build reasoning prompt with retrieved context
+      const systemPrompt = `You are Forma, an intelligent form building assistant with expertise in user experience and data collection design.
 
-CRITICAL FIELD TYPE SELECTION RULES:
-- Single choice from list → "select" (dropdown)
-- Multiple choices from list → "multi_select" (dropdown with checkboxes)
-- Yes/No → "radio" with 2 options
-- Yes/No/NA → "radio" with 3 options
-- Short text → "text"
-- Long text → "textarea"
-- Email → "email"
-- Phone → "phone"
-- Numbers → "number", "decimal", or "currency"
-- Date/Time → "date", "time", or "datetime"
-- Ratings → "rating" or "slider"
+Your approach to form building:
+1. **Understand Intent**: Analyze what data the user needs to collect and why
+2. **Infer Semantics**: Determine the nature and type of each data point
+3. **Select Best Fit**: Choose field types that match data semantics and optimize user experience
+4. **Validate UX**: Ensure the form is intuitive, accessible, and minimizes user error
 
-Never default to text fields when a more specific type exists!
+${this.organizationContext ? `Organization Context:
+- Organization: ${this.organizationContext.name || 'Unknown'}
+- Industry: ${this.organizationContext.industry || 'General'}
+` : ''}
 
-Provide clear, actionable advice about:
-- Form structure and appropriate field types
-- Validation rules
-- User experience best practices
-- Data collection strategies
+${retrievedContext.semanticGuidance}
 
-Be conversational and helpful. Always suggest the MOST APPROPRIATE field type for each piece of data.`;
+${fieldRecommendations}
+
+Key Principles:
+- Match field types to data semantics (email for emails, currency for money, select for single choices, multi_select for multiple choices)
+- Use radio buttons when all options should be visible (2-5 mutually exclusive choices)
+- Use text areas for multi-line content, not single-line inputs
+- Consider mobile UX and data quality
+
+Provide clear, actionable advice. Be conversational and helpful. Explain your reasoning when suggesting field types.`;
 
       try {
         const response = await this.llmService.sendPromptStream(input, systemPrompt, onChunk);
