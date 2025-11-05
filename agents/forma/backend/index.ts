@@ -1,5 +1,5 @@
 import type { LlmConfiguration } from '../../../shared/schema';
-import { LLMService } from '../../../server/llm-service';
+import { FormaLLMService } from '../llm-service';
 import { retrieveRelevantContext, extractFieldTypeRecommendations, type RetrievalContext } from '../retrieval-service';
 import { executeFormaTool, getFormaToolsForLLM } from '../tools';
 
@@ -35,13 +35,14 @@ export interface FormaInput {
 /**
  * Forma AI Agent - RAG-Enhanced Intelligent Form Builder
  * Uses retrieval-augmented generation with field catalog and exemplars
+ * Now with dynamic function calling for seamless tool usage
  */
 export class FormaAgent {
-  private llmService: LLMService;
+  private llmService: FormaLLMService;
   private organizationContext?: { industry?: string; name?: string };
   
   constructor(llmConfig: LlmConfiguration, organizationContext?: { industry?: string; name?: string }) {
-    this.llmService = new LLMService(llmConfig);
+    this.llmService = new FormaLLMService(llmConfig);
     this.organizationContext = organizationContext;
   }
   
@@ -61,10 +62,7 @@ export class FormaAgent {
   }
   
   private async executeConversational(message: string): Promise<FormatResult> {
-    // STEP 1: Analyze query and pre-execute relevant tool calls for comprehensive context
-    const toolResults = await this.preExecuteRelevantTools(message);
-    
-    // STEP 2: Retrieve relevant context from field catalog and exemplars
+    // STEP 1: Retrieve relevant context from field catalog and exemplars
     const retrievalContext: RetrievalContext = {
       userQuery: message,
       organizationIndustry: this.organizationContext?.industry,
@@ -74,12 +72,15 @@ export class FormaAgent {
     const retrievedContext = retrieveRelevantContext(retrievalContext);
     const fieldRecommendations = extractFieldTypeRecommendations(retrievedContext);
     
-    // STEP 3: Build reasoning-based system prompt with retrieved context + tool results
-    const systemPrompt = this.buildReasoningPrompt(retrievedContext, fieldRecommendations, toolResults);
+    // STEP 2: Build reasoning-based system prompt with retrieved context
+    const systemPrompt = this.buildReasoningPromptWithTools(retrievedContext, fieldRecommendations);
     
-    // STEP 4: Send to LLM for intelligent reasoning
+    // STEP 3: Get tool definitions for LLM function calling
+    const tools = getFormaToolsForLLM();
+    
+    // STEP 4: Send to LLM with function calling - LLM will dynamically call tools as needed
     try {
-      const response = await this.llmService.sendPrompt(message, systemPrompt);
+      const response = await this.llmService.sendPromptWithTools(message, systemPrompt, tools);
       
       let jsonStr = response.trim();
       if (jsonStr.includes('```json')) {
@@ -116,76 +117,19 @@ export class FormaAgent {
   }
   
   /**
-   * Pre-execute relevant tools based on intelligent query analysis
-   * This provides context-enrichment without requiring LLM function calling infrastructure
+   * Build reasoning-based prompt with tools available for dynamic calling
    */
-  private async preExecuteRelevantTools(query: string): Promise<string> {
-    const lowerQuery = query.toLowerCase();
-    const toolOutputs: Map<string, any> = new Map(); // Deduplicate results
-    
-    // Always search field catalog for form-building queries
-    try {
-      const catalogResult = executeFormaTool('search_field_catalog', { 
-        query: query,
-        industry: this.organizationContext?.industry 
-      });
-      
-      // Only include if we got useful results
-      if (catalogResult.relevantFieldTypes?.length > 0 || catalogResult.exampleFields?.length > 0) {
-        toolOutputs.set('catalog_search', {
-          type: 'Catalog Search',
-          data: {
-            topFieldTypes: catalogResult.relevantFieldTypes?.slice(0, 3),
-            exampleFields: catalogResult.exampleFields?.slice(0, 3)
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Field catalog search failed:', error);
-    }
-    
-    // Industry-specific exemplars if applicable
-    if (this.organizationContext?.industry) {
-      try {
-        const industryResult = executeFormaTool('get_industry_exemplars', { 
-          industry: this.organizationContext.industry 
-        });
-        if (industryResult.exemplarCount > 0) {
-          toolOutputs.set('industry_exemplars', {
-            type: 'Industry Examples',
-            data: {
-              industry: this.organizationContext.industry,
-              examples: industryResult.exemplars?.slice(0, 2).map((ex: any) => ({
-                name: ex.name,
-                keyDecisions: ex.keyDecisions?.slice(0, 3),
-                sampleFields: ex.sampleFields?.slice(0, 3)
-              }))
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Industry exemplars fetch failed:', error);
-      }
-    }
-    
-    // Format tool outputs concisely
-    if (toolOutputs.size === 0) {
-      return '';
-    }
-    
-    const formattedOutputs = Array.from(toolOutputs.values()).map(output => {
-      return `\n**${output.type}**:\n${JSON.stringify(output.data, null, 2)}`;
-    });
-    
-    return `\n\n=== Context from Knowledge Base ===\n${formattedOutputs.join('\n')}\n=== End Context ===\n`;
-  }
-  
-  /**
-   * Build reasoning-based prompt with retrieved context and tool results
-   */
-  private buildReasoningPrompt(retrievedContext: any, fieldRecommendations: string, toolResults?: string): string {
+  private buildReasoningPromptWithTools(retrievedContext: any, fieldRecommendations: string): string {
     return `You are Forma, an intelligent form building assistant with expertise in user experience and data collection design.
-${toolResults || ''}
+
+You have access to tools to query the field catalog and industry exemplars:
+- search_field_catalog: Find appropriate field types based on data requirements
+- get_field_type_details: Get comprehensive details about a specific field type
+- get_industry_exemplars: Retrieve examples from specific industries
+- get_available_field_types: List all available field types
+- get_full_field_catalog: Access the complete field catalog
+
+Use these tools whenever you need additional context about field types or industry best practices.
 
 Your approach to form building:
 1. **Understand Intent**: Analyze what data the user needs to collect and why
@@ -350,7 +294,7 @@ Format the data properly, validate it, and provide detailed transformation infor
   }
 
   /**
-   * Execute in streaming mode for real-time responses with RAG
+   * Execute in streaming mode for real-time responses with RAG and function calling
    */
   async executeStream(input: FormaInput | string, onChunk: (chunk: string) => void): Promise<string> {
     // Handle string input for conversational streaming
@@ -365,8 +309,10 @@ Format the data properly, validate it, and provide detailed transformation infor
       const retrievedContext = retrieveRelevantContext(retrievalContext);
       const fieldRecommendations = extractFieldTypeRecommendations(retrievedContext);
       
-      // STEP 2: Build reasoning prompt with retrieved context
+      // STEP 2: Build reasoning prompt with tools
       const systemPrompt = `You are Forma, an intelligent form building assistant with expertise in user experience and data collection design.
+
+You have access to tools to query the field catalog and industry exemplars. Use them to provide informed recommendations.
 
 Your approach to form building:
 1. **Understand Intent**: Analyze what data the user needs to collect and why
@@ -391,8 +337,11 @@ Key Principles:
 
 Provide clear, actionable advice. Be conversational and helpful. Explain your reasoning when suggesting field types.`;
 
+      // STEP 3: Get tools for function calling
+      const tools = getFormaToolsForLLM();
+
       try {
-        const response = await this.llmService.sendPromptStream(input, systemPrompt, onChunk);
+        const response = await this.llmService.sendPromptStreamWithTools(input, systemPrompt, tools, onChunk);
         return response;
       } catch (error) {
         console.error('Forma streaming failed:', error);
