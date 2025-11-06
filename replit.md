@@ -14,11 +14,13 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 
 ### Recent Changes
 
-- **AI Agent Error Handling Fix** (November 6, 2025):
-  - **Fixed Forma error messages**: Updated frontend to display actual backend errors instead of generic "configure your AI provider" message
-  - **Root cause**: All agents use organization's default LLM configuration from Settings, but frontend was masking real errors
-  - **Resolution**: Frontend now properly propagates backend error messages (API failures, credential issues, etc.) to users
-  - **User Impact**: Users can now see specific error details to troubleshoot LLM configuration issues
+- **LLM Configuration System Improvements** (November 6, 2025):
+  - **Admin Delete Permissions**: Admins can now delete any LLM configuration in their organization (previously blocked by org check)
+  - **Enhanced Validation**: LLMService constructor validates provider-specific requirements before decryption (Azure: endpoint + apiVersion; OpenAI/Anthropic: API key only)
+  - **Improved Error Messages**: Provider-specific validation errors include clear instructions (e.g., "Azure endpoint required: https://your-resource.openai.azure.com")
+  - **FormaLLMService Fix**: Removed duplicate validation logic, now uses standard LLMService validation, fixed Azure endpoint field (`azureEndpoint` not `endpoint`)
+  - **Standardized Error Handling**: All 7 agent frontends (Cadence, Scribe, Forma, Echo, Parity, Relay, Radar) now display actual backend error messages instead of generic "configure your AI provider" messages
+  - **User Impact**: Clear, actionable error messages for LLM configuration issues across entire platform
 - **AI Agent Database Cleanup** (November 6, 2025):
   - **Removed duplicate/unneeded agents from database**: Deleted 6 agents from `ai_agents` table:
     - Invoice Processor (invoice-processor-58e45b3d)
