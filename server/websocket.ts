@@ -306,7 +306,7 @@ async function handleAgentExecution(
         });
       }
     } else if (agentSupportsStreaming(normalizedAgentName)) {
-      // All streaming-enabled agents (Parity, Cadence, Forma, Echo, Relay, Scribe, OmniSpectra, Radar)
+      // All streaming-enabled agents (Parity, Cadence, Forma, Echo, Relay, Scribe, Radar)
       console.log(`[WebSocket] Starting ${normalizedAgentName} streaming...`);
       fullResponse = await agent.executeStream(agentInput, (chunk: string) => {
         console.log('[WebSocket] Received chunk:', chunk.substring(0, 50));

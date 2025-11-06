@@ -486,16 +486,6 @@ export const AGENT_REGISTRY: Record<string, AgentConfig> = {
     requiresToolExecution: false,
     supportsStreaming: true,
   },
-  omnispectra: {
-    name: 'omnispectra',
-    displayName: 'OmniSpectra',
-    category: 'status',
-    path: '../agents/omnispectra/backend/index',
-    className: 'OmniSpectraAgent',
-    capabilities: ['work_status', 'team_availability', 'status_tracking', 'team_coordination'],
-    requiresToolExecution: false,
-    supportsStreaming: true,
-  },
   radar: {
     name: 'radar',
     displayName: 'Radar',
