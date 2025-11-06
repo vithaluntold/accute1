@@ -16,6 +16,8 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { EnhancedChatInput } from "@/components/EnhancedChatInput";
+import { SignatureEditor } from "@/components/SignatureEditor";
 
 interface Message {
   role: "user" | "assistant";
@@ -27,6 +29,7 @@ interface EmailTemplate {
   name: string;
   subject: string;
   body: string;
+  signature?: string;
   category: string;
   variables: string[];
   status: "building" | "complete";
@@ -496,24 +499,20 @@ export default function ScribeAgent() {
               </div>
             </ScrollArea>
             <Separator />
-            <div className="p-4">
-              <div className="flex gap-2">
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                  placeholder="Describe the email template you need..."
-                  disabled={isLoading}
-                  data-testid="input-message"
-                />
-                <Button 
-                  onClick={sendMessage} 
-                  disabled={isLoading || !input.trim()}
-                  data-testid="button-send"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="p-4 pb-20">
+              <EnhancedChatInput
+                value={input}
+                onChange={setInput}
+                onSend={(message, files) => {
+                  setInput(message);
+                  sendMessage();
+                }}
+                placeholder="Describe the email template you need..."
+                disabled={isLoading}
+                supportsAttachments={false}
+                maxLines={10}
+                testIdPrefix="scribe"
+              />
             </div>
           </CardContent>
         </Card>
@@ -581,6 +580,16 @@ export default function ScribeAgent() {
                       </div>
                     </>
                   )}
+                  
+                  <Separator />
+                  
+                  {/* Signature Editor */}
+                  <SignatureEditor
+                    value={currentTemplate.signature || ""}
+                    onChange={(signature) => {
+                      setCurrentTemplate(prev => prev ? { ...prev, signature } : null);
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
