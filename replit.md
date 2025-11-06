@@ -17,6 +17,11 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - AI Agent Pricing: Support for multiple pricing models (free, subscription, per-instance, per-token, one-time). Free agents auto-install to all organizations.
 - Recurring Scheduler: Service runs every 5 minutes to process recurring schedules and auto-create workflow assignments. Supports daily, weekly, monthly, quarterly, and annual frequencies.
 - @Mention Collaboration: Users can @mention team members in chat messages and document annotations. Mentions use format @[userId] internally, display as @FullName. Automatic notifications created for mentioned users.
+- Tag-Based Routing: Clients and organizations support tag arrays for segmentation. Tags enable conditional workflow automation (IF-THEN logic based on client tags).
+- Conditional Automations: Workflow actions support conditional execution based on tags, fields, and other criteria. Implements TaxDome-style conditional logic.
+- Auto-Advance Triggers: Event-driven workflow progression system automatically advances workflows based on events (payment_received, document_uploaded, organizer_submitted, invoice_paid).
+- Enhanced Automation Actions: 13 total automation action types including create_invoice, request_documents, send_organizer, apply_tags, remove_tags, send_proposal, apply_folder_template.
+- Workload Insights: Analytics endpoint providing per-user metrics (assignments, tasks, time tracking, completion rates, workload scores) with team totals and capacity planning.
 
 ### System Architecture
 

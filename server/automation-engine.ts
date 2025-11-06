@@ -29,8 +29,16 @@ export interface ActionConfig {
     | 'trigger_form'
     | 'send_invoice'
     | 'schedule_followup'
-    | 'trigger_workflow';
+    | 'trigger_workflow'
+    | 'create_invoice'
+    | 'request_documents'
+    | 'send_organizer'
+    | 'apply_tags'
+    | 'remove_tags'
+    | 'send_proposal'
+    | 'apply_folder_template';
   config: Record<string, any>;
+  conditions?: ConditionConfig[];
 }
 
 /**
@@ -164,7 +172,7 @@ export class AutomationEngine {
   }
 
   /**
-   * Execute a list of actions
+   * Execute a list of actions with conditional logic support
    */
   async executeActions(
     actions: ActionConfig[],
@@ -176,12 +184,40 @@ export class AutomationEngine {
       organizationId: string;
       userId: string;
       data?: Record<string, any>;
+      clientId?: string;
+      assignmentId?: string;
     }
   ): Promise<any[]> {
     const results = [];
 
     for (const action of actions) {
       try {
+        if (action.conditions && action.conditions.length > 0) {
+          const evaluationData = {
+            ...(context.data || {}),
+            clientId: context.clientId,
+            assignmentId: context.assignmentId,
+            workflowId: context.workflowId,
+            stageId: context.stageId,
+            stepId: context.stepId,
+            taskId: context.taskId,
+            organizationId: context.organizationId,
+            userId: context.userId,
+          };
+          
+          const conditionsMet = await this.evaluateConditions(action.conditions, evaluationData);
+          
+          if (!conditionsMet) {
+            results.push({ 
+              success: true, 
+              action: action.type, 
+              result: 'skipped', 
+              reason: 'conditions not met' 
+            });
+            continue;
+          }
+        }
+
         const result = await this.executeAction(action, context);
         results.push({ success: true, action: action.type, result });
       } catch (error: any) {
@@ -237,6 +273,27 @@ export class AutomationEngine {
       
       case 'trigger_workflow':
         return this.triggerWorkflow(action.config, context);
+      
+      case 'create_invoice':
+        return this.createInvoice(action.config, context);
+      
+      case 'request_documents':
+        return this.requestDocuments(action.config, context);
+      
+      case 'send_organizer':
+        return this.sendOrganizer(action.config, context);
+      
+      case 'apply_tags':
+        return this.applyTags(action.config, context);
+      
+      case 'remove_tags':
+        return this.removeTags(action.config, context);
+      
+      case 'send_proposal':
+        return this.sendProposal(action.config, context);
+      
+      case 'apply_folder_template':
+        return this.applyFolderTemplate(action.config, context);
       
       default:
         throw new Error(`Unknown action type: ${action.type}`);
@@ -822,6 +879,317 @@ export class AutomationEngine {
     });
 
     return assignment;
+  }
+
+  /**
+   * Create an invoice for a client (same as sendInvoice but clearer naming)
+   */
+  private async createInvoice(config: any, context: any): Promise<any> {
+    return this.sendInvoice(config, context);
+  }
+
+  /**
+   * Request documents from a client - creates a document request with notification
+   */
+  private async requestDocuments(config: any, context: any): Promise<any> {
+    const { clientId, documentTypes, dueDate, message, priority = 'medium' } = config;
+
+    if (!clientId) {
+      throw new Error('clientId is required to request documents');
+    }
+
+    if (!documentTypes || !Array.isArray(documentTypes) || documentTypes.length === 0) {
+      throw new Error('documentTypes array is required (e.g., ["W2", "1099", "Bank Statements"])');
+    }
+
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    const requestedDocs = documentTypes.map((docType: string) => ({
+      type: docType,
+      status: 'pending',
+      requestedAt: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : null,
+    }));
+
+    const documentRequest = {
+      id: `req_${Date.now()}`,
+      clientId,
+      organizationId: context.organizationId,
+      requestedBy: context.userId,
+      documents: requestedDocs,
+      status: 'pending',
+      message: message || `Please upload the following documents: ${documentTypes.join(', ')}`,
+      priority,
+      createdAt: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : null,
+    };
+
+    await this.storage.createNotification({
+      userId: client.createdBy,
+      title: 'Document Request',
+      message: documentRequest.message,
+      type: 'action_required',
+      metadata: {
+        documentRequest,
+        workflowId: context.workflowId,
+      },
+    });
+
+    return documentRequest;
+  }
+
+  /**
+   * Send an organizer (client information request) using form templates
+   */
+  private async sendOrganizer(config: any, context: any): Promise<any> {
+    const { clientId, formTemplateId, dueDate, message, organizerType = 'tax' } = config;
+
+    if (!clientId) {
+      throw new Error('clientId is required to send organizer');
+    }
+
+    if (!formTemplateId) {
+      throw new Error('formTemplateId is required - specify which organizer template to send');
+    }
+
+    const formTemplate = await this.storage.getFormTemplate(formTemplateId);
+    if (!formTemplate) {
+      throw new Error(`Form template ${formTemplateId} not found`);
+    }
+
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    const formRequest = await this.storage.createFormSubmission({
+      formTemplateId,
+      formVersion: formTemplate.version || 1,
+      organizationId: context.organizationId,
+      submittedBy: client.createdBy,
+      clientId,
+      status: 'pending',
+      data: {
+        triggeredBy: 'automation',
+        workflowId: context.workflowId,
+        organizerType,
+        message: message || `Please complete the ${organizerType} organizer`,
+        dueDate,
+      },
+    });
+
+    await this.storage.createNotification({
+      userId: client.createdBy,
+      title: `${organizerType.toUpperCase()} Organizer`,
+      message: message || `Please complete your ${organizerType} organizer: ${formTemplate.name}`,
+      type: 'action_required',
+      metadata: {
+        formTemplateId,
+        formSubmissionId: formRequest.id,
+        organizerType,
+      },
+    });
+
+    return formRequest;
+  }
+
+  /**
+   * Apply tags to a client or organization
+   */
+  private async applyTags(config: any, context: any): Promise<any> {
+    const { targetType, targetId, tags } = config;
+
+    if (!targetType || !['client', 'organization'].includes(targetType)) {
+      throw new Error('targetType must be "client" or "organization"');
+    }
+
+    if (!targetId) {
+      throw new Error('targetId is required');
+    }
+
+    if (!tags || !Array.isArray(tags) || tags.length === 0) {
+      throw new Error('tags array is required');
+    }
+
+    if (targetType === 'client') {
+      const client = await this.storage.getClient(targetId);
+      if (!client) {
+        throw new Error(`Client ${targetId} not found`);
+      }
+
+      const existingTags = client.tags || [];
+      const newTags = [...new Set([...existingTags, ...tags])];
+      
+      await this.storage.updateClient(targetId, { tags: newTags });
+
+      return { targetType, targetId, tagsAdded: tags, totalTags: newTags };
+    } else {
+      const org = await this.storage.getOrganization(targetId);
+      if (!org) {
+        throw new Error(`Organization ${targetId} not found`);
+      }
+
+      const existingTags = org.tags || [];
+      const newTags = [...new Set([...existingTags, ...tags])];
+      
+      await this.storage.updateOrganization(targetId, { tags: newTags });
+
+      return { targetType, targetId, tagsAdded: tags, totalTags: newTags };
+    }
+  }
+
+  /**
+   * Remove tags from a client or organization
+   */
+  private async removeTags(config: any, context: any): Promise<any> {
+    const { targetType, targetId, tags, clearAll = false } = config;
+
+    if (!targetType || !['client', 'organization'].includes(targetType)) {
+      throw new Error('targetType must be "client" or "organization"');
+    }
+
+    if (!targetId) {
+      throw new Error('targetId is required');
+    }
+
+    if (!clearAll && (!tags || !Array.isArray(tags) || tags.length === 0)) {
+      throw new Error('tags array is required unless clearAll is true');
+    }
+
+    if (targetType === 'client') {
+      const client = await this.storage.getClient(targetId);
+      if (!client) {
+        throw new Error(`Client ${targetId} not found`);
+      }
+
+      const newTags = clearAll ? [] : (client.tags || []).filter((tag: string) => !tags.includes(tag));
+      
+      await this.storage.updateClient(targetId, { tags: newTags });
+
+      return { targetType, targetId, tagsRemoved: clearAll ? client.tags : tags, totalTags: newTags };
+    } else {
+      const org = await this.storage.getOrganization(targetId);
+      if (!org) {
+        throw new Error(`Organization ${targetId} not found`);
+      }
+
+      const newTags = clearAll ? [] : (org.tags || []).filter((tag: string) => !tags.includes(tag));
+      
+      await this.storage.updateOrganization(targetId, { tags: newTags });
+
+      return { targetType, targetId, tagsRemoved: clearAll ? org.tags : tags, totalTags: newTags };
+    }
+  }
+
+  /**
+   * Send a proposal to a client
+   */
+  private async sendProposal(config: any, context: any): Promise<any> {
+    const { clientId, proposalTemplateId, amount, services, validUntil, message } = config;
+
+    if (!clientId) {
+      throw new Error('clientId is required to send proposal');
+    }
+
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    let proposalContent = message || 'We are pleased to present you with this proposal.';
+
+    if (proposalTemplateId) {
+      try {
+        const template = await this.storage.getDocumentTemplate(proposalTemplateId);
+        if (template && template.content) {
+          proposalContent = template.content;
+        }
+      } catch (error: any) {
+        console.warn('Failed to load proposal template:', error.message);
+      }
+    }
+
+    const proposal = {
+      id: `prop_${Date.now()}`,
+      clientId,
+      organizationId: context.organizationId,
+      createdBy: context.userId,
+      status: 'sent',
+      amount: amount || 0,
+      services: services || [],
+      content: proposalContent,
+      validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      sentAt: new Date(),
+    };
+
+    await this.storage.createNotification({
+      userId: client.createdBy,
+      title: 'New Proposal',
+      message: `You have received a new proposal${amount ? ` for $${amount}` : ''}.`,
+      type: 'action_required',
+      metadata: {
+        proposal,
+        workflowId: context.workflowId,
+      },
+    });
+
+    return proposal;
+  }
+
+  /**
+   * Apply a folder template to organize client documents
+   */
+  private async applyFolderTemplate(config: any, context: any): Promise<any> {
+    const { clientId, folderTemplateId, folderStructure } = config;
+
+    if (!clientId) {
+      throw new Error('clientId is required to apply folder template');
+    }
+
+    const client = await this.storage.getClient(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} not found`);
+    }
+
+    let structure = folderStructure;
+
+    if (folderTemplateId && !structure) {
+      try {
+        const template = await this.storage.getFolderTemplate(folderTemplateId);
+        structure = template?.structure || [];
+      } catch (error: any) {
+        console.warn('Failed to load folder template:', error.message);
+      }
+    }
+
+    const defaultStructure = [
+      { name: 'Tax Returns', type: 'folder' },
+      { name: 'Supporting Documents', type: 'folder' },
+      { name: 'Correspondence', type: 'folder' },
+      { name: 'Invoices', type: 'folder' },
+    ];
+
+    const finalStructure = structure || defaultStructure;
+    const createdFolders = [];
+
+    for (const folder of finalStructure) {
+      const folderPath = `clients/${clientId}/${folder.name}`;
+      createdFolders.push({
+        name: folder.name,
+        path: folderPath,
+        type: folder.type || 'folder',
+      });
+    }
+
+    return {
+      clientId,
+      foldersCreated: createdFolders.length,
+      structure: createdFolders,
+      message: `Created ${createdFolders.length} folders for ${client.companyName}`,
+    };
   }
 
   /**

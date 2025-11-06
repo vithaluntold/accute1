@@ -49,6 +49,7 @@ export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -869,6 +870,7 @@ export const clients = pgTable("clients", {
   status: text("status").notNull().default("active"), // 'active', 'inactive', 'prospect'
   industry: text("industry"),
   notes: text("notes"),
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
   metadata: jsonb("metadata").default({}),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),

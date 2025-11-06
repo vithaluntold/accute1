@@ -3544,6 +3544,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Tag Management Routes ====================
+
+  // Apply tags to a client
+  app.post("/api/clients/:id/tags", requireAuth, requirePermission("clients.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const { tags } = req.body;
+      if (!Array.isArray(tags) || tags.length === 0) {
+        return res.status(400).json({ error: "tags must be a non-empty array" });
+      }
+
+      const existingTags = client.tags || [];
+      const newTags = [...new Set([...existingTags, ...tags])];
+      
+      const updated = await storage.updateClient(req.params.id, { tags: newTags });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "client", req.params.id, { action: "add_tags", tags }, req);
+      
+      res.json({ ...updated, tagsAdded: tags.filter(t => !existingTags.includes(t)) });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add tags to client" });
+    }
+  });
+
+  // Remove tags from a client
+  app.delete("/api/clients/:id/tags", requireAuth, requirePermission("clients.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const client = await storage.getClient(req.params.id);
+      if (!client || client.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      const { tags, clearAll } = req.body;
+      
+      if (!clearAll && (!Array.isArray(tags) || tags.length === 0)) {
+        return res.status(400).json({ error: "tags must be a non-empty array or clearAll must be true" });
+      }
+
+      const existingTags = client.tags || [];
+      const newTags = clearAll ? [] : existingTags.filter((tag: string) => !tags.includes(tag));
+      
+      const updated = await storage.updateClient(req.params.id, { tags: newTags });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "client", req.params.id, { action: "remove_tags", tags: clearAll ? existingTags : tags }, req);
+      
+      res.json({ ...updated, tagsRemoved: clearAll ? existingTags : tags });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove tags from client" });
+    }
+  });
+
+  // Apply tags to organization
+  app.post("/api/organization/tags", requireAuth, requirePermission("organization.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const organization = await storage.getOrganization(req.user!.organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      const { tags } = req.body;
+      if (!Array.isArray(tags) || tags.length === 0) {
+        return res.status(400).json({ error: "tags must be a non-empty array" });
+      }
+
+      const existingTags = organization.tags || [];
+      const newTags = [...new Set([...existingTags, ...tags])];
+      
+      const updated = await storage.updateOrganization(req.user!.organizationId, { tags: newTags });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "organization", req.user!.organizationId, { action: "add_tags", tags }, req);
+      
+      res.json({ ...updated, tagsAdded: tags.filter(t => !existingTags.includes(t)) });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add tags to organization" });
+    }
+  });
+
+  // Remove tags from organization
+  app.delete("/api/organization/tags", requireAuth, requirePermission("organization.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const organization = await storage.getOrganization(req.user!.organizationId);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      const { tags, clearAll } = req.body;
+      
+      if (!clearAll && (!Array.isArray(tags) || tags.length === 0)) {
+        return res.status(400).json({ error: "tags must be a non-empty array or clearAll must be true" });
+      }
+
+      const existingTags = organization.tags || [];
+      const newTags = clearAll ? [] : existingTags.filter((tag: string) => !tags.includes(tag));
+      
+      const updated = await storage.updateOrganization(req.user!.organizationId, { tags: newTags });
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "organization", req.user!.organizationId, { action: "remove_tags", tags: clearAll ? existingTags : tags }, req);
+      
+      res.json({ ...updated, tagsRemoved: clearAll ? existingTags : tags });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove tags from organization" });
+    }
+  });
+
+  // Get all unique tags used in organization (for autocomplete)
+  app.get("/api/tags/all", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const organization = await storage.getOrganization(req.user!.organizationId!);
+      
+      const allTags = new Set<string>();
+      
+      clients.forEach(client => {
+        (client.tags || []).forEach((tag: string) => allTags.add(tag));
+      });
+      
+      (organization?.tags || []).forEach((tag: string) => allTags.add(tag));
+      
+      res.json(Array.from(allTags).sort());
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch tags" });
+    }
+  });
+
   // ==================== Contact Routes ====================
 
   app.get("/api/contacts", requireAuth, requirePermission("contacts.view"), async (req: AuthRequest, res: Response) => {
