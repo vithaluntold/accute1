@@ -651,6 +651,10 @@ export async function initializeSystem(app: Express) {
       console.log("⚠️  Persistent seed accounts may already exist or failed to create:", error);
     }
 
+    // Initialize LLM Configuration Service (before agents)
+    const { initializeLLMConfigService } = await import("./llm-config-service");
+    initializeLLMConfigService(storage);
+
     // Initialize Agent Registry
     console.log("🤖 Initializing AI Agent Foundry...");
     const { agentRegistry } = await import("./agent-registry");

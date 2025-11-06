@@ -58,6 +58,7 @@ import * as cryptoUtils from "./crypto-utils";
 import { autoProgressionEngine } from "./auto-progression";
 import Stripe from "stripe";
 import { PricingService } from "@shared/pricing-service";
+import { getLLMConfigService } from "./llm-config-service";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -1776,18 +1777,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startTime = Date.now();
       
       // Get LLM configuration - use specified or default
-      let llmConfig;
-      if (llmConfigId) {
-        llmConfig = await storage.getLlmConfiguration(llmConfigId);
-        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
-          return res.status(404).json({ error: "LLM configuration not found" });
-        }
-      } else {
-        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-        if (!llmConfig) {
-          return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
-        }
-      }
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getConfig(req.user!.organizationId!, llmConfigId);
       
       // Find or create conversation
       let conversation;
@@ -3784,10 +3775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get default LLM configuration
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId);
-      if (!llmConfig) {
-        return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
-      }
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getDefaultConfig(req.user!.organizationId!);
 
       // Build conversation history with privacy filtering
       const allMessages = await storage.getOnboardingMessages(sessionId);
@@ -7535,10 +7524,8 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       }
       
       // Get LLM configuration (use default for the organization)
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      if (!llmConfig) {
-        return res.status(400).json({ error: "No LLM configuration found. Please configure an LLM provider first." });
-      }
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getDefaultConfig(req.user!.organizationId!);
       
       // Update task status to in_progress
       await storage.updateWorkflowTask(req.params.id, { status: 'in_progress' });
@@ -8708,10 +8695,8 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       }
 
       // Get default LLM configuration
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId);
-      if (!llmConfig) {
-        return res.status(400).json({ error: "No default LLM configuration found. Please configure an LLM provider first." });
-      }
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getDefaultConfig(req.user!.organizationId!);
 
       // Gather assignment data for context
       const [assignments, workflows, users, clients] = await Promise.all([
@@ -9487,12 +9472,8 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
       }
 
       // Get default LLM configuration
-      const llmConfigs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
-      const defaultConfig = llmConfigs.find(c => c.isDefault && c.isActive);
-      
-      if (!defaultConfig) {
-        return res.status(400).json({ error: "No default LLM configuration found. Please configure AI settings first." });
-      }
+      const llmConfigService = getLLMConfigService();
+      const defaultConfig = await llmConfigService.getDefaultConfig(req.user!.organizationId!);
 
       // Decrypt the API key
       const { decrypt } = await import('./llm-service');
@@ -9698,13 +9679,8 @@ Return ONLY valid JSON, no additional text.`;
       for (const msg of unprocessed) {
         try {
           // Get default LLM configuration (reuse logic from single processor)
-          const llmConfigs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
-          const defaultConfig = llmConfigs.find(c => c.isDefault && c.isActive);
-          
-          if (!defaultConfig) {
-            results.push({ emailId: msg.id, success: false, error: "No default LLM configuration" });
-            continue;
-          }
+          const llmConfigService = getLLMConfigService();
+          const defaultConfig = await llmConfigService.getDefaultConfig(req.user!.organizationId!);
 
           // Decrypt API key
           const { decrypt } = await import('./llm-service');

@@ -207,19 +207,10 @@ async function handleAgentExecution(
       throw new Error('Organization access required');
     }
 
-    // Get LLM configuration
-    let llmConfig;
-    if (llmConfigId) {
-      llmConfig = await storage.getLlmConfiguration(llmConfigId);
-      if (!llmConfig || llmConfig.organizationId !== ws.organizationId) {
-        throw new Error('LLM configuration not found');
-      }
-    } else {
-      llmConfig = await storage.getDefaultLlmConfiguration(ws.organizationId);
-      if (!llmConfig) {
-        throw new Error('No default LLM configuration found. Please configure an LLM provider first.');
-      }
-    }
+    // Get LLM configuration using centralized service
+    const { getLLMConfigService } = await import('./llm-config-service');
+    const llmConfigService = getLLMConfigService();
+    const llmConfig = await llmConfigService.getConfig(ws.organizationId, llmConfigId);
 
     // Find or create conversation
     let conversation;
