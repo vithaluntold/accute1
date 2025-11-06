@@ -57,6 +57,7 @@ const platformMenuCategories = [
     items: [
       { title: "My Published Items", url: "/admin/marketplace/published", icon: Package, permission: null },
       { title: "Agent Foundry", url: "/admin/agent-foundry", icon: Bot, permission: null },
+      { title: "Agent Integration Guide", url: "/agent-integration-guide", icon: FileText, permission: null },
     ]
   },
   {
@@ -94,6 +95,7 @@ const organizationMenuCategories = [
     title: "AI & Automation",
     items: [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
+      { title: "Agent Integration Guide", url: "/agent-integration-guide", icon: FileText, permission: null },
       { title: "AI Roundtable", url: "/roundtable", icon: Users, permission: "roundtable.access" },
       { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
       { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },

@@ -110,6 +110,7 @@ import AutomatedInvoicing from "@/pages/automated-invoicing";
 // import SubscriptionPricing from "@/pages/subscription-pricing";
 import EmployeeProfile from "@/pages/employee-profile";
 import LiveChat from "@/pages/live-chat";
+import AgentIntegrationGuide from "@/pages/agent-integration-guide";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -495,6 +496,13 @@ function Router() {
             <AgentDetail />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/agent-integration-guide">
+        <ProtectedRoute>
+          <AppLayout>
+            <AgentIntegrationGuide />
+          </AppLayout>
+        </ProtectedRoute>
       </Route>
       <Route path="/ai-agents">
         <OrganizationRoute>
