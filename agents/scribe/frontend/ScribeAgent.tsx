@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/resizable";
 import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 import { SignatureEditor } from "@/components/SignatureEditor";
+import { TemplateAttachments, type TemplateAttachment } from "@/components/TemplateAttachments";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,6 +31,7 @@ interface EmailTemplate {
   subject: string;
   body: string;
   signature?: string;
+  attachments?: TemplateAttachment[];
   category: string;
   variables: string[];
   status: "building" | "complete";
@@ -588,6 +590,16 @@ export default function ScribeAgent() {
                     value={currentTemplate.signature || ""}
                     onChange={(signature) => {
                       setCurrentTemplate(prev => prev ? { ...prev, signature } : null);
+                    }}
+                  />
+                  
+                  <Separator />
+                  
+                  {/* Default Attachments */}
+                  <TemplateAttachments
+                    attachments={currentTemplate.attachments || []}
+                    onChange={(attachments) => {
+                      setCurrentTemplate(prev => prev ? { ...prev, attachments } : null);
                     }}
                   />
                 </div>
