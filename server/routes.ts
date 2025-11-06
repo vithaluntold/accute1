@@ -293,7 +293,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Account is inactive" });
       }
 
-      // Create session
+      // Check if MFA is enabled for this user
+      const mfaEnabled = await mfaService.isMFAEnabled(user.id);
+      
+      if (mfaEnabled) {
+        // Generate device fingerprint
+        const userAgent = req.headers['user-agent'] || '';
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || '';
+        const deviceId = mfaService.generateDeviceFingerprint(userAgent, ipAddress);
+
+        // Check if device is trusted
+        const isTrusted = await mfaService.isDeviceTrusted(user.id, deviceId);
+
+        if (!isTrusted) {
+          // MFA verification required - don't create session yet
+          return res.json({
+            mfaRequired: true,
+            userId: user.id,
+            deviceId, // Send back for trust-device option
+          });
+        }
+      }
+
+      // Create session (password verified, MFA not required or device trusted)
       const token = generateToken(user.id);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
@@ -331,6 +353,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Complete login after MFA verification
+  app.post("/api/auth/login/mfa", rateLimit(10, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { userId, token, trustDevice, deviceId, deviceName } = req.body;
+
+      if (!userId || !token) {
+        return res.status(400).json({ error: "User ID and MFA token are required" });
+      }
+
+      // Verify MFA token
+      const isValid = await mfaService.verifyToken(userId, token);
+
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid MFA token" });
+      }
+
+      // Get user details
+      const user = await storage.getUser(userId);
+      if (!user || !user.isActive) {
+        return res.status(403).json({ error: "Account is inactive or not found" });
+      }
+
+      // Trust device if requested
+      if (trustDevice && deviceId && deviceName) {
+        const userAgent = req.headers['user-agent'] || '';
+        const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || '';
+        await mfaService.trustDevice(userId, deviceId, deviceName, ipAddress, userAgent);
+      }
+
+      // Create session
+      const sessionToken = generateToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createSession(user.id, sessionToken, expiresAt);
+
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "login_mfa", "user", user.id, {}, req);
+
+      // Set session cookie
+      res.cookie('session_token', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roleId: user.roleId,
+          roleName: role?.name,
+          organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
+        },
+        role,
+        token: sessionToken,
+      });
+    } catch (error: any) {
+      console.error("MFA login completion error:", error);
+      res.status(500).json({ error: "MFA login failed" });
     }
   });
 
