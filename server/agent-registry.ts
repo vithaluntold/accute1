@@ -200,8 +200,9 @@ class AgentRegistry {
       const orgsToInstall = allOrgs.filter(org => !installedOrgIds.has(org.id));
 
       if (orgsToInstall.length > 0) {
-        // Insert installations one by one to ensure proper handling
+        // Insert installations one by one and enable in organizationAgents
         for (const org of orgsToInstall) {
+          // Create installation record
           await db.insert(aiAgentInstallations).values({
             agentId,
             organizationId: org.id,
@@ -209,8 +210,34 @@ class AgentRegistry {
             configuration: {},
             isActive: true,
           });
+
+          // Enable agent for organization (required for access checks)
+          const existingOrgAgent = await db
+            .select()
+            .from(organizationAgents)
+            .where(
+              and(
+                eq(organizationAgents.organizationId, org.id),
+                eq(organizationAgents.agentId, agentId)
+              )
+            )
+            .limit(1);
+
+          if (existingOrgAgent.length === 0) {
+            await db.insert(organizationAgents).values({
+              organizationId: org.id,
+              agentId,
+              status: 'enabled',
+              enabledBy: installedBy,
+            });
+          } else if (existingOrgAgent[0].status !== 'enabled') {
+            await db
+              .update(organizationAgents)
+              .set({ status: 'enabled', enabledBy: installedBy, updatedAt: new Date() })
+              .where(eq(organizationAgents.id, existingOrgAgent[0].id));
+          }
         }
-        console.log(`  → Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
+        console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
       }
     } catch (error) {
       console.error(`Failed to auto-install agent ${agentSlug}:`, error);

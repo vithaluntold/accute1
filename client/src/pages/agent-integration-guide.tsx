@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Folder, 
   FileCode, 
@@ -13,7 +14,8 @@ import {
   Code2,
   Box,
   Zap,
-  BookOpen
+  BookOpen,
+  AlertCircle
 } from "lucide-react";
 
 export default function AgentIntegrationGuide() {
@@ -302,6 +304,41 @@ export default function AgentIntegrationGuide() {
                         <Badge variant="outline">hybrid</Badge>
                       </div>
                     </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
+                      Pending: LLM Configuration Integration
+                    </h3>
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Critical Integration Step Required</AlertTitle>
+                      <AlertDescription className="mt-2 space-y-2">
+                        <p>
+                          To fully enable Accute mode integration, AI services need to accept dynamic LLM configuration. 
+                          This is currently in progress.
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          <p className="font-medium">Current Status:</p>
+                          <ul className="list-disc list-inside space-y-1 text-sm">
+                            <li>Both modes currently use Replit AI integrations</li>
+                            <li>LLM configuration needs to be threaded through to AI services</li>
+                            <li>Estimated: 2-3 days of work</li>
+                          </ul>
+                        </div>
+                        <div className="mt-3 p-3 bg-muted rounded-md">
+                          <p className="text-sm font-mono">
+                            📄 See: <code>agents/rai-compliance/NOTE_CRITICAL_LIMITATION.md</code> for complete implementation guide
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          ⚠️ Before integrating external agents, read the README file to complete this integration step.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
                   </div>
 
                   <Separator />
