@@ -13,6 +13,16 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - **Subscription System**: Subscription pricing UI and routes disabled per user request
 
 ### Recent Changes (November 2025)
+- **Centralized LLM Configuration Service** (November 2025):
+  - **Architecture**: Complete rewrite of LLM configuration and agent authentication module for simplification
+  - **Single Source of Truth**: Created `LLMConfigService` class that manages all LLM configuration fetching and caching
+  - **Automatic Caching**: Default configs cached for 5 minutes to reduce database queries
+  - **Unified API**: All agents, routes, WebSocket handlers, and automation engine now use the same centralized service
+  - **Error Handling**: Consistent error messages across all LLM config operations
+  - **Simplified Code**: Removed repetitive config fetching logic from routes.ts, websocket.ts, and automation-engine.ts
+  - **Files Modified**: server/llm-config-service.ts (new), server/init.ts, server/routes.ts, server/websocket.ts, server/automation-engine.ts
+  - **Initialization**: Service initialized early in server startup (before agents) to ensure availability
+  - **Usage Pattern**: `getLLMConfigService().getConfig(orgId, configId?)` or `getDefaultConfig(orgId)`
 - **WebSocket Initialization**: Implemented true lazy-loading for WebSockets. Server attaches an upgrade event listener but only initializes the WebSocketServer on the first `/ws/ai-stream` connection. The first upgrade request is properly handled via `handleUpgrade()` to ensure immediate connection success.
 - **Luca Document Access**: Luca agent now loads all organization documents and includes them in its system prompt. When users ask about documents, Luca can reference the available files by name, upload date, and category (up to 50 documents displayed, with indication if more exist).
 - **Agent Context Propagation**: WebSocket handler now passes organizationId, userId, and conversationId context to all agents via structured input, enabling document access and context-aware responses.
@@ -92,8 +102,13 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Recharts**: Frontend library for data visualizations.
 
 ### AI Agent Configuration
+- **Centralized Configuration Service**: New `LLMConfigService` provides single source of truth for all LLM configs
+  - Automatic caching (5 min TTL) to reduce database load
+  - Consistent error handling across all agents
+  - Unified API: `getConfig(orgId, configId?)` and `getDefaultConfig(orgId)`
+  - Initialized at server startup before agents load
 - **Default LLM Provider**: Azure OpenAI configured per organization
-- **AI Agents**: All 9 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, OmniSpectra, Radar) use organization's default LLM configuration
+- **AI Agents**: All 9 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, OmniSpectra, Radar) use organization's default LLM configuration via centralized service
 - **Setup**: Run `tsx server/seed-default-llm.ts` to create default Azure OpenAI config for Sterling organization
 - **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
 - **Session Management**: All agents support persistent chat sessions with conversation history
