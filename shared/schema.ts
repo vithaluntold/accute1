@@ -2315,6 +2315,7 @@ export const emailTemplates = pgTable("email_templates", {
   
   subject: text("subject").notNull(),
   body: text("body").notNull(), // HTML content with merge fields {{client_name}}, {{portal_link}}, etc.
+  signature: text("signature"), // HTML email signature with images, merge fields, contact info
   variables: jsonb("variables").notNull().default(sql`'[]'::jsonb`), // Available merge fields
   isActive: boolean("is_active").notNull().default(true),
   isDefault: boolean("is_default").notNull().default(false), // System-provided templates
