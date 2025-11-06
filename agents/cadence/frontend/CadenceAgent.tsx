@@ -236,7 +236,17 @@ export default function CadenceAgent() {
         }),
       });
 
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || data.details || "Failed to send message");
+      }
+
       const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -266,7 +276,7 @@ export default function CadenceAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please try again."
+        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

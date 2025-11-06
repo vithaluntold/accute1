@@ -29,9 +29,10 @@ export class FormaLLMService {
   private readonly TIMEOUT_MS = 90000; // 90 seconds (longer for tool calls)
   
   constructor(config: LlmConfiguration) {
+    // Use base LLMService which validates everything
+    this.baseLLMService = new LLMService(config);
     this.config = config;
     this.apiKey = decrypt(config.apiKeyEncrypted);
-    this.baseLLMService = new LLMService(config);
   }
   
   /**
@@ -155,11 +156,19 @@ export class FormaLLMService {
     systemPrompt: string,
     tools: any[]
   ): Promise<string> {
+    if (!this.config.azureEndpoint) {
+      throw new Error('Azure endpoint is required for Azure OpenAI');
+    }
+    
     // Azure uses OpenAI SDK with different endpoint
+    // Format: https://{resource}.openai.azure.com/openai/deployments/{deployment-name}
+    const baseURL = `${this.config.azureEndpoint}/openai/deployments/${this.config.model}`;
+    const apiVersion = this.config.modelVersion || '2024-02-15-preview';
+    
     const openai = new OpenAI({
       apiKey: this.apiKey,
-      baseURL: this.config.endpoint,
-      defaultQuery: { 'api-version': '2024-02-15-preview' },
+      baseURL,
+      defaultQuery: { 'api-version': apiVersion },
       defaultHeaders: { 'api-key': this.apiKey },
     });
     

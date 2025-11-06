@@ -1453,8 +1453,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const existing = await storage.getLlmConfiguration(req.params.id);
       
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
+      if (!existing) {
         return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      // Allow deletion if user is admin of the organization that owns the config
+      // Or if user is super_admin
+      const isSuperAdmin = req.user!.role === 'super_admin';
+      const isOrgAdmin = existing.organizationId === req.user!.organizationId;
+      
+      if (!isSuperAdmin && !isOrgAdmin) {
+        return res.status(403).json({ error: "Not authorized to delete this configuration" });
       }
       
       await storage.deleteLlmConfiguration(req.params.id);
@@ -1462,7 +1471,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to delete LLM configuration" });
+      console.error("Delete LLM config error:", error);
+      res.status(500).json({ 
+        error: "Failed to delete LLM configuration",
+        details: error.message
+      });
     }
   });
 

@@ -211,7 +211,17 @@ export default function RelayAgent() {
         }),
       });
 
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || data.details || "Failed to send message");
+      }
+
       const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -239,7 +249,7 @@ export default function RelayAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
+        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

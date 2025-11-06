@@ -242,17 +242,15 @@ export default function ParityAgent() {
         }),
       });
 
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || data.details || "Failed to send message");
+      }
+
       const data = await response.json();
-      
-      // Check if the response contains an error
+
       if (data.error) {
-        console.error("API Error:", data.error, data.details);
-        const errorMessage: Message = {
-          role: "assistant",
-          content: `Sorry, I encountered an error: ${data.error}${data.details ? ` (${data.details})` : ''}`
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        return;
+        throw new Error(data.error);
       }
       
       const assistantMessage: Message = { 
@@ -281,10 +279,10 @@ export default function ParityAgent() {
         });
       }
     } catch (error) {
-      console.error("Network/Parse Error:", error);
+      console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please ensure you have configured your AI provider credentials in Settings > LLM Configuration."
+        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

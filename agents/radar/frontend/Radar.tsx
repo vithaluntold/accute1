@@ -51,8 +51,19 @@ export default function Radar() {
           projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
         }),
       });
-      if (!res.ok) throw new Error("Failed to send message");
-      return res.json();
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || data.details || "Failed to send message");
+      }
+      
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
     },
     onSuccess: (data) => {
       setMessages((prev) => [
@@ -64,10 +75,10 @@ export default function Radar() {
         },
       ]);
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to send message. Please try again.",
         variant: "destructive",
       });
     },
