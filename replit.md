@@ -12,6 +12,32 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - **WebSocket Management**: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
 - **Subscription System**: Subscription pricing UI and routes disabled per user request
 
+### Recent Changes
+
+- **AI Agent Cleanup** (November 6, 2025):
+  - Removed non-functional/duplicate agents from the system:
+    - **OmniSpectra** (Work Status Bot) - removed agent directory and registrations
+    - **Parity AI Accountant (Example)** - removed duplicate example agent
+    - **Invoice Processor** - removed from seed data
+    - **Tax Compliance Advisor** - removed from seed data
+    - **Reconciliation Assistant** - removed from seed data
+  - **Active agents**: Only functional agents remain (Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar)
+  - Single Parity agent maintained: "Parity AI" is the only working Parity variant
+- **Profile Verification Banner Removed** (November 6, 2025):
+  - Removed KYC/profile verification banner from dashboard to reduce user friction
+  - Banner was showing completion percentage and missing requirements on main dashboard
+  - Users can still access profile completion via their profile settings if needed
+- **Email Template Default Attachments** (November 6, 2025):
+  - Email templates now support default attachments that are automatically included when template is used
+  - **Database**: Added `attachments` JSONB column to `email_templates` table storing file metadata array
+  - **Component**: Created `TemplateAttachments` component for upload/preview/removal of default attachments
+  - **Integration**: Available in both Scribe agent preview panel and manual email template creation form
+  - **Backend**: Generic `/api/upload` endpoint handles file uploads with multer (50MB limit, MIME type validation)
+  - **File Storage**: Files stored in `/uploads` directory with sanitized, unique filenames
+  - **User Experience**: Drag & drop or click to upload files, preview with file icons, remove individual attachments
+  - **Bug Fix**: Fixed Scribe save-template endpoint to include signature and attachments fields when saving templates
+  - **Validation**: Both signature and attachments are optional (not required) when creating email templates
+
 ### System Architecture
 
 #### UI/UX Decisions
