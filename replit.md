@@ -14,6 +14,18 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 
 ### Recent Changes
 
+- **AI Agent Database Cleanup** (November 6, 2025):
+  - **Removed duplicate/unneeded agents from database**: Deleted 7 agents from `ai_agents` table:
+    - Invoice Processor (invoice-processor-58e45b3d)
+    - OmniSpectra (omnispectra)
+    - Parity duplicate with empty slug
+    - Parity AI Accountant Example (parity-example)
+    - Reconciliation Assistant (reconciliation-assistant-9a18b77f)
+    - Tax Compliance Advisor (tax-compliance-advisor-bf82a991)
+    - Work Status Bot (work-status-bot)
+  - **8 Active Agents**: Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar
+  - **No orphaned installations**: Verified no broken references in `ai_agent_installations` table
+  - **Result**: Agent Marketplace now displays only functional, production-ready agents
 - **AI Roundtable WebSocket Fix** (November 6, 2025):
   - **Fixed layout overflow**: Changed roundtable page from `h-screen` to `h-full` to properly fit within app layout
   - **Added footer clearance**: Main content area now has `pb-20` padding on desktop to prevent overlap with FinACEverse footer
