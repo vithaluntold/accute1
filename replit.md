@@ -14,29 +14,15 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 
 ### Recent Changes
 
-- **AI Agent Cleanup** (November 6, 2025):
-  - Removed non-functional/duplicate agents from the system:
-    - **OmniSpectra** (Work Status Bot) - removed agent directory and registrations
-    - **Parity AI Accountant (Example)** - removed duplicate example agent
-    - **Invoice Processor** - removed from seed data
-    - **Tax Compliance Advisor** - removed from seed data
-    - **Reconciliation Assistant** - removed from seed data
-  - **Active agents**: Only functional agents remain (Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar)
-  - Single Parity agent maintained: "Parity AI" is the only working Parity variant
-- **Profile Verification Banner Removed** (November 6, 2025):
-  - Removed KYC/profile verification banner from dashboard to reduce user friction
-  - Banner was showing completion percentage and missing requirements on main dashboard
-  - Users can still access profile completion via their profile settings if needed
-- **Email Template Default Attachments** (November 6, 2025):
-  - Email templates now support default attachments that are automatically included when template is used
-  - **Database**: Added `attachments` JSONB column to `email_templates` table storing file metadata array
-  - **Component**: Created `TemplateAttachments` component for upload/preview/removal of default attachments
-  - **Integration**: Available in both Scribe agent preview panel and manual email template creation form
-  - **Backend**: Generic `/api/upload` endpoint handles file uploads with multer (50MB limit, MIME type validation)
-  - **File Storage**: Files stored in `/uploads` directory with sanitized, unique filenames
-  - **User Experience**: Drag & drop or click to upload files, preview with file icons, remove individual attachments
-  - **Bug Fix**: Fixed Scribe save-template endpoint to include signature and attachments fields when saving templates
-  - **Validation**: Both signature and attachments are optional (not required) when creating email templates
+- **AI Roundtable WebSocket Fix** (November 6, 2025):
+  - **Fixed layout overflow**: Changed roundtable page from `h-screen` to `h-full` to properly fit within app layout
+  - **Added footer clearance**: Main content area now has `pb-20` padding on desktop to prevent overlap with FinACEverse footer
+  - **Enabled Roundtable WebSocket**: Uncommented and initialized `setupRoundtableWebSocket` in server startup
+  - **Implemented agent responses**: Added `processUserMessage` method to orchestrator to queue agent tasks when users send messages
+  - **Added agent execution**: Created `executeAgentTasks` function in WebSocket handler to run agents and broadcast responses
+  - **Connection status**: WebSocket now properly shows "Connected" status instead of "Disconnected"
+  - **Message triggering**: User messages now trigger active agents to respond in the roundtable conversation
+  - **Agent integration**: Uses existing agent-loader to execute agents (Luca, Cadence, Forma, Parity) with roundtable context
 
 ### System Architecture
 
