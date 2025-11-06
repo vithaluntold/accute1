@@ -161,8 +161,32 @@ export function EnhancedChatInput({
       )}
 
       {/* Input Area */}
-      <div className="flex items-end gap-2">
-        <div className="flex-1 relative">
+      <div className="flex items-center gap-2">
+        {/* Attachment Button (outside, on the left) */}
+        {supportsAttachments && (
+          <>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-11 w-11 flex-shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              data-testid={`${testIdPrefix}-attach-button`}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+            />
+          </>
+        )}
+        
+        <div className="flex-1">
           <Textarea
             ref={textareaRef}
             value={value}
@@ -170,40 +194,17 @@ export function EnhancedChatInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className="resize-none min-h-[44px] pr-12"
+            className="resize-none min-h-[44px]"
             data-testid={`${testIdPrefix}-input`}
           />
-          
-          {/* Attachment Button (inside textarea) */}
-          {supportsAttachments && (
-            <>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute bottom-2 right-2 h-8 w-8"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled}
-                data-testid={`${testIdPrefix}-attach-button`}
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleFileSelect}
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-              />
-            </>
-          )}
         </div>
 
         {/* Send Button */}
         <Button
+          size="icon"
           onClick={handleSend}
           disabled={disabled || (!value.trim() && attachedFiles.length === 0)}
-          className="h-11"
+          className="h-11 w-11 flex-shrink-0"
           data-testid={`${testIdPrefix}-send-button`}
         >
           <Send className="h-4 w-4" />
