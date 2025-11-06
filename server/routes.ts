@@ -166,6 +166,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // ==================== File Upload Routes ====================
+  
+  // Generic file upload for template attachments
+  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Generate public URL for the uploaded file
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      res.json({ 
+        url: fileUrl,
+        filename: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype
+      });
+    } catch (error: any) {
+      console.error("File upload error:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
   // ==================== Auth Routes ====================
   
   // Register

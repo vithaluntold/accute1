@@ -48,6 +48,14 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
     - Updated `getUser()` method to include role relation via LEFT JOIN
     - Added admin checks on PATCH/DELETE endpoints for message templates, email templates, and documents
     - Non-admin users receive 403 error when attempting to modify global templates/documents via API
+- **Email Template Default Attachments** (November 6, 2025):
+  - Email templates now support default attachments that are automatically included when template is used
+  - **Database**: Added `attachments` JSONB column to `email_templates` table storing file metadata array
+  - **Component**: Created `TemplateAttachments` component for upload/preview/removal of default attachments
+  - **Integration**: Available in both Scribe agent preview panel and manual email template creation form
+  - **Backend**: Generic `/api/upload` endpoint handles file uploads with multer (50MB limit, MIME type validation)
+  - **File Storage**: Files stored in `/uploads` directory with sanitized, unique filenames
+  - **User Experience**: Drag & drop or click to upload files, preview with file icons, remove individual attachments
 
 ### System Architecture
 

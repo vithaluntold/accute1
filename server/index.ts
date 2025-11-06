@@ -179,6 +179,13 @@ app.use('/api/payment-methods', paymentLimiter);
 app.use('/api/subscription-invoices/:id/pay', paymentLimiter);
 app.use('/api/subscription-invoices/:id/complete-payment', paymentLimiter);
 
+// Serve uploaded files statically
+const uploadsPath = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsPath));
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
