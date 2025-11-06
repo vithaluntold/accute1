@@ -44,6 +44,49 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Multi-Factor Authentication (MFA)
+export const userMFA = pgTable("user_mfa", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaEnforced: boolean("mfa_enforced").notNull().default(false), // Organization policy
+  
+  // TOTP secret (encrypted)
+  totpSecret: text("totp_secret"),
+  totpSecretIv: text("totp_secret_iv"),
+  totpSecretTag: text("totp_secret_tag"),
+  
+  // Backup codes (hashed, one-time use)
+  backupCodes: text("backup_codes").array().default(sql`ARRAY[]::text[]`),
+  backupCodesUsed: text("backup_codes_used").array().default(sql`ARRAY[]::text[]`),
+  
+  lastVerified: timestamp("last_verified"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("user_mfa_user_idx").on(table.userId),
+}));
+
+// Trusted devices for MFA (skip MFA for 30 days)
+export const trustedDevices = pgTable("trusted_devices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  deviceId: varchar("device_id", { length: 255 }).notNull(), // Browser fingerprint
+  deviceName: varchar("device_name", { length: 255 }),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  
+  expiresAt: timestamp("expires_at").notNull(), // 30 days from trust
+  lastUsed: timestamp("last_used"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userDeviceIdx: index("trusted_devices_user_device_idx").on(table.userId, table.deviceId),
+}));
+
 // Organizations for multi-tenancy
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1645,6 +1688,19 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertUserMFASchema = createInsertSchema(userMFA).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastVerified: true,
+});
+
+export const insertTrustedDeviceSchema = createInsertSchema(trustedDevices).omit({
+  id: true,
+  createdAt: true,
+  lastUsed: true,
 });
 
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
