@@ -331,11 +331,11 @@ export default function AgentIntegrationGuide() {
                         </div>
                         <div className="mt-3 p-3 bg-muted rounded-md">
                           <p className="text-sm font-mono">
-                            📄 See: <code>agents/rai-compliance/NOTE_CRITICAL_LIMITATION.md</code> for complete implementation guide
+                            See: <code>agents/rai-compliance/NOTE_CRITICAL_LIMITATION.md</code> for complete implementation guide
                           </p>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          ⚠️ Before integrating external agents, read the README file to complete this integration step.
+                          WARNING: Before integrating external agents, read the README file to complete this integration step.
                         </p>
                       </AlertDescription>
                     </Alert>

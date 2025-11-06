@@ -142,8 +142,9 @@ class AgentRegistry {
         agentId = inserted[0].id;
       }
 
-      // Auto-install free agents for all organizations (disabled for now due to caching issues)
-      // Will implement via dedicated API endpoint instead
+      // Auto-install free agents for all organizations
+      // NOTE: Temporarily disabled due to tsx compilation caching issues
+      // The method is public and can be called manually or via API endpoint
       // await this.autoInstallForOrganizations(agentId, pricingModel, manifest.slug);
     } catch (error) {
       console.error(`Failed to sync agent ${manifest.slug} to database:`, error);
@@ -228,12 +229,12 @@ class AgentRegistry {
               organizationId: org.id,
               agentId,
               status: 'enabled',
-              enabledBy: installedBy,
+              grantedBy: installedBy,
             });
           } else if (existingOrgAgent[0].status !== 'enabled') {
             await db
               .update(organizationAgents)
-              .set({ status: 'enabled', enabledBy: installedBy, updatedAt: new Date() })
+              .set({ status: 'enabled', updatedAt: new Date() })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
         }

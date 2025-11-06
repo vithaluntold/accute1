@@ -681,6 +681,17 @@ export async function initializeSystem(app: Express) {
       console.error("❌ Failed to register agent routes:", error);
     }
 
+    // Initialize Recurring Scheduler Service
+    console.log("⏰ Initializing recurring scheduler service...");
+    try {
+      const { getRecurringSchedulerService } = await import("./services/recurringSchedulerService");
+      const scheduler = getRecurringSchedulerService();
+      scheduler.start(5); // Check every 5 minutes
+      console.log("✅ Recurring scheduler service started");
+    } catch (error) {
+      console.error("❌ Failed to start recurring scheduler:", error);
+    }
+
     console.log("✅ System initialized successfully");
   } catch (error) {
     console.error("❌ System initialization failed:", error);

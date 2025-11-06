@@ -2734,6 +2734,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Recurring Schedules Routes ====================
+
+  app.get("/api/recurring-schedules", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const schedules = await db
+        .select()
+        .from(schema.recurringSchedules)
+        .where(eq(schema.recurringSchedules.organizationId, req.user!.organizationId!))
+        .orderBy(schema.recurringSchedules.nextRunAt);
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch recurring schedules" });
+    }
+  });
+
+  app.get("/api/recurring-schedules/:id", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const schedule = await db
+        .select()
+        .from(schema.recurringSchedules)
+        .where(
+          and(
+            eq(schema.recurringSchedules.id, req.params.id),
+            eq(schema.recurringSchedules.organizationId, req.user!.organizationId!)
+          )
+        )
+        .limit(1);
+
+      if (schedule.length === 0) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      res.json(schedule[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch schedule" });
+    }
+  });
+
+  app.post("/api/recurring-schedules", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { workflowId, name, description, frequency, interval, dayOfWeek, dayOfMonth, monthOfYear, timeOfDay, startDate, endDate, assignmentTemplate } = req.body;
+
+      const workflow = await storage.getWorkflow(workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      const { getRecurringSchedulerService } = await import("./services/recurringSchedulerService");
+      const scheduler = getRecurringSchedulerService();
+      
+      const now = new Date();
+      const firstRun = startDate ? new Date(startDate) : now;
+      
+      const nextRunAt = scheduler['calculateNextRun'](
+        firstRun < now ? now : firstRun,
+        frequency,
+        interval || 1,
+        dayOfWeek || null,
+        dayOfMonth || null,
+        monthOfYear || null,
+        timeOfDay || null
+      );
+
+      const inserted = await db.insert(schema.recurringSchedules).values({
+        organizationId: req.user!.organizationId!,
+        workflowId,
+        name,
+        description,
+        frequency,
+        interval: interval || 1,
+        dayOfWeek,
+        dayOfMonth,
+        monthOfYear,
+        timeOfDay,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        assignmentTemplate: assignmentTemplate || {},
+        nextRunAt,
+        createdBy: req.userId!,
+      }).returning();
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "recurring_schedule", inserted[0].id, { name, workflow: workflow.name }, req);
+      res.json(inserted[0]);
+    } catch (error: any) {
+      console.error("Failed to create recurring schedule:", error);
+      res.status(500).json({ error: "Failed to create recurring schedule" });
+    }
+  });
+
+  app.patch("/api/recurring-schedules/:id", requireAuth, requirePermission("workflows.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.recurringSchedules)
+        .where(
+          and(
+            eq(schema.recurringSchedules.id, req.params.id),
+            eq(schema.recurringSchedules.organizationId, req.user!.organizationId!)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      const updated = await db
+        .update(schema.recurringSchedules)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(eq(schema.recurringSchedules.id, req.params.id))
+        .returning();
+
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "recurring_schedule", req.params.id, {}, req);
+      res.json(updated[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to update recurring schedule" });
+    }
+  });
+
+  app.delete("/api/recurring-schedules/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.recurringSchedules)
+        .where(
+          and(
+            eq(schema.recurringSchedules.id, req.params.id),
+            eq(schema.recurringSchedules.organizationId, req.user!.organizationId!)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      await db.delete(schema.recurringSchedules).where(eq(schema.recurringSchedules.id, req.params.id));
+      await logActivity(req.userId, req.user!.organizationId || undefined, "delete", "recurring_schedule", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete recurring schedule" });
+    }
+  });
+
+  app.post("/api/recurring-schedules/:id/trigger", requireAuth, requirePermission("workflows.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.recurringSchedules)
+        .where(
+          and(
+            eq(schema.recurringSchedules.id, req.params.id),
+            eq(schema.recurringSchedules.organizationId, req.user!.organizationId!)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      const { getRecurringSchedulerService } = await import("./services/recurringSchedulerService");
+      const scheduler = getRecurringSchedulerService();
+      
+      await scheduler.manualTrigger(req.params.id);
+      await logActivity(req.userId, req.user!.organizationId || undefined, "trigger", "recurring_schedule", req.params.id, {}, req);
+      
+      res.json({ success: true, message: "Schedule triggered successfully" });
+    } catch (error: any) {
+      console.error("Failed to trigger recurring schedule:", error);
+      res.status(500).json({ error: error.message || "Failed to trigger recurring schedule" });
+    }
+  });
+
   // ==================== Client Portal Task Routes ====================
 
   // Get all tasks for a client
