@@ -13,6 +13,8 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - **Subscription System**: Subscription pricing UI and routes disabled per user request
 
 ### Recent Changes (November 2025)
+- **Scribe WebSocket Input Fix** (November 6, 2025): Fixed critical bug where Scribe agent failed on WebSocket connections due to input format mismatch. WebSocket sends `{ query, context }` but Scribe expected `{ message, history }`. Updated both `execute()` and `executeStream()` methods to handle both formats: `input.message || input.query`. This enables Scribe to work seamlessly via both HTTP POST (`/api/agents/scribe/chat`) and WebSocket (`/ws/ai-stream`).
+- **Template Literal Escaping**: Fixed `${{amount}}` in Scribe's system prompt by escaping to `\${{amount}}` to prevent JavaScript variable interpolation errors.
 - **WebSocket Initialization**: Implemented true lazy-loading for WebSockets. Server attaches an upgrade event listener but only initializes the WebSocketServer on the first `/ws/ai-stream` connection. The first upgrade request is properly handled via `handleUpgrade()` to ensure immediate connection success.
 - **Luca Document Access**: Luca agent now loads all organization documents and includes them in its system prompt. When users ask about documents, Luca can reference the available files by name, upload date, and category (up to 50 documents displayed, with indication if more exist).
 - **Agent Context Propagation**: WebSocket handler now passes organizationId, userId, and conversationId context to all agents via structured input, enabling document access and context-aware responses.
