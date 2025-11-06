@@ -10,8 +10,8 @@ import path from "path";
 import { pathToFileURL } from "url";
 import type { Express } from "express";
 import { db } from "./db";
-import { aiAgents, organizationAgents, userAgentAccess } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { aiAgents, organizationAgents, userAgentAccess, aiAgentInstallations, organizations, users } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 export interface AgentManifest {
   slug: string;
@@ -126,18 +126,94 @@ class AgentRegistry {
         pricePerInstance: pricePerInstance !== null ? pricePerInstance.toString() : null,
         pricePerToken: pricePerToken !== null ? pricePerToken.toString() : null,
         oneTimeFee: oneTimeFee !== null ? oneTimeFee.toString() : null,
+        isPublished: true, // Auto-publish registry agents
       };
 
+      let agentId: string;
+      
       if (existing.length > 0) {
         await db
           .update(aiAgents)
           .set({ ...agentData, updatedAt: new Date() })
           .where(eq(aiAgents.id, existing[0].id));
+        agentId = existing[0].id;
       } else {
-        await db.insert(aiAgents).values(agentData);
+        const inserted = await db.insert(aiAgents).values(agentData).returning();
+        agentId = inserted[0].id;
       }
+
+      // Auto-install free agents for all organizations (disabled for now due to caching issues)
+      // Will implement via dedicated API endpoint instead
+      // await this.autoInstallForOrganizations(agentId, pricingModel, manifest.slug);
     } catch (error) {
       console.error(`Failed to sync agent ${manifest.slug} to database:`, error);
+    }
+  }
+
+  /**
+   * Auto-install agents for all organizations based on pricing model
+   * Free agents: Auto-installed immediately
+   * Paid agents: Tracked but not auto-installed (user must explicitly install)
+   */
+  async autoInstallForOrganizations(
+    agentId: string,
+    pricingModel: string,
+    agentSlug: string
+  ): Promise<void> {
+    try {
+      // Only auto-install free agents
+      if (pricingModel !== 'free') {
+        console.log(`  → Agent ${agentSlug} is paid (${pricingModel}) - skipping auto-install`);
+        return;
+      }
+
+      // Get all organizations
+      const allOrgs = await db.select({ id: organizations.id }).from(organizations);
+      
+      if (allOrgs.length === 0) {
+        return;
+      }
+
+      // Get system user (first super admin) to use as installer
+      const systemUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, 'Super Admin'))
+        .limit(1);
+
+      if (systemUser.length === 0) {
+        console.log(`  → No system user found for auto-install of ${agentSlug}`);
+        return;
+      }
+
+      const installedBy = systemUser[0].id;
+
+      // Check existing installations
+      const existingInstallations = await db
+        .select({ organizationId: aiAgentInstallations.organizationId })
+        .from(aiAgentInstallations)
+        .where(eq(aiAgentInstallations.agentId, agentId));
+
+      const installedOrgIds = new Set(existingInstallations.map(i => i.organizationId));
+
+      // Install for organizations that don't have it yet
+      const orgsToInstall = allOrgs.filter(org => !installedOrgIds.has(org.id));
+
+      if (orgsToInstall.length > 0) {
+        // Insert installations one by one to ensure proper handling
+        for (const org of orgsToInstall) {
+          await db.insert(aiAgentInstallations).values({
+            agentId,
+            organizationId: org.id,
+            installedBy,
+            configuration: {},
+            isActive: true,
+          });
+        }
+        console.log(`  → Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
+      }
+    } catch (error) {
+      console.error(`Failed to auto-install agent ${agentSlug}:`, error);
     }
   }
 

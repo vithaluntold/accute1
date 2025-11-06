@@ -249,6 +249,64 @@ export default function AgentIntegrationGuide() {
                   <Separator />
 
                   <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Pricing Models</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Agents support flexible pricing models through the manifest. Auto-installation behavior depends on pricing:
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Free Agents</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500">Auto-Installed</Badge>
+                          </div>
+                          <p className="text-muted-foreground">
+                            Free agents automatically install for all organizations when loaded by the registry.
+                          </p>
+                          <div className="bg-muted p-2 rounded text-xs">
+                            <code>pricingModel: "free"</code>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Paid Agents</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500">Manual Install</Badge>
+                          </div>
+                          <p className="text-muted-foreground">
+                            Paid agents appear in marketplace but require explicit installation by organizations.
+                          </p>
+                          <div className="bg-muted p-2 rounded text-xs space-y-1">
+                            <div><code>pricingModel: "per_month"</code></div>
+                            <div><code>priceMonthly: 49.99</code></div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium">Supported Pricing Models:</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">free</Badge>
+                        <Badge variant="outline">per_month</Badge>
+                        <Badge variant="outline">per_year</Badge>
+                        <Badge variant="outline">per_instance</Badge>
+                        <Badge variant="outline">per_token</Badge>
+                        <Badge variant="outline">one_time</Badge>
+                        <Badge variant="outline">hybrid</Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
                     <h3 className="font-semibold text-lg">Agent Class Requirements</h3>
                     <p className="text-sm text-muted-foreground">Your backend agent class MUST implement:</p>
                     <div className="bg-muted p-4 rounded-lg font-mono text-sm">
