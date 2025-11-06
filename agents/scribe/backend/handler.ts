@@ -4,6 +4,7 @@ import { storage } from "../../../server/storage";
 import { insertEmailTemplateSchema } from "../../../shared/schema";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import { ScribeAgent } from "./index";
+import { getLLMConfigService } from "../../../server/llm-config-service";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,16 +20,9 @@ export const registerRoutes = (app: any) => {
     try {
       const { message, history, currentTemplate, llmConfigId } = req.body;
       
-      // Get LLM configuration (user-selected or default)
-      let llmConfig;
-      if (llmConfigId) {
-        llmConfig = await storage.getLlmConfiguration(llmConfigId);
-        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
-          return res.status(404).json({ error: "LLM configuration not found" });
-        }
-      } else {
-        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      }
+      // Get LLM configuration using centralized service
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getConfig(req.user!.organizationId!, llmConfigId);
       
       if (!llmConfig) {
         return res.status(400).json({ 
