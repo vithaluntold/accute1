@@ -56,6 +56,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
   - **Backend**: Generic `/api/upload` endpoint handles file uploads with multer (50MB limit, MIME type validation)
   - **File Storage**: Files stored in `/uploads` directory with sanitized, unique filenames
   - **User Experience**: Drag & drop or click to upload files, preview with file icons, remove individual attachments
+  - **Bug Fix**: Fixed Scribe save-template endpoint to include signature and attachments fields when saving templates
 
 ### System Architecture
 
