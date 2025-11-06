@@ -17,6 +17,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
   - **Architecture**: Complete rewrite of LLM configuration and agent authentication module for simplification
   - **Single Source of Truth**: Created `LLMConfigService` class that manages all LLM configuration fetching and caching
   - **Automatic Caching**: Default configs cached for 5 minutes to reduce database queries
+  - **Cache Invalidation**: Cache automatically cleared when configs are created, updated, or deleted to prevent stale reads
   - **Unified API**: All agents, routes, WebSocket handlers, and automation engine now use the same centralized service
   - **Error Handling**: Consistent error messages across all LLM config operations
   - **Simplified Code**: Removed repetitive config fetching logic from routes.ts, websocket.ts, and automation-engine.ts
@@ -104,6 +105,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 ### AI Agent Configuration
 - **Centralized Configuration Service**: New `LLMConfigService` provides single source of truth for all LLM configs
   - Automatic caching (5 min TTL) to reduce database load
+  - Cache invalidation on create/update/delete operations to prevent stale reads
   - Consistent error handling across all agents
   - Unified API: `getConfig(orgId, configId?)` and `getDefaultConfig(orgId)`
   - Initialized at server startup before agents load
