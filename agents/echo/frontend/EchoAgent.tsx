@@ -506,7 +506,7 @@ export default function EchoAgent() {
                 }}
                 placeholder="Describe the message template you need..."
                 disabled={isLoading}
-                supportsAttachments={false}
+                supportsAttachments={true}
                 maxLines={10}
                 testIdPrefix="echo"
               />

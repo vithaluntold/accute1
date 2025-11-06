@@ -859,7 +859,7 @@ export function LucaChatWidget() {
             }}
             placeholder="Message Luca..."
             disabled={isStreaming}
-            supportsAttachments={false}
+            supportsAttachments={true}
             maxLines={10}
             testIdPrefix="luca"
           />

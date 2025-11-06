@@ -509,7 +509,7 @@ export default function ScribeAgent() {
                 }}
                 placeholder="Describe the email template you need..."
                 disabled={isLoading}
-                supportsAttachments={false}
+                supportsAttachments={true}
                 maxLines={10}
                 testIdPrefix="scribe"
               />

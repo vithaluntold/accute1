@@ -608,7 +608,7 @@ export default function ParityAgent() {
               }}
               placeholder="Describe the document you need..."
               disabled={isLoading}
-              supportsAttachments={false}
+              supportsAttachments={true}
               maxLines={10}
               testIdPrefix="parity"
             />
