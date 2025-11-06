@@ -1386,6 +1386,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: req.user!.id
       });
       
+      // Clear cache so new/updated default configs are picked up immediately
+      const llmConfigService = getLLMConfigService();
+      llmConfigService.clearCache(req.user!.organizationId!);
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "llm_configuration", config.id, {}, req);
       
       // Don't send back the encrypted key
@@ -1418,6 +1422,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const config = await storage.updateLlmConfiguration(req.params.id, updates);
+      
+      // Clear cache so updated configs are picked up immediately
+      const llmConfigService = getLLMConfigService();
+      llmConfigService.clearCache(req.user!.organizationId!);
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "llm_configuration", req.params.id, {}, req);
       
       res.json({ ...config, apiKeyEncrypted: '[ENCRYPTED]' });
@@ -1435,6 +1444,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteLlmConfiguration(req.params.id);
+      
+      // Clear cache so deletions are reflected immediately
+      const llmConfigService = getLLMConfigService();
+      llmConfigService.clearCache(req.user!.organizationId!);
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "llm_configuration", req.params.id, {}, req);
       
       res.json({ success: true });
