@@ -13,8 +13,9 @@ export interface TriggerConfig {
 
 export interface ConditionConfig {
   field: string;
-  operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'exists';
+  operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'greater_than_or_equal' | 'less_than_or_equal' | 'exists' | 'not_exists' | 'in' | 'not_in' | 'contains_any' | 'contains_all' | 'starts_with' | 'ends_with';
   value: any;
+  logic?: 'AND' | 'OR'; // For combining multiple conditions
 }
 
 export interface ActionConfig {
@@ -40,32 +41,126 @@ export class AutomationEngine {
 
   /**
    * Evaluate a set of conditions against provided data
+   * Supports tag-based conditions, field comparisons, and complex operators
+   * Correctly handles mixed AND/OR logic by evaluating conditions in sequence
    */
-  evaluateConditions(conditions: ConditionConfig[], data: Record<string, any>): boolean {
-    if (!conditions || conditions.length === 0) {
-      return true; // No conditions means always true
+  async evaluateConditions(
+    conditions: ConditionConfig[] | Record<string, any>, 
+    data: Record<string, any>
+  ): Promise<boolean> {
+    if (!conditions) {
+      return true;
     }
 
-    return conditions.every(condition => {
-      const fieldValue = this.getNestedValue(data, condition.field);
+    const conditionsArray = Array.isArray(conditions) ? conditions : [conditions];
+    
+    if (conditionsArray.length === 0) {
+      return true;
+    }
 
-      switch (condition.operator) {
-        case 'equals':
-          return fieldValue == condition.value;
-        case 'not_equals':
-          return fieldValue != condition.value;
-        case 'contains':
-          return String(fieldValue).includes(String(condition.value));
-        case 'greater_than':
-          return Number(fieldValue) > Number(condition.value);
-        case 'less_than':
-          return Number(fieldValue) < Number(condition.value);
-        case 'exists':
-          return fieldValue !== undefined && fieldValue !== null;
-        default:
-          return false;
+    let result = true;
+    
+    for (const condition of conditionsArray) {
+      const conditionResult = await this.evaluateSingleCondition(condition, data);
+      
+      if (condition.logic === 'OR') {
+        result = result || conditionResult;
+      } else {
+        result = result && conditionResult;
       }
-    });
+    }
+
+    return result;
+  }
+
+  /**
+   * Evaluate a single condition
+   */
+  private async evaluateSingleCondition(
+    condition: ConditionConfig, 
+    data: Record<string, any>
+  ): Promise<boolean> {
+    const fieldValue = await this.getFieldValue(condition.field, data);
+
+    switch (condition.operator) {
+      case 'equals':
+        return fieldValue == condition.value;
+      
+      case 'not_equals':
+        return fieldValue != condition.value;
+      
+      case 'contains':
+        if (Array.isArray(fieldValue)) {
+          return fieldValue.includes(condition.value);
+        }
+        return String(fieldValue).includes(String(condition.value));
+      
+      case 'greater_than':
+        return Number(fieldValue) > Number(condition.value);
+      
+      case 'less_than':
+        return Number(fieldValue) < Number(condition.value);
+      
+      case 'greater_than_or_equal':
+        return Number(fieldValue) >= Number(condition.value);
+      
+      case 'less_than_or_equal':
+        return Number(fieldValue) <= Number(condition.value);
+      
+      case 'exists':
+        return fieldValue !== undefined && fieldValue !== null;
+      
+      case 'not_exists':
+        return fieldValue === undefined || fieldValue === null;
+      
+      case 'in':
+        return Array.isArray(condition.value) && condition.value.includes(fieldValue);
+      
+      case 'not_in':
+        return Array.isArray(condition.value) && !condition.value.includes(fieldValue);
+      
+      case 'contains_any':
+        if (!Array.isArray(fieldValue) || !Array.isArray(condition.value)) {
+          return false;
+        }
+        return condition.value.some(val => fieldValue.includes(val));
+      
+      case 'contains_all':
+        if (!Array.isArray(fieldValue) || !Array.isArray(condition.value)) {
+          return false;
+        }
+        return condition.value.every(val => fieldValue.includes(val));
+      
+      case 'starts_with':
+        return String(fieldValue).startsWith(String(condition.value));
+      
+      case 'ends_with':
+        return String(fieldValue).endsWith(String(condition.value));
+      
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Get field value with support for nested paths and dynamic data fetching
+   * Supports paths like: client.tags, assignment.client.name, workflow.status
+   */
+  private async getFieldValue(field: string, data: Record<string, any>): Promise<any> {
+    if (field.includes('.')) {
+      const parts = field.split('.');
+      const firstPart = parts[0];
+      
+      if (firstPart === 'client' && data.clientId && !data.client) {
+        data.client = await this.storage.getClient(data.clientId);
+      } else if (firstPart === 'workflow' && data.workflowId && !data.workflow) {
+        data.workflow = await this.storage.getWorkflow(data.workflowId);
+      } else if (firstPart === 'assignment' && data.assignmentId && !data.assignment) {
+        data.assignment = await this.storage.getWorkflowAssignment(data.assignmentId);
+      }
+    }
+    
+    return this.getNestedValue(data, field);
   }
 
   /**
@@ -304,7 +399,7 @@ export class AutomationEngine {
 
     if (allComplete && step.autoProgress) {
       // Evaluate step's progress conditions
-      const conditionsMet = this.evaluateConditions(
+      const conditionsMet = await this.evaluateConditions(
         (step.progressConditions as any) || [],
         { allTasksComplete: true, step }
       );
@@ -348,7 +443,7 @@ export class AutomationEngine {
 
     if (allComplete && stage.autoProgress) {
       // Evaluate stage's progress conditions
-      const conditionsMet = this.evaluateConditions(
+      const conditionsMet = await this.evaluateConditions(
         (stage.progressConditions as any) || [],
         { allStepsComplete: true, stage }
       );
@@ -373,10 +468,10 @@ export class AutomationEngine {
   }
 
   /**
-   * Send an email
+   * Send an email using Resend
    */
   private async sendEmail(config: any, context: any): Promise<any> {
-    const { to, subject, body, templateId, variables } = config;
+    const { to, subject, body, html, templateId, variables } = config;
     
     // Get recipient email
     let recipientEmail = to;
@@ -398,35 +493,78 @@ export class AutomationEngine {
       throw new Error('No recipient email address specified');
     }
 
-    // Create email record (in production, integrate with email service like SendGrid, AWS SES, etc.)
-    const email = {
-      to: recipientEmail,
-      subject: subject || 'Workflow Notification',
-      body: body || '',
-      templateId,
-      variables,
-      status: 'pending',
-      sentAt: null,
-      metadata: {
-        workflowId: context.workflowId,
-        organizationId: context.organizationId,
-      },
-    };
+    // Process email template if provided
+    let emailBody = body || '';
+    let emailHtml = html;
 
-    // Log the email action
-    console.log('[Automation] Email scheduled:', email);
-    
-    // In a real implementation, this would integrate with an email service
-    // For now, create a notification as fallback
-    await this.storage.createNotification({
-      userId: context.userId,
-      title: `Email sent: ${subject}`,
-      message: `To: ${recipientEmail}\n\n${body}`,
-      type: 'info',
-      metadata: email,
-    });
+    if (templateId && !emailHtml) {
+      try {
+        const template = await this.storage.getEmailTemplate(templateId);
+        if (template) {
+          emailHtml = template.content || '';
+          
+          if (variables && typeof variables === 'object') {
+            Object.entries(variables).forEach(([key, value]) => {
+              const regex = new RegExp(`{{${key}}}`, 'g');
+              emailHtml = emailHtml?.replace(regex, String(value));
+              emailBody = emailBody.replace(regex, String(value));
+            });
+          }
+        }
+      } catch (error: any) {
+        console.warn('[Automation] Failed to load email template:', templateId, error.message);
+      }
+    }
 
-    return { sent: true, email };
+    const finalSubject = subject || 'Workflow Notification';
+    const finalBody = emailBody || 'This is an automated notification from your workflow.';
+
+    try {
+      const { sendEmail: resendSendEmail } = await import('./resend-service');
+      
+      const result = await resendSendEmail({
+        to: recipientEmail,
+        subject: finalSubject,
+        html: emailHtml,
+        text: finalBody
+      });
+
+      if (result.success) {
+        console.log('[Automation] Email sent successfully via Resend:', result.messageId);
+        
+        await this.storage.createNotification({
+          userId: context.userId,
+          title: `Email sent: ${finalSubject}`,
+          message: `To: ${recipientEmail}\n\nEmail sent successfully via Resend`,
+          type: 'info',
+          metadata: {
+            emailMessageId: result.messageId,
+            workflowId: context.workflowId,
+            organizationId: context.organizationId,
+          },
+        });
+
+        return { sent: true, messageId: result.messageId };
+      } else {
+        throw new Error(result.error || 'Failed to send email');
+      }
+    } catch (error: any) {
+      console.error('[Automation] Failed to send email via Resend:', error);
+      
+      await this.storage.createNotification({
+        userId: context.userId,
+        title: `Email notification: ${finalSubject}`,
+        message: `To: ${recipientEmail}\n\n${finalBody}\n\n(Email service unavailable - notification created instead)`,
+        type: 'warning',
+        metadata: {
+          workflowId: context.workflowId,
+          organizationId: context.organizationId,
+          emailError: error.message
+        },
+      });
+
+      return { sent: false, error: error.message, fallbackNotificationCreated: true };
+    }
   }
 
   /**

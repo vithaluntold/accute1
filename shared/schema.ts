@@ -2520,6 +2520,46 @@ export const userAgentAccess = pgTable("user_agent_access", {
   uniqueUserAgent: index("user_agent_access_unique_idx").on(table.userId, table.agentId, table.organizationId),
 }));
 
+// Recurring Schedules - Auto-create assignments on schedule (daily, weekly, monthly, etc.)
+export const recurringSchedules = pgTable("recurring_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Schedule configuration
+  frequency: text("frequency").notNull(), // 'daily', 'weekly', 'monthly', 'quarterly', 'annually'
+  interval: integer("interval").notNull().default(1), // Every N days/weeks/months/etc
+  dayOfWeek: integer("day_of_week"), // 0-6 for weekly (0 = Sunday)
+  dayOfMonth: integer("day_of_month"), // 1-31 for monthly
+  monthOfYear: integer("month_of_year"), // 1-12 for annually
+  timeOfDay: text("time_of_day").default("09:00:00"), // What time to create assignments
+  
+  // Assignment template
+  assignmentTemplate: jsonb("assignment_template").notNull().default(sql`'{}'::jsonb`), // Default values for created assignments
+  
+  // Active period
+  startDate: timestamp("start_date").notNull().defaultNow(),
+  endDate: timestamp("end_date"), // NULL means indefinite
+  
+  // Status and tracking
+  isActive: boolean("is_active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at").notNull(),
+  runCount: integer("run_count").notNull().default(0),
+  
+  // Metadata
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("recurring_schedules_org_idx").on(table.organizationId),
+  workflowIdx: index("recurring_schedules_workflow_idx").on(table.workflowId),
+  nextRunIdx: index("recurring_schedules_next_run_idx").on(table.nextRunAt),
+  activeIdx: index("recurring_schedules_active_idx").on(table.isActive),
+}));
+
 // Workflow Assignments - When a client is added to a workflow, it becomes an "assignment"
 // Example: Acme Corporation + 1120 Filing Workflow = Assignment
 export const workflowAssignments = pgTable("workflow_assignments", {
