@@ -14,16 +14,20 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 
 ### Recent Changes
 
+- **AI Agent Error Handling Fix** (November 6, 2025):
+  - **Fixed Forma error messages**: Updated frontend to display actual backend errors instead of generic "configure your AI provider" message
+  - **Root cause**: All agents use organization's default LLM configuration from Settings, but frontend was masking real errors
+  - **Resolution**: Frontend now properly propagates backend error messages (API failures, credential issues, etc.) to users
+  - **User Impact**: Users can now see specific error details to troubleshoot LLM configuration issues
 - **AI Agent Database Cleanup** (November 6, 2025):
-  - **Removed duplicate/unneeded agents from database**: Deleted 7 agents from `ai_agents` table:
+  - **Removed duplicate/unneeded agents from database**: Deleted 6 agents from `ai_agents` table:
     - Invoice Processor (invoice-processor-58e45b3d)
-    - OmniSpectra (omnispectra)
     - Parity duplicate with empty slug
     - Parity AI Accountant Example (parity-example)
     - Reconciliation Assistant (reconciliation-assistant-9a18b77f)
     - Tax Compliance Advisor (tax-compliance-advisor-bf82a991)
     - Work Status Bot (work-status-bot)
-  - **8 Active Agents**: Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar
+  - **9 Active Agents**: Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar, OmniSpectra
   - **No orphaned installations**: Verified no broken references in `ai_agent_installations` table
   - **Result**: Agent Marketplace now displays only functional, production-ready agents
 - **AI Roundtable WebSocket Fix** (November 6, 2025):

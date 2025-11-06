@@ -231,7 +231,17 @@ export default function FormaAgent() {
         }),
       });
 
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || data.details || "Failed to send message");
+      }
+
       const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -260,7 +270,7 @@ export default function FormaAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
+        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -357,10 +367,15 @@ export default function FormaAgent() {
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || "Upload failed");
       }
 
       const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
       
       setTodos(prev => prev.map(t => ({ ...t, status: "completed" as const })));
       
@@ -384,14 +399,15 @@ export default function FormaAgent() {
     } catch (error) {
       console.error("Upload error:", error);
       setTodos([]);
+      const errorMsg = error instanceof Error ? error.message : "Failed to process document. Please try again.";
       toast({
         title: "Upload failed",
-        description: "Failed to process document. Please try again.",
+        description: errorMsg,
         variant: "destructive"
       });
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: "Sorry, I couldn't process that document. Please try again or describe your form requirements instead."
+        content: `Sorry, I couldn't process that document. Error: ${errorMsg}`
       }]);
     } finally {
       setIsLoading(false);
