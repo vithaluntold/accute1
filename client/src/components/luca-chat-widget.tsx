@@ -57,6 +57,7 @@ import { queryClient } from "@/lib/queryClient";
 import lucaLogoUrl from "@assets/Luca Transparent symbol (1)_1761720299435.png";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   id: string;
@@ -848,37 +849,20 @@ export function LucaChatWidget() {
         </div>
 
         {/* Input Area */}
-        <div className="border-t p-4">
-          <div className="flex gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Message Luca..."
-              className="min-h-[44px] max-h-32 resize-none"
-              rows={1}
-              disabled={isStreaming}
-              data-testid="input-message"
-            />
-            <Button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isStreaming}
-              size="icon"
-              className="h-11 w-11 flex-shrink-0"
-              data-testid="button-send-message"
-            >
-              {isStreaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+        <div className="border-t p-4 pb-20">
+          <EnhancedChatInput
+            value={input}
+            onChange={setInput}
+            onSend={(message, files) => {
+              setInput(message);
+              handleSend();
+            }}
+            placeholder="Message Luca..."
+            disabled={isStreaming}
+            supportsAttachments={false}
+            maxLines={10}
+            testIdPrefix="luca"
+          />
           <p className="text-xs text-center text-muted-foreground mt-2">
             Luca can make mistakes. Verify important information.
           </p>

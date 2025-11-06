@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -146,22 +147,20 @@ export default function OmniSpectra() {
             </div>
           )}
 
-          <div className="flex gap-2">
-            <Input
+          <div className="pb-20">
+            <EnhancedChatInput
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onChange={setInput}
+              onSend={(message, files) => {
+                setInput(message);
+                handleSend();
+              }}
               placeholder="Ask about work status..."
               disabled={chatMutation.isPending}
-              data-testid="input-message"
+              supportsAttachments={false}
+              maxLines={10}
+              testIdPrefix="omnispectra"
             />
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || chatMutation.isPending}
-              data-testid="button-send"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
           </div>
         </CardContent>
       </Card>

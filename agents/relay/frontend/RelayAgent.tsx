@@ -15,6 +15,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -435,24 +436,20 @@ export default function RelayAgent() {
               </div>
             </ScrollArea>
             <Separator />
-            <div className="p-4">
-              <div className="flex gap-2">
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                  placeholder="Paste an email or describe the task..."
-                  disabled={isLoading}
-                  data-testid="input-message"
-                />
-                <Button 
-                  onClick={sendMessage} 
-                  disabled={isLoading || !input.trim()}
-                  data-testid="button-send"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="p-4 pb-20">
+              <EnhancedChatInput
+                value={input}
+                onChange={setInput}
+                onSend={(message, files) => {
+                  setInput(message);
+                  sendMessage();
+                }}
+                placeholder="Paste an email or describe the task..."
+                disabled={isLoading}
+                supportsAttachments={false}
+                maxLines={10}
+                testIdPrefix="relay"
+              />
             </div>
           </CardContent>
         </Card>

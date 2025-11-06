@@ -31,6 +31,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -597,25 +598,20 @@ export default function ParityAgent() {
           </ScrollArea>
           
           {/* Input Area */}
-          <div className="border-t p-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Describe the document you need..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
-                disabled={isLoading}
-                data-testid="input-parity-message"
-              />
-              <Button 
-                onClick={sendMessage} 
-                disabled={isLoading || !input.trim()}
-                size="icon"
-                data-testid="button-send-message"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+          <div className="border-t p-4 pb-20">
+            <EnhancedChatInput
+              value={input}
+              onChange={setInput}
+              onSend={(message, files) => {
+                setInput(message);
+                sendMessage();
+              }}
+              placeholder="Describe the document you need..."
+              disabled={isLoading}
+              supportsAttachments={false}
+              maxLines={10}
+              testIdPrefix="parity"
+            />
           </div>
         </CardContent>
       </Card>
