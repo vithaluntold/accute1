@@ -6590,6 +6590,102 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // Project Workflows - Projects as combinations of 2+ workflows
+  app.get("/api/projects/:id/workflows", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const workflows = await storage.getProjectWorkflows(req.params.id);
+      res.json(workflows);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch project workflows" });
+    }
+  });
+
+  app.post("/api/projects/:id/workflows", requireAuth, requirePermission("projects.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      const workflow = await storage.getWorkflow(req.body.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      const projectWorkflow = await storage.addWorkflowToProject({
+        projectId: req.params.id,
+        workflowId: req.body.workflowId,
+        order: req.body.order || 0
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "add_workflow", "project", req.params.id, { workflowId: req.body.workflowId }, req);
+      res.status(201).json(projectWorkflow);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to add workflow to project" });
+    }
+  });
+
+  app.delete("/api/projects/:id/workflows/:workflowId", requireAuth, requirePermission("projects.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project || project.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+      await storage.removeWorkflowFromProject(req.params.id, req.params.workflowId);
+      await logActivity(req.user!.id, req.user!.organizationId!, "remove_workflow", "project", req.params.id, { workflowId: req.params.workflowId }, req);
+      res.status(200).json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to remove workflow from project" });
+    }
+  });
+
+  // Move assignment between workflows (within a project)
+  app.post("/api/assignments/:id/move-workflow", requireAuth, requirePermission("assignments.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const assignment = await storage.getWorkflowAssignment(req.params.id);
+      if (!assignment || assignment.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      const { targetWorkflowId, projectId } = req.body;
+      
+      if (!targetWorkflowId) {
+        return res.status(400).json({ error: "targetWorkflowId is required" });
+      }
+
+      const targetWorkflow = await storage.getWorkflow(targetWorkflowId);
+      if (!targetWorkflow || targetWorkflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Target workflow not found" });
+      }
+
+      if (projectId) {
+        const isWorkflowInProject = await storage.isWorkflowInProject(projectId, targetWorkflowId);
+        if (!isWorkflowInProject) {
+          return res.status(400).json({ error: "Target workflow is not part of this project" });
+        }
+      }
+
+      const updatedAssignment = await storage.updateWorkflowAssignment(req.params.id, {
+        workflowId: targetWorkflowId,
+        currentStageId: null,
+        currentStepId: null,
+        currentTaskId: null,
+        status: 'not_started'
+      });
+
+      await logActivity(req.user!.id, req.user!.organizationId!, "move_workflow", "assignment", req.params.id, { 
+        fromWorkflowId: assignment.workflowId, 
+        toWorkflowId: targetWorkflowId, 
+        projectId 
+      }, req);
+
+      res.json(updatedAssignment);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to move assignment to different workflow" });
+    }
+  });
+
   // Team Chat
   app.get("/api/chat/channels", requireAuth, async (req: AuthRequest, res: Response) => {
     try {

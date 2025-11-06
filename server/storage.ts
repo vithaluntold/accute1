@@ -3662,6 +3662,51 @@ export class DbStorage implements IStorage {
     await db.delete(schema.projectTasks).where(eq(schema.projectTasks.id, id));
   }
 
+  // Project Workflows - Projects as combinations of 2+ workflows
+  async addWorkflowToProject(projectWorkflow: schema.InsertProjectWorkflow): Promise<schema.ProjectWorkflow> {
+    const result = await db.insert(schema.projectWorkflows).values(projectWorkflow).returning();
+    return result[0];
+  }
+
+  async getProjectWorkflows(projectId: string): Promise<any[]> {
+    return await db.select({
+      id: schema.projectWorkflows.id,
+      projectId: schema.projectWorkflows.projectId,
+      workflowId: schema.projectWorkflows.workflowId,
+      order: schema.projectWorkflows.order,
+      createdAt: schema.projectWorkflows.createdAt,
+      workflow: {
+        id: schema.workflows.id,
+        name: schema.workflows.name,
+        description: schema.workflows.description,
+        status: schema.workflows.status,
+      }
+    })
+    .from(schema.projectWorkflows)
+    .leftJoin(schema.workflows, eq(schema.projectWorkflows.workflowId, schema.workflows.id))
+    .where(eq(schema.projectWorkflows.projectId, projectId))
+    .orderBy(schema.projectWorkflows.order);
+  }
+
+  async removeWorkflowFromProject(projectId: string, workflowId: string): Promise<void> {
+    await db.delete(schema.projectWorkflows)
+      .where(and(
+        eq(schema.projectWorkflows.projectId, projectId),
+        eq(schema.projectWorkflows.workflowId, workflowId)
+      ));
+  }
+
+  async isWorkflowInProject(projectId: string, workflowId: string): Promise<boolean> {
+    const result = await db.select()
+      .from(schema.projectWorkflows)
+      .where(and(
+        eq(schema.projectWorkflows.projectId, projectId),
+        eq(schema.projectWorkflows.workflowId, workflowId)
+      ))
+      .limit(1);
+    return result.length > 0;
+  }
+
   // Team Chat
   async createChatChannel(channel: schema.InsertChatChannel): Promise<schema.ChatChannel> {
     const result = await db.insert(schema.chatChannels).values(channel).returning();

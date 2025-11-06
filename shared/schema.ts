@@ -2223,6 +2223,18 @@ export const projectTasks = pgTable("project_tasks", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Project-Workflow Junction - Projects are combinations of 2+ workflows
+export const projectWorkflows = pgTable("project_workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  order: integer("order").notNull().default(0), // Display order within project
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  projectWorkflowIdx: index("project_workflows_project_idx").on(table.projectId),
+  uniqueProjectWorkflow: unique().on(table.projectId, table.workflowId),
+}));
+
 // Team Chat
 export const chatChannels = pgTable("chat_channels", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2836,6 +2848,7 @@ export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit
 export const insertSignatureRequestSchema = createInsertSchema(signatureRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProjectWorkflowSchema = createInsertSchema(projectWorkflows).omit({ id: true, createdAt: true });
 export const insertChatChannelSchema = createInsertSchema(chatChannels).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChatMemberSchema = createInsertSchema(chatMembers).omit({ id: true });
 export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
@@ -2896,6 +2909,8 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
 export type ProjectTask = typeof projectTasks.$inferSelect;
+export type InsertProjectWorkflow = z.infer<typeof insertProjectWorkflowSchema>;
+export type ProjectWorkflow = typeof projectWorkflows.$inferSelect;
 export type InsertChatChannel = z.infer<typeof insertChatChannelSchema>;
 export type ChatChannel = typeof chatChannels.$inferSelect;
 export type InsertChatMember = z.infer<typeof insertChatMemberSchema>;
