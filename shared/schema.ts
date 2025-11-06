@@ -52,12 +52,10 @@ export const userMFA = pgTable("user_mfa", {
   mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   mfaEnforced: boolean("mfa_enforced").notNull().default(false), // Organization policy
   
-  // TOTP secret (encrypted)
+  // TOTP secret (AES-256-GCM encrypted in format: iv:encryptedData:authTag)
   totpSecret: text("totp_secret"),
-  totpSecretIv: text("totp_secret_iv"),
-  totpSecretTag: text("totp_secret_tag"),
   
-  // Backup codes (hashed, one-time use)
+  // Backup codes (hashed with bcrypt, one-time use)
   backupCodes: text("backup_codes").array().default(sql`ARRAY[]::text[]`),
   backupCodesUsed: text("backup_codes_used").array().default(sql`ARRAY[]::text[]`),
   

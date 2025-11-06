@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import { db } from '../db';
 import { userMFA, trustedDevices, users } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { encryptionService } from './encryptionService';
+import { encrypt, decrypt } from '../crypto-utils';
 
 export class MFAService {
   /**
@@ -53,17 +53,15 @@ export class MFAService {
       backupCodes.map(code => bcrypt.hash(code, 10))
     );
 
-    // Encrypt TOTP secret using AES-256-GCM
-    const encrypted = await encryptionService.encrypt(secret);
+    // Encrypt TOTP secret using AES-256-GCM (returns format: iv:encryptedData:authTag)
+    const encryptedSecret = encrypt(secret);
 
     // Store MFA data (disabled initially - user must verify first)
     if (existingMFA) {
       // Update existing record
       await db.update(userMFA)
         .set({
-          totpSecret: encrypted.encrypted,
-          totpSecretIv: encrypted.iv,
-          totpSecretTag: encrypted.tag,
+          totpSecret: encryptedSecret,
           backupCodes: hashedBackupCodes,
           backupCodesUsed: [],
           mfaEnabled: false, // User must verify to enable
@@ -74,9 +72,7 @@ export class MFAService {
       // Create new record
       await db.insert(userMFA).values({
         userId,
-        totpSecret: encrypted.encrypted,
-        totpSecretIv: encrypted.iv,
-        totpSecretTag: encrypted.tag,
+        totpSecret: encryptedSecret,
         backupCodes: hashedBackupCodes,
         backupCodesUsed: [],
         mfaEnabled: false
@@ -106,12 +102,8 @@ export class MFAService {
       throw new Error('MFA is already enabled');
     }
 
-    // Decrypt TOTP secret
-    const secret = await encryptionService.decrypt(
-      mfa.totpSecret,
-      mfa.totpSecretIv!,
-      mfa.totpSecretTag!
-    );
+    // Decrypt TOTP secret (format: iv:encryptedData:authTag)
+    const secret = decrypt(mfa.totpSecret!);
 
     // Verify token
     const isValid = authenticator.verify({ token, secret });
@@ -142,12 +134,8 @@ export class MFAService {
       return false;
     }
 
-    // Decrypt TOTP secret
-    const secret = await encryptionService.decrypt(
-      mfa.totpSecret,
-      mfa.totpSecretIv!,
-      mfa.totpSecretTag!
-    );
+    // Decrypt TOTP secret (format: iv:encryptedData:authTag)
+    const secret = decrypt(mfa.totpSecret!);
 
     // Verify token with 1 step window (30 seconds before/after)
     const isValid = authenticator.verify({ 

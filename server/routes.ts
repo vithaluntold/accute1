@@ -59,6 +59,7 @@ import { autoProgressionEngine } from "./auto-progression";
 import Stripe from "stripe";
 import { PricingService } from "@shared/pricing-service";
 import { getLLMConfigService } from "./llm-config-service";
+import { mfaService } from "./services/mfaService";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -369,6 +370,247 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // ==================== MFA (Multi-Factor Authentication) Routes ====================
+
+  // Setup MFA - Generate TOTP secret and QR code
+  app.post("/api/mfa/setup", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+      const { secret, qrCodeUrl, backupCodes } = await mfaService.setupMFA(userId);
+
+      res.json({
+        success: true,
+        secret, // For manual entry in authenticator apps
+        qrCodeUrl, // For scanning with authenticator apps
+        backupCodes // Save these securely!
+      });
+    } catch (error: any) {
+      console.error("MFA setup error:", error);
+      res.status(500).json({ error: error.message || "Failed to setup MFA" });
+    }
+  });
+
+  // Verify TOTP token and enable MFA
+  app.post("/api/mfa/verify-setup", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ error: "TOTP token is required" });
+      }
+
+      const isValid = await mfaService.verifyAndEnableMFA(userId, token);
+
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid TOTP token" });
+      }
+
+      // Log activity
+      await logActivity(userId, req.user!.organizationId || undefined, "enable_mfa", "user", userId, {}, req);
+
+      res.json({ success: true, message: "MFA enabled successfully" });
+    } catch (error: any) {
+      console.error("MFA verification error:", error);
+      res.status(500).json({ error: error.message || "Failed to verify MFA" });
+    }
+  });
+
+  // Verify TOTP token (during login)
+  app.post("/api/mfa/verify", async (req: Request, res: Response) => {
+    try {
+      const { userId, token, deviceId } = req.body;
+
+      if (!userId || !token) {
+        return res.status(400).json({ error: "User ID and token are required" });
+      }
+
+      const isValid = await mfaService.verifyToken(userId, token);
+
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid TOTP token" });
+      }
+
+      res.json({ success: true, verified: true });
+    } catch (error: any) {
+      console.error("MFA token verification error:", error);
+      res.status(500).json({ error: "Failed to verify token" });
+    }
+  });
+
+  // Verify backup code (during login)
+  app.post("/api/mfa/verify-backup-code", async (req: Request, res: Response) => {
+    try {
+      const { userId, backupCode } = req.body;
+
+      if (!userId || !backupCode) {
+        return res.status(400).json({ error: "User ID and backup code are required" });
+      }
+
+      const isValid = await mfaService.verifyBackupCode(userId, backupCode);
+
+      if (!isValid) {
+        return res.status(400).json({ error: "Invalid or already used backup code" });
+      }
+
+      res.json({ success: true, verified: true });
+    } catch (error: any) {
+      console.error("Backup code verification error:", error);
+      res.status(500).json({ error: "Failed to verify backup code" });
+    }
+  });
+
+  // Disable MFA
+  app.post("/api/mfa/disable", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password is required to disable MFA" });
+      }
+
+      // Verify password before disabling MFA
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      await mfaService.disableMFA(userId);
+
+      // Log activity
+      await logActivity(userId, req.user!.organizationId || undefined, "disable_mfa", "user", userId, {}, req);
+
+      res.json({ success: true, message: "MFA disabled successfully" });
+    } catch (error: any) {
+      console.error("MFA disable error:", error);
+      res.status(500).json({ error: "Failed to disable MFA" });
+    }
+  });
+
+  // Get MFA status
+  app.get("/api/mfa/status", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const status = await mfaService.getMFAStatus(userId);
+
+      res.json(status);
+    } catch (error: any) {
+      console.error("MFA status error:", error);
+      res.status(500).json({ error: "Failed to fetch MFA status" });
+    }
+  });
+
+  // Regenerate backup codes
+  app.post("/api/mfa/regenerate-backup-codes", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password is required to regenerate backup codes" });
+      }
+
+      // Verify password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      const backupCodes = await mfaService.regenerateBackupCodes(userId);
+
+      // Log activity
+      await logActivity(userId, req.user!.organizationId || undefined, "regenerate_backup_codes", "user", userId, {}, req);
+
+      res.json({
+        success: true,
+        backupCodes // Save these securely!
+      });
+    } catch (error: any) {
+      console.error("Backup codes regeneration error:", error);
+      res.status(500).json({ error: error.message || "Failed to regenerate backup codes" });
+    }
+  });
+
+  // Trust a device (skip MFA for 30 days)
+  app.post("/api/mfa/trust-device", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { deviceId, deviceName } = req.body;
+
+      if (!deviceId || !deviceName) {
+        return res.status(400).json({ error: "Device ID and name are required" });
+      }
+
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+
+      await mfaService.trustDevice(userId, deviceId, deviceName, ipAddress, userAgent);
+
+      res.json({ success: true, message: "Device trusted for 30 days" });
+    } catch (error: any) {
+      console.error("Trust device error:", error);
+      res.status(500).json({ error: "Failed to trust device" });
+    }
+  });
+
+  // Check if device is trusted
+  app.post("/api/mfa/check-trusted-device", async (req: Request, res: Response) => {
+    try {
+      const { userId, deviceId } = req.body;
+
+      if (!userId || !deviceId) {
+        return res.status(400).json({ error: "User ID and device ID are required" });
+      }
+
+      const isTrusted = await mfaService.isDeviceTrusted(userId, deviceId);
+
+      res.json({ trusted: isTrusted });
+    } catch (error: any) {
+      console.error("Check trusted device error:", error);
+      res.status(500).json({ error: "Failed to check device trust status" });
+    }
+  });
+
+  // Get all trusted devices
+  app.get("/api/mfa/trusted-devices", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const devices = await mfaService.getTrustedDevices(userId);
+
+      res.json({ devices });
+    } catch (error: any) {
+      console.error("Get trusted devices error:", error);
+      res.status(500).json({ error: "Failed to fetch trusted devices" });
+    }
+  });
+
+  // Remove a trusted device
+  app.delete("/api/mfa/trusted-devices/:deviceId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { deviceId } = req.params;
+
+      await mfaService.removeTrustedDevice(userId, deviceId);
+
+      res.json({ success: true, message: "Device removed from trusted devices" });
+    } catch (error: any) {
+      console.error("Remove trusted device error:", error);
+      res.status(500).json({ error: "Failed to remove trusted device" });
     }
   });
 
