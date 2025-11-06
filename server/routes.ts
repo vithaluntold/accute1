@@ -4830,6 +4830,22 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Mention System Routes ====================
+
+  app.get("/api/mentions/users", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { MentionService } = await import("./services/mentionService");
+      const searchQuery = req.query.q as string | undefined;
+      const users = await MentionService.getOrganizationUsers(
+        req.user!.organizationId!,
+        searchQuery
+      );
+      res.json(users);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch users for mentions" });
+    }
+  });
+
   // ==================== Activity Log Routes ====================
   
   app.get("/api/activity-logs", requireAuth, requirePermission("analytics.view"), async (req: AuthRequest, res: Response) => {
@@ -6908,13 +6924,29 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       if (!channel || channel.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "Channel not found" });
       }
+
+      const { MentionService } = await import("./services/mentionService");
+      const mentionedUserIds = MentionService.extractMentions(req.body.content);
+
       const message = await storage.createChatMessage({
         channelId: req.params.id,
         senderId: req.user!.id,
         content: req.body.content,
-        mentions: req.body.mentions || [],
+        mentions: mentionedUserIds,
         attachments: req.body.attachments || []
       });
+
+      if (mentionedUserIds.length > 0) {
+        await MentionService.createMentionNotifications({
+          resourceType: 'comment',
+          resourceId: message.id,
+          resourceTitle: channel.name,
+          organizationId: channel.organizationId,
+          mentionedBy: req.user!.id,
+          content: req.body.content,
+        });
+      }
+
       res.status(201).json(message);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to send message" });
@@ -9000,6 +9032,95 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch time tracking metrics" });
+    }
+  });
+
+  // Get workload insights for team members
+  app.get("/api/analytics/workload-insights", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const [users, assignments, tasks, timeEntries] = await Promise.all([
+        storage.getUsersByOrganization(req.user!.organizationId),
+        storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId),
+        db.select().from(schema.assignmentTasks).where(eq(schema.assignmentTasks.organizationId, req.user!.organizationId)),
+        db.select().from(schema.timeEntries).where(eq(schema.timeEntries.organizationId, req.user!.organizationId))
+      ]);
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const workloadData = users.map(user => {
+        const userAssignments = assignments.filter(a => a.assignedTo === user.id);
+        const userTasks = tasks.filter((t: any) => t.assignedTo === user.id);
+        const userTimeEntries = timeEntries.filter(t => t.userId === user.id);
+
+        const activeAssignments = userAssignments.filter(a => a.status === 'active' || a.status === 'not-started');
+        const completedAssignments = userAssignments.filter(a => a.status === 'completed');
+        
+        const activeTasks = userTasks.filter((t: any) => t.status !== 'done' && t.status !== 'cancelled');
+        const overdueTasks = activeTasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < now);
+        const completedTasks = userTasks.filter((t: any) => t.status === 'done');
+
+        const recentTimeEntries = userTimeEntries.filter(t => new Date(t.date) >= thirtyDaysAgo);
+        const totalHours = recentTimeEntries.reduce((sum, t) => sum + parseFloat(t.hours || '0'), 0);
+        const billableHours = recentTimeEntries.filter(t => t.isBillable).reduce((sum, t) => sum + parseFloat(t.hours || '0'), 0);
+
+        const avgTasksPerAssignment = userAssignments.length > 0 
+          ? userTasks.length / userAssignments.length 
+          : 0;
+
+        const completionRate = (completedTasks.length + completedAssignments.length) > 0
+          ? ((completedTasks.length + completedAssignments.length) / (userTasks.length + userAssignments.length)) * 100
+          : 0;
+
+        return {
+          userId: user.id,
+          userName: user.fullName,
+          userEmail: user.email,
+          role: user.role,
+          workload: {
+            activeAssignments: activeAssignments.length,
+            completedAssignments: completedAssignments.length,
+            activeTasks: activeTasks.length,
+            overdueTasks: overdueTasks.length,
+            completedTasks: completedTasks.length,
+            totalTasks: userTasks.length,
+          },
+          hours: {
+            total: parseFloat(totalHours.toFixed(2)),
+            billable: parseFloat(billableHours.toFixed(2)),
+            nonBillable: parseFloat((totalHours - billableHours).toFixed(2)),
+            billablePercentage: totalHours > 0 ? parseFloat((billableHours / totalHours * 100).toFixed(1)) : 0,
+          },
+          metrics: {
+            avgTasksPerAssignment: parseFloat(avgTasksPerAssignment.toFixed(1)),
+            completionRate: parseFloat(completionRate.toFixed(1)),
+            workloadScore: activeAssignments.length * 10 + activeTasks.length * 2 + overdueTasks.length * 5,
+          }
+        };
+      });
+
+      const sortedByWorkload = workloadData.sort((a, b) => b.metrics.workloadScore - a.metrics.workloadScore);
+
+      const teamTotals = {
+        activeAssignments: sortedByWorkload.reduce((sum, u) => sum + u.workload.activeAssignments, 0),
+        activeTasks: sortedByWorkload.reduce((sum, u) => sum + u.workload.activeTasks, 0),
+        overdueTasks: sortedByWorkload.reduce((sum, u) => sum + u.workload.overdueTasks, 0),
+        totalHours: parseFloat(sortedByWorkload.reduce((sum, u) => sum + u.hours.total, 0).toFixed(2)),
+        avgCompletionRate: parseFloat((sortedByWorkload.reduce((sum, u) => sum + u.metrics.completionRate, 0) / sortedByWorkload.length).toFixed(1)),
+      };
+
+      res.json({
+        teamMembers: sortedByWorkload,
+        teamTotals,
+        timestamp: now.toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Workload insights error:", error);
+      res.status(500).json({ error: "Failed to fetch workload insights" });
     }
   });
 

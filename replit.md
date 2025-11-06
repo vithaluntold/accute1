@@ -16,6 +16,7 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Cadence Workflow Builder: Now supports FULL hierarchy extraction (Stages → Steps → Tasks → Subtasks → Checklists) from uploaded documents and conversational building
 - AI Agent Pricing: Support for multiple pricing models (free, subscription, per-instance, per-token, one-time). Free agents auto-install to all organizations.
 - Recurring Scheduler: Service runs every 5 minutes to process recurring schedules and auto-create workflow assignments. Supports daily, weekly, monthly, quarterly, and annual frequencies.
+- @Mention Collaboration: Users can @mention team members in chat messages and document annotations. Mentions use format @[userId] internally, display as @FullName. Automatic notifications created for mentioned users.
 
 ### System Architecture
 
