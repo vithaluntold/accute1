@@ -16,7 +16,6 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -236,17 +235,7 @@ export default function CadenceAgent() {
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.details || "Failed to send message");
-      }
-
       const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -276,7 +265,7 @@ export default function CadenceAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -550,24 +539,47 @@ export default function CadenceAgent() {
             </div>
           )}
 
-          <div className="p-4 pb-20 border-t">
-            <EnhancedChatInput
-              value={input}
-              onChange={setInput}
-              onSend={(message, files) => {
-                if (files && files.length > 0) {
-                  handleFileUpload(files[0]);
-                } else {
-                  setInput(message);
-                  sendMessage();
-                }
-              }}
-              placeholder="Describe the workflow you want to build..."
-              disabled={isLoading}
-              supportsAttachments={true}
-              maxLines={10}
-              testIdPrefix="cadence"
-            />
+          <div className="p-4 border-t">
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.xls,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                variant="outline"
+                size="icon"
+                title="Upload workflow document"
+                data-testid="button-upload-document"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                placeholder="Describe the workflow you want to build..."
+                disabled={isLoading}
+                data-testid="input-cadence-message"
+                className="flex-1"
+              />
+              <Button
+                onClick={sendMessage}
+                disabled={isLoading || !input.trim()}
+                data-testid="button-send-message"
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Press Enter to send, Shift+Enter for new line
+            </p>
           </div>
         </CardContent>
       </Card>

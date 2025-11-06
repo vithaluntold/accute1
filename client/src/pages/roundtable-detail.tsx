@@ -182,7 +182,7 @@ export default function RoundtableDetail() {
     .map(p => p.participantId);
 
   return (
-    <div className="flex h-full flex-col" data-testid="roundtable-detail">
+    <div className="flex h-screen flex-col" data-testid="roundtable-detail">
       {/* Header */}
       <div className="shrink-0 border-b bg-card">
         <div className="flex items-center justify-between p-4">

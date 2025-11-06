@@ -482,48 +482,6 @@ export class RoundtableOrchestrator {
   }
 
   /**
-   * Process a user message and trigger agent responses
-   */
-  async processUserMessage(
-    sessionId: string,
-    message: RoundtableMessage
-  ): Promise<void> {
-    // Only process main channel user messages
-    if (message.channelType !== 'main' || message.senderType !== 'user') {
-      return;
-    }
-
-    const activeAgents = this.getActiveAgents(sessionId);
-    
-    // If no agents are active, nothing to do
-    if (activeAgents.length === 0) {
-      return;
-    }
-
-    // For now, trigger all active agents to respond
-    // In the future, could implement intelligent routing based on message content
-    console.log(`[Roundtable] Triggering ${activeAgents.length} agents for session ${sessionId}`);
-    
-    // Store for async agent execution
-    for (const agentSlug of activeAgents) {
-      this.queueTask({
-        id: `${sessionId}-${agentSlug}-${Date.now()}`,
-        sessionId,
-        agentSlug,
-        taskType: 'respond_to_question',
-        payload: {
-          messageId: message.id,
-          content: message.content,
-          senderName: message.senderName
-        },
-        priority: 1,
-        status: 'pending',
-        createdAt: new Date(),
-      });
-    }
-  }
-
-  /**
    * Clean up session data
    */
   async cleanupSession(sessionId: string): Promise<void> {

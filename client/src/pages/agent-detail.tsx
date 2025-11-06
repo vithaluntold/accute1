@@ -12,6 +12,7 @@ const agentComponents: Record<string, React.LazyExoticComponent<any>> = {
   echo: lazy(() => import("../../../agents/echo/frontend/EchoAgent")),
   forma: lazy(() => import("../../../agents/forma/frontend/FormaAgent")),
   luca: lazy(() => import("../../../agents/luca/frontend/LucaAgent")),
+  omnispectra: lazy(() => import("../../../agents/omnispectra/frontend/OmniSpectra")),
   parity: lazy(() => import("../../../agents/parity/frontend/ParityAgent")),
   radar: lazy(() => import("../../../agents/radar/frontend/Radar")),
   relay: lazy(() => import("../../../agents/relay/frontend/RelayAgent")),

@@ -41,8 +41,6 @@ import { Switch } from "@/components/ui/switch";
 import { GradientHero } from "@/components/gradient-hero";
 import { DataTable, type ColumnDef } from "@/components/data-table";
 import { formatDistance } from "date-fns";
-import { SignatureEditor } from "@/components/SignatureEditor";
-import { TemplateAttachments, type TemplateAttachment } from "@/components/TemplateAttachments";
 
 type EmailTemplate = {
   id: string;
@@ -50,8 +48,6 @@ type EmailTemplate = {
   category: string;
   subject: string;
   body: string;
-  signature: string | null;
-  attachments: TemplateAttachment[] | null;
   variables: string[] | null;
   isActive: boolean;
   logoUrl: string | null;
@@ -70,8 +66,6 @@ type TemplateFormData = {
   category: string;
   subject: string;
   body: string;
-  signature: string;
-  attachments: TemplateAttachment[];
   logoUrl: string;
   footerText: string;
   facebook: string;
@@ -244,8 +238,6 @@ export default function EmailTemplatesPage() {
         category: selectedTemplate.category,
         subject: selectedTemplate.subject,
         body: selectedTemplate.body,
-        signature: selectedTemplate.signature || "",
-        attachments: selectedTemplate.attachments || [],
         logoUrl: selectedTemplate.logoUrl || "",
         footerText: selectedTemplate.footerText || "",
         facebook: selectedTemplate.socialLinks?.facebook || "",
@@ -263,8 +255,6 @@ export default function EmailTemplatesPage() {
         category: "",
         subject: "",
         body: "",
-        signature: "",
-        attachments: [],
         logoUrl: "",
         footerText: "",
         facebook: "",
@@ -303,8 +293,6 @@ export default function EmailTemplatesPage() {
       category: data.category,
       subject: data.subject,
       body: data.body,
-      signature: data.signature || null,
-      attachments: data.attachments && data.attachments.length > 0 ? data.attachments : null,
       logoUrl: data.logoUrl || null,
       footerText: data.footerText || null,
       socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
@@ -688,32 +676,6 @@ export default function EmailTemplatesPage() {
                     Available placeholders: {'{{client_name}}'}, {'{{contact_name}}'}, {'{{company_name}}'}, {'{{portal_link}}'}, {'{{assignment_name}}'}, {'{{document_name}}'}
                   </p>
                 </div>
-                
-                <Separator />
-                
-                <Controller
-                  name="signature"
-                  control={form.control}
-                  render={({ field }) => (
-                    <SignatureEditor
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-                
-                <Separator />
-                
-                <Controller
-                  name="attachments"
-                  control={form.control}
-                  render={({ field }) => (
-                    <TemplateAttachments
-                      attachments={field.value || []}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
               </TabsContent>
 
               <TabsContent value="branding" className="space-y-4 mt-4">

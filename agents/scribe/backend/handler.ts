@@ -63,8 +63,6 @@ export const registerRoutes = (app: any) => {
         name: req.body.name,
         subject: req.body.subject,
         body: req.body.body,
-        signature: req.body.signature || null,
-        attachments: req.body.attachments || null,
         category: req.body.category || "custom",
         variables: req.body.variables || [],
         scope: templateScope,

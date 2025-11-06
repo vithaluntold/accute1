@@ -16,7 +16,6 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -231,17 +230,7 @@ export default function FormaAgent() {
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.details || "Failed to send message");
-      }
-
       const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -270,7 +259,7 @@ export default function FormaAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -367,15 +356,10 @@ export default function FormaAgent() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.details || "Upload failed");
+        throw new Error("Upload failed");
       }
 
       const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
       
       setTodos(prev => prev.map(t => ({ ...t, status: "completed" as const })));
       
@@ -399,15 +383,14 @@ export default function FormaAgent() {
     } catch (error) {
       console.error("Upload error:", error);
       setTodos([]);
-      const errorMsg = error instanceof Error ? error.message : "Failed to process document. Please try again.";
       toast({
         title: "Upload failed",
-        description: errorMsg,
+        description: "Failed to process document. Please try again.",
         variant: "destructive"
       });
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: `Sorry, I couldn't process that document. Error: ${errorMsg}`
+        content: "Sorry, I couldn't process that document. Please try again or describe your form requirements instead."
       }]);
     } finally {
       setIsLoading(false);
@@ -625,24 +608,43 @@ export default function FormaAgent() {
           )}
           
           {/* Input Area */}
-          <div className="border-t p-4 pb-20">
-            <EnhancedChatInput
-              value={input}
-              onChange={setInput}
-              onSend={(message, files) => {
-                if (files && files.length > 0) {
-                  handleFileUpload(files[0]);
-                } else {
-                  setInput(message);
-                  sendMessage();
-                }
-              }}
-              placeholder="Describe your form or add fields..."
-              disabled={isLoading}
-              supportsAttachments={true}
-              maxLines={10}
-              testIdPrefix="forma"
-            />
+          <div className="border-t p-4">
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.xls,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                variant="outline"
+                size="icon"
+                title="Upload questionnaire document"
+                data-testid="button-upload-document"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+              <Input
+                placeholder="Describe your form or add fields..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
+                disabled={isLoading}
+                data-testid="input-forma-message"
+              />
+              <Button 
+                onClick={sendMessage} 
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                data-testid="button-send-message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

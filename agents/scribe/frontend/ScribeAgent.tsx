@@ -16,9 +16,6 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { EnhancedChatInput } from "@/components/EnhancedChatInput";
-import { SignatureEditor } from "@/components/SignatureEditor";
-import { TemplateAttachments, type TemplateAttachment } from "@/components/TemplateAttachments";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,8 +27,6 @@ interface EmailTemplate {
   name: string;
   subject: string;
   body: string;
-  signature?: string;
-  attachments?: TemplateAttachment[];
   category: string;
   variables: string[];
   status: "building" | "complete";
@@ -235,17 +230,7 @@ export default function ScribeAgent() {
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.details || "Failed to send message");
-      }
-
       const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
       const assistantMessage: Message = { 
         role: "assistant", 
         content: data.response,
@@ -273,7 +258,7 @@ export default function ScribeAgent() {
       console.error("Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -511,20 +496,24 @@ export default function ScribeAgent() {
               </div>
             </ScrollArea>
             <Separator />
-            <div className="p-4 pb-20">
-              <EnhancedChatInput
-                value={input}
-                onChange={setInput}
-                onSend={(message, files) => {
-                  setInput(message);
-                  sendMessage();
-                }}
-                placeholder="Describe the email template you need..."
-                disabled={isLoading}
-                supportsAttachments={true}
-                maxLines={10}
-                testIdPrefix="scribe"
-              />
+            <div className="p-4">
+              <div className="flex gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                  placeholder="Describe the email template you need..."
+                  disabled={isLoading}
+                  data-testid="input-message"
+                />
+                <Button 
+                  onClick={sendMessage} 
+                  disabled={isLoading || !input.trim()}
+                  data-testid="button-send"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -592,26 +581,6 @@ export default function ScribeAgent() {
                       </div>
                     </>
                   )}
-                  
-                  <Separator />
-                  
-                  {/* Signature Editor */}
-                  <SignatureEditor
-                    value={currentTemplate.signature || ""}
-                    onChange={(signature) => {
-                      setCurrentTemplate(prev => prev ? { ...prev, signature } : null);
-                    }}
-                  />
-                  
-                  <Separator />
-                  
-                  {/* Default Attachments */}
-                  <TemplateAttachments
-                    attachments={currentTemplate.attachments || []}
-                    onChange={(attachments) => {
-                      setCurrentTemplate(prev => prev ? { ...prev, attachments } : null);
-                    }}
-                  />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

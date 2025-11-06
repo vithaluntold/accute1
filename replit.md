@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It automates tasks, enhances efficiency, ensures compliance, and improves accounting practices through specialized AI agents. Key features include multi-agent orchestration, a library of templates, multi-provider AI support, an AI agent marketplace, global payment coverage, and native mobile apps. The platform also offers multi-role authentication, custom workflow building, secure document management, and integrations for email and calendar scheduling.
+Accute is an AI-native accounting workflow automation platform for modern accounting firms. It leverages specialized AI agents to automate tasks, enhancing efficiency, ensuring compliance, and improving accounting practices. Key capabilities include multi-agent orchestration, six specialized AI agents (Cadence, Forma, Relay, Parity, Echo, Scribe), an extensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, and native mobile apps. The platform offers multi-role authentication, forms, workflows, email integration, calendar scheduling, custom workflow building, and secure document management.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory
@@ -12,66 +12,71 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - **WebSocket Management**: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
 - **Subscription System**: Subscription pricing UI and routes disabled per user request
 
-### Recent Changes
-
-- **LLM Configuration System Improvements** (November 6, 2025):
-  - **Admin Delete Permissions**: Admins can now delete any LLM configuration in their organization (previously blocked by org check)
-  - **Enhanced Validation**: LLMService constructor validates provider-specific requirements before decryption (Azure: endpoint + apiVersion; OpenAI/Anthropic: API key only)
-  - **Improved Error Messages**: Provider-specific validation errors include clear instructions (e.g., "Azure endpoint required: https://your-resource.openai.azure.com")
-  - **FormaLLMService Fix**: Removed duplicate validation logic, now uses standard LLMService validation, fixed Azure endpoint field (`azureEndpoint` not `endpoint`)
-  - **Standardized Error Handling**: All 7 agent frontends (Cadence, Scribe, Forma, Echo, Parity, Relay, Radar) now display actual backend error messages instead of generic "configure your AI provider" messages
-  - **User Impact**: Clear, actionable error messages for LLM configuration issues across entire platform
-- **AI Agent Database Cleanup** (November 6, 2025):
-  - **Removed duplicate/unneeded agents from database**: Deleted 6 agents from `ai_agents` table:
-    - Invoice Processor (invoice-processor-58e45b3d)
-    - Parity duplicate with empty slug
-    - Parity AI Accountant Example (parity-example)
-    - Reconciliation Assistant (reconciliation-assistant-9a18b77f)
-    - Tax Compliance Advisor (tax-compliance-advisor-bf82a991)
-    - Work Status Bot (work-status-bot)
-  - **9 Active Agents**: Cadence, Scribe, Forma, Echo, Parity AI, Luca, Relay, Radar, OmniSpectra
-  - **No orphaned installations**: Verified no broken references in `ai_agent_installations` table
-  - **Result**: Agent Marketplace now displays only functional, production-ready agents
-- **AI Roundtable WebSocket Fix** (November 6, 2025):
-  - **Fixed layout overflow**: Changed roundtable page from `h-screen` to `h-full` to properly fit within app layout
-  - **Added footer clearance**: Main content area now has `pb-20` padding on desktop to prevent overlap with FinACEverse footer
-  - **Enabled Roundtable WebSocket**: Uncommented and initialized `setupRoundtableWebSocket` in server startup
-  - **Implemented agent responses**: Added `processUserMessage` method to orchestrator to queue agent tasks when users send messages
-  - **Added agent execution**: Created `executeAgentTasks` function in WebSocket handler to run agents and broadcast responses
-  - **Connection status**: WebSocket now properly shows "Connected" status instead of "Disconnected"
-  - **Message triggering**: User messages now trigger active agents to respond in the roundtable conversation
-  - **Agent integration**: Uses existing agent-loader to execute agents (Luca, Cadence, Forma, Parity) with roundtable context
+### Recent Changes (November 2025)
+- **WebSocket Initialization**: Implemented true lazy-loading for WebSockets. Server attaches an upgrade event listener but only initializes the WebSocketServer on the first `/ws/ai-stream` connection. The first upgrade request is properly handled via `handleUpgrade()` to ensure immediate connection success.
+- **Luca Document Access**: Luca agent now loads all organization documents and includes them in its system prompt. When users ask about documents, Luca can reference the available files by name, upload date, and category (up to 50 documents displayed, with indication if more exist).
+- **Agent Context Propagation**: WebSocket handler now passes organizationId, userId, and conversationId context to all agents via structured input, enabling document access and context-aware responses.
+- **Circular Dependency Fix**: Resolved circular import in Luca backend by using `export * from './handler'` instead of named export, allowing registerRoutes to be properly exported without hanging.
+- **Subscription Features Disabled**: All subscription-related UI routes and pages removed from App.tsx per user request:
+  - `/subscription-pricing` route removed
+  - `/subscription` (select plan) route removed  
+  - `/admin/subscriptions` admin pages removed
+  - `/admin/subscription-analytics` removed
+  - `/admin/subscription-plans` removed
+  - `/admin/pricing-regions` removed
+  - `/admin/coupons` removed
+  - Backend API endpoints remain for future use if needed
+- **Message Templates Sidebar Navigation**: Added "Message Templates" to the Communication section of sidebar navigation for easier access to the message template workspace.
+- **AI Agent Installation Flow**: Fixed "Install Echo AI" button on Message Templates page to correctly redirect to `/ai-agents` page instead of `/marketplace`.
+- **AI Agent Footer Overlap Fix**: Added bottom padding (`pb-20`) to all AI agent interfaces (Echo, Cadence, Forma, Parity, Scribe, Relay, Radar, OmniSpectra) to prevent the "Powered by FinACEverse" footer from covering the chat input box.
+- **Template & Document List View with Preview Panel** (November 2025):
+  - Converted Message Templates, Documents, and Email Templates from card view to Windows/macOS-style list view
+  - Implemented reusable DataTable component with sortable columns, search, and collapsible preview panel
+  - Preview panel toggle button (Show/Hide Preview) similar to Windows File Explorer
+  - **Preview content only shows in side panel** - removed Preview column from main table
+  - Simplified preview panel shows full content details without view mode complexity
+  - List views include: sortable columns, search functionality, row selection, and action buttons
+  - Empty states provide helpful guidance and quick actions
+- **Admin RBAC Enhancement**:
+  - Admin and Super Admin users can now edit/delete ALL templates and documents, including global ones
+  - **Frontend**: Role-based permission checks added to Message Templates, Documents, and Email Templates pages
+    - Edit/Delete buttons only show for: Admins (all items) or non-admins (organization-scoped items only)
+    - Preview/Download buttons always visible for all users
+  - **Backend**: Server-side authorization enforces admin-only access to global resources
+    - Updated `getUser()` method to include role relation via LEFT JOIN
+    - Added admin checks on PATCH/DELETE endpoints for message templates, email templates, and documents
+    - Non-admin users receive 403 error when attempting to modify global templates/documents via API
 
 ### System Architecture
 
 #### UI/UX Decisions
-The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific typography (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is implemented as a responsive Progressive Web App (PWA) for cross-device compatibility and native-like experience with offline support.
+The UI is inspired by Linear and Notion, using the Carbon Design System. It features a Porsche-to-Pink gradient, specific font usage (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is a responsive Progressive Web App (PWA) for cross-browser and cross-device compatibility, offering a native-like experience with offline support.
 
 #### Technical Implementations
-The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript. Data is persisted in PostgreSQL (Neon) with Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale deployment.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript. Data persistence is handled by PostgreSQL (Neon) with Drizzle ORM. Authentication uses JWT and bcrypt, with AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale deployment.
 
 #### Feature Specifications
-- **Multi-tenant Architecture**: Provides isolated data and distinct roles for SaaS and tenant levels.
-- **Role-Based Access Control**: A four-tier system comprising Super Admin, Admin, Employee, and Client roles.
-- **Client Portal**: A dedicated interface for client interactions.
-- **AI Client Onboarding System**: A privacy-first, conversational, AI-driven onboarding process.
-- **Conversational AI Agent Interfaces**: Full-screen, dynamic UIs for specialized AI agents.
-- **Unified Workflows System**: Offers visual automation with hierarchical project management and hybrid execution capabilities.
-- **AI Agent Marketplace & Execution System**: For discovering, installing, and managing AI agents.
-- **LLM Configuration Management**: CRUD operations for AI provider credentials with AES-256-GCM encryption.
-- **PKI Digital Signatures**: Ensures tamper-proof document verification using RSA-2048.
-- **Secure Document Management**: Provides encrypted storage, authenticated downloads, and access control.
-- **Marketplace System**: Offers templates (Documents, Forms, Workflows) with pricing models.
-- **Hierarchical Folder Structure**: Supports unlimited nesting for content categorization.
-- **Projects Management**: Comprehensive tracking of client engagements.
-- **AI Agent Foundry**: A system for onboarding and deploying custom AI agents.
+- **Multi-tenant Architecture**: Isolated data and distinct roles for SaaS and tenant levels.
+- **Role-Based Access Control**: Four-tier system (Super Admin, Admin, Employee, Client).
+- **Client Portal**: Dedicated interface for client-facing interactions.
+- **AI Client Onboarding System**: Privacy-first, conversational, AI-driven onboarding.
+- **Conversational AI Agent Interfaces**: Full-screen, dynamic conversational UIs for specialized agents.
+- **Unified Workflows System**: Visual automation with hierarchical project management and hybrid execution.
+- **AI Agent Marketplace & Execution System**: For browsing, installing, and managing AI agents.
+- **LLM Configuration Management**: CRUD for AI provider credentials with AES-256-GCM encryption.
+- **PKI Digital Signatures**: Tamper-proof document verification using RSA-2048.
+- **Secure Document Management**: Encrypted storage, authenticated downloads, and access control.
+- **Marketplace System**: Provides templates (Documents, Forms, Workflows) with pricing models.
+- **Hierarchical Folder Structure**: Unlimited nesting for content categorization.
+- **Projects Management**: Comprehensive client engagement tracking.
+- **AI Agent Foundry**: System for onboarding and deployment of custom AI agents.
 - **Template Scoping System**: Dual-scope architecture for global and organization-specific templates.
-- **Subscription Management System**: A four-tier subscription model (FREE, CORE, AI, EDGE) including regional pricing, prorated upgrades/downgrades, auto-payment, and service pause on payment failure. Employee roles count towards maxUsers limits; clients do not.
-- **Invoice Generation System**: Automatically generates invoices for subscription events with detailed breakdowns and status tracking.
-- **Payment Security**: Implements AES-256-GCM encryption for credentials, HTTPS enforcement, rate limiting, comprehensive security headers, and payment audit logging.
+- **Subscription Management System**: Four-tier subscription model (FREE, CORE, AI, EDGE) with regional pricing, prorated upgrades/downgrades, auto-payment, and service pause on payment failure. **User Counting**: Employees (Admin, Employee roles) count toward maxUsers subscription limits. Clients do NOT count toward maxUsers limits.
+- **Invoice Generation System**: Auto-generates invoices for subscription events with detailed breakdowns and status tracking.
+- **Payment Security**: AES-256-GCM encryption for credentials, HTTPS enforcement, rate limiting, comprehensive security headers, and payment audit logging.
 
 #### System Design Choices
-The project is organized into `client/`, `server/`, and `shared/` directories. Security is a core focus, incorporating robust authentication, encryption, and access control, alongside multi-tenancy support. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security. AI agents are accessed via dynamic routing with lazy-loaded components.
+The project is structured into `client/`, `server/`, and `shared/` directories. Security is paramount, with robust authentication, encryption, and access control, supporting multi-tenancy. The Automation Engine supports various action types (create_task, send_notification, run_ai_agent, update_field, wait_delay) with context propagation and multi-tenant security. AI agents are accessed via dynamic routing with lazy-loaded components.
 
 ### External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
@@ -79,9 +84,36 @@ The project is organized into `client/`, `server/`, and `shared/` directories. S
 - **Azure OpenAI API**: AI model integration (default for AI agents).
 - **Anthropic Claude API**: AI model integration.
 - **Resend**: Transactional email service.
-- **MSG91**: SMS service for OTP verification.
-- **Razorpay**: Payment gateway for subscription billing and one-time payments.
-- **Gmail API**: Per-user OAuth integration for email account connectivity.
+- **MSG91**: SMS service for OTP verification (India-optimized, supports international).
+- **Razorpay**: Payment gateway for subscription billing and one-time payments (India, UAE, Turkey, USA).
+- **Gmail API**: Per-user OAuth integration for email account connectivity. System-wide OAuth app credentials (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`) enable each user to connect their own Gmail account. User tokens encrypted with AES-256-GCM. Redirect URI: `https://accute.io/api/email-accounts/oauth/gmail/callback`.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+### AI Agent Configuration
+- **Default LLM Provider**: Azure OpenAI configured per organization
+- **AI Agents**: All 9 agents (Forma, Cadence, Parity, Echo, Relay, Scribe, Luca, OmniSpectra, Radar) use organization's default LLM configuration
+- **Setup**: Run `tsx server/seed-default-llm.ts` to create default Azure OpenAI config for Sterling organization
+- **Management**: Admins can configure multiple LLM providers in Settings, set one as default per organization
+- **Session Management**: All agents support persistent chat sessions with conversation history
+- **Agent Details**:
+  - **Forma**: RAG-Enhanced Intelligent Form Builder
+    - **Architecture**: Full RAG (Retrieval-Augmented Generation) with semantic intelligence
+    - **Field Catalog**: 30+ field types with semantic metadata, use cases, and UX heuristics
+    - **Form Exemplars**: Curated high-quality forms from multiple industries demonstrating intelligent field selection
+    - **Semantic Retrieval**: Context-aware retrieval of relevant field types and patterns based on user intent
+    - **Reasoning Chains**: Uses 4-step reasoning process (Understand Intent → Infer Semantics → Select Best Fit → Validate UX)
+    - **Organization Context**: Adapts field selection based on organization industry and compliance needs
+    - **Self-Critique**: Generates explanations for field type choices with reasoning
+    - **Dynamic Tools**: Can query field catalog and exemplars during inference for up-to-date information
+    - **Seamless Intelligence**: No hardcoded rules - uses principles-based reasoning with retrieved context
+    - Example behaviors: Single choice → select, Multiple choices → multi_select, Yes/No/NA → radio, Money → currency
+  - **Cadence**: Workflow automation designer
+  - **Parity**: Document generation specialist
+  - **Echo**: Message template creator
+  - **Relay**: Inbox intelligence for email-to-task conversion
+  - **Scribe**: Writing and content creation assistant
+  - **Luca**: Accounting, finance & taxation expert
+  - **OmniSpectra**: Work status tracking and team availability
+  - **Radar**: Comprehensive activity logger for legal evidence and client accountability

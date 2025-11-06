@@ -166,30 +166,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // ==================== File Upload Routes ====================
-  
-  // Generic file upload for template attachments
-  app.post("/api/upload", requireAuth, upload.single('file'), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      // Generate public URL for the uploaded file
-      const fileUrl = `/uploads/${req.file.filename}`;
-      
-      res.json({ 
-        url: fileUrl,
-        filename: req.file.originalname,
-        size: req.file.size,
-        mimeType: req.file.mimetype
-      });
-    } catch (error: any) {
-      console.error("File upload error:", error);
-      res.status(500).json({ error: "Failed to upload file" });
-    }
-  });
-
   // ==================== Auth Routes ====================
   
   // Register
@@ -1453,17 +1429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const existing = await storage.getLlmConfiguration(req.params.id);
       
-      if (!existing) {
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "LLM configuration not found" });
-      }
-      
-      // Allow deletion if user is admin of the organization that owns the config
-      // Or if user is super_admin
-      const isSuperAdmin = req.user!.role === 'super_admin';
-      const isOrgAdmin = existing.organizationId === req.user!.organizationId;
-      
-      if (!isSuperAdmin && !isOrgAdmin) {
-        return res.status(403).json({ error: "Not authorized to delete this configuration" });
       }
       
       await storage.deleteLlmConfiguration(req.params.id);
@@ -1471,11 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Delete LLM config error:", error);
-      res.status(500).json({ 
-        error: "Failed to delete LLM configuration",
-        details: error.message
-      });
+      res.status(500).json({ error: "Failed to delete LLM configuration" });
     }
   });
 

@@ -31,7 +31,6 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
-import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -242,15 +241,17 @@ export default function ParityAgent() {
         }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || data.details || "Failed to send message");
-      }
-
       const data = await response.json();
-
+      
+      // Check if the response contains an error
       if (data.error) {
-        throw new Error(data.error);
+        console.error("API Error:", data.error, data.details);
+        const errorMessage: Message = {
+          role: "assistant",
+          content: `Sorry, I encountered an error: ${data.error}${data.details ? ` (${data.details})` : ''}`
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
       }
       
       const assistantMessage: Message = { 
@@ -279,10 +280,10 @@ export default function ParityAgent() {
         });
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Network/Parse Error:", error);
       const errorMessage: Message = {
         role: "assistant",
-        content: error instanceof Error ? error.message : "Sorry, I encountered an error. Please try again."
+        content: "Sorry, I encountered an error. Please ensure you have configured your AI provider credentials in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -596,20 +597,25 @@ export default function ParityAgent() {
           </ScrollArea>
           
           {/* Input Area */}
-          <div className="border-t p-4 pb-20">
-            <EnhancedChatInput
-              value={input}
-              onChange={setInput}
-              onSend={(message, files) => {
-                setInput(message);
-                sendMessage();
-              }}
-              placeholder="Describe the document you need..."
-              disabled={isLoading}
-              supportsAttachments={true}
-              maxLines={10}
-              testIdPrefix="parity"
-            />
+          <div className="border-t p-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Describe the document you need..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
+                disabled={isLoading}
+                data-testid="input-parity-message"
+              />
+              <Button 
+                onClick={sendMessage} 
+                disabled={isLoading || !input.trim()}
+                size="icon"
+                data-testid="button-send-message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

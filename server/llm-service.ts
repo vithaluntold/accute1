@@ -77,65 +77,8 @@ export class LLMService {
   private readonly RETRY_DELAY_MS = 1000; // 1 second
   
   constructor(config: LlmConfiguration) {
-    // Validate configuration before attempting decryption
-    this.validateConfiguration(config);
-    
     this.config = config;
-    
-    // Try to decrypt API key with helpful error messages
-    try {
-      this.apiKey = decrypt(config.apiKeyEncrypted);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('ENCRYPTION_KEY')) {
-        throw new Error('Encryption key not configured or invalid. Please contact system administrator.');
-      }
-      throw new Error(`Failed to decrypt API key. This may indicate the encryption key has changed or the configuration is corrupted. Original error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-  
-  /**
-   * Validate LLM configuration has required fields for the provider
-   */
-  private validateConfiguration(config: LlmConfiguration): void {
-    // Check basic fields
-    if (!config.provider) {
-      throw new Error('LLM provider is required. Please configure your AI provider in Settings > LLM Configuration.');
-    }
-    
-    if (!config.model) {
-      throw new Error('Model name is required. Please configure your AI model in Settings > LLM Configuration.');
-    }
-    
-    if (!config.apiKeyEncrypted) {
-      throw new Error('API key is required. Please configure your API key in Settings > LLM Configuration.');
-    }
-    
-    // Provider-specific validation
-    switch (config.provider) {
-      case 'azure':
-        if (!config.azureEndpoint) {
-          throw new Error('Azure endpoint is required for Azure OpenAI. Please configure it in Settings > LLM Configuration (e.g., https://your-resource.openai.azure.com).');
-        }
-        if (!config.modelVersion) {
-          throw new Error('Azure API version is required for Azure OpenAI. Please configure it in Settings > LLM Configuration (e.g., 2024-02-15-preview).');
-        }
-        // Validate endpoint format
-        if (!config.azureEndpoint.startsWith('https://') || !config.azureEndpoint.includes('.openai.azure.com')) {
-          throw new Error(`Invalid Azure endpoint format: "${config.azureEndpoint}". Expected format: https://your-resource.openai.azure.com`);
-        }
-        break;
-        
-      case 'openai':
-        // OpenAI just needs model and API key (already validated above)
-        break;
-        
-      case 'anthropic':
-        // Anthropic just needs model and API key (already validated above)
-        break;
-        
-      default:
-        throw new Error(`Unsupported LLM provider: ${config.provider}. Supported providers: openai, azure, anthropic.`);
-    }
+    this.apiKey = decrypt(config.apiKeyEncrypted);
   }
   
   /**

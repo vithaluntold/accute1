@@ -159,6 +159,46 @@ async function seed() {
 
     console.log("✓ Assigned permissions to roles");
 
+    // Create sample AI agents
+    const sampleAgents = [
+      {
+        name: "Invoice Processor",
+        description: "Automatically extracts data from invoices and categorizes expenses",
+        provider: "openai",
+        category: "invoicing",
+        capabilities: ["data_extraction", "categorization", "validation"],
+        configuration: { model: "gpt-4", temperature: 0.2 },
+        rating: 5,
+        isPublic: true,
+      },
+      {
+        name: "Tax Compliance Advisor",
+        description: "Provides real-time tax compliance recommendations based on regulations",
+        provider: "anthropic",
+        category: "tax_filing",
+        capabilities: ["compliance_check", "regulation_lookup", "recommendation"],
+        configuration: { model: "claude-3-5-sonnet-20241022", temperature: 0.3 },
+        rating: 5,
+        isPublic: true,
+      },
+      {
+        name: "Reconciliation Assistant",
+        description: "Matches transactions across accounts and identifies discrepancies",
+        provider: "azure_openai",
+        category: "reconciliation",
+        capabilities: ["transaction_matching", "discrepancy_detection", "reporting"],
+        configuration: { model: "gpt-4", temperature: 0.1 },
+        rating: 4,
+        isPublic: true,
+      },
+    ];
+
+    for (const agent of sampleAgents) {
+      await db.insert(schema.aiAgents).values(agent);
+    }
+
+    console.log("✓ Created sample AI agents");
+
     console.log("✅ Database seeded successfully");
   } catch (error) {
     console.error("❌ Seeding failed:", error);

@@ -68,7 +68,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeSystem } from "./init";
 // DISABLED: WebSockets now lazy-load with chat sessions, not at server startup
 // import { setupWebSocket } from "./websocket";
-import { setupRoundtableWebSocket } from "./roundtable-websocket";
+// import { setupRoundtableWebSocket } from "./roundtable-websocket";
 // import { setupTeamChatWebSocket } from "./team-chat-websocket";
 // import { setupLiveChatWebSocket } from "./live-chat-websocket";
 import path from "path";
@@ -179,13 +179,6 @@ app.use('/api/payment-methods', paymentLimiter);
 app.use('/api/subscription-invoices/:id/pay', paymentLimiter);
 app.use('/api/subscription-invoices/:id/complete-payment', paymentLimiter);
 
-// Serve uploaded files statically
-const uploadsPath = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsPath)) {
-  fs.mkdirSync(uploadsPath, { recursive: true });
-}
-app.use('/uploads', express.static(uploadsPath));
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -288,19 +281,9 @@ app.use((req, res, next) => {
     
     // DISABLED: WebSocket initialization removed from server startup
     // WebSockets now lazy-load when chat sessions start to prevent startup errors
-    // See: server/websocket.ts, server/team-chat-websocket.ts, etc.
+    // See: server/websocket.ts, server/roundtable-websocket.ts, etc.
     // They will be initialized on-demand when first chat connection is made
     console.log('ℹ️  WebSockets disabled at startup - will initialize on-demand');
-    
-    // Enable Roundtable WebSocket (always initialized)
-    try {
-      console.log('🔧 Initializing Roundtable WebSocket server...');
-      setupRoundtableWebSocket(server);
-      console.log('✅ Roundtable WebSocket server initialized');
-    } catch (wsError) {
-      console.error('❌ Roundtable WebSocket setup failed:', wsError);
-      console.warn('⚠️  Continuing without Roundtable WebSocket');
-    }
 
     // Error handler MUST be registered AFTER static file serving
     // so it only catches actual errors, not SPA routes

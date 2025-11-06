@@ -433,16 +433,6 @@ async function handleSendMessage(
     type: 'new_message',
     data: savedMessage
   });
-
-  // Process message and trigger agent responses (async)
-  orchestrator.processUserMessage(ws.sessionId, savedMessage).catch((err) => {
-    console.error('[Roundtable WS] Error processing user message:', err);
-  });
-  
-  // Execute queued tasks for active agents
-  executeAgentTasks(ws.sessionId, orchestrator, sessionConnections).catch((err) => {
-    console.error('[Roundtable WS] Error executing agent tasks:', err);
-  });
 }
 
 /**
@@ -622,95 +612,6 @@ async function handleTypingIndicator(
       recipientParticipantId: message.recipientParticipantId
     }
   }, ws);
-}
-
-/**
- * Execute queued agent tasks for a session
- */
-async function executeAgentTasks(
-  sessionId: string,
-  orchestrator: RoundtableOrchestrator,
-  sessionConnections: Map<string, Set<RoundtableWebSocket>>
-) {
-  const tasks = orchestrator.getPendingTasks(sessionId);
-  if (tasks.length === 0) {
-    return;
-  }
-
-  console.log(`[Roundtable] Executing ${tasks.length} tasks for session ${sessionId}`);
-
-  // Import agent loader
-  const { createAgentInstance } = await import('./agent-loader');
-  
-  // Get session context for agents
-  const context = await orchestrator.getSessionContext(sessionId);
-  
-  // Get default LLM config for the organization
-  const llmConfig = await storage.getDefaultLlmConfiguration(context.organizationId);
-  if (!llmConfig) {
-    console.error('[Roundtable] No default LLM configuration found');
-    return;
-  }
-
-  // Execute tasks for each agent
-  for (const task of tasks) {
-    try {
-      orchestrator.markTaskInProgress(task.id);
-      
-      const agentSlug = task.agentSlug;
-      const normalizedAgentName = agentSlug.toLowerCase().replace(/\s+/g, '');
-      
-      console.log(`[Roundtable] Executing agent: ${normalizedAgentName}`);
-      
-      // Load agent
-      const agent = await createAgentInstance(normalizedAgentName, llmConfig) as any;
-      
-      // Prepare input with roundtable context
-      const agentInput = {
-        query: task.payload.content as string,
-        context: {
-          sessionId,
-          objective: context.objective,
-          participants: context.participants.map((p: any) => p.displayName).join(', '),
-          recentMessages: `User ${task.payload.senderName} said: ${task.payload.content}`,
-        }
-      };
-      
-      // Execute agent (non-streaming for roundtable)
-      let response: string;
-      if (agent.execute) {
-        const result = await agent.execute(agentInput);
-        response = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-      } else {
-        response = `Agent ${agentSlug} acknowledged your message.`;
-      }
-      
-      console.log(`[Roundtable] Agent ${normalizedAgentName} responded with ${response.length} chars`);
-      
-      // Create agent message in database
-      const agentMetadata = orchestrator.getAgentMetadata(agentSlug);
-      const agentMessage = await orchestrator.createMessage(
-        sessionId,
-        agentSlug,
-        agentMetadata?.name || agentSlug,
-        'agent',
-        response,
-        'main'
-      );
-      
-      // Broadcast agent response to all participants
-      broadcastToSession(sessionId, sessionConnections, {
-        type: 'new_message',
-        data: agentMessage
-      });
-      
-      orchestrator.completeTask(task.id, { response });
-      
-    } catch (error: any) {
-      console.error(`[Roundtable] Error executing agent ${task.agentSlug}:`, error);
-      orchestrator.failTask(task.id, error.message || 'Agent execution failed');
-    }
-  }
 }
 
 /**

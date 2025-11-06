@@ -8,7 +8,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EnhancedChatInput } from "@/components/EnhancedChatInput";
 
 interface Message {
   role: "user" | "assistant";
@@ -51,19 +50,8 @@ export default function Radar() {
           projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
         }),
       });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || data.details || "Failed to send message");
-      }
-      
-      const data = await res.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      return data;
+      if (!res.ok) throw new Error("Failed to send message");
+      return res.json();
     },
     onSuccess: (data) => {
       setMessages((prev) => [
@@ -75,10 +63,10 @@ export default function Radar() {
         },
       ]);
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send message. Please try again.",
+        description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
     },
@@ -221,20 +209,22 @@ export default function Radar() {
                 </Button>
               </div>
 
-              <div className="pb-20">
-                <EnhancedChatInput
+              <div className="flex gap-2">
+                <Input
                   value={input}
-                  onChange={setInput}
-                  onSend={(message, files) => {
-                    setInput(message);
-                    handleSend();
-                  }}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Ask about activity logs, timelines, or generate reports..."
                   disabled={chatMutation.isPending}
-                  supportsAttachments={false}
-                  maxLines={10}
-                  testIdPrefix="radar"
+                  data-testid="input-message"
                 />
+                <Button
+                  onClick={handleSend}
+                  disabled={!input.trim() || chatMutation.isPending}
+                  data-testid="button-send"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>

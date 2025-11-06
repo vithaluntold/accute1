@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { useState, useEffect } from "react";
 import type { WorkflowTask } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
+import { KycWarningBanner } from "@/components/kyc-warning-banner";
 
 interface TaskStats {
   total: number;
@@ -162,6 +163,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* KYC Verification Status Banner */}
+      {currentUserProfile && <KycWarningBanner user={currentUserProfile} />}
 
       {/* My Task Statistics */}
       <div>
