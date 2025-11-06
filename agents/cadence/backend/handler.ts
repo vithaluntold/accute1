@@ -73,8 +73,8 @@ export const registerRoutes = (app: any) => {
 
 When a user describes a workflow they want to build:
 1. Ask clarifying questions if needed
-2. Suggest stages and steps based on their description
-3. Guide them through building a complete workflow structure
+2. Suggest stages, steps, and tasks based on their description
+3. Guide them through building a complete workflow structure with full hierarchy
 4. Be conversational and friendly
 
 When building a workflow, you should respond with both:
@@ -98,7 +98,34 @@ IMPORTANT: After your conversational response, include a JSON block with the wor
             "name": "Step Name",
             "description": "Optional description",
             "order": 1,
-            "status": "added"
+            "status": "added",
+            "tasks": [
+              {
+                "id": "unique-id",
+                "name": "Task Name",
+                "description": "Task description",
+                "order": 1,
+                "type": "manual",
+                "status": "pending",
+                "priority": "medium",
+                "subtasks": [
+                  {
+                    "id": "unique-id",
+                    "name": "Subtask Name",
+                    "order": 1,
+                    "status": "pending"
+                  }
+                ],
+                "checklists": [
+                  {
+                    "id": "unique-id",
+                    "item": "Checklist item",
+                    "order": 1,
+                    "isChecked": false
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -111,12 +138,13 @@ IMPORTANT: After your conversational response, include a JSON block with the wor
 Current workflow state: ${currentWorkflow ? JSON.stringify(currentWorkflow) : "No workflow started yet"}
 
 Guidelines:
-- Start with high-level stages, then break them down into steps
+- Build the full hierarchy: Stages → Steps → Tasks → Subtasks & Checklists
 - Mark new items as "added" status, existing items as "complete"
 - Set status to "complete" only when the user confirms the workflow is done
-- Be specific with step names and descriptions
+- Be specific with names and descriptions at all levels
+- Include tasks, subtasks, and checklists for detailed workflows
 - Consider typical workflow patterns for common processes
-- Ask if they want to add more stages or steps before marking complete`;
+- Ask if they want to add more detail before marking complete`;
 
       // Call LLM service
       const responseText = await llmService.sendPrompt(fullPrompt, systemPrompt);
@@ -164,37 +192,71 @@ Guidelines:
       // Validate scope parameter
       const templateScope = scope === "global" ? "global" : "organization";
 
-      // Convert Cadence workflow format to system workflow format
-      const stages = workflow.stages.map((stage: Stage) => ({
-        id: stage.id,
-        name: stage.name,
-        order: stage.order,
-        description: "",
-        steps: stage.steps.map((step: Step) => ({
-          id: step.id,
-          name: step.name,
-          description: step.description || "",
-          order: step.order,
-          type: "manual" as const,
-          requiresApproval: false,
-          approvers: []
-        }))
-      }));
-
-      // Save to database via storage layer as a template
+      // Save to database via storage layer
       const { storage } = await import("../../../server/storage");
+      
+      // First, create the workflow
       const savedWorkflow = await storage.createWorkflow({
         name: workflow.name,
         description: workflow.description || "",
         category: "custom",
-        stages: stages,
         triggers: [],
-        status: "published",
-        isTemplate: true, // Save as template for reuse
+        status: "draft",
         scope: templateScope,
         organizationId: templateScope === "organization" ? organizationId! : null,
         createdBy: userId!,
       });
+
+      // Then create stages, steps, tasks, subtasks, and checklists hierarchically
+      for (const stageData of workflow.stages || []) {
+        const savedStage = await storage.createWorkflowStage({
+          workflowId: savedWorkflow.id,
+          name: stageData.name,
+          description: stageData.description || "",
+          order: stageData.order || 0,
+        });
+
+        for (const stepData of stageData.steps || []) {
+          const savedStep = await storage.createWorkflowStep({
+            stageId: savedStage.id,
+            name: stepData.name,
+            description: stepData.description || "",
+            order: stepData.order || 0,
+          });
+
+          for (const taskData of stepData.tasks || []) {
+            const savedTask = await storage.createWorkflowTask({
+              stepId: savedStep.id,
+              name: taskData.name,
+              description: taskData.description || "",
+              order: taskData.order || 0,
+              type: taskData.type || "manual",
+              status: taskData.status || "pending",
+              priority: taskData.priority || "medium",
+            });
+
+            // Create subtasks
+            for (const subtaskData of taskData.subtasks || []) {
+              await storage.createTaskSubtask({
+                taskId: savedTask.id,
+                name: subtaskData.name,
+                order: subtaskData.order || 0,
+                status: subtaskData.status || "pending",
+              });
+            }
+
+            // Create checklists
+            for (const checklistData of taskData.checklists || []) {
+              await storage.createTaskChecklist({
+                taskId: savedTask.id,
+                item: checklistData.item,
+                order: checklistData.order || 0,
+                isChecked: checklistData.isChecked || false,
+              });
+            }
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -290,12 +352,12 @@ Guidelines:
       // Use AI to extract workflow structure
       const llmService = new LLMService(llmConfig);
 
-      const systemPrompt = `You are Cadence, an AI workflow builder. You analyze documents containing workflow specifications and convert them into structured workflows.
+      const systemPrompt = `You are Cadence, an AI workflow builder. You analyze documents containing workflow specifications and convert them into structured workflows with FULL hierarchy.
 
 **YOUR TASK:**
 1. Read the provided workflow document
-2. Extract the hierarchical structure: Workflow > Stages > Steps > Tasks
-3. Identify all stages, steps, and tasks
+2. Extract the COMPLETE hierarchical structure: Workflow > Stages > Steps > Tasks > Subtasks > Checklists
+3. Identify all levels: stages, steps, tasks, subtasks, and checklist items
 4. Return a complete workflow structure
 
 **WORKFLOW STRUCTURE:**
@@ -304,16 +366,43 @@ Guidelines:
   "description": "Brief description",
   "stages": [
     {
-      "id": "unique_id",
+      "id": "stage_1",
       "name": "Stage Name",
       "order": 0,
       "steps": [
         {
-          "id": "unique_id",
+          "id": "step_1",
           "name": "Step Name",
           "description": "Step description",
           "order": 0,
-          "status": "pending"
+          "status": "pending",
+          "tasks": [
+            {
+              "id": "task_1",
+              "name": "Task Name",
+              "description": "Task description",
+              "order": 0,
+              "type": "manual",
+              "status": "pending",
+              "priority": "medium",
+              "subtasks": [
+                {
+                  "id": "subtask_1",
+                  "name": "Subtask Name",
+                  "order": 0,
+                  "status": "pending"
+                }
+              ],
+              "checklists": [
+                {
+                  "id": "checklist_1",
+                  "item": "Checklist item text",
+                  "order": 0,
+                  "isChecked": false
+                }
+              ]
+            }
+          ]
         }
       ]
     }
@@ -322,33 +411,40 @@ Guidelines:
 }
 
 **STRUCTURE EXTRACTION RULES:**
-- **Workflow**: The top-level process name
-- **Stages**: Major phases or sections (e.g., "Onboarding", "Review", "Approval")
-- **Steps**: Individual tasks or actions within each stage
-- **Tasks/Subtasks**: Can be included as steps with detailed descriptions
+- **Workflow**: The top-level process name (document title)
+- **Stages**: Major phases or numbered sections (e.g., "1. Engagement and Client Onboarding")
+- **Steps**: High-level activities within each stage (can be derived from headings like "1.1 Engagement Letter")
+- **Tasks**: Bulleted items under "Tasks:" heading
+- **Subtasks**: Bulleted items under "Subtasks:" heading
+- **Checklists**: Bullet points under "Checklists:" or "Checklist:" heading (use bullet symbol • as indicator)
 
-**HIERARCHY EXAMPLES:**
-1. Section headers → Stages
-2. Numbered/bulleted items → Steps
-3. Sub-items → Include in step descriptions
-4. Checklists → Convert to individual steps
+**EXTRACTION PATTERNS:**
+1. Numbered sections (e.g., "1. Section Name") → Stages
+2. Sub-numbered items (e.g., "1.1 Activity") → Steps
+3. Items under "Tasks:" → Tasks within the current step
+4. Items under "Subtasks:" → Subtasks within the current task
+5. Items under "Checklists:" or lines starting with "•" → Checklist items
 
 **IMPORTANT:**
-- Extract ALL stages, steps, and tasks from the document
-- Maintain the hierarchical order
-- Use descriptive names
-- Set status to "complete" when done
-- Generate unique IDs for each stage and step
+- Extract ALL levels from the document: stages, steps, tasks, subtasks, checklists
+- Maintain the hierarchical order exactly as in the document
+- Use descriptive names taken directly from the document
+- Generate unique, sequential IDs (stage_1, step_1, task_1, etc.)
+- If a section has tasks but no explicit steps, create a default step named after the section
+- Set all statuses to "pending"
+- Set priority to "medium" for all tasks
+- Set type to "manual" for all tasks
+- Set status to "complete" when extraction is done
 
 **RESPONSE FORMAT:**
 Respond with TWO parts separated by "---WORKFLOW_JSON---":
-1. A brief summary of what you found
+1. A brief summary of what you found (include counts of stages, steps, tasks, subtasks, checklists)
 2. The complete workflow JSON
 
 Example:
-I found a 3-stage client onboarding workflow with 12 total steps. Here's your structured workflow.
+I extracted a complete workflow with 7 stages, 15 steps, 42 tasks, 28 subtasks, and 35 checklist items. Here's your structured workflow.
 ---WORKFLOW_JSON---
-{"name":"Client Onboarding","description":"Complete client onboarding process","stages":[...],"status":"complete"}`;
+{"name":"Statutory Audit End-to-End Workflow","description":"Complete workflow...","stages":[...],"status":"complete"}`;
 
       const userPrompt = `Please analyze this document and create a workflow from it:
 

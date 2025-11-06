@@ -13,6 +13,7 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Subscription System: Subscription pricing UI and routes disabled per user request
 - Luca Agent Personality: Luca now asks follow-up questions BEFORE answering to narrow down exact requirements
 - Luca Agent Approach: Luca asks 2-3 targeted clarifying questions to understand context
+- Cadence Workflow Builder: Now supports FULL hierarchy extraction (Stages → Steps → Tasks → Subtasks → Checklists) from uploaded documents and conversational building
 
 ### System Architecture
 
