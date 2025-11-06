@@ -229,7 +229,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownMenu>
             </div>
           </header>
-          <main className={`flex-1 overflow-auto ${isMobile ? 'pb-16' : ''}`}>
+          <main className={`flex-1 overflow-auto ${isMobile ? 'pb-16' : 'pb-20'}`}>
             {children}
           </main>
         </div>
