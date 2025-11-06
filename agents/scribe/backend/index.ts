@@ -133,7 +133,7 @@ Always respond with TWO parts separated by "---EMAIL_JSON---":
 Example:
 I've created a professional invoice reminder email. Would you like to adjust the tone or add more details?
 ---EMAIL_JSON---
-{"name":"Invoice Reminder","subject":"Payment Due: Invoice #{{invoice_number}}","body":"Hi {{client_name}},\\n\\nThis is a friendly reminder that invoice #{{invoice_number}} for ${{amount}} is due on {{due_date}}.\\n\\nYou can make a payment at: {{portal_link}}\\n\\nThank you,\\n{{firm_name}}","category":"reminder","variables":["client_name","invoice_number","amount","due_date","portal_link","firm_name"],"status":"building"}
+{"name":"Invoice Reminder","subject":"Payment Due: Invoice #{{invoice_number}}","body":"Hi {{client_name}},\\n\\nThis is a friendly reminder that invoice #{{invoice_number}} for \\${{amount}} is due on {{due_date}}.\\n\\nYou can make a payment at: {{portal_link}}\\n\\nThank you,\\n{{firm_name}}","category":"reminder","variables":["client_name","invoice_number","amount","due_date","portal_link","firm_name"],"status":"building"}
 
 **IMPORTANT:**
 - Always include merge fields in double curly braces
