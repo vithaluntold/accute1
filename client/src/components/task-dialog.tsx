@@ -30,11 +30,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Zap } from "lucide-react";
+import { Sparkles, Zap, Plus, X, CheckSquare, ListTodo } from "lucide-react";
 import type { InstalledAgentView } from "@shared/schema";
 import { AutomationActionsEditor, type AutomationAction } from "@/components/automation-actions-editor";
 
@@ -93,12 +95,30 @@ interface TaskDialogProps {
   tasksCount: number;
 }
 
+interface Subtask {
+  id?: string;
+  name: string;
+  order: number;
+  status: string;
+}
+
+interface ChecklistItem {
+  id?: string;
+  item: string;
+  order: number;
+  isChecked: boolean;
+}
+
 export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasksCount }: TaskDialogProps) {
   const { toast } = useToast();
   const isEditing = !!task;
   const [selectedTab, setSelectedTab] = useState<string>("manual");
   const [automationActions, setAutomationActions] = useState<AutomationAction[]>([]);
   const [automationActionsValid, setAutomationActionsValid] = useState<boolean>(true);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
+  const [newSubtaskName, setNewSubtaskName] = useState("");
+  const [newChecklistItem, setNewChecklistItem] = useState("");
 
   // Fetch installed AI agents
   const { data: installedAgents = [] } = useQuery<InstalledAgentView[]>({
@@ -143,6 +163,18 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
       } else {
         setAutomationActions([]);
       }
+      // Load subtasks if they exist
+      if (taskData.subtasks && Array.isArray(taskData.subtasks)) {
+        setSubtasks(taskData.subtasks);
+      } else {
+        setSubtasks([]);
+      }
+      // Load checklists if they exist
+      if (taskData.checklists && Array.isArray(taskData.checklists)) {
+        setChecklists(taskData.checklists);
+      } else {
+        setChecklists([]);
+      }
     } else if (open && !task) {
       setSelectedTab("manual");
       form.reset({
@@ -157,6 +189,8 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
         automationInput: "",
       });
       setAutomationActions([]);
+      setSubtasks([]);
+      setChecklists([]);
     }
   }, [open, task, tasksCount, form]);
 
@@ -249,6 +283,10 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
     // Always include automation actions (even if empty) to allow clearing
     cleanData.automationActions = automationActions;
     
+    // Include subtasks and checklists
+    cleanData.subtasks = subtasks;
+    cleanData.checklists = checklists;
+    
     if (isEditing) {
       updateMutation.mutate(cleanData);
     } else {
@@ -328,6 +366,143 @@ export function TaskDialog({ open, onOpenChange, stepId, workflowId, task, tasks
                     </FormItem>
                   )}
                 />
+
+                {/* Subtasks Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <ListTodo className="h-4 w-4" />
+                      Subtasks
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {subtasks.map((subtask, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                        <span className="flex-1 text-sm">{subtask.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setSubtasks(subtasks.filter((_, i) => i !== index))}
+                          data-testid={`button-remove-subtask-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add subtask..."
+                        value={newSubtaskName}
+                        onChange={(e) => setNewSubtaskName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newSubtaskName.trim()) {
+                            e.preventDefault();
+                            setSubtasks([...subtasks, {
+                              name: newSubtaskName.trim(),
+                              order: subtasks.length,
+                              status: 'pending'
+                            }]);
+                            setNewSubtaskName("");
+                          }
+                        }}
+                        data-testid="input-new-subtask"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (newSubtaskName.trim()) {
+                            setSubtasks([...subtasks, {
+                              name: newSubtaskName.trim(),
+                              order: subtasks.length,
+                              status: 'pending'
+                            }]);
+                            setNewSubtaskName("");
+                          }
+                        }}
+                        data-testid="button-add-subtask"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Checklists Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4" />
+                      Checklist
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {checklists.map((checklist, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                        <Checkbox
+                          checked={checklist.isChecked}
+                          onCheckedChange={(checked) => {
+                            const updated = [...checklists];
+                            updated[index].isChecked = checked as boolean;
+                            setChecklists(updated);
+                          }}
+                          data-testid={`checkbox-checklist-${index}`}
+                        />
+                        <span className="flex-1 text-sm">{checklist.item}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setChecklists(checklists.filter((_, i) => i !== index))}
+                          data-testid={`button-remove-checklist-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add checklist item..."
+                        value={newChecklistItem}
+                        onChange={(e) => setNewChecklistItem(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newChecklistItem.trim()) {
+                            e.preventDefault();
+                            setChecklists([...checklists, {
+                              item: newChecklistItem.trim(),
+                              order: checklists.length,
+                              isChecked: false
+                            }]);
+                            setNewChecklistItem("");
+                          }
+                        }}
+                        data-testid="input-new-checklist"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (newChecklistItem.trim()) {
+                            setChecklists([...checklists, {
+                              item: newChecklistItem.trim(),
+                              order: checklists.length,
+                              isChecked: false
+                            }]);
+                            setNewChecklistItem("");
+                          }
+                        }}
+                        data-testid="button-add-checklist"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* AI-Powered Task Content */}

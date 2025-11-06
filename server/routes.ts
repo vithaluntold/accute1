@@ -7330,6 +7330,31 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         stepId: req.params.stepId,
         automationInput: req.body.automationInput?.trim(),
       });
+      
+      // Create subtasks if provided
+      if (req.body.subtasks && Array.isArray(req.body.subtasks)) {
+        for (const subtask of req.body.subtasks) {
+          await storage.createTaskSubtask({
+            taskId: task.id,
+            name: subtask.name,
+            order: subtask.order || 0,
+            status: subtask.status || "pending",
+          });
+        }
+      }
+      
+      // Create checklists if provided
+      if (req.body.checklists && Array.isArray(req.body.checklists)) {
+        for (const checklist of req.body.checklists) {
+          await storage.createTaskChecklist({
+            taskId: task.id,
+            item: checklist.item,
+            order: checklist.order || 0,
+            isChecked: checklist.isChecked || false,
+          });
+        }
+      }
+      
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "workflow_task", task.id, { name: task.name }, req);
       res.status(201).json(task);
     } catch (error: any) {
