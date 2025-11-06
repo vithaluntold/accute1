@@ -17,7 +17,9 @@ import {
   MoreVertical,
   Sparkles,
   GripVertical,
-  Settings
+  Settings,
+  ListTodo,
+  CheckSquare
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -76,6 +78,20 @@ interface WorkflowTask {
   automationInput?: string;
   automationOutput?: any;
   automationConfig?: any;
+  subtasks?: Array<{
+    id: string;
+    taskId: string;
+    name: string;
+    order: number;
+    status: string;
+  }>;
+  checklists?: Array<{
+    id: string;
+    taskId: string;
+    item: string;
+    order: number;
+    isChecked: boolean;
+  }>;
 }
 
 export default function WorkflowDetail() {
@@ -754,6 +770,60 @@ function TaskCard({
                 </Badge>
               )}
             </div>
+
+            {/* Subtasks Display */}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <div className="mt-2 ml-5 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <ListTodo className="h-3 w-3" />
+                  <span className="font-medium">Subtasks ({task.subtasks.filter(s => s.status === 'completed').length}/{task.subtasks.length})</span>
+                </div>
+                {task.subtasks.slice(0, 2).map((subtask) => (
+                  <div key={subtask.id} className="flex items-center gap-1.5 text-xs text-muted-foreground ml-4">
+                    {subtask.status === 'completed' ? (
+                      <CheckCircle2 className="h-2.5 w-2.5 text-green-600" />
+                    ) : (
+                      <Circle className="h-2.5 w-2.5" />
+                    )}
+                    <span className={subtask.status === 'completed' ? 'line-through' : ''}>
+                      {subtask.name}
+                    </span>
+                  </div>
+                ))}
+                {task.subtasks.length > 2 && (
+                  <div className="text-xs text-muted-foreground ml-4">
+                    +{task.subtasks.length - 2} more
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Checklists Display */}
+            {task.checklists && task.checklists.length > 0 && (
+              <div className="mt-2 ml-5 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CheckSquare className="h-3 w-3" />
+                  <span className="font-medium">Checklist ({task.checklists.filter(c => c.isChecked).length}/{task.checklists.length})</span>
+                </div>
+                {task.checklists.slice(0, 2).map((checklist) => (
+                  <div key={checklist.id} className="flex items-center gap-1.5 text-xs text-muted-foreground ml-4">
+                    {checklist.isChecked ? (
+                      <CheckCircle2 className="h-2.5 w-2.5 text-green-600" />
+                    ) : (
+                      <Circle className="h-2.5 w-2.5" />
+                    )}
+                    <span className={checklist.isChecked ? 'line-through' : ''}>
+                      {checklist.item}
+                    </span>
+                  </div>
+                ))}
+                {task.checklists.length > 2 && (
+                  <div className="text-xs text-muted-foreground ml-4">
+                    +{task.checklists.length - 2} more
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

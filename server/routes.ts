@@ -7288,7 +7288,21 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(403).json({ error: "Access denied" });
       }
       const tasks = await storage.getTasksByStep(req.params.stepId);
-      res.json(tasks);
+      
+      // Enrich each task with subtasks and checklists
+      const enrichedTasks = await Promise.all(tasks.map(async (task) => {
+        const [subtasks, checklists] = await Promise.all([
+          storage.getSubtasksByTask(task.id),
+          storage.getChecklistsByTask(task.id)
+        ]);
+        return {
+          ...task,
+          subtasks,
+          checklists
+        };
+      }));
+      
+      res.json(enrichedTasks);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch tasks" });
     }
