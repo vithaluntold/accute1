@@ -342,6 +342,307 @@ export const subscriptionEvents = pgTable("subscription_events", {
   processedIdx: index("subscription_events_processed_idx").on(table.processed),
 }));
 
+// Product Families - Group features into bundles that super admin can manage
+export const productFamilies = pgTable("product_families", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(), // 'Core Features', 'AI Features', 'Compliance Features'
+  slug: text("slug").notNull().unique(), // 'core-features', 'ai-features'
+  description: text("description"),
+  displayOrder: integer("display_order").notNull().default(0),
+  
+  // Feature configuration
+  features: jsonb("features").notNull().default(sql`'[]'::jsonb`), // Array of feature identifiers
+  
+  // Metadata
+  icon: text("icon"), // Icon name for UI
+  color: text("color"), // Brand color for UI
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("product_families_slug_idx").on(table.slug),
+  displayOrderIdx: index("product_families_display_order_idx").on(table.displayOrder),
+}));
+
+// Plan SKUs - Support for SKU-based and usage-based pricing
+export const planSKUs = pgTable("plan_skus", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => subscriptionPlans.id, { onDelete: "cascade" }),
+  
+  // SKU details
+  sku: text("sku").notNull().unique(), // 'ACCUTE-CORE-MONTHLY-USD', 'ACCUTE-AI-YEARLY-INR'
+  name: text("name").notNull(), // Display name
+  description: text("description"),
+  
+  // Pricing model
+  pricingModel: text("pricing_model").notNull(), // 'fixed', 'usage_based', 'hybrid', 'per_seat', 'tiered'
+  
+  // Fixed pricing
+  fixedPrice: numeric("fixed_price", { precision: 10, scale: 2 }),
+  
+  // Usage-based pricing
+  usageUnit: text("usage_unit"), // 'tokens', 'api_calls', 'documents', 'storage_gb', 'users'
+  usagePrice: numeric("usage_price", { precision: 10, scale: 6 }), // Price per unit
+  includedUsage: integer("included_usage").default(0), // Free units included
+  
+  // Hybrid pricing (fixed + usage)
+  basePrice: numeric("base_price", { precision: 10, scale: 2 }),
+  
+  // Tiered pricing configuration
+  tiers: jsonb("tiers").default(sql`'[]'::jsonb`), // [{minUnits: 0, maxUnits: 100, pricePerUnit: 1.0}, ...]
+  
+  // Regional and billing
+  regionCode: text("region_code"), // For region-specific SKUs
+  currency: text("currency").notNull().default("USD"),
+  billingCycle: text("billing_cycle").notNull(), // 'monthly', 'yearly', '3_year', 'one_time'
+  
+  // Gateway integration
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
+  razorpayPlanId: text("razorpay_plan_id"),
+  payuPlanId: text("payu_plan_id"),
+  payoneerPlanId: text("payoneer_plan_id"),
+  
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  planIdx: index("plan_skus_plan_idx").on(table.planId),
+  skuIdx: index("plan_skus_sku_idx").on(table.sku),
+}));
+
+// Plan Add-ons - Additional features organizations can purchase
+export const planAddons = pgTable("plan_addons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productFamilyId: varchar("product_family_id").references(() => productFamilies.id, { onDelete: "set null" }),
+  
+  // Add-on details
+  name: text("name").notNull(), // 'Extra Storage', 'Additional Users', 'Priority Support'
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  
+  // Pricing
+  pricingModel: text("pricing_model").notNull().default("fixed"), // 'fixed', 'per_unit', 'tiered'
+  priceMonthly: numeric("price_monthly", { precision: 10, scale: 2 }),
+  priceYearly: numeric("price_yearly", { precision: 10, scale: 2 }),
+  
+  // Unit-based pricing
+  unit: text("unit"), // 'gb', 'user', 'seat', 'document'
+  pricePerUnit: numeric("price_per_unit", { precision: 10, scale: 4 }),
+  minQuantity: integer("min_quantity").default(1),
+  maxQuantity: integer("max_quantity"), // null = unlimited
+  
+  // Features granted
+  features: jsonb("features").notNull().default(sql`'[]'::jsonb`),
+  
+  // Quota increases
+  additionalStorage: integer("additional_storage"), // GB
+  additionalUsers: integer("additional_users"),
+  additionalClients: integer("additional_clients"),
+  additionalWorkflows: integer("additional_workflows"),
+  
+  // Applicability
+  applicablePlans: jsonb("applicable_plans").default(sql`'[]'::jsonb`), // Empty = all plans
+  
+  // Gateway integration
+  stripeProductId: text("stripe_product_id"),
+  razorpayPlanId: text("razorpay_plan_id"),
+  
+  displayOrder: integer("display_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("plan_addons_slug_idx").on(table.slug),
+  displayOrderIdx: index("plan_addons_display_order_idx").on(table.displayOrder),
+}));
+
+// Subscription Add-ons - Track which add-ons organizations have purchased
+export const subscriptionAddons = pgTable("subscription_addons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => platformSubscriptions.id, { onDelete: "cascade" }),
+  addonId: varchar("addon_id").notNull().references(() => planAddons.id, { onDelete: "cascade" }),
+  
+  // Quantity and pricing
+  quantity: integer("quantity").notNull().default(1),
+  priceSnapshot: jsonb("price_snapshot").notNull(), // Immutable pricing at purchase time
+  
+  // Status
+  status: text("status").notNull().default("active"), // 'active', 'cancelled', 'expired'
+  
+  // Billing
+  currentPeriodStart: timestamp("current_period_start").notNull().defaultNow(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  nextBillingDate: timestamp("next_billing_date"),
+  
+  // Payment gateway integration
+  stripeSubscriptionItemId: text("stripe_subscription_item_id"),
+  razorpayAddonId: text("razorpay_addon_id"),
+  
+  addedBy: varchar("added_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  cancelledAt: timestamp("cancelled_at"),
+}, (table) => ({
+  subscriptionIdx: index("subscription_addons_subscription_idx").on(table.subscriptionId),
+  addonIdx: index("subscription_addons_addon_idx").on(table.addonId),
+}));
+
+// Payment Gateway Configurations - Organizations configure their own payment gateways
+export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Gateway details
+  gateway: text("gateway").notNull(), // 'razorpay', 'stripe', 'payu', 'payoneer'
+  nickname: text("nickname"), // User-friendly name
+  
+  // Credentials (encrypted with AES-256-GCM in format: iv:encryptedData:authTag)
+  credentials: jsonb("credentials").notNull(), // Encrypted API keys, secrets
+  
+  // Configuration
+  config: jsonb("config").default(sql`'{}'::jsonb`), // Webhook URLs, settings
+  
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false), // Default gateway for client payments
+  
+  // Testing
+  isTestMode: boolean("is_test_mode").notNull().default(false),
+  
+  // Webhook verification
+  webhookSecret: text("webhook_secret"), // Encrypted
+  
+  // Usage tracking
+  lastUsedAt: timestamp("last_used_at"),
+  totalTransactions: integer("total_transactions").notNull().default(0),
+  totalVolume: numeric("total_volume", { precision: 15, scale: 2 }).notNull().default(sql`0`),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("payment_gateway_configs_org_idx").on(table.organizationId),
+  gatewayIdx: index("payment_gateway_configs_gateway_idx").on(table.gateway),
+  defaultIdx: index("payment_gateway_configs_default_idx").on(table.isDefault),
+}));
+
+// Service Plans - Fiverr-style service offerings that admins create for clients
+export const servicePlans = pgTable("service_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // Service details
+  title: text("title").notNull(), // 'Tax Return Preparation', 'Monthly Bookkeeping', 'Payroll Processing'
+  slug: text("slug").notNull(), // URL-friendly identifier
+  description: text("description"),
+  
+  // Categorization
+  category: text("category"), // 'tax', 'bookkeeping', 'payroll', 'consulting', 'audit'
+  tags: jsonb("tags").default(sql`'[]'::jsonb`), // Search tags
+  
+  // Pricing
+  pricingModel: text("pricing_model").notNull().default("fixed"), // 'fixed', 'hourly', 'custom'
+  basePrice: numeric("base_price", { precision: 10, scale: 2 }),
+  currency: text("currency").notNull().default("USD"),
+  
+  // Hourly pricing
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }),
+  estimatedHours: integer("estimated_hours"),
+  
+  // Pricing tiers (like Fiverr packages: Basic, Standard, Premium)
+  tiers: jsonb("tiers").default(sql`'[]'::jsonb`), // [{name, price, features, deliveryDays}, ...]
+  
+  // Deliverables
+  deliveryDays: integer("delivery_days"), // Expected delivery time
+  revisions: integer("revisions"), // Number of revisions included
+  features: jsonb("features").default(sql`'[]'::jsonb`), // What's included
+  
+  // Requirements
+  requirements: jsonb("requirements").default(sql`'[]'::jsonb`), // What client needs to provide
+  
+  // Media
+  coverImage: text("cover_image"),
+  gallery: jsonb("gallery").default(sql`'[]'::jsonb`), // Additional images
+  
+  // Availability
+  isAvailable: boolean("is_available").notNull().default(true),
+  maxOrders: integer("max_orders"), // Queue limit
+  currentOrders: integer("current_orders").notNull().default(0),
+  
+  // Stats
+  totalOrders: integer("total_orders").notNull().default(0),
+  rating: numeric("rating", { precision: 3, scale: 2 }), // 0-5.00
+  reviewCount: integer("review_count").notNull().default(0),
+  
+  // Visibility
+  isPublic: boolean("is_public").notNull().default(true), // Show in marketplace
+  isFeatured: boolean("is_featured").notNull().default(false),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("service_plans_org_idx").on(table.organizationId),
+  slugIdx: index("service_plans_slug_idx").on(table.slug),
+  categoryIdx: index("service_plans_category_idx").on(table.category),
+  publicIdx: index("service_plans_public_idx").on(table.isPublic),
+  uniqueOrgSlug: unique("unique_org_slug_service").on(table.organizationId, table.slug),
+}));
+
+// Service Plan Purchases - Track when clients purchase service plans
+export const servicePlanPurchases = pgTable("service_plan_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicePlanId: varchar("service_plan_id").notNull().references(() => servicePlans.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Pricing snapshot
+  selectedTier: text("selected_tier"), // Which tier was purchased
+  priceSnapshot: jsonb("price_snapshot").notNull(), // Pricing at purchase time
+  totalAmount: numeric("total_amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  
+  // Status
+  status: text("status").notNull().default("pending"), // 'pending', 'in_progress', 'delivered', 'completed', 'cancelled', 'refunded'
+  
+  // Delivery
+  deliveryDate: timestamp("delivery_date"),
+  deliveredAt: timestamp("delivered_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Requirements and communication
+  clientRequirements: jsonb("client_requirements"), // Client's inputs
+  notes: text("notes"),
+  
+  // Review
+  rating: numeric("rating", { precision: 3, scale: 2 }), // 0-5.00
+  review: text("review"),
+  reviewedAt: timestamp("reviewed_at"),
+  
+  // Payment
+  paymentStatus: text("payment_status").notNull().default("pending"), // 'pending', 'paid', 'failed', 'refunded'
+  paymentId: varchar("payment_id").references(() => payments.id),
+  paymentGateway: text("payment_gateway"), // 'razorpay', 'stripe', 'payu', 'payoneer'
+  paymentGatewayOrderId: text("payment_gateway_order_id"),
+  
+  // Assignment
+  assignedTo: varchar("assigned_to").references(() => users.id), // Which employee is working on this
+  
+  purchasedBy: varchar("purchased_by").references(() => users.id), // Client user who purchased
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  servicePlanIdx: index("service_plan_purchases_service_idx").on(table.servicePlanId),
+  clientIdx: index("service_plan_purchases_client_idx").on(table.clientId),
+  orgIdx: index("service_plan_purchases_org_idx").on(table.organizationId),
+  statusIdx: index("service_plan_purchases_status_idx").on(table.status),
+}));
+
 // Roles table (Super Admin, Admin, Employee, Client)
 // scope: 'platform' for SaaS-level roles (Super Admin), 'tenant' for organization roles
 export const roles = pgTable("roles", {
@@ -2986,6 +3287,13 @@ export const insertPlanVolumeTierSchema = createInsertSchema(planVolumeTiers).om
 export const insertCouponSchema = createInsertSchema(coupons).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCouponRedemptionSchema = createInsertSchema(couponRedemptions).omit({ id: true, redeemedAt: true });
 export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({ id: true, createdAt: true });
+export const insertProductFamilySchema = createInsertSchema(productFamilies).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlanSKUSchema = createInsertSchema(planSKUs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlanAddonSchema = createInsertSchema(planAddons).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSubscriptionAddonSchema = createInsertSchema(subscriptionAddons).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfigs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertServicePlanSchema = createInsertSchema(servicePlans).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertServicePlanPurchaseSchema = createInsertSchema(servicePlanPurchases).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -3085,6 +3393,20 @@ export type InsertCouponRedemption = z.infer<typeof insertCouponRedemptionSchema
 export type CouponRedemption = typeof couponRedemptions.$inferSelect;
 export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
 export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+export type InsertProductFamily = z.infer<typeof insertProductFamilySchema>;
+export type ProductFamily = typeof productFamilies.$inferSelect;
+export type InsertPlanSKU = z.infer<typeof insertPlanSKUSchema>;
+export type PlanSKU = typeof planSKUs.$inferSelect;
+export type InsertPlanAddon = z.infer<typeof insertPlanAddonSchema>;
+export type PlanAddon = typeof planAddons.$inferSelect;
+export type InsertSubscriptionAddon = z.infer<typeof insertSubscriptionAddonSchema>;
+export type SubscriptionAddon = typeof subscriptionAddons.$inferSelect;
+export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
+export type PaymentGatewayConfig = typeof paymentGatewayConfigs.$inferSelect;
+export type InsertServicePlan = z.infer<typeof insertServicePlanSchema>;
+export type ServicePlan = typeof servicePlans.$inferSelect;
+export type InsertServicePlanPurchase = z.infer<typeof insertServicePlanPurchaseSchema>;
+export type ServicePlanPurchase = typeof servicePlanPurchases.$inferSelect;
 
 export const subscriptionPlanFormSchema = insertSubscriptionPlanSchema.extend({
   featuresInput: z.string().optional(),
