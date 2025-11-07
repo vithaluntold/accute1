@@ -38,10 +38,6 @@ import {
   MessageCircle, 
   X, 
   ChevronDown, 
-  Calculator, 
-  FileText, 
-  TrendingUp, 
-  HelpCircle,
   Maximize2,
   Minimize2,
   Plus,
@@ -89,35 +85,6 @@ interface ChatMessage {
   createdAt: Date;
 }
 
-interface QuickAction {
-  label: string;
-  icon: any;
-  prompt: string;
-}
-
-const quickActions: QuickAction[] = [
-  {
-    label: "Tax questions",
-    icon: Calculator,
-    prompt: "I need help understanding tax implications for my business"
-  },
-  {
-    label: "Accounting concepts",
-    icon: FileText,
-    prompt: "Can you explain accounting concepts and principles?"
-  },
-  {
-    label: "Financial analysis",
-    icon: TrendingUp,
-    prompt: "Help me analyze financial statements"
-  },
-  {
-    label: "General support",
-    icon: HelpCircle,
-    prompt: "I need general accounting support"
-  }
-];
-
 export function LucaChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -129,7 +96,6 @@ export function LucaChatWidget() {
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(true);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -217,7 +183,6 @@ export function LucaChatWidget() {
       })) || [];
       
       setMessages(loadedMessages);
-      setShowQuickActions(loadedMessages.length === 0);
     } catch (error) {
       console.error('[Luca Chat] Error loading session messages:', error);
     }
@@ -237,7 +202,6 @@ export function LucaChatWidget() {
       queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
       setCurrentSessionId(newSession.id);
       setMessages([]);
-      setShowQuickActions(true);
     },
   });
 
@@ -265,7 +229,6 @@ export function LucaChatWidget() {
       if (currentSessionId === deletedId) {
         setCurrentSessionId(null);
         setMessages([]);
-        setShowQuickActions(true);
       }
     },
   });
@@ -456,8 +419,6 @@ export function LucaChatWidget() {
       sessionId = newSession.id;
     }
 
-    setShowQuickActions(false);
-
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -501,10 +462,6 @@ export function LucaChatWidget() {
 
     setInput("");
     setIsExpanded(true);
-  };
-
-  const handleQuickAction = (action: QuickAction) => {
-    handleSend(action.prompt);
   };
 
   const renderChatInterface = () => (
@@ -697,7 +654,6 @@ export function LucaChatWidget() {
                     setIsFullScreen(false);
                   } else {
                     setIsExpanded(false);
-                    setShowQuickActions(true);
                   }
                 }}
                 data-testid="button-minimize-chat"
@@ -745,44 +701,7 @@ export function LucaChatWidget() {
         {/* Messages */}
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full p-4" ref={scrollRef}>
-            {messages.length === 0 && showQuickActions ? (
-              <div className="space-y-4">
-                <div className="flex flex-col items-center justify-center text-center p-6">
-                  <div className="p-3 rounded-xl bg-primary/10 mb-3">
-                    <img 
-                      src={lucaLogoUrl} 
-                      alt="Luca" 
-                      className="h-10 w-10 object-contain"
-                    />
-                  </div>
-                  <h4 className="font-semibold mb-1.5">Choose a topic to get started</h4>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Or type your own question below
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  {quickActions.map((action, index) => {
-                    const Icon = action.icon;
-                    return (
-                      <button
-                        key={index}
-                        onClick={() => handleQuickAction(action)}
-                        className="text-left px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-all duration-200 group hover-elevate active-elevate-2"
-                        data-testid={`button-quick-action-${index}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                            <Icon className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="text-sm font-medium">{action.label}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : messages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <div className="p-4 rounded-full bg-primary/10 mb-4">
                   <img 
