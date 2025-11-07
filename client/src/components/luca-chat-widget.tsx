@@ -895,28 +895,6 @@ export function LucaChatWidget() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="p-4 space-y-2">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleQuickAction(action)}
-                    className="w-full text-left px-4 py-3 rounded-xl bg-muted/50 hover:bg-muted transition-all duration-200 group hover-elevate active-elevate-2"
-                    data-testid={`button-quick-action-preview-${index}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <Icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <span className="text-sm font-medium">{action.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Start Conversation Button */}
             <div className="p-4 pt-2 border-t">
               <Button
