@@ -55,6 +55,23 @@ function validateEnvironment() {
     warnings.forEach(warning => console.warn(`   - ${warning}`));
     console.warn('');
   }
+
+  // CRITICAL: Production safety check for test endpoints
+  // Prevent accidental enablement of test-only MFA endpoints in production
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_TEST_TOTP_ENDPOINT === 'true') {
+    console.error('❌ CRITICAL SECURITY ERROR: ENABLE_TEST_TOTP_ENDPOINT is enabled in production!');
+    console.error('');
+    console.error('This test-only endpoint MUST NOT be enabled in production.');
+    console.error('It allows unauthenticated TOTP generation and bypasses MFA security.');
+    console.error('');
+    console.error('💡 To fix this:');
+    console.error('   1. Remove ENABLE_TEST_TOTP_ENDPOINT from production environment');
+    console.error('   2. Or set ENABLE_TEST_TOTP_ENDPOINT=false in production');
+    console.error('   3. This flag should ONLY be enabled in development/test environments\n');
+    
+    // Exit immediately - this is a critical security issue
+    process.exit(1);
+  }
 }
 
 // Run validation before any imports that might use these variables

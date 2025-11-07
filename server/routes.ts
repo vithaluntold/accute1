@@ -646,6 +646,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TEST/DEVELOPMENT ONLY ====================
+  // Generate TOTP token for automated testing
+  // SECURITY: This endpoint is ONLY available when ENABLE_TEST_TOTP_ENDPOINT=true
+  // and NODE_ENV !== 'production'. Server startup will fail if misconfigured.
+  app.post("/api/mfa/test/generate-totp", async (req: Request, res: Response) => {
+    // Production safety check
+    if (process.env.NODE_ENV === 'production') {
+      console.error('⛔ CRITICAL: /api/mfa/test/generate-totp accessed in production!');
+      return res.status(403).json({ error: "This endpoint is not available in production" });
+    }
+
+    // Feature flag check
+    if (process.env.ENABLE_TEST_TOTP_ENDPOINT !== 'true') {
+      return res.status(403).json({ error: "Test TOTP endpoint is not enabled" });
+    }
+
+    try {
+      const { secret } = req.body;
+
+      if (!secret) {
+        return res.status(400).json({ error: "TOTP secret is required" });
+      }
+
+      // Generate current TOTP token
+      const token = mfaService.getCurrentToken(secret);
+
+      // Audit log for security monitoring
+      console.log(`[TEST] TOTP generated for secret: ${secret.substring(0, 4)}...`);
+
+      res.json({ token });
+    } catch (error: any) {
+      console.error("Test TOTP generation error:", error);
+      res.status(500).json({ error: "Failed to generate TOTP" });
+    }
+  });
+
   // Regenerate backup codes
   app.post("/api/mfa/regenerate-backup-codes", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
