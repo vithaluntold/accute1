@@ -28,6 +28,28 @@
   }
 }
 
+/* Sun and Moon Revolving Animation - Day to Night Cycle */
+@keyframes sunMoonRevolve {
+  0% {
+    transform: rotate(0deg) translateX(30px) rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg) translateX(30px) rotate(-180deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(30px) rotate(-360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);

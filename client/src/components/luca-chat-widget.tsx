@@ -755,10 +755,27 @@ export function LucaChatWidget() {
                         </ReactMarkdown>
                       </div>
                       {message.isStreaming && (
-                        <div className="flex items-center gap-1 mt-2">
-                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                        <div className="flex items-center gap-2 mt-2">
+                          {/* Sun and Moon Revolving - Time Passing */}
+                          <div className="relative w-12 h-12 flex items-center justify-center">
+                            {/* Orbit Path */}
+                            <div className="absolute w-full h-full border border-primary/20 rounded-full" />
+                            
+                            {/* Sun and Moon orbiting */}
+                            <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 3s linear infinite' }}>
+                              {/* Sun (Golden) */}
+                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+                            </div>
+                            
+                            {/* Moon orbiting (opposite side) */}
+                            <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 3s linear infinite', transform: 'rotate(180deg)' }}>
+                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-gradient-to-br from-blue-200 to-blue-300 rounded-full shadow-[0_0_6px_rgba(191,219,254,0.6)]" />
+                            </div>
+                            
+                            {/* Center axis */}
+                            <div className="absolute w-1 h-1 bg-primary/40 rounded-full" />
+                          </div>
+                          <span className="text-xs text-muted-foreground">Thinking...</span>
                         </div>
                       )}
                     </div>
@@ -802,7 +819,12 @@ export function LucaChatWidget() {
               data-testid="button-send-message"
             >
               {isStreaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="relative w-4 h-4">
+                  {/* Mini Sun/Moon Revolving */}
+                  <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 2s linear infinite' }}>
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full" />
+                  </div>
+                </div>
               ) : (
                 <Send className="h-4 w-4" />
               )}
@@ -879,7 +901,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 1 - Greeting */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[360px]"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[360px] overflow-hidden"
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out',
                 transformOrigin: 'right center',
@@ -888,7 +910,23 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Mangala Chihnas */}
+              {/* Background Watermarks */}
+              <img 
+                src={mangalaSwan} 
+                alt="" 
+                className="absolute top-0 right-10 w-20 h-20 opacity-[0.08] pointer-events-none"
+                style={{ animation: 'pulse 3s ease-in-out infinite' }}
+                draggable={false}
+              />
+              <img 
+                src={mangalaDoubleSpiral} 
+                alt="" 
+                className="absolute bottom-0 left-12 w-16 h-16 opacity-[0.08] pointer-events-none"
+                style={{ animation: 'pulse 4s ease-in-out infinite 0.5s' }}
+                draggable={false}
+              />
+              
+              {/* Mangala Chihnas (Visible) */}
               <img 
                 src={mangalaSpiral} 
                 alt="" 
@@ -931,7 +969,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 2 - Start Conversation */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[320px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[320px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
               onClick={() => setIsExpanded(true)}
               data-testid="button-start-conversation"
               style={{
@@ -942,7 +980,16 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Mangala Chihnas */}
+              {/* Background Watermark */}
+              <img 
+                src={mangalaFlame} 
+                alt="" 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 opacity-[0.08] pointer-events-none"
+                style={{ animation: 'pulse 3.5s ease-in-out infinite 0.2s' }}
+                draggable={false}
+              />
+              
+              {/* Mangala Chihnas (Visible) */}
               <img 
                 src={mangalaSwan} 
                 alt="" 
@@ -964,7 +1011,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 3 - Tax Question */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[300px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[300px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
               onClick={() => setIsExpanded(true)}
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out 0.2s backwards',
@@ -974,7 +1021,16 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Mangala Chihnas */}
+              {/* Background Watermark */}
+              <img 
+                src={mangalaSpiral} 
+                alt="" 
+                className="absolute bottom-0 right-8 w-20 h-20 opacity-[0.08] pointer-events-none"
+                style={{ animation: 'pulse 4s ease-in-out infinite 0.3s' }}
+                draggable={false}
+              />
+              
+              {/* Mangala Chihnas (Visible) */}
               <img 
                 src={mangalaFlame} 
                 alt="" 
@@ -996,7 +1052,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 4 - Accounting Help */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[280px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[280px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
               onClick={() => setIsExpanded(true)}
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out 0.3s backwards',
@@ -1006,7 +1062,16 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Mangala Chihnas */}
+              {/* Background Watermarks */}
+              <img 
+                src={mangalaSwan} 
+                alt="" 
+                className="absolute top-0 left-8 w-16 h-16 opacity-[0.08] pointer-events-none"
+                style={{ animation: 'pulse 3.5s ease-in-out infinite 0.7s' }}
+                draggable={false}
+              />
+              
+              {/* Mangala Chihnas (Visible) */}
               <img 
                 src={mangalaDoubleSpiral} 
                 alt="" 
