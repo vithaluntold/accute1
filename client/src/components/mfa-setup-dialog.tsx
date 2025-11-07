@@ -37,14 +37,13 @@ export function MFASetupDialog({ open, onClose }: MFASetupDialogProps) {
   // Step 1: Setup MFA
   const setupMFA = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest<{
+      const res = await apiRequest('POST', '/api/mfa/setup');
+      const response = await res.json() as {
         success: boolean;
         secret: string;
         qrCodeUrl: string;
         backupCodes: string[];
-      }>('/api/mfa/setup', {
-        method: 'POST',
-      });
+      };
       return response;
     },
     onSuccess: (data) => {
@@ -67,11 +66,8 @@ export function MFASetupDialog({ open, onClose }: MFASetupDialogProps) {
   // Step 2: Verify and enable MFA
   const verifyMFA = useMutation({
     mutationFn: async (token: string) => {
-      const response = await apiRequest<{ success: boolean; message: string }>('/api/mfa/verify-setup', {
-        method: 'POST',
-        body: JSON.stringify({ token }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const res = await apiRequest('POST', '/api/mfa/verify-setup', { token });
+      const response = await res.json() as { success: boolean; message: string };
       return response;
     },
     onSuccess: () => {
