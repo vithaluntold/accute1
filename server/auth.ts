@@ -114,16 +114,23 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
 export function requirePermission(permission: string) {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
+      console.log(`❌ [PERMISSION] No user in request for permission: ${permission}`);
       return res.status(401).json({ error: "Authentication required" });
     }
 
     const userPermissions = await storage.getPermissionsByRole(req.user.roleId);
     const hasPermission = userPermissions.some(p => p.name === permission);
 
+    console.log(`🔐 [PERMISSION] User ${req.user.email} (role: ${req.user.roleId}) checking for "${permission}"`);
+    console.log(`   Available permissions: ${userPermissions.map(p => p.name).join(', ')}`);
+    console.log(`   Has permission: ${hasPermission}`);
+
     if (!hasPermission) {
-      return res.status(403).json({ error: "Insufficient permissions" });
+      console.log(`❌ [PERMISSION] DENIED: User ${req.user.email} lacks "${permission}"`);
+      return res.status(403).json({ error: "Insufficient permissions", required: permission });
     }
 
+    console.log(`✅ [PERMISSION] GRANTED: ${permission}`);
     next();
   };
 }

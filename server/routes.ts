@@ -1856,12 +1856,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/llm-configurations/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
     try {
+      console.log(`🔧 [LLM DELETE] User ${req.user!.email} attempting to delete LLM config ${req.params.id}`);
+      
       const existing = await storage.getLlmConfiguration(req.params.id);
       
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
+      if (!existing) {
+        console.log(`❌ [LLM DELETE] Config ${req.params.id} not found`);
         return res.status(404).json({ error: "LLM configuration not found" });
       }
       
+      if (existing.organizationId !== req.user!.organizationId) {
+        console.log(`❌ [LLM DELETE] Organization mismatch: config org ${existing.organizationId}, user org ${req.user!.organizationId}`);
+        return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      console.log(`🗑️  [LLM DELETE] Deleting config ${req.params.id} from org ${req.user!.organizationId}`);
       await storage.deleteLlmConfiguration(req.params.id);
       
       // Clear cache so deletions are reflected immediately
@@ -1870,9 +1879,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "llm_configuration", req.params.id, {}, req);
       
+      console.log(`✅ [LLM DELETE] Successfully deleted config ${req.params.id}`);
       res.json({ success: true });
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to delete LLM configuration" });
+      console.error(`❌ [LLM DELETE] Failed to delete LLM configuration:`, error);
+      res.status(500).json({ error: "Failed to delete LLM configuration", details: error.message });
     }
   });
 
