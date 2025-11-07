@@ -901,7 +901,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 1 - Greeting */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[360px] overflow-hidden"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[360px]"
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out',
                 transformOrigin: 'right center',
@@ -910,37 +910,7 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Background Watermarks */}
-              <img 
-                src={mangalaSwan} 
-                alt="" 
-                className="absolute top-0 right-10 w-20 h-20 opacity-[0.08] pointer-events-none"
-                style={{ animation: 'pulse 3s ease-in-out infinite' }}
-                draggable={false}
-              />
-              <img 
-                src={mangalaDoubleSpiral} 
-                alt="" 
-                className="absolute bottom-0 left-12 w-16 h-16 opacity-[0.08] pointer-events-none"
-                style={{ animation: 'pulse 4s ease-in-out infinite 0.5s' }}
-                draggable={false}
-              />
-              
-              {/* Mangala Chihnas (Visible) */}
-              <img 
-                src={mangalaSpiral} 
-                alt="" 
-                className="absolute left-2 top-2 w-8 h-8 opacity-60"
-                draggable={false}
-              />
-              <img 
-                src={mangalaFlame} 
-                alt="" 
-                className="absolute right-2 top-2 w-8 h-8 opacity-60"
-                draggable={false}
-              />
-              
-              <div className="flex items-start gap-3 pl-4">
+              <div className="flex items-start gap-3 pl-2">
                 <div className="relative flex-shrink-0">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                     <img 
@@ -954,8 +924,10 @@ export function LucaChatWidget() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
+                    <img src={mangalaSpiral} alt="" className="w-4 h-4 opacity-40" draggable={false} />
                     <h3 className="font-semibold text-sm">Luca</h3>
                     <Badge variant="secondary" className="text-xs h-4 px-1.5">AI</Badge>
+                    <img src={mangalaFlame} alt="" className="w-4 h-4 opacity-40" draggable={false} />
                   </div>
                   <p className="text-sm">
                     {getGreeting()}!
@@ -969,7 +941,7 @@ export function LucaChatWidget() {
 
             {/* Palm Leaf 2 - Start Conversation */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[320px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[320px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
               onClick={() => setIsExpanded(true)}
               data-testid="button-start-conversation"
               style={{
@@ -980,38 +952,17 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Background Watermark */}
-              <img 
-                src={mangalaFlame} 
-                alt="" 
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 opacity-[0.08] pointer-events-none"
-                style={{ animation: 'pulse 3.5s ease-in-out infinite 0.2s' }}
-                draggable={false}
-              />
-              
-              {/* Mangala Chihnas (Visible) */}
-              <img 
-                src={mangalaSwan} 
-                alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              <img 
-                src={mangalaDoubleSpiral} 
-                alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              
-              <div className="flex items-center gap-3 pl-4">
-                <MessageCircle className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="flex items-center gap-2 pl-2">
+                <img src={mangalaSwan} alt="" className="w-4 h-4 opacity-40 flex-shrink-0" draggable={false} />
+                <MessageCircle className="h-4 w-4 text-primary flex-shrink-0" />
                 <span className="text-sm font-medium">Start a conversation</span>
+                <img src={mangalaDoubleSpiral} alt="" className="w-4 h-4 opacity-40 flex-shrink-0 ml-auto" draggable={false} />
               </div>
             </div>
 
             {/* Palm Leaf 3 - Tax Question */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[300px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[300px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
               onClick={() => setIsExpanded(true)}
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out 0.2s backwards',
@@ -1021,38 +972,17 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Background Watermark */}
-              <img 
-                src={mangalaSpiral} 
-                alt="" 
-                className="absolute bottom-0 right-8 w-20 h-20 opacity-[0.08] pointer-events-none"
-                style={{ animation: 'pulse 4s ease-in-out infinite 0.3s' }}
-                draggable={false}
-              />
-              
-              {/* Mangala Chihnas (Visible) */}
-              <img 
-                src={mangalaFlame} 
-                alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              <img 
-                src={mangalaSpiral} 
-                alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              
-              <div className="flex items-center gap-3 pl-4">
-                <Calculator className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="flex items-center gap-2 pl-2">
+                <img src={mangalaFlame} alt="" className="w-4 h-4 opacity-40 flex-shrink-0" draggable={false} />
+                <Calculator className="h-4 w-4 text-primary flex-shrink-0" />
                 <span className="text-sm font-medium">Ask a tax question</span>
+                <img src={mangalaSpiral} alt="" className="w-4 h-4 opacity-40 flex-shrink-0 ml-auto" draggable={false} />
               </div>
             </div>
 
             {/* Palm Leaf 4 - Accounting Help */}
             <div 
-              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[280px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500 overflow-hidden"
+              className="relative bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 w-full max-w-[280px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
               onClick={() => setIsExpanded(true)}
               style={{
                 animation: 'unfoldLeaf 0.5s ease-out 0.3s backwards',
@@ -1062,32 +992,11 @@ export function LucaChatWidget() {
               {/* Thread Hole */}
               <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#8B7355] border-2 border-[#6B5840] shadow-inner" />
               
-              {/* Background Watermarks */}
-              <img 
-                src={mangalaSwan} 
-                alt="" 
-                className="absolute top-0 left-8 w-16 h-16 opacity-[0.08] pointer-events-none"
-                style={{ animation: 'pulse 3.5s ease-in-out infinite 0.7s' }}
-                draggable={false}
-              />
-              
-              {/* Mangala Chihnas (Visible) */}
-              <img 
-                src={mangalaDoubleSpiral} 
-                alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              <img 
-                src={mangalaSwan} 
-                alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
-                draggable={false}
-              />
-              
-              <div className="flex items-center gap-3 pl-4">
-                <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="flex items-center gap-2 pl-2">
+                <img src={mangalaDoubleSpiral} alt="" className="w-4 h-4 opacity-40 flex-shrink-0" draggable={false} />
+                <FileText className="h-4 w-4 text-primary flex-shrink-0" />
                 <span className="text-sm font-medium">Get accounting help</span>
+                <img src={mangalaSwan} alt="" className="w-4 h-4 opacity-40 flex-shrink-0 ml-auto" draggable={false} />
               </div>
             </div>
           </div>
