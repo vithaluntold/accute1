@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
 import { pricingManagementService } from './pricing-management-service';
 import * as schema from '@shared/schema';
-import { requireAuth, requirePlatform, requireAdmin, logActivity, type AuthRequest } from './auth';
+import { requireAuth, requirePlatform, requireAdmin, requirePermission, logActivity, type AuthRequest } from './auth';
 import { z } from 'zod';
+import { storage } from './storage';
 
 /**
  * Pricing Management Routes - PRODUCTION SECURED
@@ -485,7 +486,7 @@ export function registerPricingRoutes(app: Router) {
   // SERVICE PLAN PURCHASES (Client - Organization Scoped)
   // ============================
   
-  app.get('/api/my-purchases', requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get('/api/my-purchases', requireAuth, requirePermission("clients.view"), async (req: AuthRequest, res: Response) => {
     try {
       const clientId = req.query.clientId as string;
       
@@ -493,8 +494,40 @@ export function registerPricingRoutes(app: Router) {
         return res.status(400).json({ error: 'Client ID required' });
       }
       
-      // SECURITY: Verify client belongs to user or user has access
-      // TODO: Add proper client-user relationship check
+      // SECURITY: Verify client exists and user has access
+      const client = await storage.getClient(clientId);
+      if (!client) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+      
+      // MULTI-TIER AUTHORIZATION - Following requireAdmin pattern from auth.ts
+      const userRole = await storage.getRole(req.user!.roleId);
+      if (!userRole) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Tier 1: Platform admins (Super Admin) can access any client
+      const isPlatformAdmin = userRole.scope === "platform" && req.user!.organizationId === null;
+      
+      // Tier 2: Organization admins can access any client in their org
+      const isOrgAdmin = userRole.name === "Admin" && userRole.scope !== "platform";
+      
+      // Tier 3: Check if user is assigned to this client
+      const isAssignedUser = client.assignedTo === req.user!.id;
+      
+      if (!isPlatformAdmin) {
+        // Verify client belongs to user's organization
+        if (client.organizationId !== req.user!.organizationId) {
+          await logActivity(req.user!.id, req.user!.organizationId || undefined, 'unauthorized_access_attempt', 'service_plan_purchase', clientId, { reason: 'Cross-organization access attempt' }, req);
+          return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        // Within organization: check assignment or admin status
+        if (!isAssignedUser && !isOrgAdmin) {
+          await logActivity(req.user!.id, req.user!.organizationId || undefined, 'unauthorized_access_attempt', 'service_plan_purchase', clientId, { reason: 'Not assigned to client' }, req);
+          return res.status(403).json({ error: 'Access denied - you are not assigned to this client' });
+        }
+      }
       
       const purchases = await pricingManagementService.getServicePlanPurchasesByClient(clientId);
       res.json(purchases);
