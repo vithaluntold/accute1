@@ -756,25 +756,7 @@ export function LucaChatWidget() {
                       </div>
                       {message.isStreaming && (
                         <div className="flex items-center gap-2 mt-2">
-                          {/* Sun and Moon Revolving - Time Passing */}
-                          <div className="relative w-12 h-12 flex items-center justify-center">
-                            {/* Orbit Path */}
-                            <div className="absolute w-full h-full border border-primary/20 rounded-full" />
-                            
-                            {/* Sun and Moon orbiting */}
-                            <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 3s linear infinite' }}>
-                              {/* Sun (Golden) */}
-                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
-                            </div>
-                            
-                            {/* Moon orbiting (opposite side) */}
-                            <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 3s linear infinite', transform: 'rotate(180deg)' }}>
-                              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-gradient-to-br from-blue-200 to-blue-300 rounded-full shadow-[0_0_6px_rgba(191,219,254,0.6)]" />
-                            </div>
-                            
-                            {/* Center axis */}
-                            <div className="absolute w-1 h-1 bg-primary/40 rounded-full" />
-                          </div>
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           <span className="text-xs text-muted-foreground">Thinking...</span>
                         </div>
                       )}
@@ -819,12 +801,7 @@ export function LucaChatWidget() {
               data-testid="button-send-message"
             >
               {isStreaming ? (
-                <div className="relative w-4 h-4">
-                  {/* Mini Sun/Moon Revolving */}
-                  <div className="absolute w-full h-full" style={{ animation: 'sunMoonRevolve 2s linear infinite' }}>
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full" />
-                  </div>
-                </div>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
