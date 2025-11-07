@@ -82,7 +82,7 @@ import OrganizationsPage from "@/pages/admin/organizations";
 // import SubscriptionsPage from "@/pages/admin/subscriptions";
 // import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
 // import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
-// import PricingRegionsPage from "@/pages/admin/pricing-regions";
+import PricingRegionsPage from "@/pages/admin/pricing-regions";
 // import CouponsPage from "@/pages/admin/coupons";
 import PlatformSettingsPage from "@/pages/admin/platform-settings";
 import AllUsersPage from "@/pages/admin/users";
