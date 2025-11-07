@@ -703,7 +703,7 @@ export const lucaChatSessions = pgTable("luca_chat_sessions", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   organizationId: varchar("organization_id").references(() => organizations.id),
   title: text("title").notNull().default("New Chat"),
-  llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id), // Which AI provider was used
+  llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id, { onDelete: "set null" }), // Which AI provider was used - preserve chat history even if config deleted
   isActive: boolean("is_active").notNull().default(true),
   isPinned: boolean("is_pinned").notNull().default(false),
   lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
