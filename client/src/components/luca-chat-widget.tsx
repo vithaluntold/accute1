@@ -377,11 +377,14 @@ export function LucaChatWidget() {
               )
             );
             
-            if (currentSessionId && streamingContentRef.current) {
-              addMessageMutation.mutate({
-                sessionId: currentSessionId,
-                role: "assistant",
-                content: streamingContentRef.current,
+            // Assistant messages are now saved by the backend WebSocket handler
+            // Invalidate the session query to refetch messages and sync with database
+            if (currentSessionId) {
+              queryClient.invalidateQueries({ 
+                queryKey: ["/api/luca-chat-sessions", currentSessionId] 
+              });
+              queryClient.invalidateQueries({ 
+                queryKey: ["/api/luca-chat-sessions"] 
               });
             }
             
