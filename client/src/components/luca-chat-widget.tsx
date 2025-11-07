@@ -892,13 +892,13 @@ export function LucaChatWidget() {
               <img 
                 src={mangalaSpiral} 
                 alt="" 
-                className="absolute left-2 top-2 w-6 h-6 opacity-30"
+                className="absolute left-2 top-2 w-8 h-8 opacity-60"
                 draggable={false}
               />
               <img 
                 src={mangalaFlame} 
                 alt="" 
-                className="absolute right-2 top-2 w-6 h-6 opacity-30"
+                className="absolute right-2 top-2 w-8 h-8 opacity-60"
                 draggable={false}
               />
               
@@ -946,13 +946,13 @@ export function LucaChatWidget() {
               <img 
                 src={mangalaSwan} 
                 alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               <img 
                 src={mangalaDoubleSpiral} 
                 alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               
@@ -978,13 +978,13 @@ export function LucaChatWidget() {
               <img 
                 src={mangalaFlame} 
                 alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               <img 
                 src={mangalaSpiral} 
                 alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               
@@ -1010,13 +1010,13 @@ export function LucaChatWidget() {
               <img 
                 src={mangalaDoubleSpiral} 
                 alt="" 
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               <img 
                 src={mangalaSwan} 
                 alt="" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 opacity-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 opacity-60"
                 draggable={false}
               />
               
