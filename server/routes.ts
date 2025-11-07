@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { setupWebSocket } from "./websocket";
 import * as schema from "@shared/schema";
+import { registerPricingRoutes } from "./pricing-routes";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
@@ -15433,6 +15434,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
     }
   });
+
+  // Register pricing management routes (product families, SKUs, add-ons, gateways, service plans)
+  registerPricingRoutes(app);
 
   const httpServer = createServer(app);
   
