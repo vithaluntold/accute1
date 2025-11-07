@@ -5,7 +5,8 @@
  */
 
 import WebSocket from 'ws';
-import { setTimeout } from 'timers/promises';
+import { setTimeout as sleep } from 'timers/promises';
+import fetch from 'isomorphic-fetch';
 
 const AGENTS = [
   { name: 'Cadence', id: 'cadence', description: 'Workflow automation expert' },
@@ -21,7 +22,16 @@ const AGENTS = [
 
 const TEST_PROMPT = "Hello, please introduce yourself briefly.";
 const TIMEOUT_MS = 30000; // 30 seconds per agent
-const SERVER_URL = process.env.SERVER_URL || 'ws://localhost:5000';
+const HTTP_SERVER_URL = process.env.HTTP_SERVER_URL || 'http://localhost:5000';
+const WS_SERVER_URL = process.env.WS_SERVER_URL || 'ws://localhost:5000';
+
+// Test user credentials (using persistent seed account)
+const TEST_USER = {
+  email: process.env.TEST_USER_EMAIL || 'admin@sterling.com',
+  password: process.env.TEST_USER_PASSWORD || 'Admin123!',
+};
+
+let sessionToken = '';
 
 // ANSI color codes
 const colors = {
@@ -38,6 +48,46 @@ function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
+async function authenticate() {
+  log('\n🔐 Authenticating test user...', 'yellow');
+  
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(TEST_USER),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+    }
+
+    // Extract session token from Set-Cookie header
+    const setCookieHeader = response.headers.get('set-cookie');
+    if (!setCookieHeader) {
+      throw new Error('No session cookie received');
+    }
+
+    // Parse session token from cookie
+    const match = setCookieHeader.match(/session_token=([^;]+)/);
+    if (!match) {
+      throw new Error('Session token not found in cookie');
+    }
+
+    sessionToken = match[1];
+    log(`✓ Authenticated successfully`, 'green');
+    log(`  User: ${TEST_USER.email}`, 'gray');
+    log(`  Token: ${sessionToken.substring(0, 20)}...`, 'gray');
+    
+    return sessionToken;
+  } catch (error) {
+    log(`✗ Authentication failed: ${error.message}`, 'red');
+    throw error;
+  }
+}
+
 function testAgent(agent) {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
@@ -49,7 +99,11 @@ function testAgent(agent) {
     log(`Description: ${agent.description}`, 'gray');
     log('='.repeat(80), 'cyan');
 
-    const ws = new WebSocket(`${SERVER_URL}/ws/ai-stream`);
+    const ws = new WebSocket(`${WS_SERVER_URL}/ws/ai-stream`, {
+      headers: {
+        Cookie: `session_token=${sessionToken}`,
+      },
+    });
     
     const timeoutId = setTimeout(() => {
       if (!responseReceived) {
@@ -131,7 +185,8 @@ async function runTests() {
   log('║              ACCUTE AI AGENTS - COMPREHENSIVE TEST SUITE             ║', 'cyan');
   log('╚══════════════════════════════════════════════════════════════════════╝\n', 'cyan');
   
-  log(`Server: ${SERVER_URL}`, 'gray');
+  log(`HTTP Server: ${HTTP_SERVER_URL}`, 'gray');
+  log(`WebSocket Server: ${WS_SERVER_URL}`, 'gray');
   log(`Testing ${AGENTS.length} agents...`, 'gray');
   log(`Timeout: ${TIMEOUT_MS}ms per agent\n`, 'gray');
 
@@ -139,9 +194,17 @@ async function runTests() {
   let passed = 0;
   let failed = 0;
 
+  // Authenticate first
+  try {
+    await authenticate();
+  } catch (error) {
+    log('\n❌ Cannot proceed without authentication', 'red');
+    process.exit(1);
+  }
+
   // Wait for server to be ready
-  log('Waiting 2 seconds for server to be fully ready...', 'yellow');
-  await setTimeout(2000);
+  log('\nWaiting 2 seconds for server to be fully ready...', 'yellow');
+  await sleep(2000);
 
   for (const agent of AGENTS) {
     try {
@@ -161,7 +224,7 @@ async function runTests() {
     }
 
     // Small delay between tests
-    await setTimeout(500);
+    await sleep(500);
   }
 
   // Print summary
