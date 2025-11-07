@@ -92,15 +92,19 @@ export default function Settings() {
   });
 
   // Trusted Devices Query
-  const { data: trustedDevices = [], isLoading: devicesLoading } = useQuery<Array<{
-    id: string;
-    deviceName: string;
-    lastUsed: string;
-    createdAt: string;
-  }>>({
+  const { data: trustedDevicesData, isLoading: devicesLoading } = useQuery<{
+    devices: Array<{
+      id: string;
+      deviceName: string;
+      lastUsed: string;
+      createdAt: string;
+    }>;
+  }>({
     queryKey: ['/api/mfa/trusted-devices'],
     enabled: mfaStatus?.enabled === true, // Only fetch if MFA is enabled
   });
+
+  const trustedDevices = trustedDevicesData?.devices || [];
 
   // Revoke Trusted Device Mutation
   const revokeDeviceMutation = useMutation({

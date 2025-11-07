@@ -46,22 +46,18 @@ export function MFAVerificationModal({
     mutationFn: async (code: string) => {
       const deviceName = `${navigator.platform} - ${new Date().toLocaleDateString()}`;
       
-      const response = await apiRequest<{
-        user: any;
-        role: any;
-        token: string;
-      }>('/api/auth/login/mfa', {
-        method: 'POST',
-        body: JSON.stringify({
+      const response = await apiRequest(
+        'POST',
+        '/api/auth/login/mfa',
+        {
           userId,
           token: code,
           trustDevice,
           deviceId,
           deviceName,
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return response;
+        }
+      );
+      return response.json();
     },
     onSuccess: (data) => {
       toast({
@@ -89,21 +85,17 @@ export function MFAVerificationModal({
       const deviceName = `${navigator.platform} - ${new Date().toLocaleDateString()}`;
       
       // Verify backup code and complete login in one call
-      const response = await apiRequest<{
-        user: any;
-        role: any;
-        token: string;
-      }>('/api/mfa/verify-backup-code', {
-        method: 'POST',
-        body: JSON.stringify({
+      const response = await apiRequest(
+        'POST',
+        '/api/mfa/verify-backup-code',
+        {
           userId,
           backupCode: code,
           deviceId,
           deviceName,
-        }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return response;
+        }
+      );
+      return response.json();
     },
     onSuccess: (data) => {
       toast({

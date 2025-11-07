@@ -158,6 +158,14 @@ export class MFAService {
   }
 
   /**
+   * Get current TOTP token for a given secret (TEST/DEVELOPMENT ONLY)
+   * Used by automated testing to generate valid TOTP codes
+   */
+  getCurrentToken(secret: string): string {
+    return authenticator.generate(secret);
+  }
+
+  /**
    * Verify backup code
    */
   async verifyBackupCode(userId: string, code: string): Promise<boolean> {
