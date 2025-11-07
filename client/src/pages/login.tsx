@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import { MFAVerificationModal } from "@/components/mfa-verification-modal";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -23,6 +24,11 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showMFAModal, setShowMFAModal] = useState(false);
+  const [mfaData, setMFAData] = useState<{
+    userId: string;
+    deviceId: string;
+  } | null>(null);
   
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -38,6 +44,17 @@ export default function Login() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Check if MFA is required
+      if (data.mfaRequired) {
+        setMFAData({
+          userId: data.userId,
+          deviceId: data.deviceId,
+        });
+        setShowMFAModal(true);
+        return;
+      }
+
+      // Normal login flow (no MFA or device is trusted)
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       toast({
@@ -60,6 +77,30 @@ export default function Login() {
       });
     },
   });
+
+  const handleMFASuccess = (data: { user: any; role: any; token: string }) => {
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    setShowMFAModal(false);
+    setMFAData(null);
+    
+    toast({
+      title: "Welcome back!",
+      description: "MFA verification successful",
+    });
+
+    // Redirect based on role
+    if (data.role?.scope === "platform") {
+      setLocation("/admin/dashboard", { replace: true });
+    } else {
+      setLocation("/dashboard", { replace: true });
+    }
+  };
+
+  const handleMFACancel = () => {
+    setShowMFAModal(false);
+    setMFAData(null);
+  };
 
   const onSubmit = (data: LoginForm) => {
     loginMutation.mutate(data);
@@ -138,6 +179,17 @@ export default function Login() {
           </Button>
         </CardFooter>
       </Card>
+
+      {/* MFA Verification Modal */}
+      {showMFAModal && mfaData && (
+        <MFAVerificationModal
+          open={showMFAModal}
+          userId={mfaData.userId}
+          deviceId={mfaData.deviceId}
+          onSuccess={handleMFASuccess}
+          onCancel={handleMFACancel}
+        />
+      )}
     </div>
   );
 }

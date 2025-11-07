@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock, Sparkles } from "lucide-react";
+import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock, Sparkles, KeyRound } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MFASetupDialog } from "@/components/mfa-setup-dialog";
 
 // LLM Configuration schema (for AI agents)
 const llmConfigSchema = z.object({
@@ -71,12 +72,52 @@ export default function Settings() {
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [testConnectionResult, setTestConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showMFASetup, setShowMFASetup] = useState(false);
+  const [showDisableMFAConfirm, setShowDisableMFAConfirm] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
   
   const { data: currentUser } = useQuery({
     queryKey: ["/api/auth/me"],
   });
 
   const isSuperAdmin = (currentUser as any)?.role?.name === "Super Admin";
+
+  // MFA Status Query
+  const { data: mfaStatus, isLoading: mfaLoading } = useQuery<{
+    enabled: boolean;
+    enforced: boolean;
+    backupCodesRemaining: number;
+  }>({
+    queryKey: ['/api/mfa/status'],
+  });
+
+  // Disable MFA Mutation
+  const disableMFAMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const response = await apiRequest('/api/mfa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/mfa/status'] });
+      toast({
+        title: "MFA Disabled",
+        description: "Two-factor authentication has been disabled",
+      });
+      setShowDisableMFAConfirm(false);
+      setDisablePassword('');
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to disable MFA",
+        variant: "destructive",
+      });
+    },
+  });
 
   // LLM Configurations (for AI agents)
   const llmForm = useForm<LlmConfigFormData>({
@@ -237,6 +278,92 @@ export default function Settings() {
       />
       
       <div className="container mx-auto p-6 space-y-6">
+
+      {/* MFA Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Two-Factor Authentication
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Add an extra layer of security to your account with TOTP-based MFA
+            </CardDescription>
+          </div>
+          {!mfaLoading && !mfaStatus?.enabled && (
+            <Button onClick={() => setShowMFASetup(true)} data-testid="button-enable-mfa">
+              <KeyRound className="h-4 w-4 mr-2" />
+              Enable MFA
+            </Button>
+          )}
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {mfaLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading MFA status...
+            </div>
+          ) : mfaStatus?.enabled ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium">MFA is Active</p>
+                    <p className="text-sm text-muted-foreground">
+                      Your account is protected with two-factor authentication
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700">
+                  Enabled
+                </Badge>
+              </div>
+
+              {mfaStatus.backupCodesRemaining !== undefined && (
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <KeyRound className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Backup Codes</p>
+                      <p className="text-sm text-muted-foreground">
+                        {mfaStatus.backupCodesRemaining} {mfaStatus.backupCodesRemaining === 1 ? 'code' : 'codes'} remaining
+                      </p>
+                    </div>
+                  </div>
+                  {mfaStatus.backupCodesRemaining < 3 && (
+                    <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300">
+                      Low
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              <Button
+                variant="destructive"
+                onClick={() => setShowDisableMFAConfirm(true)}
+                data-testid="button-disable-mfa"
+              >
+                Disable MFA
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-4 border rounded-lg">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">MFA is not enabled</p>
+                <p className="text-sm text-muted-foreground">
+                  Protect your account with two-factor authentication using Google Authenticator or similar apps
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
@@ -599,6 +726,53 @@ export default function Settings() {
                 "Remove Configuration"
               )}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MFA Setup Dialog */}
+      <MFASetupDialog
+        open={showMFASetup}
+        onClose={() => setShowMFASetup(false)}
+      />
+
+      {/* Disable MFA Confirmation Dialog */}
+      <AlertDialog open={showDisableMFAConfirm} onOpenChange={setShowDisableMFAConfirm}>
+        <AlertDialogContent data-testid="dialog-disable-mfa-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the extra layer of security from your account. Enter your password to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-2">
+            <Label htmlFor="disable-password">Password</Label>
+            <Input
+              id="disable-password"
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              placeholder="Enter your password"
+              data-testid="input-disable-mfa-password"
+            />
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDisableMFAConfirm(false);
+              setDisablePassword('');
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={() => disableMFAMutation.mutate(disablePassword)}
+              disabled={!disablePassword || disableMFAMutation.isPending}
+              data-testid="button-confirm-disable-mfa"
+            >
+              {disableMFAMutation.isPending ? "Disabling..." : "Disable MFA"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

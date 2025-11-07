@@ -50,6 +50,7 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Subscription Management System**: Four-tier model with regional pricing and automated billing.
 - **Invoice Generation System**: Auto-generates invoices for subscription events.
 - **Payment Security**: AES-256-GCM encryption, HTTPS, rate limiting, and audit logging.
+- **Multi-Factor Authentication (MFA)**: TOTP-based MFA using Google Authenticator/Authy. Features include QR code setup, 10 backup codes (bcrypt hashed), trusted devices (30-day expiry), device fingerprinting, and AES-256-GCM encrypted TOTP secrets.
 
 #### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation.

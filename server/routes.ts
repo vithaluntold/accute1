@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "User ID and MFA token are required" });
       }
 
-      // Verify MFA token
+      // Verify TOTP token
       const isValid = await mfaService.verifyToken(userId, token);
 
       if (!isValid) {
@@ -534,22 +534,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify backup code (during login)
-  app.post("/api/mfa/verify-backup-code", async (req: Request, res: Response) => {
+  // Verify backup code and complete login (during login)
+  app.post("/api/mfa/verify-backup-code", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
-      const { userId, backupCode } = req.body;
+      const { userId, backupCode, deviceId, deviceName } = req.body;
 
       if (!userId || !backupCode) {
         return res.status(400).json({ error: "User ID and backup code are required" });
       }
 
+      // Verify backup code
       const isValid = await mfaService.verifyBackupCode(userId, backupCode);
 
       if (!isValid) {
         return res.status(400).json({ error: "Invalid or already used backup code" });
       }
 
-      res.json({ success: true, verified: true });
+      // Backup code verified - complete login (similar to login/mfa endpoint)
+      const user = await storage.getUser(userId);
+      if (!user || !user.isActive) {
+        return res.status(403).json({ error: "Account is inactive or not found" });
+      }
+
+      // SECURITY: Never trust device with backup codes (they're for emergencies)
+      // Users should re-enable MFA with authenticator app after using backup code
+
+      // Create session
+      const token = generateToken(user.id);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await storage.createSession(user.id, token, expiresAt);
+
+      // Get role and permissions
+      const role = await storage.getRole(user.roleId);
+      const permissions = await storage.getPermissionsByRole(user.roleId);
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "login_backup_code", "user", user.id, {}, req);
+
+      // Set session cookie
+      res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          roleId: user.roleId,
+          roleName: role?.name,
+          organizationId: user.organizationId,
+          permissions: permissions.map(p => p.name),
+        },
+        role,
+        token,
+      });
     } catch (error: any) {
       console.error("Backup code verification error:", error);
       res.status(500).json({ error: "Failed to verify backup code" });
