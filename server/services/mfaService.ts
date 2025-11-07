@@ -190,6 +190,9 @@ export class MFAService {
       if (isValid) {
         // Mark code as used
         const updatedUsedCodes = [...(mfa.backupCodesUsed || []), hashedCode];
+        
+        console.log(`[MFA] Marking backup code as used for user ${userId}`);
+        console.log(`[MFA] Previously used: ${mfa.backupCodesUsed?.length || 0}, Now used: ${updatedUsedCodes.length}`);
 
         await db.update(userMFA)
           .set({
@@ -198,6 +201,8 @@ export class MFAService {
             updatedAt: new Date()
           })
           .where(eq(userMFA.userId, userId));
+        
+        console.log(`[MFA] Backup code marked as used successfully`);
 
         return true;
       }
@@ -255,6 +260,8 @@ export class MFAService {
 
     const backupCodesRemaining = 
       (mfa.backupCodes?.length || 0) - (mfa.backupCodesUsed?.length || 0);
+    
+    console.log(`[MFA] Status for user ${userId}: total codes=${mfa.backupCodes?.length || 0}, used=${mfa.backupCodesUsed?.length || 0}, remaining=${backupCodesRemaining}`);
 
     return {
       enabled: mfa.mfaEnabled,

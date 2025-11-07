@@ -648,19 +648,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== TEST/DEVELOPMENT ONLY ====================
   // Generate TOTP token for automated testing
-  // SECURITY: This endpoint is ONLY available when ENABLE_TEST_TOTP_ENDPOINT=true
-  // and NODE_ENV !== 'production'. Server startup will fail if misconfigured.
+  // SECURITY: This endpoint is ONLY available in development/test environments.
+  // It is enabled by default when NODE_ENV !== 'production', but can be explicitly
+  // disabled by setting ENABLE_TEST_TOTP_ENDPOINT=false
   app.post("/api/mfa/test/generate-totp", async (req: Request, res: Response) => {
-    // Production safety check
+    // Production safety check (highest priority)
     if (process.env.NODE_ENV === 'production') {
       console.error('⛔ CRITICAL: /api/mfa/test/generate-totp accessed in production!');
       return res.status(403).json({ error: "This endpoint is not available in production" });
     }
 
-    // Feature flag check
-    if (process.env.ENABLE_TEST_TOTP_ENDPOINT !== 'true') {
-      return res.status(403).json({ error: "Test TOTP endpoint is not enabled" });
+    // Check if explicitly disabled in dev/test
+    if (process.env.ENABLE_TEST_TOTP_ENDPOINT === 'false') {
+      return res.status(403).json({ error: "Test TOTP endpoint is disabled" });
     }
+
+    // Allow in development/test by default
 
     try {
       const { secret } = req.body;

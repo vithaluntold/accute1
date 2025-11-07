@@ -109,10 +109,8 @@ export default function Settings() {
   // Revoke Trusted Device Mutation
   const revokeDeviceMutation = useMutation({
     mutationFn: async (deviceId: string) => {
-      const response = await apiRequest(`/api/mfa/trusted-devices/${deviceId}`, {
-        method: 'DELETE',
-      });
-      return response;
+      const response = await apiRequest('DELETE', `/api/mfa/trusted-devices/${deviceId}`);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/mfa/trusted-devices'] });
@@ -133,12 +131,8 @@ export default function Settings() {
   // Disable MFA Mutation
   const disableMFAMutation = useMutation({
     mutationFn: async (password: string) => {
-      const response = await apiRequest('/api/mfa/disable', {
-        method: 'POST',
-        body: JSON.stringify({ password }),
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return response;
+      const response = await apiRequest('POST', '/api/mfa/disable', { password });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/mfa/status'] });
