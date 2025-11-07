@@ -1,4 +1,4 @@
-import { db } from "@db";
+import { db } from "../db.js";
 import { eq, and, inArray } from "drizzle-orm";
 import { users, notifications } from "@shared/schema";
 
