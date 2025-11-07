@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Palm Leaf Manuscript Unfold Animation */
+@keyframes unfoldLeaf {
+  0% {
+    opacity: 0;
+    transform: perspective(1000px) rotateY(-90deg) translateX(20px);
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1000px) rotateY(0deg) translateX(0);
+  }
+}
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);

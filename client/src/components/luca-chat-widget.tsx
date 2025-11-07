@@ -46,7 +46,9 @@ import {
   MoreVertical,
   Check,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Calculator,
+  FileText
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -839,14 +841,14 @@ export function LucaChatWidget() {
         </div>
       )}
 
-      {/* Expanded Chat Widget (Preview State) - Floating Bubbles */}
+      {/* Expanded Chat Widget - Palm Leaf Manuscript Style */}
       {isOpen && !isExpanded && !isFullScreen && (
         <div
-          className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[9999] animate-in slide-in-from-bottom-8 fade-in duration-300 flex flex-col items-end gap-3"
+          className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[9999] flex flex-col items-end gap-2"
           style={{
             bottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : '96px',
             right: isMobile ? 'calc(16px + env(safe-area-inset-right))' : '24px',
-            maxWidth: isMobile ? 'calc(100vw - 32px)' : '400px',
+            maxWidth: isMobile ? 'calc(100vw - 32px)' : '380px',
           }}
         >
           {/* Close button */}
@@ -860,8 +862,14 @@ export function LucaChatWidget() {
             <X className="h-4 w-4" />
           </Button>
 
-          {/* Greeting Bubble */}
-          <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 max-w-[320px] animate-in slide-in-from-right-4 duration-300">
+          {/* Palm Leaf 1 - Greeting */}
+          <div 
+            className="bg-card/95 backdrop-blur-sm rounded-lg shadow-lg border-l-4 border-l-primary/30 p-4 max-w-[340px] transition-all duration-500 hover:border-l-primary/50"
+            style={{
+              animation: 'unfoldLeaf 0.5s ease-out',
+              transformOrigin: 'right center',
+            }}
+          >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -877,7 +885,7 @@ export function LucaChatWidget() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-semibold text-sm">Luca</h3>
-                  <Badge variant="secondary" className="text-xs h-4 px-1.5">AI</Badge>
+                  <Badge variant="secondary" className="text-xs h-4 px-1.5">AI Assistant</Badge>
                 </div>
                 <p className="text-sm">
                   {getGreeting()}! 👋
@@ -885,35 +893,55 @@ export function LucaChatWidget() {
                 <p className="text-sm text-muted-foreground mt-1">
                   How can I help you today?
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Accounting & Tax Expert
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Action Buttons - Floating Pills */}
-          <button
+          {/* Palm Leaf 2 - Start Conversation */}
+          <div 
+            className="bg-card/95 backdrop-blur-sm rounded-lg shadow-lg border-l-4 border-l-primary/20 p-4 max-w-[300px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
             onClick={() => setIsExpanded(true)}
-            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-75"
             data-testid="button-start-conversation"
+            style={{
+              animation: 'unfoldLeaf 0.5s ease-out 0.1s backwards',
+              transformOrigin: 'right center',
+            }}
           >
-            Start a conversation
-          </button>
+            <div className="flex items-center gap-3">
+              <MessageCircle className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-sm font-medium">Start a conversation</span>
+            </div>
+          </div>
 
-          <button
+          {/* Palm Leaf 3 - Tax Question */}
+          <div 
+            className="bg-card/95 backdrop-blur-sm rounded-lg shadow-lg border-l-4 border-l-primary/20 p-4 max-w-[280px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
             onClick={() => setIsExpanded(true)}
-            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-100"
+            style={{
+              animation: 'unfoldLeaf 0.5s ease-out 0.2s backwards',
+              transformOrigin: 'right center',
+            }}
           >
-            Ask a tax question
-          </button>
+            <div className="flex items-center gap-3">
+              <Calculator className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-sm font-medium">Ask a tax question</span>
+            </div>
+          </div>
 
-          <button
+          {/* Palm Leaf 4 - Accounting Help */}
+          <div 
+            className="bg-card/95 backdrop-blur-sm rounded-lg shadow-lg border-l-4 border-l-primary/20 p-4 max-w-[260px] cursor-pointer hover-elevate active-elevate-2 transition-all duration-500"
             onClick={() => setIsExpanded(true)}
-            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-150"
+            style={{
+              animation: 'unfoldLeaf 0.5s ease-out 0.3s backwards',
+              transformOrigin: 'right center',
+            }}
           >
-            Get accounting help
-          </button>
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+              <span className="text-sm font-medium">Get accounting help</span>
+            </div>
+          </div>
         </div>
       )}
 
