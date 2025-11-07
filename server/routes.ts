@@ -9,6 +9,7 @@ import { db } from "./db";
 import { setupWebSocket } from "./websocket";
 import * as schema from "@shared/schema";
 import { registerPricingRoutes } from "./pricing-routes";
+import { registerSubscriptionRoutes } from "./subscription-routes";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
@@ -15437,6 +15438,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // Register pricing management routes (product families, SKUs, add-ons, gateways, service plans)
   registerPricingRoutes(app);
+
+  // Register subscription & feature gating routes
+  registerSubscriptionRoutes(app);
 
   const httpServer = createServer(app);
   

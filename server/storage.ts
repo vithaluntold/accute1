@@ -775,6 +775,22 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  // Alias for feature gating system
+  async getActiveSubscriptionByOrganization(organizationId: string): Promise<schema.PlatformSubscription | undefined> {
+    const result = await db.select().from(schema.platformSubscriptions)
+      .where(and(
+        eq(schema.platformSubscriptions.organizationId, organizationId),
+        eq(schema.platformSubscriptions.status, 'active')
+      ));
+    return result[0];
+  }
+
+  async getSubscriptionPlan(planId: string): Promise<schema.SubscriptionPlan | undefined> {
+    const result = await db.select().from(schema.subscriptionPlans)
+      .where(eq(schema.subscriptionPlans.id, planId));
+    return result[0];
+  }
+
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(schema.users);
   }
