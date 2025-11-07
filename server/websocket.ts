@@ -20,6 +20,7 @@ interface StreamMessage {
   contextType?: string;
   contextId?: string;
   contextData?: any;
+  lucaSessionId?: string;
 }
 
 // Lazy WebSocket initialization - only creates when first connection is made
@@ -195,7 +196,7 @@ async function handleAgentExecution(
   ws: AuthenticatedWebSocket,
   message: StreamMessage
 ) {
-  const { agentName, input, llmConfigId, conversationId, contextType, contextId, contextData } = message;
+  const { agentName, input, llmConfigId, conversationId, contextType, contextId, contextData, lucaSessionId } = message;
   const startTime = Date.now();
 
   try {
@@ -212,49 +213,65 @@ async function handleAgentExecution(
     const llmConfigService = getLLMConfigService();
     const llmConfig = await llmConfigService.getConfig(ws.organizationId, llmConfigId);
 
-    // Find or create conversation
-    let conversation;
-    if (conversationId) {
-      conversation = await storage.getAiConversation(conversationId);
-      if (!conversation || conversation.userId !== ws.userId) {
-        throw new Error('Conversation not found');
+    // Handle Luca agent specially with its dedicated chat system
+    const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');
+    const isLucaAgent = normalizedAgentName === 'luca';
+
+    // Validate Luca session if provided
+    if (isLucaAgent && lucaSessionId) {
+      const lucaSession = await storage.getLucaChatSession(lucaSessionId);
+      if (!lucaSession || lucaSession.userId !== ws.userId) {
+        throw new Error('Luca chat session not found or access denied');
       }
-    } else if (contextType && contextId) {
-      conversation = await storage.getAiConversationByContext(
-        contextType,
-        contextId,
-        ws.userId!,
-        agentName
-      );
+    } else if (isLucaAgent && !lucaSessionId) {
+      throw new Error('Luca session ID is required');
     }
 
-    if (!conversation) {
-      conversation = await storage.createAiConversation({
-        agentName,
-        organizationId: ws.organizationId,
-        userId: ws.userId!,
-        contextType: contextType || null,
-        contextId: contextId || null,
-        contextData: contextData || {}
+    // For Luca, user messages are already saved by the frontend mutation
+    // For other agents, we manage conversations in the standard way
+    let conversation;
+    if (!isLucaAgent) {
+      if (conversationId) {
+        conversation = await storage.getAiConversation(conversationId);
+        if (!conversation || conversation.userId !== ws.userId) {
+          throw new Error('Conversation not found');
+        }
+      } else if (contextType && contextId) {
+        conversation = await storage.getAiConversationByContext(
+          contextType,
+          contextId,
+          ws.userId!,
+          agentName
+        );
+      }
+
+      if (!conversation) {
+        conversation = await storage.createAiConversation({
+          agentName,
+          organizationId: ws.organizationId,
+          userId: ws.userId!,
+          contextType: contextType || null,
+          contextId: contextId || null,
+          contextData: contextData || {}
+        });
+      }
+
+      // Save user message
+      await storage.createAiMessage({
+        conversationId: conversation.id,
+        role: "user",
+        content: input,
+        llmConfigId: llmConfig.id
       });
     }
-
-    // Save user message
-    await storage.createAiMessage({
-      conversationId: conversation.id,
-      role: "user",
-      content: input,
-      llmConfigId: llmConfig.id
-    });
 
     // Send start event
     ws.send(JSON.stringify({ 
       type: 'stream_start', 
-      conversationId: conversation.id 
+      conversationId: isLucaAgent ? lucaSessionId : conversation?.id 
     }));
 
     // Execute agent dynamically using agent loader
-    const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');
     let fullResponse = '';
 
     console.log(`[WebSocket] Executing agent: ${normalizedAgentName}, input length: ${input.length}`);
@@ -268,7 +285,7 @@ async function handleAgentExecution(
       context: {
         organizationId: ws.organizationId,
         userId: ws.userId,
-        conversationId: conversation.id,
+        conversationId: isLucaAgent ? lucaSessionId : conversation?.id,
       }
     };
     
@@ -317,19 +334,40 @@ async function handleAgentExecution(
     const executionTime = Date.now() - startTime;
 
     // Save assistant message
-    const assistantMessage = await storage.createAiMessage({
-      conversationId: conversation.id,
-      role: "assistant",
-      content: fullResponse,
-      llmConfigId: llmConfig.id,
-      executionTimeMs: executionTime
-    });
+    let assistantMessageId: string;
+    if (isLucaAgent && lucaSessionId) {
+      // Save to Luca-specific chat messages table
+      const lucaMessage = await storage.createLucaChatMessage({
+        sessionId: lucaSessionId,
+        role: "assistant",
+        content: fullResponse,
+        metadata: { executionTimeMs: executionTime, llmConfigId: llmConfig.id }
+      });
+      assistantMessageId = lucaMessage.id;
+
+      // Update session's lastMessageAt
+      await storage.updateLucaChatSession(lucaSessionId, {
+        lastMessageAt: new Date(),
+      });
+    } else if (conversation) {
+      // Save to standard AI agent messages table
+      const assistantMessage = await storage.createAiMessage({
+        conversationId: conversation.id,
+        role: "assistant",
+        content: fullResponse,
+        llmConfigId: llmConfig.id,
+        executionTimeMs: executionTime
+      });
+      assistantMessageId = assistantMessage.id;
+    } else {
+      throw new Error('No conversation or Luca session found');
+    }
 
     // Send completion event
     ws.send(JSON.stringify({ 
       type: 'stream_end', 
-      conversationId: conversation.id,
-      messageId: assistantMessage.id,
+      conversationId: isLucaAgent ? lucaSessionId : conversation?.id,
+      messageId: assistantMessageId,
       executionTime 
     }));
 

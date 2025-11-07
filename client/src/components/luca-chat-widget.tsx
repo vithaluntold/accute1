@@ -484,6 +484,7 @@ export function LucaChatWidget() {
           agentName: 'luca',
           input: textToSend,
           llmConfigId: selectedLlmConfig,
+          lucaSessionId: sessionId,
         }));
       }, { once: true });
     } else if (ws.readyState === WebSocket.OPEN) {
@@ -492,6 +493,7 @@ export function LucaChatWidget() {
         agentName: 'luca',
         input: textToSend,
         llmConfigId: selectedLlmConfig,
+        lucaSessionId: sessionId,
       }));
     }
 
