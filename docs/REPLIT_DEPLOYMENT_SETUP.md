@@ -10,12 +10,20 @@ You **MUST** modify your deployment configuration to run the comprehensive build
 
 ### Option 1: Modify .replit File (Recommended)
 
-Update your `.replit` file to use the comprehensive build script:
+Update your `.replit` file with TWO critical changes:
 
+**1. Set the build command:**
 ```toml
 [deployment]
 build = ["sh", "-c", "./scripts/build-production.sh"]
-run = ["sh", "-c", "npm start"]
+run = ["npm", "run", "start"]
+```
+
+**2. Set NODE_ENV in the [env] section:**
+```toml
+[env]
+PORT = "5000"
+NODE_ENV = "production"
 ```
 
 If `.replit` doesn't exist, create it with:
