@@ -45,6 +45,7 @@ const platformMenuCategories = [
   {
     title: "Subscription Management",
     items: [
+      { title: "Pricing Management", url: "/admin/pricing", icon: DollarSign, permission: null },
       { title: "Analytics", url: "/admin/subscription-analytics", icon: TrendingUp, permission: null },
       { title: "Plans", url: "/admin/subscription-plans", icon: Package, permission: null },
       { title: "Pricing Regions", url: "/admin/pricing-regions", icon: Globe, permission: null },
