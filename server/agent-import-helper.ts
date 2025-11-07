@@ -22,7 +22,6 @@ export async function importAgentBackend(agentName: string): Promise<any> {
   console.error(`process.execPath: "${process.execPath}"`);
   console.error(`process.argv[0]: "${process.argv[0]}"`);
   console.error(`process.argv[1]: "${process.argv[1]}"`);
-  console.error(`__dirname: "${__dirname}"`);
   
   // Check multiple production indicators to ensure proper detection
   const check1 = process.env.NODE_ENV === 'production';
