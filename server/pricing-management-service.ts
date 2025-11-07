@@ -10,6 +10,34 @@ import { encrypt, decrypt } from './crypto-utils';
 export class PricingManagementService {
   
   // ============================
+  // SECURITY HELPERS
+  // ============================
+  
+  async getSubscriptionForOrganization(subscriptionId: string, organizationId: string): Promise<schema.PlatformSubscription | undefined> {
+    const [subscription] = await db.select()
+      .from(schema.platformSubscriptions)
+      .where(and(
+        eq(schema.platformSubscriptions.id, subscriptionId),
+        eq(schema.platformSubscriptions.organizationId, organizationId)
+      ));
+    return subscription;
+  }
+  
+  async getSubscriptionAddon(id: string): Promise<schema.SubscriptionAddon | undefined> {
+    const [addon] = await db.select()
+      .from(schema.subscriptionAddons)
+      .where(eq(schema.subscriptionAddons.id, id));
+    return addon;
+  }
+  
+  async getServicePlanPurchase(id: string): Promise<schema.ServicePlanPurchase | undefined> {
+    const [purchase] = await db.select()
+      .from(schema.servicePlanPurchases)
+      .where(eq(schema.servicePlanPurchases.id, id));
+    return purchase;
+  }
+  
+  // ============================
   // PRODUCT FAMILIES
   // ============================
   
@@ -219,9 +247,15 @@ export class PricingManagementService {
       .from(schema.paymentGatewayConfigs)
       .where(eq(schema.paymentGatewayConfigs.id, id));
     
+    // Return with encrypted credentials - DO NOT decrypt for API responses
+    return config;
+  }
+  
+  // INTERNAL USE ONLY: Decrypt credentials for payment processing
+  async getDecryptedPaymentGatewayConfig(id: string): Promise<schema.PaymentGatewayConfig | undefined> {
+    const config = await this.getPaymentGatewayConfig(id);
     if (!config) return undefined;
     
-    // Decrypt credentials
     const decryptedCredentials = decrypt(config.credentials as any);
     const decryptedWebhookSecret = config.webhookSecret ? decrypt(config.webhookSecret) : undefined;
     
@@ -240,12 +274,8 @@ export class PricingManagementService {
         eq(schema.paymentGatewayConfigs.isActive, true)
       ));
     
-    // Decrypt credentials for each config
-    return configs.map(config => ({
-      ...config,
-      credentials: JSON.parse(decrypt(config.credentials as any)),
-      webhookSecret: config.webhookSecret ? decrypt(config.webhookSecret) : undefined
-    }));
+    // Return with encrypted credentials - DO NOT decrypt for API responses
+    return configs;
   }
   
   async getDefaultPaymentGateway(organizationId: string): Promise<schema.PaymentGatewayConfig | undefined> {
@@ -257,12 +287,22 @@ export class PricingManagementService {
         eq(schema.paymentGatewayConfigs.isActive, true)
       ));
     
+    // Return with encrypted credentials - DO NOT decrypt for API responses
+    return config;
+  }
+  
+  // INTERNAL USE ONLY: Decrypt default gateway for payment processing
+  async getDecryptedDefaultPaymentGateway(organizationId: string): Promise<schema.PaymentGatewayConfig | undefined> {
+    const config = await this.getDefaultPaymentGateway(organizationId);
     if (!config) return undefined;
+    
+    const decryptedCredentials = decrypt(config.credentials as any);
+    const decryptedWebhookSecret = config.webhookSecret ? decrypt(config.webhookSecret) : undefined;
     
     return {
       ...config,
-      credentials: JSON.parse(decrypt(config.credentials as any)),
-      webhookSecret: config.webhookSecret ? decrypt(config.webhookSecret) : undefined
+      credentials: JSON.parse(decryptedCredentials),
+      webhookSecret: decryptedWebhookSecret
     };
   }
   
@@ -283,13 +323,8 @@ export class PricingManagementService {
       .where(eq(schema.paymentGatewayConfigs.id, id))
       .returning();
     
-    if (!updated) return undefined;
-    
-    return {
-      ...updated,
-      credentials: JSON.parse(decrypt(updated.credentials as any)),
-      webhookSecret: updated.webhookSecret ? decrypt(updated.webhookSecret) : undefined
-    };
+    // Return with encrypted credentials - DO NOT decrypt for API responses
+    return updated;
   }
   
   async deletePaymentGatewayConfig(id: string): Promise<void> {

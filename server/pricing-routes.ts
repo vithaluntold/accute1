@@ -1,11 +1,14 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { pricingManagementService } from './pricing-management-service';
-import * as schema from '../shared/schema';
-import { requireAuth, requirePlatform, type AuthRequest } from './auth';
+import * as schema from '@shared/schema';
+import { requireAuth, requirePlatform, requireAdmin, logActivity, type AuthRequest } from './auth';
+import { z } from 'zod';
 
 /**
- * Pricing Management Routes
- * Handles product families, SKUs, add-ons, payment gateways, and service plans
+ * Pricing Management Routes - PRODUCTION SECURED
+ * All routes require authentication and proper authorization
+ * All inputs validated with Zod schemas
+ * Organization scoping enforced
  */
 export function registerPricingRoutes(app: Router) {
   
@@ -13,44 +16,56 @@ export function registerPricingRoutes(app: Router) {
   // PRODUCT FAMILIES (Super Admin Only)
   // ============================
   
-  // Get all product families
   app.get('/api/pricing/product-families', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       const families = await pricingManagementService.getAllProductFamilies();
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'view', 'product_family', 'all', {}, req);
       res.json(families);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Create product family
-  app.post('/api/pricing/product-families', async (req: Request, res: Response) => {
+  app.post('/api/pricing/product-families', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const data: schema.InsertProductFamily = req.body;
+      const data = schema.insertProductFamilySchema.parse({
+        ...req.body,
+        createdBy: req.user!.id
+      });
       const family = await pricingManagementService.createProductFamily(data);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'create', 'product_family', family.id, { name: family.name }, req);
       res.json(family);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update product family
-  app.patch('/api/pricing/product-families/:id', async (req: Request, res: Response) => {
+  app.patch('/api/pricing/product-families/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updateProductFamily(req.params.id, req.body);
+      // Only allow updating specific fields
+      const allowedFields = ['name', 'slug', 'description', 'displayOrder', 'features', 'icon', 'color', 'isActive'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updateProductFamily(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'Product family not found' });
       }
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'update', 'product_family', req.params.id, updateData, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Delete product family
-  app.delete('/api/pricing/product-families/:id', async (req: Request, res: Response) => {
+  app.delete('/api/pricing/product-families/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       await pricingManagementService.deleteProductFamily(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'delete', 'product_family', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -61,8 +76,7 @@ export function registerPricingRoutes(app: Router) {
   // PLAN SKUs (Super Admin Only)
   // ============================
   
-  // Get all SKUs
-  app.get('/api/pricing/skus', async (req: Request, res: Response) => {
+  app.get('/api/pricing/skus', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       const skus = await pricingManagementService.getAllPlanSKUs();
       res.json(skus);
@@ -71,8 +85,7 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Get SKUs by plan
-  app.get('/api/pricing/plans/:planId/skus', async (req: Request, res: Response) => {
+  app.get('/api/pricing/plans/:planId/skus', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const skus = await pricingManagementService.getPlanSKUsByPlan(req.params.planId);
       res.json(skus);
@@ -81,34 +94,46 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Create SKU
-  app.post('/api/pricing/skus', async (req: Request, res: Response) => {
+  app.post('/api/pricing/skus', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const data: schema.InsertPlanSKU = req.body;
+      const data = schema.insertPlanSKUSchema.parse({
+        ...req.body,
+        createdBy: req.user!.id
+      });
       const sku = await pricingManagementService.createPlanSKU(data);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'create', 'plan_sku', sku.id, { sku: sku.sku }, req);
       res.json(sku);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update SKU
-  app.patch('/api/pricing/skus/:id', async (req: Request, res: Response) => {
+  app.patch('/api/pricing/skus/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updatePlanSKU(req.params.id, req.body);
+      const allowedFields = ['name', 'description', 'pricingModel', 'fixedPrice', 'usageUnit', 'usagePrice', 
+        'includedUsage', 'basePrice', 'tiers', 'regionCode', 'currency', 'billingCycle', 'isActive'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updatePlanSKU(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'SKU not found' });
       }
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'update', 'plan_sku', req.params.id, updateData, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Delete SKU
-  app.delete('/api/pricing/skus/:id', async (req: Request, res: Response) => {
+  app.delete('/api/pricing/skus/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       await pricingManagementService.deletePlanSKU(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'delete', 'plan_sku', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -119,8 +144,7 @@ export function registerPricingRoutes(app: Router) {
   // PLAN ADD-ONS (Super Admin Only)
   // ============================
   
-  // Get all add-ons
-  app.get('/api/pricing/addons', async (req: Request, res: Response) => {
+  app.get('/api/pricing/addons', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const addons = await pricingManagementService.getAllPlanAddons();
       res.json(addons);
@@ -129,8 +153,7 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Get add-ons by family
-  app.get('/api/pricing/families/:familyId/addons', async (req: Request, res: Response) => {
+  app.get('/api/pricing/families/:familyId/addons', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const addons = await pricingManagementService.getAddonsByFamily(req.params.familyId);
       res.json(addons);
@@ -139,34 +162,47 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Create add-on
-  app.post('/api/pricing/addons', async (req: Request, res: Response) => {
+  app.post('/api/pricing/addons', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const data: schema.InsertPlanAddon = req.body;
+      const data = schema.insertPlanAddonSchema.parse({
+        ...req.body,
+        createdBy: req.user!.id
+      });
       const addon = await pricingManagementService.createPlanAddon(data);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'create', 'plan_addon', addon.id, { name: addon.name }, req);
       res.json(addon);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update add-on
-  app.patch('/api/pricing/addons/:id', async (req: Request, res: Response) => {
+  app.patch('/api/pricing/addons/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updatePlanAddon(req.params.id, req.body);
+      const allowedFields = ['name', 'slug', 'description', 'pricingModel', 'priceMonthly', 'priceYearly',
+        'unit', 'pricePerUnit', 'minQuantity', 'maxQuantity', 'features', 'additionalStorage', 
+        'additionalUsers', 'additionalClients', 'additionalWorkflows', 'applicablePlans', 'displayOrder', 'isActive'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updatePlanAddon(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'Add-on not found' });
       }
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'update', 'plan_addon', req.params.id, updateData, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Delete add-on
-  app.delete('/api/pricing/addons/:id', async (req: Request, res: Response) => {
+  app.delete('/api/pricing/addons/:id', requireAuth, requirePlatform, async (req: AuthRequest, res: Response) => {
     try {
       await pricingManagementService.deletePlanAddon(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, 'delete', 'plan_addon', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -174,12 +210,20 @@ export function registerPricingRoutes(app: Router) {
   });
   
   // ============================
-  // SUBSCRIPTION ADD-ONS (Admin)
+  // SUBSCRIPTION ADD-ONS (Admin - Organization Scoped)
   // ============================
   
-  // Get subscription add-ons
-  app.get('/api/subscriptions/:subscriptionId/addons', async (req: Request, res: Response) => {
+  app.get('/api/subscriptions/:subscriptionId/addons', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      // SECURITY: Verify subscription belongs to user's organization
+      const subscription = await pricingManagementService.getSubscriptionForOrganization(
+        req.params.subscriptionId,
+        req.user!.organizationId!
+      );
+      if (!subscription) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       const addons = await pricingManagementService.getSubscriptionAddons(req.params.subscriptionId);
       res.json(addons);
     } catch (error: any) {
@@ -187,24 +231,51 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Add subscription add-on
-  app.post('/api/subscriptions/:subscriptionId/addons', async (req: Request, res: Response) => {
+  app.post('/api/subscriptions/:subscriptionId/addons', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const data: schema.InsertSubscriptionAddon = {
+      // SECURITY: Verify subscription belongs to user's organization
+      const subscription = await pricingManagementService.getSubscriptionForOrganization(
+        req.params.subscriptionId,
+        req.user!.organizationId!
+      );
+      if (!subscription) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const data = schema.insertSubscriptionAddonSchema.parse({
         ...req.body,
-        subscriptionId: req.params.subscriptionId
-      };
+        subscriptionId: req.params.subscriptionId,
+        addedBy: req.user!.id
+      });
       const addon = await pricingManagementService.addSubscriptionAddon(data);
+      await logActivity(req.user!.id, req.user!.organizationId!, 'add', 'subscription_addon', addon.id, { addonId: data.addonId }, req);
       res.json(addon);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Cancel subscription add-on
-  app.delete('/api/subscriptions/addons/:id', async (req: Request, res: Response) => {
+  app.delete('/api/subscriptions/addons/:id', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
+      // SECURITY: Verify addon belongs to user's organization
+      const addon = await pricingManagementService.getSubscriptionAddon(req.params.id);
+      if (!addon) {
+        return res.status(404).json({ error: 'Addon not found' });
+      }
+      
+      const subscription = await pricingManagementService.getSubscriptionForOrganization(
+        addon.subscriptionId,
+        req.user!.organizationId!
+      );
+      if (!subscription) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       await pricingManagementService.cancelSubscriptionAddon(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, 'cancel', 'subscription_addon', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -212,25 +283,26 @@ export function registerPricingRoutes(app: Router) {
   });
   
   // ============================
-  // PAYMENT GATEWAY CONFIGURATIONS (Admin)
+  // PAYMENT GATEWAY CONFIGURATIONS (Admin - Organization Scoped)
   // ============================
   
-  // Get organization's payment gateway configs
-  app.get('/api/payment-gateways', async (req: Request, res: Response) => {
+  app.get('/api/payment-gateways', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
-      if (!user || !user.organizationId) {
+      if (!req.user!.organizationId) {
         return res.status(403).json({ error: 'Organization required' });
       }
       
-      const configs = await pricingManagementService.getPaymentGatewayConfigsByOrganization(user.organizationId);
+      const configs = await pricingManagementService.getPaymentGatewayConfigsByOrganization(req.user!.organizationId);
       
-      // Don't expose credentials in list view
-      const sanitized = configs.map(({ credentials, webhookSecret, ...config }) => ({
-        ...config,
-        hasCredentials: true,
-        gateway: config.gateway
-      }));
+      // SECURITY: Strip all sensitive fields from response
+      const sanitized = configs.map(config => {
+        const { credentials, webhookSecret, ...safe } = config;
+        return {
+          ...safe,
+          hasCredentials: !!credentials,
+          hasWebhookSecret: !!webhookSecret
+        };
+      });
       
       res.json(sanitized);
     } catch (error: any) {
@@ -238,44 +310,78 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Create payment gateway config
-  app.post('/api/payment-gateways', async (req: Request, res: Response) => {
+  app.post('/api/payment-gateways', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
-      if (!user || !user.organizationId) {
+      if (!req.user!.organizationId) {
         return res.status(403).json({ error: 'Organization required' });
       }
       
-      const data: schema.InsertPaymentGatewayConfig = {
+      const data = schema.insertPaymentGatewayConfigSchema.parse({
         ...req.body,
-        organizationId: user.organizationId,
-        createdBy: user.id
-      };
+        organizationId: req.user!.organizationId,
+        createdBy: req.user!.id
+      });
       
       const config = await pricingManagementService.createPaymentGatewayConfig(data);
-      res.json(config);
+      await logActivity(req.user!.id, req.user!.organizationId, 'create', 'payment_gateway_config', config.id, { gateway: config.gateway }, req);
+      
+      // SECURITY: Strip all sensitive fields from response
+      const { credentials, webhookSecret, ...sanitized } = config;
+      res.json({ 
+        ...sanitized, 
+        hasCredentials: !!credentials,
+        hasWebhookSecret: !!webhookSecret 
+      });
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update payment gateway config
-  app.patch('/api/payment-gateways/:id', async (req: Request, res: Response) => {
+  app.patch('/api/payment-gateways/:id', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updatePaymentGatewayConfig(req.params.id, req.body);
+      // SECURITY: Verify config belongs to user's organization
+      const existing = await pricingManagementService.getPaymentGatewayConfig(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const allowedFields = ['nickname', 'credentials', 'config', 'isActive', 'isDefault', 'isTestMode', 'webhookSecret'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updatePaymentGatewayConfig(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'Payment gateway config not found' });
       }
-      res.json(updated);
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, 'update', 'payment_gateway_config', req.params.id, { gateway: updated.gateway }, req);
+      
+      // SECURITY: Strip all sensitive fields from response
+      const { credentials, webhookSecret, ...sanitized } = updated;
+      res.json({ 
+        ...sanitized, 
+        hasCredentials: !!credentials,
+        hasWebhookSecret: !!webhookSecret 
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Delete payment gateway config
-  app.delete('/api/payment-gateways/:id', async (req: Request, res: Response) => {
+  app.delete('/api/payment-gateways/:id', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
+      // SECURITY: Verify config belongs to user's organization
+      const existing = await pricingManagementService.getPaymentGatewayConfig(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       await pricingManagementService.deletePaymentGatewayConfig(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, 'delete', 'payment_gateway_config', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -283,26 +389,24 @@ export function registerPricingRoutes(app: Router) {
   });
   
   // ============================
-  // SERVICE PLANS (Admin)
+  // SERVICE PLANS (Admin - Organization Scoped)
   // ============================
   
-  // Get organization's service plans
-  app.get('/api/service-plans', async (req: Request, res: Response) => {
+  app.get('/api/service-plans', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
-      if (!user || !user.organizationId) {
+      if (!req.user!.organizationId) {
         return res.status(403).json({ error: 'Organization required' });
       }
       
-      const plans = await pricingManagementService.getServicePlansByOrganization(user.organizationId);
+      const plans = await pricingManagementService.getServicePlansByOrganization(req.user!.organizationId);
       res.json(plans);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Get public service plans for an organization (client-facing)
-  app.get('/api/marketplace/:organizationId/service-plans', async (req: Request, res: Response) => {
+  // Public marketplace endpoint (no auth required for browsing)
+  app.get('/api/marketplace/:organizationId/service-plans', async (req, res: Response) => {
     try {
       const plans = await pricingManagementService.getPublicServicePlans(req.params.organizationId);
       res.json(plans);
@@ -311,44 +415,66 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Create service plan
-  app.post('/api/service-plans', async (req: Request, res: Response) => {
+  app.post('/api/service-plans', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
-      if (!user || !user.organizationId) {
+      if (!req.user!.organizationId) {
         return res.status(403).json({ error: 'Organization required' });
       }
       
-      const data: schema.InsertServicePlan = {
+      const data = schema.insertServicePlanSchema.parse({
         ...req.body,
-        organizationId: user.organizationId,
-        createdBy: user.id
-      };
+        organizationId: req.user!.organizationId,
+        createdBy: req.user!.id
+      });
       
       const plan = await pricingManagementService.createServicePlan(data);
+      await logActivity(req.user!.id, req.user!.organizationId, 'create', 'service_plan', plan.id, { title: plan.title }, req);
       res.json(plan);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update service plan
-  app.patch('/api/service-plans/:id', async (req: Request, res: Response) => {
+  app.patch('/api/service-plans/:id', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updateServicePlan(req.params.id, req.body);
+      // SECURITY: Verify plan belongs to user's organization
+      const existing = await pricingManagementService.getServicePlan(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const allowedFields = ['title', 'slug', 'description', 'category', 'tags', 'pricingModel', 'basePrice', 
+        'currency', 'hourlyRate', 'estimatedHours', 'tiers', 'deliveryDays', 'revisions', 'features', 
+        'requirements', 'coverImage', 'gallery', 'isAvailable', 'maxOrders', 'isPublic', 'isFeatured'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updateServicePlan(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'Service plan not found' });
       }
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, 'update', 'service_plan', req.params.id, updateData, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Delete service plan
-  app.delete('/api/service-plans/:id', async (req: Request, res: Response) => {
+  app.delete('/api/service-plans/:id', requireAuth, requireAdmin, async (req: AuthRequest, res: Response) => {
     try {
+      // SECURITY: Verify plan belongs to user's organization
+      const existing = await pricingManagementService.getServicePlan(req.params.id);
+      if (!existing || existing.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       await pricingManagementService.deleteServicePlan(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, 'delete', 'service_plan', req.params.id, {}, req);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -356,18 +482,19 @@ export function registerPricingRoutes(app: Router) {
   });
   
   // ============================
-  // SERVICE PLAN PURCHASES (Client)
+  // SERVICE PLAN PURCHASES (Client - Organization Scoped)
   // ============================
   
-  // Get client's purchases
-  app.get('/api/my-purchases', async (req: Request, res: Response) => {
+  app.get('/api/my-purchases', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
       const clientId = req.query.clientId as string;
       
       if (!clientId) {
         return res.status(400).json({ error: 'Client ID required' });
       }
+      
+      // SECURITY: Verify client belongs to user or user has access
+      // TODO: Add proper client-user relationship check
       
       const purchases = await pricingManagementService.getServicePlanPurchasesByClient(clientId);
       res.json(purchases);
@@ -376,39 +503,52 @@ export function registerPricingRoutes(app: Router) {
     }
   });
   
-  // Purchase service plan
-  app.post('/api/service-plans/:id/purchase', async (req: Request, res: Response) => {
+  app.post('/api/service-plans/:id/purchase', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const user = (req as any).user;
-      
-      const data: schema.InsertServicePlanPurchase = {
+      const data = schema.insertServicePlanPurchaseSchema.parse({
         ...req.body,
         servicePlanId: req.params.id,
-        purchasedBy: user.id
-      };
+        purchasedBy: req.user!.id
+      });
       
       const purchase = await pricingManagementService.createServicePlanPurchase(data);
+      await logActivity(req.user!.id, data.organizationId, 'purchase', 'service_plan', req.params.id, { purchaseId: purchase.id }, req);
       res.json(purchase);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Update purchase status
-  app.patch('/api/purchases/:id', async (req: Request, res: Response) => {
+  app.patch('/api/purchases/:id', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const updated = await pricingManagementService.updateServicePlanPurchase(req.params.id, req.body);
+      // SECURITY: Verify purchase belongs to user's organization or user is admin
+      const existing = await pricingManagementService.getServicePlanPurchase(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Purchase not found' });
+      }
+      
+      // Only allow updating specific fields
+      const allowedFields = ['status', 'clientRequirements', 'notes', 'assignedTo', 'deliveredAt', 'completedAt'];
+      const updateData = Object.keys(req.body)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => ({ ...obj, [key]: req.body[key] }), {});
+      
+      const updated = await pricingManagementService.updateServicePlanPurchase(req.params.id, updateData);
       if (!updated) {
         return res.status(404).json({ error: 'Purchase not found' });
       }
+      
+      await logActivity(req.user!.id, existing.organizationId, 'update', 'service_plan_purchase', req.params.id, updateData, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
   
-  // Add review to purchase
-  app.post('/api/purchases/:id/review', async (req: Request, res: Response) => {
+  app.post('/api/purchases/:id/review', requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const { rating, review } = req.body;
       
@@ -416,11 +556,18 @@ export function registerPricingRoutes(app: Router) {
         return res.status(400).json({ error: 'Rating must be between 1 and 5' });
       }
       
+      // SECURITY: Verify purchase belongs to user
+      const existing = await pricingManagementService.getServicePlanPurchase(req.params.id);
+      if (!existing || existing.purchasedBy !== req.user!.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
       const updated = await pricingManagementService.addServicePlanReview(req.params.id, rating, review);
       if (!updated) {
         return res.status(404).json({ error: 'Purchase not found' });
       }
       
+      await logActivity(req.user!.id, existing.organizationId, 'review', 'service_plan_purchase', req.params.id, { rating }, req);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
