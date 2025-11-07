@@ -823,7 +823,7 @@ export function LucaChatWidget() {
         >
           <Button
             size="lg"
-            className="h-14 w-14 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-gradient-to-br from-[#e5a660] to-[#d76082] border-2 border-white/20"
+            className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-primary border-2 border-primary/20"
             onClick={() => setIsOpen(true)}
             data-testid="button-open-luca-chat"
           >
@@ -833,7 +833,7 @@ export function LucaChatWidget() {
               className="w-full h-full object-contain pointer-events-none"
               draggable={false}
             />
-            <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+            <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white" />
             <span className="sr-only">Open Luca AI Assistant</span>
           </Button>
         </div>
@@ -850,53 +850,52 @@ export function LucaChatWidget() {
             maxWidth: isMobile ? '100%' : '380px',
           }}
         >
-          <div className="bg-background/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
-            {/* Header with Gradient */}
-            <div className="relative bg-gradient-to-br from-[#e5a660] to-[#d76082] p-6 pb-8">
-              <div className="absolute inset-0 bg-black/20" />
+          <div className="bg-card rounded-xl shadow-xl border overflow-hidden">
+            {/* Clean Header */}
+            <div className="relative bg-card border-b p-4">
               <Button
                 size="icon"
                 variant="ghost"
-                className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white z-10"
+                className="absolute top-2 right-2 h-8 w-8 rounded-lg"
                 onClick={() => setIsOpen(false)}
                 data-testid="button-close-luca-preview"
               >
                 <X className="h-4 w-4" />
               </Button>
               
-              <div className="relative flex items-start gap-3">
-                <div className="p-2.5 rounded-xl bg-white shadow-lg">
-                  <img 
-                    src={lucaLogoUrl} 
-                    alt="Luca" 
-                    className="h-10 w-10 object-contain"
-                    draggable={false}
-                  />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-white text-lg">
-                      {getGreeting()}
-                    </h3>
-                    <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
+              <div className="flex items-center gap-3 pr-10">
+                <div className="relative">
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <img 
+                      src={lucaLogoUrl} 
+                      alt="Luca" 
+                      className="h-8 w-8 object-contain"
+                      draggable={false}
+                    />
                   </div>
-                  <p className="text-white/90 text-base font-medium mb-1">
-                    How can Luca help today?
-                  </p>
-                  <div className="flex items-center gap-2 text-white/70 text-xs">
-                    <span className="font-medium">Luca AI Assistant</span>
-                    <span>•</span>
-                    <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs h-5">
-                      <Sparkles className="h-2.5 w-2.5 mr-1" />
-                      Online
+                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-card" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-base">
+                      Luca
+                    </h3>
+                    <Badge variant="secondary" className="text-xs h-5">
+                      AI
                     </Badge>
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    Accounting & Tax Expert
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Start Conversation Button */}
-            <div className="p-4 pt-2 border-t">
+            {/* Content */}
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {getGreeting()}! I'm here to help with accounting, finance, and taxation questions.
+              </p>
               <Button
                 className="w-full gap-2"
                 onClick={() => setIsExpanded(true)}
@@ -905,9 +904,6 @@ export function LucaChatWidget() {
                 <MessageCircle className="h-4 w-4" />
                 Start a conversation
               </Button>
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                Accounting, Finance & Taxation Expert
-              </p>
             </div>
           </div>
         </div>
