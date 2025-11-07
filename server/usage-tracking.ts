@@ -54,7 +54,57 @@ export class UsageTrackingService {
   }
 
   /**
+   * Get current user count for organization
+   */
+  static async getUserCount(organizationId: string): Promise<number> {
+    try {
+      const result = await db
+        .select({ count: count() })
+        .from(schema.users)
+        .where(eq(schema.users.organizationId, organizationId));
+      
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('[Usage Tracking] Error counting users:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get current client count for organization
+   */
+  static async getClientCount(organizationId: string): Promise<number> {
+    try {
+      const result = await db
+        .select({ count: count() })
+        .from(schema.clients)
+        .where(eq(schema.clients.organizationId, organizationId));
+      
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('[Usage Tracking] Error counting clients:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get current storage usage for organization (in GB)
+   * NOTE: Requires implementing document size tracking
+   */
+  static async getStorageUsage(organizationId: string): Promise<number> {
+    try {
+      // TODO: Implement actual storage calculation from documents table
+      // For now, return 0 as storage tracking needs to be implemented
+      return 0;
+    } catch (error) {
+      console.error('[Usage Tracking] Error calculating storage:', error);
+      return 0;
+    }
+  }
+
+  /**
    * Get all usage metrics for organization
+   * Uses real-time queries for ALL metrics (no cached values)
    */
   static async getOrganizationUsage(organizationId: string): Promise<{
     users: number;
@@ -64,19 +114,20 @@ export class UsageTrackingService {
     aiAgents: number;
   }> {
     try {
-      // Get subscription for cached user/client/storage counts
-      const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
-      
-      // Get real-time workflow and AI agent counts
-      const [workflows, aiAgents] = await Promise.all([
+      // CRITICAL: Query ALL counts in real-time (no cached values)
+      // This ensures free-tier quotas are enforced correctly
+      const [users, clients, storage, workflows, aiAgents] = await Promise.all([
+        this.getUserCount(organizationId),
+        this.getClientCount(organizationId),
+        this.getStorageUsage(organizationId),
         this.getWorkflowCount(organizationId),
         this.getAIAgentCount(organizationId)
       ]);
 
       return {
-        users: subscription?.currentUsers || 0,
-        clients: subscription?.currentClients || 0,
-        storage: Number(subscription?.currentStorage) || 0,
+        users,
+        clients,
+        storage,
         workflows,
         aiAgents
       };

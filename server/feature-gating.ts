@@ -23,18 +23,24 @@ import {
 
 /**
  * Check if organization has access to a specific feature
+ * TELEMETRY: Logs quota denials vs system faults
  */
 export async function hasFeatureAccess(
   organizationId: string,
   feature: FeatureIdentifier
 ): Promise<boolean> {
+  const context = { organizationId, feature };
+  
   try {
     // Get organization's active subscription
     const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
     
     if (!subscription) {
+      // TELEMETRY: Quota denial (no subscription)
+      console.info('[Feature Gating] QUOTA_DENIAL: No subscription', context);
+      
       // No subscription = free plan with limited features
-      const freePlanFeatures: FeatureIdentifier[] = ['workflows', 'client_portal', 'document_management'];
+      const freePlanFeatures: FeatureIdentifier[] = FREE_TIER_ENTITLEMENTS.features;
       return freePlanFeatures.includes(feature);
     }
 
@@ -43,15 +49,38 @@ export async function hasFeatureAccess(
       const plan = await storage.getSubscriptionPlan(subscription.planId);
       if (plan && plan.features) {
         const planFeatures = plan.features as FeatureIdentifier[];
-        return planFeatures.includes(feature);
+        const hasAccess = planFeatures.includes(feature);
+        
+        if (!hasAccess) {
+          // TELEMETRY: Quota denial (feature not in plan)
+          console.info('[Feature Gating] QUOTA_DENIAL: Feature not in plan', {
+            ...context,
+            plan: plan.name,
+            planFeatures
+          });
+        }
+        
+        return hasAccess;
       }
     }
 
+    // TELEMETRY: System fault (missing plan data)
+    console.warn('[Feature Gating] SYSTEM_FAULT: Missing plan data', {
+      ...context,
+      subscriptionId: subscription.id,
+      planId: subscription.planId
+    });
+
     // Fallback to basic features for unknown plans
-    return ['workflows', 'client_portal', 'document_management'].includes(feature);
+    return FREE_TIER_ENTITLEMENTS.features.includes(feature);
   } catch (error) {
-    console.error('[Feature Gating] CRITICAL: Error checking feature access:', error);
-    // SECURITY: Fail closed on errors - deny access and log
+    // TELEMETRY: System fault (unexpected error)
+    console.error('[Feature Gating] SYSTEM_FAULT: Unexpected error in hasFeatureAccess', {
+      ...context,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // SECURITY: Fail closed on errors - deny access
     return false;
   }
 }
@@ -68,21 +97,47 @@ export async function checkResourceLimit(
     const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
     
     if (!subscription) {
-      // Default free tier limits
-      const limits = {
-        maxUsers: 5,
-        maxClients: 10,
-        maxStorage: 5,
-        maxWorkflows: 10,
-        maxAIAgents: 3
-      };
+      // Default free tier limits - USE REAL USAGE TRACKING
+      const limits = FREE_TIER_ENTITLEMENTS.limits;
+      const usage = await UsageTrackingService.getOrganizationUsage(organizationId);
       
       const limit = limits[resource];
-      const current = 0; // Would need actual usage tracking
+      let current = 0;
+      switch (resource) {
+        case 'maxUsers':
+          current = usage.users;
+          break;
+        case 'maxClients':
+          current = usage.clients;
+          break;
+        case 'maxStorage':
+          current = usage.storage;
+          break;
+        case 'maxWorkflows':
+          current = usage.workflows; // Real-time count
+          break;
+        case 'maxAIAgents':
+          current = usage.aiAgents; // Real-time count
+          break;
+      }
+      
       const available = Math.max(0, limit - current);
+      const allowed = current + requestedAmount <= limit;
+      
+      if (!allowed) {
+        // TELEMETRY: Quota denial (free tier limit exceeded)
+        console.info('[Feature Gating] QUOTA_DENIAL: Free tier limit exceeded', {
+          organizationId,
+          resource,
+          limit,
+          current,
+          requestedAmount,
+          available
+        });
+      }
       
       return {
-        allowed: current + requestedAmount <= limit,
+        allowed,
         limit,
         current,
         available
@@ -93,39 +148,59 @@ export async function checkResourceLimit(
     const rawLimit = subscription[resource];
     const limit = rawLimit == null ? Infinity : rawLimit;
     
-    // Get current usage based on resource type
+    // Get current usage using real-time tracking
+    const usage = await UsageTrackingService.getOrganizationUsage(organizationId);
+    
     let current = 0;
     switch (resource) {
       case 'maxUsers':
-        current = subscription.currentUsers || 0;
+        current = usage.users;
         break;
       case 'maxClients':
-        current = subscription.currentClients || 0;
+        current = usage.clients;
         break;
       case 'maxStorage':
-        current = Number(subscription.currentStorage) || 0;
+        current = usage.storage;
         break;
       case 'maxWorkflows':
-        // Would query workflow count for org
-        current = 0;
+        current = usage.workflows; // Real-time count
         break;
       case 'maxAIAgents':
-        // Would query AI agent installations for org
-        current = 0;
+        current = usage.aiAgents; // Real-time count
         break;
     }
 
     const available = limit === Infinity ? Infinity : Math.max(0, limit - current);
+    const allowed = current + requestedAmount <= limit;
+    
+    if (!allowed && limit !== Infinity) {
+      // TELEMETRY: Quota denial (limit exceeded)
+      console.info('[Feature Gating] QUOTA_DENIAL: Resource limit exceeded', {
+        organizationId,
+        resource,
+        limit,
+        current,
+        requestedAmount,
+        available
+      });
+    }
     
     return {
-      allowed: current + requestedAmount <= limit,
+      allowed,
       limit,
       current,
       available
     };
   } catch (error) {
-    console.error('[Feature Gating] CRITICAL: Error checking resource limit:', error);
-    // SECURITY: Fail closed on errors - deny access and log
+    // TELEMETRY: System fault (unexpected error)
+    console.error('[Feature Gating] SYSTEM_FAULT: Unexpected error in checkResourceLimit', {
+      organizationId,
+      resource,
+      requestedAmount,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // SECURITY: Fail closed on errors - deny access
     return {
       allowed: false,
       limit: 0,
