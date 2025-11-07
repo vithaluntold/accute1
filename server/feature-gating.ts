@@ -1,40 +1,25 @@
 import { Response, NextFunction } from 'express';
 import { storage } from './storage';
 import { AuthRequest, logActivity } from './auth';
-import type { SubscriptionPlan } from '@shared/schema';
+import { UsageTrackingService } from './usage-tracking';
+import {
+  FeatureIdentifier,
+  ResourceLimit,
+  SubscriptionEntitlements,
+  normalizeEntitlements,
+  PLATFORM_ADMIN_ENTITLEMENTS,
+  FREE_TIER_ENTITLEMENTS,
+  isPlatformAdmin as checkIsPlatformAdmin
+} from '@shared/subscription-types';
 
 /**
  * Feature Gating System - Subscription-based access control
  * 
  * Controls feature visibility and access based on organization's subscription plan.
  * Works in conjunction with RBAC for comprehensive authorization.
+ * 
+ * Uses shared subscription types for frontend-backend consistency.
  */
-
-export type FeatureIdentifier = 
-  | 'workflows'
-  | 'ai_agents'
-  | 'signatures'
-  | 'analytics'
-  | 'custom_branding'
-  | 'api_access'
-  | 'sso'
-  | 'advanced_reporting'
-  | 'white_label'
-  | 'priority_support'
-  | 'custom_workflows'
-  | 'automations'
-  | 'integrations'
-  | 'document_management'
-  | 'client_portal'
-  | 'team_collaboration'
-  | 'time_tracking';
-
-export type ResourceLimit = 
-  | 'maxUsers'
-  | 'maxClients'
-  | 'maxStorage'
-  | 'maxWorkflows'
-  | 'maxAIAgents';
 
 /**
  * Check if organization has access to a specific feature
@@ -247,51 +232,44 @@ export function requireResourceLimit(resource: ResourceLimit, amount: number = 1
 }
 
 /**
- * Get full feature entitlements for an organization
+ * Check if user is platform admin (helper for bypass logic)
  */
-export async function getOrganizationEntitlements(organizationId: string): Promise<{
-  plan: string;
-  features: FeatureIdentifier[];
-  limits: {
-    maxUsers: number;
-    maxClients: number;
-    maxStorage: number;
-    maxWorkflows: number;
-    maxAIAgents: number;
-  };
-  usage: {
-    users: number;
-    clients: number;
-    storage: number;
-    workflows: number;
-    aiAgents: number;
-  };
-}> {
+export async function isPlatformAdmin(userId: string, organizationId: string | null): Promise<boolean> {
+  if (organizationId !== null) {
+    return false; // Regular users always have an organization
+  }
+  
+  // Get user's role to verify platform scope
+  const user = await storage.getUser(userId);
+  if (!user) {
+    return false;
+  }
+  
+  const role = await storage.getRole(user.roleId);
+  return role?.scope === 'platform';
+}
+
+/**
+ * Get full feature entitlements for an organization
+ * Uses shared normalizeEntitlements for consistency
+ */
+export async function getOrganizationEntitlements(organizationId: string): Promise<SubscriptionEntitlements> {
   const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
   
+  // No subscription = free tier
   if (!subscription) {
-    return {
+    const usage = await UsageTrackingService.getOrganizationUsage(organizationId);
+    
+    return normalizeEntitlements({
       plan: 'free',
-      features: ['workflows', 'client_portal', 'document_management'],
-      limits: {
-        maxUsers: 5,
-        maxClients: 10,
-        maxStorage: 5,
-        maxWorkflows: 10,
-        maxAIAgents: 3
-      },
-      usage: {
-        users: 0,
-        clients: 0,
-        storage: 0,
-        workflows: 0,
-        aiAgents: 0
-      }
-    };
+      features: FREE_TIER_ENTITLEMENTS.features,
+      rawLimits: FREE_TIER_ENTITLEMENTS.limits,
+      usage
+    });
   }
 
+  // Get features from plan
   let features: FeatureIdentifier[] = [];
-  
   if (subscription.planId) {
     const plan = await storage.getSubscriptionPlan(subscription.planId);
     if (plan && plan.features) {
@@ -299,26 +277,20 @@ export async function getOrganizationEntitlements(organizationId: string): Promi
     }
   }
 
-  // CRITICAL: Normalize null/undefined limits to Infinity for unlimited plans
-  // Frontend expects numbers, so we use Number.MAX_SAFE_INTEGER as sentinel for "unlimited"
-  const UNLIMITED = 999999; // Sentinel value for unlimited (frontend-safe)
+  // Get real-time usage counts
+  const usage = await UsageTrackingService.getOrganizationUsage(organizationId);
   
-  return {
+  // Normalize using shared utility (handles null/undefined limits correctly)
+  return normalizeEntitlements({
     plan: subscription.plan,
     features,
-    limits: {
-      maxUsers: subscription.maxUsers ?? UNLIMITED,
-      maxClients: subscription.maxClients ?? UNLIMITED,
-      maxStorage: subscription.maxStorage ?? UNLIMITED,
-      maxWorkflows: subscription.maxWorkflows ?? UNLIMITED,
-      maxAIAgents: subscription.maxAIAgents ?? UNLIMITED
+    rawLimits: {
+      maxUsers: subscription.maxUsers,
+      maxClients: subscription.maxClients,
+      maxStorage: subscription.maxStorage,
+      maxWorkflows: subscription.maxWorkflows,
+      maxAIAgents: subscription.maxAIAgents
     },
-    usage: {
-      users: subscription.currentUsers || 0,
-      clients: subscription.currentClients || 0,
-      storage: Number(subscription.currentStorage) || 0,
-      workflows: 0, // Would query actual count
-      aiAgents: 0  // Would query actual count
-    }
-  };
+    usage
+  });
 }

@@ -22,27 +22,29 @@ export function ResourceLimitBadge({
   showProgress = false,
   compact = false 
 }: ResourceLimitBadgeProps) {
-  const { limit, current, percentage, isAtLimit, isNearLimit, isLoading } = useResourceLimit(resource);
+  const { limit, current, percentage, isAtLimit, isNearLimit, isUnlimited, isLoading } = useResourceLimit(resource);
 
   if (isLoading) {
     return null;
   }
 
   const getIcon = () => {
+    if (isUnlimited) return <CheckCircle className="h-3 w-3" />;
     if (isAtLimit) return <AlertCircle className="h-3 w-3" />;
     if (isNearLimit) return <AlertTriangle className="h-3 w-3" />;
     return <CheckCircle className="h-3 w-3" />;
   };
 
   const getVariant = (): "default" | "destructive" | "outline" | "secondary" => {
+    if (isUnlimited) return "default";
     if (isAtLimit) return "destructive";
     if (isNearLimit) return "secondary";
     return "default";
   };
 
   const label = compact 
-    ? `${current}/${limit}`
-    : `${current} of ${limit} ${formatResourceName(resource)}`;
+    ? (isUnlimited ? `${current}/∞` : `${current}/${limit}`)
+    : (isUnlimited ? `${current} ${formatResourceName(resource)} (Unlimited)` : `${current} of ${limit} ${formatResourceName(resource)}`);
 
   const content = (
     <div className="space-y-2">
@@ -50,18 +52,21 @@ export function ResourceLimitBadge({
         {getIcon()}
         <span className="font-medium">{label}</span>
       </div>
-      {showProgress && (
+      {showProgress && !isUnlimited && (
         <div className="space-y-1">
           <Progress value={percentage} className="h-2" data-testid={`progress-${resource}`} />
           <p className="text-xs text-muted-foreground">{percentage.toFixed(0)}% used</p>
         </div>
       )}
-      {isAtLimit && (
+      {showProgress && isUnlimited && (
+        <p className="text-xs text-muted-foreground">Unlimited plan - no restrictions</p>
+      )}
+      {isAtLimit && !isUnlimited && (
         <p className="text-xs text-destructive">
           Limit reached. Upgrade to add more.
         </p>
       )}
-      {isNearLimit && !isAtLimit && (
+      {isNearLimit && !isAtLimit && !isUnlimited && (
         <p className="text-xs text-muted-foreground">
           Approaching limit. Consider upgrading.
         </p>
@@ -87,7 +92,7 @@ export function ResourceLimitBadge({
           </Badge>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{percentage.toFixed(0)}% of limit used</p>
+          <p>{isUnlimited ? 'Unlimited plan' : `${percentage.toFixed(0)}% of limit used`}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
