@@ -661,22 +661,19 @@ export async function initializeSystem(app: Express) {
     await agentRegistry.initialize();
     console.log("✅ Agent Foundry initialized successfully");
 
-    // Register agent routes AFTER agents are loaded
-    console.log("🔧 Registering agent routes...");
+    // Register agent routes using STATIC registration (bulletproof approach)
+    console.log("🔧 Registering agent routes (STATIC METHOD)...");
     try {
-      const agents = agentRegistry.getAllAgents();
-      console.log(`📋 Found ${agents.length} agents to register routes for`);
+      // Import the static agent loader
+      const { registerAllAgentRoutes } = await import("./agents-static.js");
       
-      for (const agent of agents) {
-        console.log(`  → Registering routes for: ${agent.slug}`);
-        try {
-          await agentRegistry.registerAgentRoutes(app, agent.slug);
-          console.log(`  ✓ Successfully registered: ${agent.slug}`);
-        } catch (error) {
-          console.error(`  ✗ Failed to register routes for agent ${agent.slug}:`, error);
-        }
-      }
-      console.log("✅ Agent route registration complete");
+      const agents = agentRegistry.getAllAgents();
+      const agentSlugs = agents.map((a: any) => a.slug);
+      
+      console.log(`📋 Found ${agentSlugs.length} agents to register routes for`);
+      
+      registerAllAgentRoutes(agentSlugs, app);
+      console.log("✅ Agent route registration complete (STATIC)");
     } catch (error) {
       console.error("❌ Failed to register agent routes:", error);
     }
