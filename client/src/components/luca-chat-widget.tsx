@@ -839,73 +839,81 @@ export function LucaChatWidget() {
         </div>
       )}
 
-      {/* Expanded Chat Widget (Preview State) */}
+      {/* Expanded Chat Widget (Preview State) - Floating Bubbles */}
       {isOpen && !isExpanded && !isFullScreen && (
         <div
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] animate-in slide-in-from-bottom-8 fade-in duration-300"
+          className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-[9999] animate-in slide-in-from-bottom-8 fade-in duration-300 flex flex-col items-end gap-3"
           style={{
-            bottom: isMobile ? 'calc(16px + env(safe-area-inset-bottom))' : '24px',
+            bottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : '96px',
             right: isMobile ? 'calc(16px + env(safe-area-inset-right))' : '24px',
-            width: isMobile ? 'calc(100vw - 32px)' : '380px',
-            maxWidth: isMobile ? '100%' : '380px',
+            maxWidth: isMobile ? 'calc(100vw - 32px)' : '400px',
           }}
         >
-          <div className="bg-card rounded-xl shadow-xl border overflow-hidden">
-            {/* Clean Header */}
-            <div className="relative bg-card border-b p-4">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute top-2 right-2 h-8 w-8 rounded-lg"
-                onClick={() => setIsOpen(false)}
-                data-testid="button-close-luca-preview"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              
-              <div className="flex items-center gap-3 pr-10">
-                <div className="relative">
-                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <img 
-                      src={lucaLogoUrl} 
-                      alt="Luca" 
-                      className="h-8 w-8 object-contain"
-                      draggable={false}
-                    />
-                  </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 rounded-full border-2 border-card" />
+          {/* Close button */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 rounded-full bg-card/95 backdrop-blur-sm border shadow-lg hover-elevate"
+            onClick={() => setIsOpen(false)}
+            data-testid="button-close-luca-preview"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+
+          {/* Greeting Bubble */}
+          <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 max-w-[320px] animate-in slide-in-from-right-4 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="relative flex-shrink-0">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <img 
+                    src={lucaLogoUrl} 
+                    alt="Luca" 
+                    className="h-6 w-6 object-contain"
+                    draggable={false}
+                  />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-base">
-                      Luca
-                    </h3>
-                    <Badge variant="secondary" className="text-xs h-5">
-                      AI
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Accounting & Tax Expert
-                  </p>
+                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-card" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-sm">Luca</h3>
+                  <Badge variant="secondary" className="text-xs h-4 px-1.5">AI</Badge>
                 </div>
+                <p className="text-sm">
+                  {getGreeting()}! 👋
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  How can I help you today?
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Accounting & Tax Expert
+                </p>
               </div>
             </div>
-
-            {/* Content */}
-            <div className="p-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {getGreeting()}! I'm here to help with accounting, finance, and taxation questions.
-              </p>
-              <Button
-                className="w-full gap-2"
-                onClick={() => setIsExpanded(true)}
-                data-testid="button-start-conversation"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Start a conversation
-              </Button>
-            </div>
           </div>
+
+          {/* Action Buttons - Floating Pills */}
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-75"
+            data-testid="button-start-conversation"
+          >
+            Start a conversation
+          </button>
+
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-100"
+          >
+            Ask a tax question
+          </button>
+
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="bg-card/95 backdrop-blur-sm rounded-full shadow-lg border px-5 py-3 text-sm font-medium hover-elevate active-elevate-2 transition-all max-w-[280px] text-left animate-in slide-in-from-right-4 duration-300 delay-150"
+          >
+            Get accounting help
+          </button>
         </div>
       )}
 
