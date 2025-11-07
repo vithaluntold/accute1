@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, Building2, UserPlus, CheckCircle2 } from "lucide-react";
 import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import { MangalaWatermarks } from "@/components/mangala-watermarks";
 
 const superAdminSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -211,7 +212,8 @@ export default function Register() {
   if (registrationType === "invite" && inviteLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
+        <MangalaWatermarks />
+        <Card className="w-full max-w-md relative z-10">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -226,7 +228,8 @@ export default function Register() {
   if (registrationType === "invite" && !invitationData?.valid) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
+        <MangalaWatermarks />
+        <Card className="w-full max-w-md relative z-10">
           <CardHeader>
             <CardTitle className="text-2xl">Invalid Invitation</CardTitle>
             <CardDescription>This invitation link is invalid or has expired</CardDescription>
@@ -250,7 +253,8 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <MangalaWatermarks />
+      <Card className="w-full max-w-md relative z-10">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img src={logoUrl} alt="Accute Logo" className="h-12" data-testid="img-logo" />

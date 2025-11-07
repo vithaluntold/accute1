@@ -29,6 +29,7 @@ import { LucaChatWidget } from "@/components/luca-chat-widget";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
+import { MangalaWatermarks } from "@/components/mangala-watermarks";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -126,8 +127,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <MangalaWatermarks />
       <SidebarProvider>
-        <div className="flex h-screen w-full">
+        <div className="flex h-screen w-full relative z-10">
           <AppSidebar />
           <div className="flex flex-col flex-1 overflow-hidden">
             <header className="flex items-center justify-between gap-4 px-4 py-3 border-b bg-background">

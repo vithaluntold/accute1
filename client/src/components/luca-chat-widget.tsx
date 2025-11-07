@@ -707,7 +707,7 @@ export function LucaChatWidget() {
         {/* Messages */}
         <div className="flex-1 overflow-hidden relative">
           {/* Background Watermarks - WhatsApp style scattered pattern */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.04]">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.15]">
             {/* Row 1 */}
             <img src={mangalaSpiral} alt="" className="absolute w-16 h-16" style={{ top: '5%', left: '10%' }} draggable={false} />
             <img src={mangalaFlame} alt="" className="absolute w-20 h-20" style={{ top: '8%', left: '45%' }} draggable={false} />

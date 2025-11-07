@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
+import { MangalaWatermarks } from "@/components/mangala-watermarks";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -78,8 +79,9 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <MangalaWatermarks />
       {/* Navigation */}
-      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 relative">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img src={logoUrl} alt="Accute" className="h-8 w-8" />
