@@ -12,6 +12,7 @@ import type { Express } from "express";
 import { db } from "./db";
 import { aiAgents, organizationAgents, userAgentAccess, aiAgentInstallations, organizations, users } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { importAgentBackend } from './agent-import-helper';
 
 export interface AgentManifest {
   slug: string;
@@ -265,12 +266,8 @@ class AgentRegistry {
         return;
       }
 
-      const agentDir = path.join(this.agentsDir, slug);
-      const backendPath = path.join(agentDir, manifest.backendEntry);
-      
-      // Convert file path to URL for ESM compatibility with TypeScript
-      const backendUrl = pathToFileURL(backendPath).href;
-      const handler = await import(backendUrl);
+      // Use the helper function to import agent backend (handles dev/prod paths)
+      const handler = await importAgentBackend(slug);
       
       if (typeof handler.registerRoutes !== "function") {
         throw new Error(`Agent ${slug} backend must export a registerRoutes function`);

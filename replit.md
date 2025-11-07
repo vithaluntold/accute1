@@ -80,3 +80,12 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
   - If ENCRYPTION_KEY changes, existing credentials cannot be decrypted
   - Server validates this at startup and fails fast if missing/invalid
   - See: `docs/ENCRYPTION_KEY_CRITICAL.md` for detailed explanation
+
+### Critical Production Deployment Requirements
+- **AI Agent Backends Must Be Compiled**: Production cannot load TypeScript files directly
+  - Development: `tsx` transpiles `.ts` files on-the-fly
+  - Production: Needs compiled `.js` files in `dist/agents/*/backend/index.js`
+  - **SOLUTION**: Run `./scripts/build-production.sh` before deploying
+  - **REPLIT DEPLOYMENT**: Modify `.replit` file to use `build = ["sh", "-c", "./scripts/build-production.sh"]`
+  - See: `docs/REPLIT_DEPLOYMENT_SETUP.md` and `docs/PRODUCTION_BUILD.md` for complete guide
+  - Without this, all AI agents will fail with "Cannot find module" errors in production

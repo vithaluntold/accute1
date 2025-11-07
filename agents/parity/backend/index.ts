@@ -250,3 +250,6 @@ Check for inconsistencies, imbalances, and violations. Provide detailed analysis
     }
   }
 }
+
+// Re-export registerRoutes for agent registry
+export { registerRoutes } from './handler';
