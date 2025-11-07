@@ -15,49 +15,36 @@ import path from 'path';
  * @returns The imported module
  */
 export async function importAgentBackend(agentName: string): Promise<any> {
-  // CRITICAL DEBUG INFO
-  console.error(`========== AGENT LOADER DEBUG: ${agentName} ==========`);
-  console.error(`NODE_ENV: "${process.env.NODE_ENV}"`);
-  console.error(`process.cwd(): "${process.cwd()}"`);
-  console.error(`process.execPath: "${process.execPath}"`);
-  console.error(`process.argv[0]: "${process.argv[0]}"`);
-  console.error(`process.argv[1]: "${process.argv[1]}"`);
+  console.log(`[AGENT LOADER] Attempting to load agent: ${agentName}`);
+  console.log(`[AGENT LOADER] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[AGENT LOADER] CWD: ${process.cwd()}`);
   
-  // Check multiple production indicators to ensure proper detection
-  const check1 = process.env.NODE_ENV === 'production';
-  const check2 = !process.env.NODE_ENV?.includes('development');
-  const check3 = process.execPath.includes('dist');
-  const check4 = process.argv[1]?.includes('dist');
-  
-  console.error(`Check 1 (NODE_ENV === 'production'): ${check1}`);
-  console.error(`Check 2 (!NODE_ENV.includes('development')): ${check2}`);
-  console.error(`Check 3 (execPath.includes('dist')): ${check3}`);
-  console.error(`Check 4 (argv[1].includes('dist')): ${check4}`);
-  
-  const isProduction = check1 || (check2 && (check3 || check4));
-  console.error(`Final isProduction: ${isProduction}`);
-  console.error(`======================================`);
-  
-  let modulePath: string;
-  
-  if (isProduction) {
-    // Production: Load compiled JS from dist/agents/<name>/backend/index.js
-    modulePath = path.join(process.cwd(), 'dist', 'agents', agentName, 'backend', 'index.js');
-    console.log(`[AGENT LOADER] Production mode - Loading ${agentName} from: ${modulePath}`);
-  } else {
-    // Development: Load TS files from agents/<name>/backend/index.ts
-    modulePath = path.join(process.cwd(), 'agents', agentName, 'backend', 'index.ts');
-    console.log(`[AGENT LOADER] Development mode - Loading ${agentName} from: ${modulePath}`);
-  }
-  
-  // Convert to file URL for ESM compatibility
-  const moduleUrl = pathToFileURL(modulePath).href;
+  // Try production path first (compiled JS)
+  const prodPath = path.join(process.cwd(), 'dist', 'agents', agentName, 'backend', 'index.js');
+  const prodUrl = pathToFileURL(prodPath).href;
   
   try {
-    return await import(moduleUrl);
-  } catch (error) {
-    console.error(`Failed to import agent ${agentName}:`, error);
-    console.error(`Attempted path: ${modulePath}`);
-    throw new Error(`Agent ${agentName} backend module not found or failed to load`);
+    console.log(`[AGENT LOADER] Trying production path: ${prodPath}`);
+    const module = await import(prodUrl);
+    console.log(`[AGENT LOADER] ✅ Successfully loaded from production path`);
+    return module;
+  } catch (prodError) {
+    console.log(`[AGENT LOADER] Production path failed, trying development path...`);
+    
+    // Fallback to development path (TypeScript)
+    const devPath = path.join(process.cwd(), 'agents', agentName, 'backend', 'index.ts');
+    const devUrl = pathToFileURL(devPath).href;
+    
+    try {
+      console.log(`[AGENT LOADER] Trying development path: ${devPath}`);
+      const module = await import(devUrl);
+      console.log(`[AGENT LOADER] ✅ Successfully loaded from development path`);
+      return module;
+    } catch (devError) {
+      console.error(`[AGENT LOADER] ❌ Failed to load agent ${agentName} from both paths`);
+      console.error(`Production error:`, prodError);
+      console.error(`Development error:`, devError);
+      throw new Error(`Agent ${agentName} backend module not found. Tried:\n  - ${prodPath}\n  - ${devPath}`);
+    }
   }
 }
