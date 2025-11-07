@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock, Sparkles, KeyRound } from "lucide-react";
+import { Plus, Trash2, Check, X, Loader2, Settings as SettingsIcon, Shield, Copy, CheckCircle2, AlertCircle, Clock, Sparkles, KeyRound, Smartphone, Monitor } from "lucide-react";
 import { formatDistance } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,41 @@ export default function Settings() {
     backupCodesRemaining: number;
   }>({
     queryKey: ['/api/mfa/status'],
+  });
+
+  // Trusted Devices Query
+  const { data: trustedDevices = [], isLoading: devicesLoading } = useQuery<Array<{
+    id: string;
+    deviceName: string;
+    lastUsed: string;
+    createdAt: string;
+  }>>({
+    queryKey: ['/api/mfa/trusted-devices'],
+    enabled: mfaStatus?.enabled === true, // Only fetch if MFA is enabled
+  });
+
+  // Revoke Trusted Device Mutation
+  const revokeDeviceMutation = useMutation({
+    mutationFn: async (deviceId: string) => {
+      const response = await apiRequest(`/api/mfa/trusted-devices/${deviceId}`, {
+        method: 'DELETE',
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/mfa/trusted-devices'] });
+      toast({
+        title: "Device Revoked",
+        description: "This device will require MFA verification on next login",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to revoke device",
+        variant: "destructive",
+      });
+    },
   });
 
   // Disable MFA Mutation
@@ -342,6 +377,75 @@ export default function Settings() {
                   )}
                 </div>
               )}
+
+              {/* Trusted Devices Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5 text-muted-foreground" />
+                    <p className="font-medium">Trusted Devices</p>
+                  </div>
+                  {devicesLoading ? (
+                    <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" data-testid="loader-trusted-devices" />
+                  ) : (
+                    <Badge variant="secondary" data-testid="badge-trusted-devices-count">
+                      {trustedDevices.length} {trustedDevices.length === 1 ? 'device' : 'devices'}
+                    </Badge>
+                  )}
+                </div>
+
+                {devicesLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground p-4 border rounded-lg">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading trusted devices...
+                  </div>
+                ) : trustedDevices.length === 0 ? (
+                  <div className="p-4 border rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No trusted devices. You'll be asked for MFA verification on every login.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[...trustedDevices]
+                      .sort((a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime())
+                      .map((device) => (
+                      <div 
+                        key={device.id} 
+                        className="flex items-center justify-between p-3 border rounded-lg hover-elevate"
+                        data-testid={`trusted-device-${device.id}`}
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Monitor className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{device.deviceName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Last used {formatDistance(new Date(device.lastUsed), new Date(), { addSuffix: true })}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => revokeDeviceMutation.mutate(device.id)}
+                          disabled={revokeDeviceMutation.isPending}
+                          data-testid={`button-revoke-device-${device.id}`}
+                        >
+                          {revokeDeviceMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Revoke"
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Trusted devices skip MFA verification for 30 days. Revoke any device you don't recognize.
+                </p>
+              </div>
 
               <Button
                 variant="destructive"
