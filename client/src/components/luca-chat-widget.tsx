@@ -705,40 +705,8 @@ export function LucaChatWidget() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-hidden relative">
-          {/* Background Watermarks - WhatsApp style scattered pattern */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[0.15]">
-            {/* Row 1 */}
-            <img src={mangalaSpiral} alt="" className="absolute w-16 h-16" style={{ top: '5%', left: '10%' }} draggable={false} />
-            <img src={mangalaFlame} alt="" className="absolute w-20 h-20" style={{ top: '8%', left: '45%' }} draggable={false} />
-            <img src={mangalaSwan} alt="" className="absolute w-14 h-14" style={{ top: '3%', left: '75%' }} draggable={false} />
-            
-            {/* Row 2 */}
-            <img src={mangalaDoubleSpiral} alt="" className="absolute w-18 h-18" style={{ top: '22%', left: '15%' }} draggable={false} />
-            <img src={mangalaSpiral} alt="" className="absolute w-16 h-16" style={{ top: '25%', left: '60%' }} draggable={false} />
-            <img src={mangalaFlame} alt="" className="absolute w-14 h-14" style={{ top: '20%', left: '85%' }} draggable={false} />
-            
-            {/* Row 3 */}
-            <img src={mangalaSwan} alt="" className="absolute w-20 h-20" style={{ top: '40%', left: '8%' }} draggable={false} />
-            <img src={mangalaDoubleSpiral} alt="" className="absolute w-16 h-16" style={{ top: '38%', left: '40%' }} draggable={false} />
-            <img src={mangalaSpiral} alt="" className="absolute w-18 h-18" style={{ top: '42%', left: '70%' }} draggable={false} />
-            
-            {/* Row 4 */}
-            <img src={mangalaFlame} alt="" className="absolute w-14 h-14" style={{ top: '58%', left: '20%' }} draggable={false} />
-            <img src={mangalaSwan} alt="" className="absolute w-16 h-16" style={{ top: '55%', left: '52%' }} draggable={false} />
-            <img src={mangalaDoubleSpiral} alt="" className="absolute w-20 h-20" style={{ top: '60%', left: '82%' }} draggable={false} />
-            
-            {/* Row 5 */}
-            <img src={mangalaSpiral} alt="" className="absolute w-16 h-16" style={{ top: '75%', left: '12%' }} draggable={false} />
-            <img src={mangalaFlame} alt="" className="absolute w-18 h-18" style={{ top: '78%', left: '48%' }} draggable={false} />
-            <img src={mangalaSwan} alt="" className="absolute w-14 h-14" style={{ top: '72%', left: '78%' }} draggable={false} />
-            
-            {/* Row 6 */}
-            <img src={mangalaDoubleSpiral} alt="" className="absolute w-16 h-16" style={{ top: '90%', left: '25%' }} draggable={false} />
-            <img src={mangalaSpiral} alt="" className="absolute w-20 h-20" style={{ top: '92%', left: '65%' }} draggable={false} />
-          </div>
-          
-          <ScrollArea className="h-full p-4 relative z-10" ref={scrollRef}>
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full p-4" ref={scrollRef}>
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <div className="p-4 rounded-full bg-primary/10 mb-4">

@@ -13,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
 import { MFAVerificationModal } from "@/components/mfa-verification-modal";
-import { MangalaWatermarks } from "@/components/mangala-watermarks";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -109,8 +108,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <MangalaWatermarks />
-      <Card className="w-full max-w-md relative z-10">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img src={logoUrl} alt="Accute Logo" className="h-12" />
