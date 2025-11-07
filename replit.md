@@ -87,5 +87,12 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
   - Production: Needs compiled `.js` files in `dist/agents/*/backend/index.js`
   - **SOLUTION**: Run `./scripts/build-production.sh` before deploying
   - **REPLIT DEPLOYMENT**: Modify `.replit` file to use `build = ["sh", "-c", "./scripts/build-production.sh"]`
-  - See: `docs/REPLIT_DEPLOYMENT_SETUP.md` and `docs/PRODUCTION_BUILD.md` for complete guide
+  - See: `docs/REPLIT_DEPLOYMENT_SETUP.md` and `docs/PRODUCTION_BUILD.MD` for complete guide
   - Without this, all AI agents will fail with "Cannot find module" errors in production
+
+### Recent Fixes (November 2025)
+- **WebSocket Agent Execution (Nov 7, 2025)**: Fixed dev mode agent chat by replacing dynamic imports with static agent factory
+  - Issue: WebSocket handler used `createAgentInstance` with dynamic imports using relative paths (`../agents/luca/backend/index`)
+  - Solution: Created `server/agent-static-factory.ts` with static imports of all 9 agent classes
+  - Result: Agents now work reliably in both development (tsx) and production (compiled JS)
+  - Files: `server/agent-static-factory.ts`, `server/websocket.ts`

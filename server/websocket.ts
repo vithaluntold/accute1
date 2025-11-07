@@ -2,8 +2,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { parse } from 'cookie';
 import { storage } from './storage';
-// Import dynamic agent loader
-import { createAgentInstance, agentRequiresToolExecution, agentSupportsStreaming } from './agent-loader';
+// Import static agent factory for reliable agent creation in both dev and production
+import { createStaticAgentInstance } from './agent-static-factory';
+import { agentRequiresToolExecution, agentSupportsStreaming } from './agent-loader';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
@@ -276,8 +277,8 @@ async function handleAgentExecution(
 
     console.log(`[WebSocket] Executing agent: ${normalizedAgentName}, input length: ${input.length}`);
 
-    // Load agent dynamically
-    const agent = await createAgentInstance(normalizedAgentName, llmConfig) as any;
+    // Load agent using static factory (works reliably in both dev and production)
+    const agent = createStaticAgentInstance(normalizedAgentName, llmConfig) as any;
     
     // Prepare input with context for agents
     const agentInput = {
