@@ -378,11 +378,10 @@ export function LucaChatWidget() {
             );
             
             // Assistant messages are now saved by the backend WebSocket handler
-            // Invalidate the session query to refetch messages and sync with database
+            // Reload the current session to sync with database-persisted messages
             if (currentSessionId) {
-              queryClient.invalidateQueries({ 
-                queryKey: ["/api/luca-chat-sessions", currentSessionId] 
-              });
+              loadSessionMessages(currentSessionId);
+              // Also invalidate sessions list to update timestamps
               queryClient.invalidateQueries({ 
                 queryKey: ["/api/luca-chat-sessions"] 
               });

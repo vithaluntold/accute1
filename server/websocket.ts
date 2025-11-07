@@ -337,6 +337,10 @@ async function handleAgentExecution(
     let assistantMessageId: string;
     if (isLucaAgent && lucaSessionId) {
       // Save to Luca-specific chat messages table
+      console.log('[Luca WebSocket] Saving assistant message to luca_chat_messages...');
+      console.log('[Luca WebSocket] Session ID:', lucaSessionId);
+      console.log('[Luca WebSocket] Response length:', fullResponse.length);
+      
       const lucaMessage = await storage.createLucaChatMessage({
         sessionId: lucaSessionId,
         role: "assistant",
@@ -344,11 +348,14 @@ async function handleAgentExecution(
         metadata: { executionTimeMs: executionTime, llmConfigId: llmConfig.id }
       });
       assistantMessageId = lucaMessage.id;
+      
+      console.log('[Luca WebSocket] ✅ Assistant message saved! Message ID:', assistantMessageId);
 
       // Update session's lastMessageAt
       await storage.updateLucaChatSession(lucaSessionId, {
         lastMessageAt: new Date(),
       });
+      console.log('[Luca WebSocket] ✅ Session timestamp updated');
     } else if (conversation) {
       // Save to standard AI agent messages table
       const assistantMessage = await storage.createAiMessage({
