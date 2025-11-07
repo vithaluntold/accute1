@@ -9,6 +9,7 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Multi-provider AI support essential
 - Clean, modern UI following design guidelines
 - Comprehensive audit trail for compliance
+- **CRITICAL**: ENCRYPTION_KEY environment variable must be stable across deployments to prevent LLM credential decryption failures
 - WebSocket Management: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
 - Subscription System: Subscription pricing UI and routes disabled per user request
 - Luca Agent Personality: Luca now asks follow-up questions BEFORE answering to narrow down exact requirements
@@ -72,3 +73,10 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+
+### Critical Environment Variables
+- **ENCRYPTION_KEY**: AES-256-GCM encryption key for LLM credentials (MUST be 32+ chars, stable across deployments)
+  - LLM API keys are stored encrypted in database per organization
+  - If ENCRYPTION_KEY changes, existing credentials cannot be decrypted
+  - Server validates this at startup and fails fast if missing/invalid
+  - See: `docs/ENCRYPTION_KEY_CRITICAL.md` for detailed explanation

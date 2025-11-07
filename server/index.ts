@@ -5,21 +5,22 @@ function validateEnvironment() {
     { name: 'DATABASE_URL', critical: true },
     { name: 'JWT_SECRET', critical: true },
     { name: 'SESSION_SECRET', critical: true },
+    { name: 'ENCRYPTION_KEY', critical: true, minLength: 32 },
   ];
 
-  const optionalVars = [
-    { name: 'ENCRYPTION_KEY', critical: false, minLength: 32 },
-  ];
+  const optionalVars: Array<{ name: string; critical: boolean; minLength?: number }> = [];
 
   const missing: string[] = [];
   const warnings: string[] = [];
 
   // Check required variables
-  for (const { name, critical } of requiredVars) {
+  for (const { name, critical, minLength } of requiredVars) {
     if (!process.env[name]) {
       if (critical) {
-        missing.push(name);
+        missing.push(`${name} (required)`);
       }
+    } else if (minLength && process.env[name]!.length < minLength) {
+      missing.push(`${name} (too short - minimum ${minLength} characters)`);
     }
   }
 
@@ -43,7 +44,8 @@ function validateEnvironment() {
     console.error('Example .env file:');
     console.error('   DATABASE_URL="postgresql://user:pass@host:5432/dbname"');
     console.error('   JWT_SECRET="your-random-secret-key-here"');
-    console.error('   SESSION_SECRET="another-random-secret-key-here"\n');
+    console.error('   SESSION_SECRET="another-random-secret-key-here"');
+    console.error('   ENCRYPTION_KEY="generate-with: node -e \\"console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))\\""\n');
     
     // Exit immediately - don't try to start the server
     process.exit(1);
