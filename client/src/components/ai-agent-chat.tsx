@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Bot, Send, Sparkles, User, Loader2, Settings2, FileText, Download } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { AITransparencyIndicator, AIReasoning, type AITransparencyData } from "@/components/ai-transparency-indicator";
 
 interface Message {
   id: string;
@@ -34,6 +35,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  transparency?: AITransparencyData;
 }
 
 interface AIAgentChatProps {
@@ -56,6 +58,7 @@ export function AIAgentChat({
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [reasoningOpenMap, setReasoningOpenMap] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
@@ -155,10 +158,36 @@ export function AIAgentChat({
           // Mark streaming as complete
           if (streamingMessageIdRef.current) {
             const finalContent = streamingContentRef.current;
+            
+            // Generate AI transparency data (mock for now - will be from backend later)
+            const generateTransparencyData = (): AITransparencyData => {
+              const wordCount = finalContent.split(/\s+/).length;
+              const hasNumbers = /\d/.test(finalContent);
+              const hasStructure = finalContent.includes('\n') || finalContent.includes('•') || finalContent.includes('-');
+              
+              let confidence = 85; // Base confidence
+              if (wordCount > 100) confidence += 5; // Longer responses may be more detailed
+              if (hasNumbers) confidence += 3; // Data-driven responses
+              if (hasStructure) confidence += 2; // Structured output
+              confidence = Math.min(95, confidence); // Cap at 95%
+              
+              return {
+                confidence,
+                reasoning: `Response analyzed for ${wordCount} words of context. ${hasNumbers ? 'Contains data-driven insights. ' : ''}${hasStructure ? 'Uses structured formatting. ' : ''}Note: This is an estimated confidence score. Real AI transparency will be available when backend integration is complete.`,
+                modelUsed: selectedLlmConfig ? llmConfigs.find(c => c.id === selectedLlmConfig)?.model || "AI Model" : "AI Model",
+                isEstimated: true, // TODO: Remove when backend provides real transparency data
+              };
+            };
+            
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === streamingMessageIdRef.current
-                  ? { ...msg, isStreaming: false, content: finalContent }
+                  ? { 
+                      ...msg, 
+                      isStreaming: false, 
+                      content: finalContent,
+                      transparency: generateTransparencyData()
+                    }
                   : msg
               )
             );
@@ -426,6 +455,30 @@ export function AIAgentChat({
                       <p className="text-xs opacity-70 mt-1">
                         {new Date(message.timestamp).toLocaleTimeString()}
                       </p>
+                      {/* AI Transparency for assistant messages */}
+                      {message.role === "assistant" && message.transparency && (
+                        <>
+                          <AITransparencyIndicator 
+                            data={message.transparency} 
+                            variant="inline"
+                            showReasoning={reasoningOpenMap[message.id] || false}
+                            onToggleReasoning={(show) => setReasoningOpenMap(prev => ({
+                              ...prev,
+                              [message.id]: show
+                            }))}
+                          />
+                          {message.transparency.reasoning && (
+                            <AIReasoning 
+                              reasoning={message.transparency.reasoning}
+                              isOpen={reasoningOpenMap[message.id] || false}
+                              onToggle={(open) => setReasoningOpenMap(prev => ({
+                                ...prev,
+                                [message.id]: open
+                              }))}
+                            />
+                          )}
+                        </>
+                      )}
                     </>
                   )}
                 </div>
