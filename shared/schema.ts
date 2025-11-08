@@ -91,6 +91,11 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  
+  // Test account flag - grants unlimited access to all features (for testing)
+  // Existing test accounts bypass all subscription limits
+  isTestAccount: boolean("is_test_account").notNull().default(false),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

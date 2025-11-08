@@ -791,6 +791,49 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  // Subscription Add-ons
+  async getSubscriptionAddonsBySubscription(
+    subscriptionId: string
+  ): Promise<Array<{ addon: schema.SubscriptionAddon; details: schema.PlanAddon }>> {
+    const result = await db
+      .select({
+        addon: schema.subscriptionAddons,
+        details: schema.planAddons
+      })
+      .from(schema.subscriptionAddons)
+      .innerJoin(
+        schema.planAddons,
+        eq(schema.subscriptionAddons.addonId, schema.planAddons.id)
+      )
+      .where(
+        and(
+          eq(schema.subscriptionAddons.subscriptionId, subscriptionId),
+          eq(schema.subscriptionAddons.status, 'active')
+        )
+      );
+    return result;
+  }
+
+  async getActiveAddonsForOrganization(
+    organizationId: string
+  ): Promise<Array<{ addon: schema.SubscriptionAddon; details: schema.PlanAddon }>> {
+    // Get active subscription first
+    const subscription = await this.getActiveSubscriptionByOrganization(organizationId);
+    if (!subscription) {
+      return [];
+    }
+    
+    // Get add-ons for that subscription
+    return await this.getSubscriptionAddonsBySubscription(subscription.id);
+  }
+
+  // Get organization (includes test account flag)
+  async getOrganization(organizationId: string): Promise<schema.Organization | undefined> {
+    const result = await db.select().from(schema.organizations)
+      .where(eq(schema.organizations.id, organizationId));
+    return result[0];
+  }
+
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(schema.users);
   }

@@ -110,7 +110,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
-// Permission check middleware
+// Permission check middleware (subscription-aware via RBAC bridge)
 export function requirePermission(permission: string) {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
@@ -118,16 +118,26 @@ export function requirePermission(permission: string) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const userPermissions = await storage.getPermissionsByRole(req.user.roleId);
-    const hasPermission = userPermissions.some(p => p.name === permission);
+    // ✅ NEW: Use subscription-aware effective permissions
+    const { getEffectivePermissions } = await import('./rbac-subscription-bridge');
+    const effectivePermissions = await getEffectivePermissions(
+      req.user.id,
+      req.user.roleId,
+      req.user.organizationId
+    );
+    const hasPermission = effectivePermissions.some(p => p.name === permission);
 
     console.log(`🔐 [PERMISSION] User ${req.user.email} (role: ${req.user.roleId}) checking for "${permission}"`);
-    console.log(`   Available permissions: ${userPermissions.map(p => p.name).join(', ')}`);
+    console.log(`   Effective permissions (subscription-filtered): ${effectivePermissions.map(p => p.name).join(', ')}`);
     console.log(`   Has permission: ${hasPermission}`);
 
     if (!hasPermission) {
-      console.log(`❌ [PERMISSION] DENIED: User ${req.user.email} lacks "${permission}"`);
-      return res.status(403).json({ error: "Insufficient permissions", required: permission });
+      console.log(`❌ [PERMISSION] DENIED: User ${req.user.email} lacks "${permission}" (filtered by subscription)`);
+      return res.status(403).json({ 
+        error: "Insufficient permissions", 
+        required: permission,
+        note: "This permission may require a subscription upgrade"
+      });
     }
 
     console.log(`✅ [PERMISSION] GRANTED: ${permission}`);
