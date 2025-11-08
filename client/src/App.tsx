@@ -34,6 +34,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import PublicFormPage from "@/pages/public-form";
 import Dashboard from "@/pages/dashboard";
+import OnboardingPage from "@/pages/onboarding";
 import Settings from "@/pages/settings";
 import Analytics from "@/pages/analytics";
 import Workflows from "@/pages/workflows";
@@ -282,6 +283,13 @@ function Router() {
         <OrganizationRoute>
           <AppLayout>
             <Dashboard />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/onboarding">
+        <OrganizationRoute>
+          <AppLayout>
+            <OnboardingPage />
           </AppLayout>
         </OrganizationRoute>
       </Route>

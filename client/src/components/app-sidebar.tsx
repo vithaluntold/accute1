@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -81,6 +81,7 @@ const organizationMenuCategories = [
     title: "Overview",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: Home, permission: null },
+      { title: "Onboarding", url: "/onboarding", icon: Rocket, permission: null },
     ]
   },
   {
