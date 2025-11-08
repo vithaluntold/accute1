@@ -12,9 +12,6 @@ import { useState, useEffect } from "react";
 import type { WorkflowTask } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
 import { KycWarningBanner } from "@/components/kyc-warning-banner";
-import { SocialProofStats, DEFAULT_PLATFORM_STATS } from "@/components/ui-psychology/SocialProofStats";
-import { TestimonialCard, DEFAULT_TESTIMONIALS } from "@/components/ui-psychology/TestimonialCard";
-import { TrustBadgeGrid, DEFAULT_TRUST_BADGES } from "@/components/ui-psychology/TrustBadge";
 
 interface TaskStats {
   total: number;
@@ -632,35 +629,6 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Social Proof Section */}
-      <div className="space-y-6">
-        {/* Platform Statistics */}
-        <SocialProofStats stats={DEFAULT_PLATFORM_STATS} />
-
-        {/* Customer Testimonials */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-1 w-12 gradient-primary rounded-full"></div>
-            <h2 className="text-xl font-display font-bold">What Our Customers Say</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {DEFAULT_TESTIMONIALS.map((testimonial, index) => (
-              <TestimonialCard
-                key={index}
-                testimonial={testimonial}
-                compact
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Trust & Security Badges */}
-        <TrustBadgeGrid
-          badges={DEFAULT_TRUST_BADGES}
-          title="Enterprise-Grade Security"
-        />
       </div>
       </div>
     </div>
