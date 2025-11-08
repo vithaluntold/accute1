@@ -29,89 +29,100 @@ import { LucaChatWidget } from "@/components/luca-chat-widget";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
-import Landing from "@/pages/landing";
-import Login from "@/pages/login";
-import Register from "@/pages/register";
-import PublicFormPage from "@/pages/public-form";
-import Dashboard from "@/pages/dashboard";
-import OnboardingPage from "@/pages/onboarding";
-import Settings from "@/pages/settings";
-import Analytics from "@/pages/analytics";
-import Workflows from "@/pages/workflows";
-import WorkflowDetail from "@/pages/workflow-detail";
-import WorkflowBuilder from "@/pages/workflow-builder";
-import AIAgents from "@/pages/ai-agents";
-import AgentDetail from "@/pages/agent-detail";
-import Marketplace from "@/pages/marketplace";
-import Assignments from "@/pages/assignments";
-import AssignmentDetail from "@/pages/assignment-detail";
-import AssignmentBot from "@/pages/assignment-bot";
-import ClientOnboarding from "@/pages/client-onboarding";
-import Kanban from "@/pages/kanban";
-import Team from "@/pages/team";
-import Roles from "@/pages/roles";
-import Documents from "@/pages/documents";
-import Forms from "@/pages/forms";
-import FormBuilder from "@/pages/form-builder";
-import FormPreview from "@/pages/form-preview";
-import FormSubmissions from "@/pages/form-submissions";
-import FormAnalytics from "@/pages/form-analytics";
-import SubmissionDetail from "@/pages/submission-detail";
-import Clients from "@/pages/clients";
-import Contacts from "@/pages/contacts";
-import Tags from "@/pages/tags";
-import Folders from "@/pages/folders";
-import DocumentRequests from "@/pages/document-requests";
-import MyDocumentRequests from "@/pages/my-document-requests";
-import Messages from "@/pages/messages";
-import TimeTracking from "@/pages/time-tracking";
-import Invoices from "@/pages/invoices";
-import Payments from "@/pages/payments";
-import Signatures from "@/pages/signatures";
-import Projects from "@/pages/projects";
-import ProjectDetail from "@/pages/project-detail";
-import TeamChat from "@/pages/team-chat";
-import Calendar from "@/pages/calendar";
-import EmailTemplates from "@/pages/email-templates";
-import MessageTemplates from "@/pages/message-templates";
-import EmailAccounts from "@/pages/email-accounts";
-import Inbox from "@/pages/inbox";
-import NotFound from "@/pages/not-found";
-import MobileApps from "@/pages/mobile-apps";
-import OrganizationsPage from "@/pages/admin/organizations";
-import SubscriptionsPage from "@/pages/admin/subscriptions";
-import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
-import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
-import PricingRegionsPage from "@/pages/admin/pricing-regions";
-import CouponsPage from "@/pages/admin/coupons";
-import PlatformSettingsPage from "@/pages/admin/platform-settings";
-import AllUsersPage from "@/pages/admin/users";
-import KycVerificationPage from "@/pages/admin/kyc-verification";
-import PricingManagementPage from "@/pages/admin/pricing-management";
-import SubscriptionSelectPage from "@/pages/subscription-select";
-import AdminTicketsPage from "@/pages/admin/tickets";
-import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
-import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
-import AdminDashboard from "@/pages/admin/admin-dashboard";
-import AgentFoundryPage from "@/pages/admin/agent-foundry";
-import ClientPortalDashboard from "@/pages/client-portal/dashboard";
-import ClientMyDocuments from "@/pages/client-portal/my-documents";
-import ClientMyTasks from "@/pages/client-portal/my-tasks";
-import ClientMyForms from "@/pages/client-portal/my-forms";
-import ClientMySignatures from "@/pages/client-portal/my-signatures";
-import ClientPortalMessages from "@/pages/client-portal/messages";
-import RoundtablePage from "@/pages/roundtable";
-import RoundtableDetail from "@/pages/roundtable-detail";
-import TeamsPage from "@/pages/teams";
-import TeamDetailPage from "@/pages/team-detail";
-import TeamHierarchyPage from "@/pages/team-hierarchy";
-import ManagerDashboardPage from "@/pages/manager-dashboard";
-import AutomatedInvoicing from "@/pages/automated-invoicing";
-import SubscriptionPricing from "@/pages/subscription-pricing";
-import EmployeeProfile from "@/pages/employee-profile";
-import LiveChat from "@/pages/live-chat";
-import AgentIntegrationGuide from "@/pages/agent-integration-guide";
-import Help from "@/pages/help";
+import { lazy, Suspense } from "react";
+import { Loader2 } from "lucide-react";
+
+const Landing = lazy(() => import("@/pages/landing"));
+const Login = lazy(() => import("@/pages/login"));
+const Register = lazy(() => import("@/pages/register"));
+const PublicFormPage = lazy(() => import("@/pages/public-form"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const OnboardingPage = lazy(() => import("@/pages/onboarding"));
+const Settings = lazy(() => import("@/pages/settings"));
+const Analytics = lazy(() => import("@/pages/analytics"));
+const Workflows = lazy(() => import("@/pages/workflows"));
+const WorkflowDetail = lazy(() => import("@/pages/workflow-detail"));
+const WorkflowBuilder = lazy(() => import("@/pages/workflow-builder"));
+const AIAgents = lazy(() => import("@/pages/ai-agents"));
+const AgentDetail = lazy(() => import("@/pages/agent-detail"));
+const Marketplace = lazy(() => import("@/pages/marketplace"));
+const Assignments = lazy(() => import("@/pages/assignments"));
+const AssignmentDetail = lazy(() => import("@/pages/assignment-detail"));
+const AssignmentBot = lazy(() => import("@/pages/assignment-bot"));
+const ClientOnboarding = lazy(() => import("@/pages/client-onboarding"));
+const Kanban = lazy(() => import("@/pages/kanban"));
+const Team = lazy(() => import("@/pages/team"));
+const Roles = lazy(() => import("@/pages/roles"));
+const Documents = lazy(() => import("@/pages/documents"));
+const Forms = lazy(() => import("@/pages/forms"));
+const FormBuilder = lazy(() => import("@/pages/form-builder"));
+const FormPreview = lazy(() => import("@/pages/form-preview"));
+const FormSubmissions = lazy(() => import("@/pages/form-submissions"));
+const FormAnalytics = lazy(() => import("@/pages/form-analytics"));
+const SubmissionDetail = lazy(() => import("@/pages/submission-detail"));
+const Clients = lazy(() => import("@/pages/clients"));
+const Contacts = lazy(() => import("@/pages/contacts"));
+const Tags = lazy(() => import("@/pages/tags"));
+const Folders = lazy(() => import("@/pages/folders"));
+const DocumentRequests = lazy(() => import("@/pages/document-requests"));
+const MyDocumentRequests = lazy(() => import("@/pages/my-document-requests"));
+const Messages = lazy(() => import("@/pages/messages"));
+const TimeTracking = lazy(() => import("@/pages/time-tracking"));
+const Invoices = lazy(() => import("@/pages/invoices"));
+const Payments = lazy(() => import("@/pages/payments"));
+const Signatures = lazy(() => import("@/pages/signatures"));
+const Projects = lazy(() => import("@/pages/projects"));
+const ProjectDetail = lazy(() => import("@/pages/project-detail"));
+const TeamChat = lazy(() => import("@/pages/team-chat"));
+const Calendar = lazy(() => import("@/pages/calendar"));
+const EmailTemplates = lazy(() => import("@/pages/email-templates"));
+const MessageTemplates = lazy(() => import("@/pages/message-templates"));
+const EmailAccounts = lazy(() => import("@/pages/email-accounts"));
+const Inbox = lazy(() => import("@/pages/inbox"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const MobileApps = lazy(() => import("@/pages/mobile-apps"));
+const OrganizationsPage = lazy(() => import("@/pages/admin/organizations"));
+const SubscriptionsPage = lazy(() => import("@/pages/admin/subscriptions"));
+const SubscriptionAnalyticsPage = lazy(() => import("@/pages/admin/subscription-analytics"));
+const SubscriptionPlansPage = lazy(() => import("@/pages/admin/subscription-plans"));
+const PricingRegionsPage = lazy(() => import("@/pages/admin/pricing-regions"));
+const CouponsPage = lazy(() => import("@/pages/admin/coupons"));
+const PlatformSettingsPage = lazy(() => import("@/pages/admin/platform-settings"));
+const AllUsersPage = lazy(() => import("@/pages/admin/users"));
+const KycVerificationPage = lazy(() => import("@/pages/admin/kyc-verification"));
+const PricingManagementPage = lazy(() => import("@/pages/admin/pricing-management"));
+const SubscriptionSelectPage = lazy(() => import("@/pages/subscription-select"));
+const AdminTicketsPage = lazy(() => import("@/pages/admin/tickets"));
+const MarketplaceCreatePage = lazy(() => import("@/pages/admin/marketplace-create"));
+const MarketplacePublishedPage = lazy(() => import("@/pages/admin/marketplace-published"));
+const AdminDashboard = lazy(() => import("@/pages/admin/admin-dashboard"));
+const AgentFoundryPage = lazy(() => import("@/pages/admin/agent-foundry"));
+const ClientPortalDashboard = lazy(() => import("@/pages/client-portal/dashboard"));
+const ClientMyDocuments = lazy(() => import("@/pages/client-portal/my-documents"));
+const ClientMyTasks = lazy(() => import("@/pages/client-portal/my-tasks"));
+const ClientMyForms = lazy(() => import("@/pages/client-portal/my-forms"));
+const ClientMySignatures = lazy(() => import("@/pages/client-portal/my-signatures"));
+const ClientPortalMessages = lazy(() => import("@/pages/client-portal/messages"));
+const RoundtablePage = lazy(() => import("@/pages/roundtable"));
+const RoundtableDetail = lazy(() => import("@/pages/roundtable-detail"));
+const TeamsPage = lazy(() => import("@/pages/teams"));
+const TeamDetailPage = lazy(() => import("@/pages/team-detail"));
+const TeamHierarchyPage = lazy(() => import("@/pages/team-hierarchy"));
+const ManagerDashboardPage = lazy(() => import("@/pages/manager-dashboard"));
+const AutomatedInvoicing = lazy(() => import("@/pages/automated-invoicing"));
+const SubscriptionPricing = lazy(() => import("@/pages/subscription-pricing"));
+const EmployeeProfile = lazy(() => import("@/pages/employee-profile"));
+const LiveChat = lazy(() => import("@/pages/live-chat"));
+const AgentIntegrationGuide = lazy(() => import("@/pages/agent-integration-guide"));
+const Help = lazy(() => import("@/pages/help"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-screen" data-testid="page-loader">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
@@ -269,7 +280,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
 function Router() {
   return (
-    <Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
@@ -910,7 +922,8 @@ function Router() {
       </Route>
 
       <Route component={NotFound} />
-    </Switch>
+      </Switch>
+    </Suspense>
   );
 }
 
