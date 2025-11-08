@@ -40,10 +40,7 @@ export function WelcomeModal({
 
   const startOnboardingMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest('/api/onboarding/progress', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
+      return await apiRequest('POST', '/api/onboarding/progress', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/onboarding/progress'] });
