@@ -1685,6 +1685,113 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.emailMessages.receivedAt));
   }
 
+  // Onboarding System
+  async createOnboardingProgress(progress: schema.InsertOnboardingProgress): Promise<schema.OnboardingProgress> {
+    const result = await db.insert(schema.onboardingProgress).values(progress).returning();
+    return result[0];
+  }
+
+  async getOnboardingProgressByUser(userId: string): Promise<schema.OnboardingProgress | undefined> {
+    const result = await db.select().from(schema.onboardingProgress)
+      .where(eq(schema.onboardingProgress.userId, userId));
+    return result[0];
+  }
+
+  async getOnboardingProgressByOrganization(organizationId: string): Promise<schema.OnboardingProgress[]> {
+    return await db.select().from(schema.onboardingProgress)
+      .where(eq(schema.onboardingProgress.organizationId, organizationId))
+      .orderBy(desc(schema.onboardingProgress.createdAt));
+  }
+
+  async getAllOnboardingProgress(): Promise<schema.OnboardingProgress[]> {
+    return await db.select().from(schema.onboardingProgress)
+      .orderBy(desc(schema.onboardingProgress.createdAt));
+  }
+
+  async updateOnboardingProgress(id: string, progress: Partial<schema.InsertOnboardingProgress>): Promise<schema.OnboardingProgress | undefined> {
+    const result = await db.update(schema.onboardingProgress)
+      .set({ ...progress, updatedAt: new Date() })
+      .where(eq(schema.onboardingProgress.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteOnboardingProgress(id: string): Promise<void> {
+    await db.delete(schema.onboardingProgress).where(eq(schema.onboardingProgress.id, id));
+  }
+
+  async createOnboardingTask(task: schema.InsertOnboardingTask): Promise<schema.OnboardingTask> {
+    const result = await db.insert(schema.onboardingTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getOnboardingTasksByProgress(progressId: string): Promise<schema.OnboardingTask[]> {
+    return await db.select().from(schema.onboardingTasks)
+      .where(eq(schema.onboardingTasks.progressId, progressId))
+      .orderBy(schema.onboardingTasks.day, schema.onboardingTasks.createdAt);
+  }
+
+  async getOnboardingTasksByDay(progressId: string, day: number): Promise<schema.OnboardingTask[]> {
+    return await db.select().from(schema.onboardingTasks)
+      .where(
+        and(
+          eq(schema.onboardingTasks.progressId, progressId),
+          eq(schema.onboardingTasks.day, day)
+        )
+      )
+      .orderBy(schema.onboardingTasks.createdAt);
+  }
+
+  async updateOnboardingTask(id: string, task: Partial<schema.InsertOnboardingTask>): Promise<schema.OnboardingTask | undefined> {
+    const result = await db.update(schema.onboardingTasks)
+      .set({ ...task, updatedAt: new Date() })
+      .where(eq(schema.onboardingTasks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async completeOnboardingTask(taskId: string): Promise<schema.OnboardingTask | undefined> {
+    const result = await db.update(schema.onboardingTasks)
+      .set({ 
+        isCompleted: true, 
+        completedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(schema.onboardingTasks.id, taskId))
+      .returning();
+    return result[0];
+  }
+
+  async createOnboardingNudge(nudge: schema.InsertOnboardingNudge): Promise<schema.OnboardingNudge> {
+    const result = await db.insert(schema.onboardingNudges).values(nudge).returning();
+    return result[0];
+  }
+
+  async getOnboardingNudgesByProgress(progressId: string): Promise<schema.OnboardingNudge[]> {
+    return await db.select().from(schema.onboardingNudges)
+      .where(eq(schema.onboardingNudges.progressId, progressId))
+      .orderBy(desc(schema.onboardingNudges.lastShownAt));
+  }
+
+  async updateOnboardingNudge(id: string, nudge: Partial<schema.InsertOnboardingNudge>): Promise<schema.OnboardingNudge | undefined> {
+    const result = await db.update(schema.onboardingNudges)
+      .set(nudge)
+      .where(eq(schema.onboardingNudges.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async dismissOnboardingNudge(nudgeId: string): Promise<schema.OnboardingNudge | undefined> {
+    const result = await db.update(schema.onboardingNudges)
+      .set({ 
+        isDismissed: true, 
+        dismissedAt: new Date()
+      })
+      .where(eq(schema.onboardingNudges.id, nudgeId))
+      .returning();
+    return result[0];
+  }
+
   // Assignment Workflow Cloning
   async cloneWorkflowToAssignment(assignmentId: string, workflowId: string, organizationId: string): Promise<void> {
     await db.transaction(async (tx) => {

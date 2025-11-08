@@ -10833,6 +10833,277 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== 21-DAY ONBOARDING SYSTEM ====================
+  
+  // Get current user's onboarding progress
+  app.get("/api/onboarding/progress", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      // Get all tasks for this progress
+      const tasks = await storage.getOnboardingTasksByProgress(progress.id);
+      
+      // Get active nudges (not dismissed)
+      const nudges = await storage.getOnboardingNudgesByProgress(progress.id);
+      const activeNudges = nudges.filter(n => !n.isDismissed);
+      
+      res.json({
+        progress,
+        tasks,
+        activeNudges,
+      });
+    } catch (error: any) {
+      console.error('Get onboarding progress error:', error);
+      res.status(500).json({ error: "Failed to fetch onboarding progress" });
+    }
+  });
+  
+  // Initialize onboarding progress for current user
+  app.post("/api/onboarding/progress", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+      
+      // Check if progress already exists
+      const existing = await storage.getOnboardingProgressByUser(req.userId!);
+      if (existing) {
+        return res.status(400).json({ error: "Onboarding progress already exists for this user" });
+      }
+      
+      // Get organization to determine region
+      const org = await storage.getOrganization(req.user!.organizationId);
+      const region = org?.region || 'USA';
+      
+      const validationSchema = schema.insertOnboardingProgressSchema.omit({
+        userId: true,
+        organizationId: true,
+      });
+      
+      const validatedData = validationSchema.parse({
+        region,
+        ...req.body,
+      });
+      
+      const progress = await storage.createOnboardingProgress({
+        ...validatedData,
+        userId: req.userId!,
+        organizationId: req.user!.organizationId,
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId, "create", "onboarding_progress", progress.id, { day: 1 }, req);
+      res.status(201).json(progress);
+    } catch (error: any) {
+      console.error('Create onboarding progress error:', error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid onboarding data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to initialize onboarding" });
+    }
+  });
+  
+  // Update onboarding progress (advance day, update streaks, unlock features, etc.)
+  app.patch("/api/onboarding/progress/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!existing || existing.id !== req.params.id) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      const updateSchema = z.object({
+        currentDay: z.number().min(1).max(21).optional(),
+        isCompleted: z.boolean().optional(),
+        totalScore: z.number().optional(),
+        currentStreak: z.number().optional(),
+        longestStreak: z.number().optional(),
+        completedSteps: z.array(z.string()).optional(),
+        unlockedFeatures: z.array(z.string()).optional(),
+        badges: z.any().optional(),
+        lastActivityAt: z.coerce.date().optional(),
+        lastLoginAt: z.coerce.date().optional(),
+        loginDates: z.array(z.string()).optional(),
+        skipWalkthroughs: z.boolean().optional(),
+        enableNudges: z.boolean().optional(),
+        metadata: z.any().optional(),
+      });
+      
+      const validatedUpdates = updateSchema.parse(req.body);
+      
+      const progress = await storage.updateOnboardingProgress(req.params.id, validatedUpdates);
+      
+      await logActivity(req.userId, req.user!.organizationId, "update", "onboarding_progress", req.params.id, validatedUpdates, req);
+      res.json(progress);
+    } catch (error: any) {
+      console.error('Update onboarding progress error:', error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update onboarding progress" });
+    }
+  });
+  
+  // Get tasks for current day
+  app.get("/api/onboarding/tasks/day/:day", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      const day = parseInt(req.params.day);
+      if (isNaN(day) || day < 1 || day > 21) {
+        return res.status(400).json({ error: "Invalid day number (must be 1-21)" });
+      }
+      
+      const tasks = await storage.getOnboardingTasksByDay(progress.id, day);
+      res.json(tasks);
+    } catch (error: any) {
+      console.error('Get onboarding tasks error:', error);
+      res.status(500).json({ error: "Failed to fetch onboarding tasks" });
+    }
+  });
+  
+  // Create a new onboarding task (typically done programmatically)
+  // SECURITY: Only authenticated user can create tasks for their own progress
+  app.post("/api/onboarding/tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // SECURITY: Always use authenticated user's progress, never trust client-supplied progressId
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      const validationSchema = schema.insertOnboardingTaskSchema.omit({
+        progressId: true, // SECURITY: Server-controlled, never from client
+      });
+      
+      const validatedData = validationSchema.parse(req.body);
+      
+      const task = await storage.createOnboardingTask({
+        ...validatedData,
+        progressId: progress.id, // SECURITY: Force user's own progress
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId, "create", "onboarding_task", task.id, { day: task.day, title: task.title }, req);
+      res.status(201).json(task);
+    } catch (error: any) {
+      console.error('Create onboarding task error:', error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid task data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create onboarding task" });
+    }
+  });
+  
+  // Complete an onboarding task (awards points, updates progress)
+  // SECURITY: Verify task belongs to authenticated user's progress
+  app.post("/api/onboarding/tasks/:taskId/complete", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // SECURITY: Get authenticated user's progress
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      // SECURITY: Verify task belongs to this user's progress (ownership check)
+      const tasks = await storage.getOnboardingTasksByProgress(progress.id);
+      const task = tasks.find(t => t.id === req.params.taskId);
+      
+      if (!task) {
+        // SECURITY: Task either doesn't exist or belongs to another user - return 403
+        return res.status(403).json({ error: "Access denied: Task not found or does not belong to your account" });
+      }
+      
+      if (task.isCompleted) {
+        return res.status(400).json({ error: "Task already completed" });
+      }
+      
+      // Complete the task
+      const completedTask = await storage.completeOnboardingTask(req.params.taskId);
+      
+      // Update progress: award points
+      const newScore = progress.totalScore + task.points;
+      await storage.updateOnboardingProgress(progress.id, {
+        totalScore: newScore,
+        lastActivityAt: new Date(),
+      });
+      
+      await logActivity(req.userId, req.user!.organizationId, "complete", "onboarding_task", task.id, { points: task.points }, req);
+      res.json({ task: completedTask, newScore });
+    } catch (error: any) {
+      console.error('Complete onboarding task error:', error);
+      res.status(500).json({ error: "Failed to complete task" });
+    }
+  });
+  
+  // Create a contextual nudge
+  // SECURITY: Only authenticated user can create nudges for their own progress
+  app.post("/api/onboarding/nudges", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // SECURITY: Always use authenticated user's progress, never trust client-supplied progressId
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      const validationSchema = schema.insertOnboardingNudgeSchema.omit({
+        progressId: true, // SECURITY: Server-controlled, never from client
+      });
+      
+      const validatedData = validationSchema.parse(req.body);
+      
+      const nudge = await storage.createOnboardingNudge({
+        ...validatedData,
+        progressId: progress.id, // SECURITY: Force user's own progress
+      });
+      
+      res.status(201).json(nudge);
+    } catch (error: any) {
+      console.error('Create onboarding nudge error:', error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid nudge data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create nudge" });
+    }
+  });
+  
+  // Dismiss a nudge
+  // SECURITY: Verify nudge belongs to authenticated user's progress
+  app.post("/api/onboarding/nudges/:nudgeId/dismiss", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // SECURITY: Get authenticated user's progress
+      const progress = await storage.getOnboardingProgressByUser(req.userId!);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      // SECURITY: Verify nudge belongs to this user's progress (ownership check)
+      const nudges = await storage.getOnboardingNudgesByProgress(progress.id);
+      const nudge = nudges.find(n => n.id === req.params.nudgeId);
+      
+      if (!nudge) {
+        // SECURITY: Nudge either doesn't exist or belongs to another user - return 403
+        return res.status(403).json({ error: "Access denied: Nudge not found or does not belong to your account" });
+      }
+      
+      const dismissedNudge = await storage.dismissOnboardingNudge(req.params.nudgeId);
+      res.json(dismissedNudge);
+    } catch (error: any) {
+      console.error('Dismiss nudge error:', error);
+      res.status(500).json({ error: "Failed to dismiss nudge" });
+    }
+  });
+  
   // ==================== SUPER ADMIN ROUTES ====================
   // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
 
