@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Bell, User, Building2, ChevronDown } from "lucide-react";
+import { Search, Bell, User, Building2, ChevronDown, Settings as SettingsIcon, HelpCircle } from "lucide-react";
 import { FinACEverseFooter } from "@/components/finaceverse-footer";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
@@ -112,10 +112,12 @@ import AutomatedInvoicing from "@/pages/automated-invoicing";
 import EmployeeProfile from "@/pages/employee-profile";
 import LiveChat from "@/pages/live-chat";
 import AgentIntegrationGuide from "@/pages/agent-integration-guide";
+import Help from "@/pages/help";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
   const { isMobile } = useMobileDetect();
+  const [, setLocation] = useLocation();
 
   const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
@@ -217,14 +219,33 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem data-testid="menu-item-profile">
+                  <DropdownMenuItem 
+                    onClick={() => setLocation('/settings')} 
+                    data-testid="menu-item-settings"
+                  >
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLocation('/profile')} 
+                    data-testid="menu-item-profile"
+                  >
+                    <User className="h-4 w-4 mr-2" />
                     Profile Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem data-testid="menu-item-preferences">
+                  <DropdownMenuItem 
+                    onClick={() => setLocation('/settings?tab=preferences')} 
+                    data-testid="menu-item-preferences"
+                  >
+                    <SettingsIcon className="h-4 w-4 mr-2" />
                     Preferences
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem data-testid="menu-item-help">
+                  <DropdownMenuItem 
+                    onClick={() => setLocation('/help')} 
+                    data-testid="menu-item-help"
+                  >
+                    <HelpCircle className="h-4 w-4 mr-2" />
                     Help & Support
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -279,6 +300,13 @@ function Router() {
             <EmployeeProfile />
           </AppLayout>
         </ProtectedRoute>
+      </Route>
+      <Route path="/help">
+        <OrganizationRoute>
+          <AppLayout>
+            <Help />
+          </AppLayout>
+        </OrganizationRoute>
       </Route>
       {/* DISABLED: Subscription select removed */}
       {/* <Route path="/subscription">
