@@ -459,23 +459,6 @@ export default function WorkflowBuilder() {
                     {/* Steps under this stage */}
                     {isExpanded && (
                       <div className="ml-6 space-y-1">
-                        {stageSteps.length === 0 && (
-                          <div className="text-center py-4">
-                            <p className="text-xs text-muted-foreground mb-2">No steps yet</p>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedStageForStep(stage.id);
-                                setStepDialogOpen(true);
-                              }}
-                              data-testid={`button-add-step-${stage.id}`}
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Add Step
-                            </Button>
-                          </div>
-                        )}
                         {stageSteps.map((step: WorkflowStep) => {
                           const stepTasks = tasks.filter((t: WorkflowTask) => t.stepId === step.id);
                           const isStepExpanded = expandedSteps.has(step.id);
@@ -504,23 +487,6 @@ export default function WorkflowBuilder() {
                               {/* Tasks under this step */}
                               {isStepExpanded && (
                                 <div className="ml-6 space-y-1">
-                                  {stepTasks.length === 0 && (
-                                    <div className="text-center py-3">
-                                      <p className="text-xs text-muted-foreground mb-2">No tasks yet</p>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                          setSelectedStepForTask(step.id);
-                                          setTaskDialogOpen(true);
-                                        }}
-                                        data-testid={`button-add-task-${step.id}`}
-                                      >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        Add Task
-                                      </Button>
-                                    </div>
-                                  )}
                                   {stepTasks.map((task: WorkflowTask) => (
                                     <button
                                       key={task.id}
@@ -541,11 +507,45 @@ export default function WorkflowBuilder() {
                                       )}
                                     </button>
                                   ))}
+                                  
+                                  {/* Add Task Button - Always visible */}
+                                  <div className="pt-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="w-full"
+                                      onClick={() => {
+                                        setSelectedStepForTask(step.id);
+                                        setTaskDialogOpen(true);
+                                      }}
+                                      data-testid={`button-add-task-${step.id}`}
+                                    >
+                                      <Plus className="h-3 w-3 mr-1" />
+                                      Add Task
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </div>
                           );
                         })}
+                        
+                        {/* Add Step Button - Always visible */}
+                        <div className="pt-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-full"
+                            onClick={() => {
+                              setSelectedStageForStep(stage.id);
+                              setStepDialogOpen(true);
+                            }}
+                            data-testid={`button-add-step-${stage.id}`}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add Step
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
