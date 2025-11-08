@@ -1772,9 +1772,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/llm-configurations", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      // Super Admin (no organizationId) can see all configurations
+      // Regular users only see their organization's configurations
       const configs = req.user!.organizationId
         ? await storage.getLlmConfigurationsByOrganization(req.user!.organizationId)
-        : [];
+        : await storage.getAllLlmConfigurations();
       // Don't send back the encrypted API keys in the list
       // Map modelVersion → azureApiVersion for UI compatibility
       const sanitized = configs.map(c => ({
