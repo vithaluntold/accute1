@@ -1,0 +1,20 @@
+{
+  "slug": "lynk",
+  "name": "Lynk",
+  "description": "Messaging intelligence specialist. Analyzes client messages and conversations, intelligently converting them into actionable tasks with context, priority, and assignments.",
+  "category": "automation",
+  "provider": "anthropic",
+  "frontendEntry": "./frontend/LynkAgent.tsx",
+  "backendEntry": "./backend/handler.ts",
+  "capabilities": ["chat", "message-processing", "task-creation"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["messages", "tasks", "automation", "client-communication"],
+  "configuration": {
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.5,
+    "maxTokens": 4000
+  }
+}

@@ -128,7 +128,7 @@ export default function MyDocumentRequestsPage() {
       formData.append("category", "Client Documents");
       formData.append("clientId", userClient!.clientId);
 
-      const response = await fetch("/api/documents/upload", {
+      const response = await fetch("/api/documents", {
         method: "POST",
         body: formData,
         credentials: "include",

@@ -13,6 +13,7 @@ import { CadenceAgent } from '../agents/cadence/backend/index';
 import { EchoAgent } from '../agents/echo/backend/index';
 import { FormaAgent } from '../agents/forma/backend/index';
 import { LucaAgent } from '../agents/luca/backend/index';
+import { LynkAgent } from '../agents/lynk/backend/index';
 import { OmniSpectraAgent } from '../agents/omnispectra/backend/index';
 import { ParityAgent } from '../agents/parity/backend/index';
 import { RadarAgent } from '../agents/radar/backend/index';
@@ -25,6 +26,7 @@ const AGENT_CONSTRUCTORS: Record<string, new (llmConfig: LlmConfiguration) => Ba
   echo: EchoAgent,
   forma: FormaAgent,
   luca: LucaAgent,
+  lynk: LynkAgent,
   omnispectra: OmniSpectraAgent,
   parity: ParityAgent,
   radar: RadarAgent,
