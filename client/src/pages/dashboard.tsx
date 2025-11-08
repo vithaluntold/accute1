@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2, Smartphone, Download, X } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2, Smartphone, Download, X, Rocket, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { getUser } from "@/lib/auth";
 import { useIsPWA } from "@/hooks/use-mobile-detect";
@@ -52,11 +52,12 @@ export default function Dashboard() {
   const userPermissions = user?.permissions || [];
   const isPWA = useIsPWA();
   const [showMobileAppBanner, setShowMobileAppBanner] = useState(true);
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(false);
   
   const hasReportsView = userPermissions.includes('reports.view');
   const hasWorkflowsView = userPermissions.includes('workflows.view');
 
-  // Check if banner was dismissed
+  // Check if mobile app banner was dismissed
   useEffect(() => {
     const dismissed = localStorage.getItem('mobile-app-banner-dismissed');
     if (dismissed) {
@@ -73,6 +74,33 @@ export default function Dashboard() {
   const { data: currentUserProfile } = useQuery<any>({
     queryKey: ["/api/users/me"],
   });
+
+  // Check onboarding progress for new user prompt
+  const { data: onboardingData, isLoading: onboardingLoading } = useQuery<any>({
+    queryKey: ['/api/onboarding/progress'],
+    retry: false,
+    enabled: !!user,
+  });
+
+  const hasOnboarding = onboardingData?.progress != null;
+
+  // Initialize onboarding banner visibility from localStorage
+  // Only show banner once query finishes loading to prevent flash
+  useEffect(() => {
+    if (onboardingLoading) return; // Wait for query to finish
+    
+    const dismissed = localStorage.getItem('onboarding-banner-dismissed');
+    if (dismissed || hasOnboarding) {
+      setShowOnboardingBanner(false);
+    } else {
+      setShowOnboardingBanner(true);
+    }
+  }, [hasOnboarding, onboardingLoading]);
+
+  const dismissOnboardingBanner = () => {
+    localStorage.setItem('onboarding-banner-dismissed', 'true');
+    setShowOnboardingBanner(false);
+  };
 
   const { data: myStats, isLoading: myStatsLoading } = useQuery<TaskStats>({
     queryKey: ['/api/dashboard/my-stats'],
@@ -118,6 +146,49 @@ export default function Dashboard() {
       />
       
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+
+      {/* 21-Day Onboarding Banner for New Users */}
+      {showOnboardingBanner && (
+        <Card className="border-primary bg-gradient-to-r from-[#e5a660]/10 to-[#d76082]/10" data-testid="card-onboarding-banner">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <Rocket className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    Start Your 21-Day Journey
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Complete daily tasks, earn points, unlock features, and master Accute in just 3 weeks!
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={dismissOnboardingBanner}
+                data-testid="button-dismiss-onboarding-banner"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="flex gap-3">
+            <Link href="/onboarding">
+              <Button data-testid="button-start-onboarding" className="gap-2">
+                <Rocket className="h-4 w-4" />
+                Begin Your Journey
+              </Button>
+            </Link>
+            <Button variant="outline" onClick={dismissOnboardingBanner} data-testid="button-maybe-later">
+              Maybe Later
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Mobile App Download Banner */}
       {!isPWA && showMobileAppBanner && (
