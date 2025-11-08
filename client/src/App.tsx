@@ -78,17 +78,16 @@ import Inbox from "@/pages/inbox";
 import NotFound from "@/pages/not-found";
 import MobileApps from "@/pages/mobile-apps";
 import OrganizationsPage from "@/pages/admin/organizations";
-// DISABLED: Subscription features removed per user request
-// import SubscriptionsPage from "@/pages/admin/subscriptions";
-// import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
-// import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
+import SubscriptionsPage from "@/pages/admin/subscriptions";
+import SubscriptionAnalyticsPage from "@/pages/admin/subscription-analytics";
+import SubscriptionPlansPage from "@/pages/admin/subscription-plans";
 import PricingRegionsPage from "@/pages/admin/pricing-regions";
-// import CouponsPage from "@/pages/admin/coupons";
+import CouponsPage from "@/pages/admin/coupons";
 import PlatformSettingsPage from "@/pages/admin/platform-settings";
 import AllUsersPage from "@/pages/admin/users";
 import KycVerificationPage from "@/pages/admin/kyc-verification";
 import PricingManagementPage from "@/pages/admin/pricing-management";
-// import SubscriptionSelectPage from "@/pages/subscription-select";
+import SubscriptionSelectPage from "@/pages/subscription-select";
 import AdminTicketsPage from "@/pages/admin/tickets";
 import MarketplaceCreatePage from "@/pages/admin/marketplace-create";
 import MarketplacePublishedPage from "@/pages/admin/marketplace-published";
@@ -107,8 +106,7 @@ import TeamDetailPage from "@/pages/team-detail";
 import TeamHierarchyPage from "@/pages/team-hierarchy";
 import ManagerDashboardPage from "@/pages/manager-dashboard";
 import AutomatedInvoicing from "@/pages/automated-invoicing";
-// DISABLED: Subscription pricing removed
-// import SubscriptionPricing from "@/pages/subscription-pricing";
+import SubscriptionPricing from "@/pages/subscription-pricing";
 import EmployeeProfile from "@/pages/employee-profile";
 import LiveChat from "@/pages/live-chat";
 import AgentIntegrationGuide from "@/pages/agent-integration-guide";
@@ -308,8 +306,7 @@ function Router() {
           </AppLayout>
         </OrganizationRoute>
       </Route>
-      {/* DISABLED: Subscription select removed */}
-      {/* <Route path="/subscription">
+      <Route path="/subscription">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin", "Admin"]}>
             <AppLayout>
@@ -317,7 +314,16 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
-      </Route> */}
+      </Route>
+      <Route path="/subscription-pricing">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Super Admin", "Admin"]}>
+            <AppLayout>
+              <SubscriptionPricing />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
       <Route path="/mobile-apps">
         <OrganizationRoute>
           <AppLayout>
@@ -353,8 +359,7 @@ function Router() {
           </RoleGuard>
         </ProtectedRoute>
       </Route>
-      {/* DISABLED: All subscription admin pages removed */}
-      {/* <Route path="/admin/subscriptions">
+      <Route path="/admin/subscriptions">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin"]}>
             <AppLayout>
@@ -398,7 +403,7 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
-      </Route> */}
+      </Route>
       <Route path="/admin/platform-settings">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Super Admin"]}>

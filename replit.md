@@ -11,7 +11,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - Comprehensive audit trail for compliance
 - **CRITICAL**: ENCRYPTION_KEY environment variable must be stable across deployments to prevent LLM credential decryption failures
 - WebSocket Management: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
-- Subscription System: Subscription pricing UI and routes disabled per user request
+- Subscription System: Full subscription UI and routes now enabled for testing (previously disabled, re-enabled Nov 8, 2025)
 - Luca Agent Personality: Luca now asks follow-up questions BEFORE answering to narrow down exact requirements
 - Luca Agent Approach: Luca asks 2-3 targeted clarifying questions to understand context
 - Cadence Workflow Builder: Now supports FULL hierarchy extraction (Stages → Steps → Tasks → Subtasks → Checklists) from uploaded documents and conversational building
