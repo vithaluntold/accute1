@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, Play, Sparkles, Plus, ChevronRight, ChevronDown, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { ArrowLeft, Save, Play, Sparkles, Plus, ChevronRight, ChevronDown, CheckCircle2, Circle, Clock, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,13 +57,19 @@ export default function WorkflowBuilder() {
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [stepDialogOpen, setStepDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [subtaskDialogOpen, setSubtaskDialogOpen] = useState(false);
+  const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
   const [selectedStageForStep, setSelectedStageForStep] = useState<string | null>(null);
   const [selectedStepForTask, setSelectedStepForTask] = useState<string | null>(null);
+  const [showSubtasks, setShowSubtasks] = useState(true);
+  const [showChecklists, setShowChecklists] = useState(true);
   
   // Form states
   const [newStage, setNewStage] = useState({ name: '', description: '' });
   const [newStep, setNewStep] = useState({ name: '', description: '' });
   const [newTask, setNewTask] = useState({ name: '', description: '', type: 'manual' });
+  const [newSubtask, setNewSubtask] = useState({ name: '' });
+  const [newChecklist, setNewChecklist] = useState({ item: '' });
 
   const isEditMode = Boolean(id);
 
@@ -236,6 +242,91 @@ export default function WorkflowBuilder() {
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message || 'Failed to create task', variant: 'destructive' });
+    },
+  });
+
+  // Create subtask mutation
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (data: { name: string }) => {
+      if (!selectedTaskId) throw new Error('No task selected');
+      return apiRequest('POST', '/api/subtasks', {
+        taskId: selectedTaskId,
+        name: data.name,
+        order: subtasks.length + 1,
+        status: 'pending',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', selectedTaskId, 'subtasks'] });
+      toast({ title: 'Success', description: 'Subtask created successfully' });
+      setSubtaskDialogOpen(false);
+      setNewSubtask({ name: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create subtask', variant: 'destructive' });
+    },
+  });
+
+  // Delete subtask mutation
+  const deleteSubtaskMutation = useMutation({
+    mutationFn: async (subtaskId: string) => {
+      return apiRequest('DELETE', `/api/subtasks/${subtaskId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', selectedTaskId, 'subtasks'] });
+      toast({ title: 'Success', description: 'Subtask deleted successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to delete subtask', variant: 'destructive' });
+    },
+  });
+
+  // Create checklist mutation
+  const createChecklistMutation = useMutation({
+    mutationFn: async (data: { item: string }) => {
+      if (!selectedTaskId) throw new Error('No task selected');
+      return apiRequest('POST', '/api/checklists', {
+        taskId: selectedTaskId,
+        item: data.item,
+        order: checklists.length + 1,
+        isChecked: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', selectedTaskId, 'checklists'] });
+      toast({ title: 'Success', description: 'Checklist item created successfully' });
+      setChecklistDialogOpen(false);
+      setNewChecklist({ item: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to create checklist item', variant: 'destructive' });
+    },
+  });
+
+  // Delete checklist mutation
+  const deleteChecklistMutation = useMutation({
+    mutationFn: async (checklistId: string) => {
+      return apiRequest('DELETE', `/api/checklists/${checklistId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', selectedTaskId, 'checklists'] });
+      toast({ title: 'Success', description: 'Checklist item deleted successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to delete checklist item', variant: 'destructive' });
+    },
+  });
+
+  // Toggle checklist mutation
+  const toggleChecklistMutation = useMutation({
+    mutationFn: async (checklistId: string) => {
+      return apiRequest('POST', `/api/checklists/${checklistId}/toggle`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks', selectedTaskId, 'checklists'] });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to toggle checklist item', variant: 'destructive' });
     },
   });
 
@@ -580,19 +671,106 @@ export default function WorkflowBuilder() {
                   </div>
                 </div>
 
-                {/* Subtasks & Checklists */}
-                {(subtasks.length > 0 || checklists.length > 0) && (
-                  <div className="flex gap-4 text-sm">
-                    {subtasks.length > 0 && (
-                      <span className="text-muted-foreground">
-                        {subtasks.filter((s: TaskSubtask) => s.status === 'completed').length}/{subtasks.length} subtasks
-                      </span>
+                </div>
+
+              {/* Subtasks Section */}
+              <div className="border-b p-4 bg-background">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={() => setShowSubtasks(!showSubtasks)}
+                    className="flex items-center gap-2 hover-elevate active-elevate-2 p-1 rounded"
+                  >
+                    {showSubtasks ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <h3 className="font-medium">Subtasks ({subtasks.length})</h3>
+                  </button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSubtaskDialogOpen(true)}
+                    data-testid="button-add-subtask"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Subtask
+                  </Button>
+                </div>
+                {showSubtasks && (
+                  <div className="space-y-1 mt-2">
+                    {subtasks.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-2">No subtasks yet</p>
                     )}
-                    {checklists.length > 0 && (
-                      <span className="text-muted-foreground">
-                        {checklists.filter((c: TaskChecklist) => c.isChecked).length}/{checklists.length} checklist items
-                      </span>
+                    {subtasks.map((subtask: TaskSubtask) => (
+                      <div
+                        key={subtask.id}
+                        className="flex items-center gap-2 p-2 rounded hover-elevate active-elevate-2"
+                        data-testid={`subtask-${subtask.id}`}
+                      >
+                        {getStatusIcon(subtask.status)}
+                        <span className="flex-1 text-sm">{subtask.name}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteSubtaskMutation.mutate(subtask.id)}
+                          data-testid={`button-delete-subtask-${subtask.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Checklists Section */}
+              <div className="border-b p-4 bg-background">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={() => setShowChecklists(!showChecklists)}
+                    className="flex items-center gap-2 hover-elevate active-elevate-2 p-1 rounded"
+                  >
+                    {showChecklists ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <h3 className="font-medium">Checklist ({checklists.length})</h3>
+                  </button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setChecklistDialogOpen(true)}
+                    data-testid="button-add-checklist"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+                {showChecklists && (
+                  <div className="space-y-1 mt-2">
+                    {checklists.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-2">No checklist items yet</p>
                     )}
+                    {checklists.map((item: TaskChecklist) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 p-2 rounded hover-elevate active-elevate-2"
+                        data-testid={`checklist-${item.id}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.isChecked}
+                          onChange={() => toggleChecklistMutation.mutate(item.id)}
+                          className="h-4 w-4"
+                          data-testid={`checkbox-${item.id}`}
+                        />
+                        <span className={cn("flex-1 text-sm", item.isChecked && "line-through text-muted-foreground")}>
+                          {item.item}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteChecklistMutation.mutate(item.id)}
+                          data-testid={`button-delete-checklist-${item.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -750,6 +928,92 @@ export default function WorkflowBuilder() {
               data-testid="button-submit-task"
             >
               {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subtask Creation Dialog */}
+      <Dialog open={subtaskDialogOpen} onOpenChange={setSubtaskDialogOpen}>
+        <DialogContent data-testid="dialog-create-subtask">
+          <DialogHeader>
+            <DialogTitle>Create New Subtask</DialogTitle>
+            <DialogDescription>
+              Add a subtask to {selectedTask?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="subtask-name">Subtask Name</Label>
+              <Input
+                id="subtask-name"
+                placeholder="e.g., Verify client signature"
+                value={newSubtask.name}
+                onChange={(e) => setNewSubtask({ name: e.target.value })}
+                data-testid="input-subtask-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSubtaskDialogOpen(false);
+                setNewSubtask({ name: '' });
+              }}
+              data-testid="button-cancel-subtask"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createSubtaskMutation.mutate(newSubtask)}
+              disabled={!newSubtask.name.trim() || createSubtaskMutation.isPending}
+              data-testid="button-submit-subtask"
+            >
+              {createSubtaskMutation.isPending ? 'Creating...' : 'Create Subtask'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Checklist Creation Dialog */}
+      <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>
+        <DialogContent data-testid="dialog-create-checklist">
+          <DialogHeader>
+            <DialogTitle>Create Checklist Item</DialogTitle>
+            <DialogDescription>
+              Add a checklist item to {selectedTask?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="checklist-item">Checklist Item</Label>
+              <Input
+                id="checklist-item"
+                placeholder="e.g., Upload ID proof"
+                value={newChecklist.item}
+                onChange={(e) => setNewChecklist({ item: e.target.value })}
+                data-testid="input-checklist-item"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setChecklistDialogOpen(false);
+                setNewChecklist({ item: '' });
+              }}
+              data-testid="button-cancel-checklist"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createChecklistMutation.mutate(newChecklist)}
+              disabled={!newChecklist.item.trim() || createChecklistMutation.isPending}
+              data-testid="button-submit-checklist"
+            >
+              {createChecklistMutation.isPending ? 'Creating...' : 'Create Item'}
             </Button>
           </DialogFooter>
         </DialogContent>
