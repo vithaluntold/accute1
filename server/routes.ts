@@ -11104,6 +11104,34 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
   
+  // Track nudge interaction (shown, dismissed, action_taken)
+  // SECURITY: Tracks analytics only, no sensitive operations
+  app.post("/api/onboarding/nudges/track", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { nudgeId, action, trigger } = req.body;
+      
+      if (!nudgeId || !action) {
+        return res.status(400).json({ error: "Missing required fields: nudgeId, action" });
+      }
+      
+      // Log for analytics (you can extend this to store in a tracking table)
+      await logActivity(
+        req.userId, 
+        req.user!.organizationId, 
+        action, 
+        "onboarding_nudge", 
+        nudgeId, 
+        { trigger }, 
+        req
+      );
+      
+      res.json({ success: true, tracked: { nudgeId, action, trigger } });
+    } catch (error: any) {
+      console.error('Track nudge error:', error);
+      res.status(500).json({ error: "Failed to track nudge" });
+    }
+  });
+  
   // ==================== SUPER ADMIN ROUTES ====================
   // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
 
