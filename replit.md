@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It leverages specialized AI agents to automate tasks, enhancing efficiency, ensuring compliance, and improving accounting practices. The platform features multi-agent orchestration, six core specialized AI agents (Cadence, Forma, Relay, Parity, Echo, Scribe), an extensive template library, multi-provider AI support, and an AI agent marketplace. It offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. Accute aims to revolutionize accounting workflows through AI-driven automation.
+Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It leverages specialized AI agents to automate tasks, enhancing efficiency, ensuring compliance, and improving accounting practices. The platform features multi-agent orchestration with 10 specialized AI agents (Cadence, Forma, Relay, Lynk, Parity, Echo, Scribe, Radar, OmniSpectra, Luca), an extensive template library, multi-provider AI support, and an AI agent marketplace. It offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. Accute aims to revolutionize accounting workflows through AI-driven automation.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory
@@ -96,6 +96,12 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 ### Recent Fixes (November 2025)
 - **WebSocket Agent Execution (Nov 7, 2025)**: Fixed dev mode agent chat by replacing dynamic imports with static agent factory
   - Issue: WebSocket handler used `createAgentInstance` with dynamic imports using relative paths (`../agents/luca/backend/index`)
-  - Solution: Created `server/agent-static-factory.ts` with static imports of all 9 agent classes
+  - Solution: Created `server/agent-static-factory.ts` with static imports of all agent classes
   - Result: Agents now work reliably in both development (tsx) and production (compiled JS)
   - Files: `server/agent-static-factory.ts`, `server/websocket.ts`
+- **Lynk AI Agent & Document Upload Fix (Nov 8, 2025)**: Implemented Lynk messaging intelligence agent and fixed client portal document upload
+  - New Agent: Lynk processes client messages and extracts actionable tasks (mirrors Relay agent for emails)
+  - Features: Chat interface, task extraction (messageSubject/messageSender), LLM integration, session management
+  - Integration: Added to agent-static-factory.ts and agents-static.ts for proper route registration and WebSocket support
+  - Bug Fix: Client portal document upload now uses correct endpoint /api/documents (was /api/documents/upload)
+  - Files: `agents/lynk/*`, `client/src/pages/my-document-requests.tsx`
