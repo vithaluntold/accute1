@@ -40,6 +40,8 @@ import { insertClientSchema } from "@shared/schema";
 import type { Client, InsertClient } from "@shared/schema";
 import { z } from "zod";
 import { GradientHero } from "@/components/gradient-hero";
+import { useUndo } from "@/hooks/use-undo";
+import { UndoToast } from "@/components/ui-psychology/UndoToast";
 
 const clientFormSchema = insertClientSchema.omit({
   organizationId: true,
@@ -66,6 +68,7 @@ const clientFormSchema = insertClientSchema.omit({
 
 export default function Clients() {
   const { toast } = useToast();
+  const { undoState, showUndo, scheduleAction, undo, confirm, cancel } = useUndo<{ id: string; name: string }>();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -189,11 +192,6 @@ export default function Clients() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      toast({
-        title: "Success",
-        description: "Client deleted successfully",
-      });
-      setDeleteTarget(null);
     },
     onError: (error: any) => {
       toast({
@@ -203,6 +201,28 @@ export default function Clients() {
       });
     },
   });
+
+  const handleDeleteWithUndo = (client: Client) => {
+    // Close the alert dialog
+    setDeleteTarget(null);
+    
+    // Schedule the deletion with undo option
+    scheduleAction(
+      `Delete ${client.companyName}`,
+      { id: client.id, name: client.companyName },
+      (data) => {
+        // This runs if user doesn't click undo
+        deleteMutation.mutate(data.id);
+      },
+      (data) => {
+        // This runs if user clicks undo
+        toast({
+          title: "Cancelled",
+          description: `Deletion of "${data.name}" was cancelled`,
+        });
+      }
+    );
+  };
 
   const filteredClients = clients.filter((client) => {
     const query = searchQuery.toLowerCase();
@@ -591,13 +611,18 @@ export default function Clients() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Client?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this client and all associated data.
+              You'll have 5 seconds to undo this action. The client and all associated data will be permanently deleted unless you click "Undo".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              onClick={() => {
+                const client = clients.find(c => c.id === deleteTarget);
+                if (client) {
+                  handleDeleteWithUndo(client);
+                }
+              }}
               data-testid="button-confirm-delete"
             >
               Delete
@@ -605,6 +630,15 @@ export default function Clients() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Undo Toast for delete actions */}
+      <UndoToast
+        show={showUndo}
+        message={undoState ? `Deleting "${undoState.data.name}"...` : ""}
+        onUndo={undo}
+        onConfirm={confirm}
+        onClose={cancel}
+      />
     </div>
   );
 }
