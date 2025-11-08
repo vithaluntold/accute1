@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { TaskSubtask, TaskChecklist, User } from "@shared/schema";
 import { GradientHero } from "@/components/gradient-hero";
+import { useCelebration } from "@/hooks/use-celebration";
+import { MicroCelebration } from "@/components/ui-psychology/MicroCelebration";
 
 // Temporary type definitions until schema is updated
 type Pipeline = any;
@@ -26,6 +28,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Pipelines() {
   const { toast } = useToast();
+  const { celebration, celebrate, hideCelebration } = useCelebration();
   const [expandedPipelines, setExpandedPipelines] = useState<Set<string>>(new Set());
   const [expandedStages, setExpandedStages] = useState<Set<string>>(new Set());
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
@@ -184,6 +187,15 @@ export default function Pipelines() {
         </div>
       )}
       </div>
+      
+      {/* Micro-celebration for task completions */}
+      <MicroCelebration
+        type={celebration.type}
+        title={celebration.title}
+        message={celebration.message}
+        show={celebration.show}
+        onComplete={hideCelebration}
+      />
     </div>
   );
 }
@@ -813,7 +825,7 @@ function TaskItem({ task, expanded, onToggle, users }: { task: PipelineTask; exp
     mutationFn: () => apiRequest("POST", `/api/tasks/${task.id}/complete`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/steps", task.stepId, "tasks"] });
-      toast({ title: "Task completed!" });
+      celebrate("task-complete", "Task Completed!", `Great work! "${task.name}" is done.`);
     },
   });
 

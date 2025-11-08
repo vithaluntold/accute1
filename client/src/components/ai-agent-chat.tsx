@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Bot, Send, Sparkles, User, Loader2, Settings2, FileText, Download } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AITransparencyIndicator, AIReasoning, type AITransparencyData } from "@/components/ai-transparency-indicator";
+import { ProcessingIndicator } from "@/components/ui-psychology/ProcessingIndicator";
 
 interface Message {
   id: string;
@@ -445,10 +446,11 @@ export function AIAgentChat({
                   data-testid={`message-${message.role}`}
                 >
                   {message.role === "assistant" && message.isStreaming && !message.content ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">{agentName} is thinking...</span>
-                    </div>
+                    <ProcessingIndicator 
+                      status="processing" 
+                      variant="ai" 
+                      className="bg-transparent dark:bg-transparent"
+                    />
                   ) : (
                     <>
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -499,7 +501,11 @@ export function AIAgentChat({
                   </AvatarFallback>
                 </Avatar>
                 <div className="rounded-lg p-3 bg-muted">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <ProcessingIndicator 
+                    status="processing" 
+                    variant="ai" 
+                    className="bg-transparent dark:bg-transparent"
+                  />
                 </div>
               </div>
             )}
