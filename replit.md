@@ -23,6 +23,9 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Auto-Advance Triggers: Event-driven workflow progression system automatically advances workflows based on events (payment_received, document_uploaded, organizer_submitted, invoice_paid).
 - Enhanced Automation Actions: 13 total automation action types including create_invoice, request_documents, send_organizer, apply_tags, remove_tags, send_proposal, apply_folder_template.
 - Workload Insights: Analytics endpoint providing per-user metrics (assignments, tasks, time tracking, completion rates, workload scores) with team totals and capacity planning.
+- **Test Account System** (Nov 8, 2025): Organizations with isTestAccount=true bypass all subscription limits and feature gates for unlimited access. All 4 existing organizations marked as test accounts.
+- **Add-on Integration** (Nov 8, 2025): Subscription add-ons now fully integrated into feature gating. Features and resource limits from active add-ons merge with base plan entitlements.
+- **RBAC-Subscription Bridge** (Nov 8, 2025): Dynamic permission filtering based on subscription features. Role permissions automatically restricted when organization lacks required subscription features.
 
 ### System Architecture
 
