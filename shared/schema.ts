@@ -3242,6 +3242,120 @@ export const emailMessages = pgTable("email_messages", {
   processedIdx: index("email_messages_processed_idx").on(table.aiProcessed),
 }));
 
+// ==================== 21-Day Onboarding System ====================
+
+// Onboarding Progress - Tracks user's journey through the 21-day onboarding
+export const onboardingProgress = pgTable("onboarding_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Progress tracking
+  currentDay: integer("current_day").notNull().default(1), // 1-21
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  
+  // Gamification
+  totalScore: integer("total_score").notNull().default(0),
+  currentStreak: integer("current_streak").notNull().default(0), // Consecutive login days
+  longestStreak: integer("longest_streak").notNull().default(0),
+  
+  // Regional customization
+  region: text("region").default("USA"), // 'USA', 'UAE', 'India'
+  
+  // Completed steps (JSONB array of step IDs)
+  completedSteps: text("completed_steps").array().default(sql`ARRAY[]::text[]`),
+  
+  // Unlocked features (JSONB array of feature IDs)
+  unlockedFeatures: text("unlocked_features").array().default(sql`ARRAY[]::text[]`),
+  
+  // Earned badges/milestones
+  badges: jsonb("badges").default(sql`'[]'::jsonb`), // [{badgeId, earnedAt, title}]
+  
+  // Activity tracking
+  lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
+  lastLoginAt: timestamp("last_login_at").notNull().defaultNow(),
+  loginDates: text("login_dates").array().default(sql`ARRAY[]::text[]`), // ISO dates for streak calculation
+  
+  // User preferences
+  skipWalkthroughs: boolean("skip_walkthroughs").notNull().default(false),
+  enableNudges: boolean("enable_nudges").notNull().default(true),
+  
+  // Metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("onboarding_progress_user_idx").on(table.userId),
+  orgIdx: index("onboarding_progress_org_idx").on(table.organizationId),
+  dayIdx: index("onboarding_progress_day_idx").on(table.currentDay),
+  streakIdx: index("onboarding_progress_streak_idx").on(table.currentStreak),
+}));
+
+// Onboarding Tasks - Granular tracking of individual tasks within each day
+export const onboardingTasks = pgTable("onboarding_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  progressId: varchar("progress_id").notNull().references(() => onboardingProgress.id, { onDelete: "cascade" }),
+  
+  // Task details
+  day: integer("day").notNull(), // 1-21
+  taskId: text("task_id").notNull(), // e.g., 'day1_profile_setup', 'day2_add_client'
+  taskType: text("task_type").notNull(), // 'profile', 'client', 'invoice', 'expense', etc.
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Completion tracking
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  
+  // Task metadata
+  requiredForDay: boolean("required_for_day").notNull().default(true), // Required vs optional
+  points: integer("points").notNull().default(10), // Points awarded on completion
+  
+  // Related entities (track which client, invoice, etc. was created)
+  relatedEntityType: text("related_entity_type"), // 'client', 'invoice', 'task', etc.
+  relatedEntityId: varchar("related_entity_id"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  progressIdx: index("onboarding_tasks_progress_idx").on(table.progressId),
+  dayIdx: index("onboarding_tasks_day_idx").on(table.day),
+  completedIdx: index("onboarding_tasks_completed_idx").on(table.isCompleted),
+  taskTypeIdx: index("onboarding_tasks_type_idx").on(table.taskType),
+}));
+
+// Onboarding Nudges - Tracks shown/dismissed contextual nudges
+export const onboardingNudges = pgTable("onboarding_nudges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  progressId: varchar("progress_id").notNull().references(() => onboardingProgress.id, { onDelete: "cascade" }),
+  
+  // Nudge details
+  nudgeId: text("nudge_id").notNull(), // e.g., 'add_first_client_tooltip'
+  nudgeType: text("nudge_type").notNull(), // 'tooltip', 'modal', 'banner', 'highlight'
+  title: text("title"),
+  message: text("message").notNull(),
+  
+  // Display tracking
+  timesShown: integer("times_shown").notNull().default(1),
+  maxShowCount: integer("max_show_count").default(3), // Max times to show before auto-dismissing
+  
+  // User interaction
+  isDismissed: boolean("is_dismissed").notNull().default(false),
+  dismissedAt: timestamp("dismissed_at"),
+  actionTaken: boolean("action_taken").notNull().default(false), // Did user complete the suggested action?
+  
+  // Timing
+  lastShownAt: timestamp("last_shown_at").notNull().defaultNow(),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  progressIdx: index("onboarding_nudges_progress_idx").on(table.progressId),
+  nudgeIdIdx: index("onboarding_nudges_nudge_id_idx").on(table.nudgeId),
+  dismissedIdx: index("onboarding_nudges_dismissed_idx").on(table.isDismissed),
+}));
+
 // Zod Schemas and Types
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
@@ -3299,6 +3413,9 @@ export const insertSubscriptionAddonSchema = createInsertSchema(subscriptionAddo
 export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfigs).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertServicePlanSchema = createInsertSchema(servicePlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertServicePlanPurchaseSchema = createInsertSchema(servicePlanPurchases).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOnboardingProgressSchema = createInsertSchema(onboardingProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOnboardingTaskSchema = createInsertSchema(onboardingTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOnboardingNudgeSchema = createInsertSchema(onboardingNudges).omit({ id: true, createdAt: true });
 
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
@@ -3412,6 +3529,12 @@ export type InsertServicePlan = z.infer<typeof insertServicePlanSchema>;
 export type ServicePlan = typeof servicePlans.$inferSelect;
 export type InsertServicePlanPurchase = z.infer<typeof insertServicePlanPurchaseSchema>;
 export type ServicePlanPurchase = typeof servicePlanPurchases.$inferSelect;
+export type InsertOnboardingProgress = z.infer<typeof insertOnboardingProgressSchema>;
+export type OnboardingProgress = typeof onboardingProgress.$inferSelect;
+export type InsertOnboardingTask = z.infer<typeof insertOnboardingTaskSchema>;
+export type OnboardingTask = typeof onboardingTasks.$inferSelect;
+export type InsertOnboardingNudge = z.infer<typeof insertOnboardingNudgeSchema>;
+export type OnboardingNudge = typeof onboardingNudges.$inferSelect;
 
 export const subscriptionPlanFormSchema = insertSubscriptionPlanSchema.extend({
   featuresInput: z.string().optional(),

@@ -578,6 +578,23 @@ export interface IStorage {
   updateEmailAccount(id: string, account: Partial<schema.InsertEmailAccount>): Promise<schema.EmailAccount | undefined>;
   deleteEmailAccount(id: string): Promise<void>;
 
+  // Onboarding System
+  createOnboardingProgress(progress: schema.InsertOnboardingProgress): Promise<schema.OnboardingProgress>;
+  getOnboardingProgressByUser(userId: string): Promise<schema.OnboardingProgress | undefined>;
+  getOnboardingProgressByOrganization(organizationId: string): Promise<schema.OnboardingProgress[]>;
+  getAllOnboardingProgress(): Promise<schema.OnboardingProgress[]>; // Super Admin
+  updateOnboardingProgress(id: string, progress: Partial<schema.InsertOnboardingProgress>): Promise<schema.OnboardingProgress | undefined>;
+  deleteOnboardingProgress(id: string): Promise<void>;
+  createOnboardingTask(task: schema.InsertOnboardingTask): Promise<schema.OnboardingTask>;
+  getOnboardingTasksByProgress(progressId: string): Promise<schema.OnboardingTask[]>;
+  getOnboardingTasksByDay(progressId: string, day: number): Promise<schema.OnboardingTask[]>;
+  updateOnboardingTask(id: string, task: Partial<schema.InsertOnboardingTask>): Promise<schema.OnboardingTask | undefined>;
+  completeOnboardingTask(taskId: string): Promise<schema.OnboardingTask | undefined>;
+  createOnboardingNudge(nudge: schema.InsertOnboardingNudge): Promise<schema.OnboardingNudge>;
+  getOnboardingNudgesByProgress(progressId: string): Promise<schema.OnboardingNudge[]>;
+  updateOnboardingNudge(id: string, nudge: Partial<schema.InsertOnboardingNudge>): Promise<schema.OnboardingNudge | undefined>;
+  dismissOnboardingNudge(nudgeId: string): Promise<schema.OnboardingNudge | undefined>;
+
   // Email Messages
   createEmailMessage(message: schema.InsertEmailMessage): Promise<schema.EmailMessage>;
   getEmailMessage(id: string): Promise<schema.EmailMessage | undefined>;
