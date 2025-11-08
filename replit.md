@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It leverages specialized AI agents to automate tasks, enhancing efficiency, ensuring compliance, and improving accounting practices. The platform features multi-agent orchestration with 10 specialized AI agents (Cadence, Forma, Relay, Lynk, Parity, Echo, Scribe, Radar, OmniSpectra, Luca), an extensive template library, multi-provider AI support, and an AI agent marketplace. It offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. Accute aims to revolutionize accounting workflows through AI-driven automation.
+Accute is an AI-native accounting workflow automation platform for modern accounting firms. It uses specialized AI agents to automate tasks, boosting efficiency, ensuring compliance, and enhancing accounting practices. Key features include multi-agent orchestration with 10 specialized AI agents, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. It offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, aiming to revolutionize accounting workflows through AI-driven automation.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory
@@ -23,17 +23,17 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Auto-Advance Triggers: Event-driven workflow progression system automatically advances workflows based on events (payment_received, document_uploaded, organizer_submitted, invoice_paid).
 - Enhanced Automation Actions: 13 total automation action types including create_invoice, request_documents, send_organizer, apply_tags, remove_tags, send_proposal, apply_folder_template.
 - Workload Insights: Analytics endpoint providing per-user metrics (assignments, tasks, time tracking, completion rates, workload scores) with team totals and capacity planning.
-- **Test Account System** (Nov 8, 2025): Organizations with isTestAccount=true bypass all subscription limits and feature gates for unlimited access. All 4 existing organizations marked as test accounts.
-- **Add-on Integration** (Nov 8, 2025): Subscription add-ons now fully integrated into feature gating. Features and resource limits from active add-ons merge with base plan entitlements.
-- **RBAC-Subscription Bridge** (Nov 8, 2025): Dynamic permission filtering based on subscription features. Role permissions automatically restricted when organization lacks required subscription features.
+- Organizations with isTestAccount=true bypass all subscription limits and feature gates for unlimited access.
+- Subscription add-ons now fully integrated into feature gating. Features and resource limits from active add-ons merge with base plan entitlements.
+- Dynamic permission filtering based on subscription features. Role permissions automatically restricted when organization lacks required subscription features.
 
 ### System Architecture
 
 #### UI/UX Decisions
-The UI draws inspiration from Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is implemented as a responsive Progressive Web App (PWA) for broad compatibility and a native-like experience.
+The UI is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
 
 #### Technical Implementations
-The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript. Data is persisted in PostgreSQL (Neon) via Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is Node.js, Express, and TypeScript. Data is stored in PostgreSQL (Neon) via Drizzle ORM. Authentication uses JWT and bcrypt, with AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
 #### Feature Specifications
 - **Multi-tenant Architecture**: Provides isolated data and distinct roles.
@@ -54,12 +54,12 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Subscription Management System**: Four-tier model with regional pricing and automated billing.
 - **Invoice Generation System**: Auto-generates invoices for subscription events.
 - **Payment Security**: AES-256-GCM encryption, HTTPS, rate limiting, and audit logging.
-- **Multi-Factor Authentication (MFA)**: TOTP-based MFA using Google Authenticator/Authy. Features include QR code setup, 10 backup codes (bcrypt hashed), trusted devices (30-day expiry), device fingerprinting, and AES-256-GCM encrypted TOTP secrets.
-- **Comprehensive Pricing & Subscription Management**: Enterprise-grade pricing system with product families for feature bundling, SKU-based plans supporting fixed/usage-based/hybrid pricing models, add-ons with per-unit pricing, time-limited coupons and discounts, regional pricing multipliers, and volume-based tiers. Super admin manages global product catalog while organizations subscribe and purchase add-ons.
-- **Multi-Gateway Payment Processing**: Organizations configure their own payment gateways (Razorpay, Stripe, PayU, Payoneer) with AES-256-GCM encrypted credentials. Supports auto-sweep, saved payment methods, and multi-currency processing. Platform subscriptions use Razorpay; organizations can use any configured gateway for client payments.
-- **Service Plans Marketplace (Fiverr-style)**: Admins create service offerings with fixed/hourly/custom pricing, tiered packages (Basic/Standard/Premium), deliverables tracking, revision limits, client requirements, and review/rating system. Clients browse marketplace, purchase services, track progress, and leave reviews. Service plan purchases integrate with payment gateways and generate invoices.
-- **Multi-Tier Authorization System**: Enterprise-grade security for service plan purchases with 7-layer protection: (1) JWT authentication, (2) RBAC permission checks, (3) client existence validation, (4) role verification, (5) platform admin bypass, (6) organization scoping, (7) user-client assignment gating. Prevents cross-organization data leakage and lateral movement within organizations.
-- **Subscription-Based Feature Gating**: Production-ready feature visibility and quota enforcement system with shared entitlement contract (`shared/subscription-types.ts`) preventing frontend-backend drift. Backend middleware (`requireFeature`, `requireResourceLimit`) and frontend hooks (`useFeatureAccess`, `useResourceLimit`, `useCanCreate`) manage access and quotas. Real-time usage tracking via `UsageTrackingService` (direct database queries for users, clients, workflows, AI agents). Explicit `isUnlimited` flags eliminate sentinel value ambiguity. Comprehensive telemetry logging (QUOTA_DENIAL vs SYSTEM_FAULT) for observability. Fail-closed security design. Platform admins bypass all gates. Free tier: maxUsers=5, maxClients=10, maxWorkflows=10, maxAIAgents=3. Features: workflows, ai_agents, signatures, analytics, custom_branding, api_access, sso, advanced_reporting, white_label, priority_support, automations, integrations, team_collaboration, time_tracking. Resource limits: maxUsers, maxClients, maxStorage (TODO), maxWorkflows, maxAIAgents. Subscription UI disabled for test accounts; fully functional for production users.
+- **Multi-Factor Authentication (MFA)**: TOTP-based MFA using Google Authenticator/Authy with QR code setup, backup codes, trusted devices, and device fingerprinting.
+- **Comprehensive Pricing & Subscription Management**: Enterprise-grade system with product families, SKU-based plans, add-ons, coupons, regional pricing, and volume tiers.
+- **Multi-Gateway Payment Processing**: Organizations configure their own payment gateways (Razorpay, Stripe, PayU, Payoneer) with encrypted credentials.
+- **Service Plans Marketplace (Fiverr-style)**: Admins create service offerings with various pricing models, deliverables tracking, and client review systems.
+- **Multi-Tier Authorization System**: 7-layer protection for service plan purchases to prevent data leakage and unauthorized access.
+- **Subscription-Based Feature Gating**: Production-ready feature visibility and quota enforcement system with shared entitlement contract. Backend middleware and frontend hooks manage access and quotas. Real-time usage tracking via `UsageTrackingService`. Fail-closed security design.
 
 #### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation.
@@ -76,32 +76,101 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
+- **pdf-parse**: PDF text extraction.
+- **mammoth**: DOCX text extraction.
+- **xlsx**: Excel file parsing (XLSX, XLS).
 
 ### Critical Environment Variables
 - **ENCRYPTION_KEY**: AES-256-GCM encryption key for LLM credentials (MUST be 32+ chars, stable across deployments)
   - LLM API keys are stored encrypted in database per organization
   - If ENCRYPTION_KEY changes, existing credentials cannot be decrypted
   - Server validates this at startup and fails fast if missing/invalid
-  - See: `docs/ENCRYPTION_KEY_CRITICAL.md` for detailed explanation
 
 ### Critical Production Deployment Requirements
 - **AI Agent Backends Must Be Compiled**: Production cannot load TypeScript files directly
   - Development: `tsx` transpiles `.ts` files on-the-fly
   - Production: Needs compiled `.js` files in `dist/agents/*/backend/index.js`
   - **SOLUTION**: Run `./scripts/build-production.sh` before deploying
-  - **REPLIT DEPLOYMENT**: Modify `.replit` file to use `build = ["sh", "-c", "./scripts/build-production.sh"]`
-  - See: `docs/REPLIT_DEPLOYMENT_SETUP.md` and `docs/PRODUCTION_BUILD.MD` for complete guide
   - Without this, all AI agents will fail with "Cannot find module" errors in production
 
+### File Attachment System for AI Agents
+All 8 conversational AI agents now support file attachments with automatic text extraction:
+
+#### FileParserService (`server/file-parser-service.ts`)
+Centralized parsing service supporting multiple file formats:
+- **PDF**: Text extraction with fallback detection for scanned/image-only PDFs
+- **DOCX**: Extracts text from paragraphs, tables, headers, and footers
+- **Excel (XLSX/XLS)**: Converts sheets to CSV-style formatted text
+- **CSV**: Automatic delimiter detection and parsing
+- **TXT**: Direct text reading
+- **Scanned PDFs**: Placeholder for OCR implementation (TODO: requires multimodal AI)
+
+Security & Validation:
+- MIME type validation (application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, etc.)
+- 10MB file size limit
+- Error handling with descriptive messages
+- Returns parsed text, filename, and metadata
+
+#### FileAttachment UI Component (`client/src/components/shared/FileAttachment.tsx`)
+Reusable React component for file uploads:
+- Client-side validation (size, type)
+- Real-time upload progress tracking with status messages
+- Success/error toast notifications
+- File removal capability
+- Accessible with proper ARIA labels
+- Test IDs:
+  - `input-file-upload`: Hidden file input element
+  - `button-attach-file`: Main upload button
+  - `text-attached-filename`: Display of attached file name
+  - `button-remove-file`: Button to remove selected file
+
+Usage Example:
+```tsx
+import { FileAttachment } from "@/components/shared/FileAttachment";
+
+<FileAttachment
+  uploadEndpoint="/api/agents/luca/upload-document"
+  onFileProcessed={(extractedText) => {
+    // Handle extracted text - add to chat, analyze, etc.
+  }}
+/>
+```
+
+#### Agent Upload Endpoints
+All 8 agents have consistent `/api/agents/{agent}/upload-document` endpoints:
+- **Agents**: Echo, Relay, Lynk, Luca, Parity, Scribe, Radar, OmniSpectra
+- **Method**: POST with multipart/form-data
+- **Field Name**: `file`
+- **Authentication**: Required (requireAuth middleware)
+- **File Size Limit**: 10MB
+- **Supported Types**: PDF, DOCX, XLSX, XLS, CSV, TXT
+- **Response**: `{ success: true, extractedText: string, filename: string, metadata: object }`
+
+Implementation Pattern:
+```typescript
+// Backend (agents/{agent}/backend/handler.ts)
+import multer from "multer";
+import { FileParserService } from "../../../server/file-parser-service";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+app.post("/api/agents/{agent}/upload-document", requireAuth, (req, res) => {
+  upload.single("file")(req, res, async (err) => {
+    // Parse file and return extracted text
+  });
+});
+```
+
+#### Future Enhancements
+- Extract multer configuration into shared middleware (prevent config drift)
+- Implement OCR for scanned PDFs using Claude 3.5 Sonnet or GPT-4 Vision
+- Add automated tests for upload endpoints and parsing logic
+- Add file extension validation in addition to MIME type checks
+- Implement global rate limiting for file upload endpoints
+
 ### Recent Fixes (November 2025)
-- **WebSocket Agent Execution (Nov 7, 2025)**: Fixed dev mode agent chat by replacing dynamic imports with static agent factory
-  - Issue: WebSocket handler used `createAgentInstance` with dynamic imports using relative paths (`../agents/luca/backend/index`)
-  - Solution: Created `server/agent-static-factory.ts` with static imports of all agent classes
-  - Result: Agents now work reliably in both development (tsx) and production (compiled JS)
-  - Files: `server/agent-static-factory.ts`, `server/websocket.ts`
-- **Lynk AI Agent & Document Upload Fix (Nov 8, 2025)**: Implemented Lynk messaging intelligence agent and fixed client portal document upload
-  - New Agent: Lynk processes client messages and extracts actionable tasks (mirrors Relay agent for emails)
-  - Features: Chat interface, task extraction (messageSubject/messageSender), LLM integration, session management
-  - Integration: Added to agent-static-factory.ts and agents-static.ts for proper route registration and WebSocket support
-  - Bug Fix: Client portal document upload now uses correct endpoint /api/documents (was /api/documents/upload)
-  - Files: `agents/lynk/*`, `client/src/pages/my-document-requests.tsx`
+- **WebSocket Agent Execution (Nov 7, 2025)**: Fixed dev mode agent chat by replacing dynamic imports with static agent factory. Created `server/agent-static-factory.ts` with static imports of all agent classes for reliable operation in both development (tsx) and production (compiled JS).
+- **Lynk AI Agent & Document Upload Fix (Nov 8, 2025)**: Implemented Lynk messaging intelligence agent (mirrors Relay for emails) with chat interface, task extraction, and LLM integration. Fixed client portal document upload to use correct endpoint `/api/documents`.
