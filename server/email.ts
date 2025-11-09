@@ -56,6 +56,19 @@ async function getUncachableResendClient() {
  * @param roleName - Role the user is being invited to
  * @returns Success status and error if applicable
  */
+// Replace Unicode smart quotes and other problematic characters with ASCII equivalents
+function sanitizeForEmail(str: string): string {
+  return str
+    // Replace smart quotes
+    .replace(/[\u2018\u2019]/g, "'")  // Single quotes
+    .replace(/[\u201C\u201D]/g, '"')  // Double quotes
+    .replace(/\u2013/g, '-')          // En dash
+    .replace(/\u2014/g, '--')         // Em dash
+    .replace(/\u2026/g, '...')        // Ellipsis
+    // Remove any remaining non-ASCII characters > 255
+    .replace(/[^\x00-\xFF]/g, '');
+}
+
 export async function sendInvitationEmail(
   email: string, 
   inviteUrl: string, 
@@ -65,13 +78,18 @@ export async function sendInvitationEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
 
+    // Sanitize all input values before using them in the template
+    const cleanOrgName = sanitizeForEmail(organizationName);
+    const cleanRoleName = sanitizeForEmail(roleName);
+    const cleanInviteUrl = sanitizeForEmail(inviteUrl);
+
     const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You're Invited to Join ${organizationName}</title>
+  <title>You're Invited to Join ${cleanOrgName}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8f9fa;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; padding: 40px 20px;">
@@ -95,7 +113,7 @@ export async function sendInvitationEmail(
               </h2>
               
               <p style="margin: 0 0 20px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
-                <strong>${organizationName}</strong> has invited you to join their team on Accute as a <strong>${roleName}</strong>.
+                <strong>${cleanOrgName}</strong> has invited you to join their team on Accute as a <strong>${cleanRoleName}</strong>.
               </p>
               
               <p style="margin: 0 0 30px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
@@ -106,7 +124,7 @@ export async function sendInvitationEmail(
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 20px 0;">
-                    <a href="${inviteUrl}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #1a1a1a 0%, #ff1493 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(255, 20, 147, 0.3);">
+                    <a href="${cleanInviteUrl}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #1a1a1a 0%, #ff1493 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(255, 20, 147, 0.3);">
                       Accept Invitation
                     </a>
                   </td>
@@ -117,8 +135,8 @@ export async function sendInvitationEmail(
                 Or copy and paste this link into your browser:
               </p>
               <p style="margin: 10px 0 0 0; padding: 12px; background-color: #f7fafc; border-radius: 6px; word-break: break-all;">
-                <a href="${inviteUrl}" style="color: #ff1493; text-decoration: none; font-size: 14px;">
-                  ${inviteUrl}
+                <a href="${cleanInviteUrl}" style="color: #ff1493; text-decoration: none; font-size: 14px;">
+                  ${cleanInviteUrl}
                 </a>
               </p>
               
@@ -147,17 +165,27 @@ export async function sendInvitationEmail(
 </html>
     `.trim();
 
+    const rawSubject = `You're invited to join ${cleanOrgName} on Accute`;
+    const cleanSubject = sanitizeForEmail(rawSubject);
+    const cleanFromEmail = sanitizeForEmail(fromEmail);
+    
     const result = await client.emails.send({
-      from: fromEmail,
+      from: cleanFromEmail,
       to: email,
-      subject: `You're invited to join ${organizationName} on Accute`,
+      subject: cleanSubject,
       html: emailHtml,
     });
 
     console.log(`✓ Invitation email sent successfully to ${email}. ID: ${result.data?.id}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to send invitation email:", error.message);
+    console.error("Failed to send invitation email:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      organizationName,
+      email
+    });
     return { 
       success: false, 
       error: error.message || "Failed to send invitation email" 

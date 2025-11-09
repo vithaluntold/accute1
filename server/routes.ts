@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { setupWebSocket } from "./websocket";
@@ -4326,6 +4326,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "team", team.id, { name: team.name }, req);
       res.json(team);
     } catch (error: any) {
+      console.error("Failed to create team:", error);
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors 
+        });
+      }
       res.status(500).json({ error: "Failed to create team" });
     }
   });
@@ -4464,6 +4471,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "supervisorId and reporteeId are required" });
       }
       
+      if (supervisorId === reporteeId) {
+        return res.status(400).json({ error: "A user cannot supervise themselves" });
+      }
+      
       const supervisor = await storage.getUser(supervisorId);
       const reportee = await storage.getUser(reporteeId);
       
@@ -4473,6 +4484,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!reportee || reportee.organizationId !== req.user!.organizationId) {
         return res.status(404).json({ error: "Reportee not found" });
+      }
+      
+      // Check if relationship already exists
+      const existingRelationships = await db.select()
+        .from(schema.supervisorRelationships)
+        .where(and(
+          eq(schema.supervisorRelationships.supervisorId, supervisorId),
+          eq(schema.supervisorRelationships.reporteeId, reporteeId)
+        ))
+        .limit(1);
+      
+      if (existingRelationships.length > 0) {
+        return res.status(409).json({ error: "Supervision relationship already exists" });
       }
       
       const relationship = await storage.createSupervisorRelationship({
@@ -4485,6 +4509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await logActivity(req.userId, req.user!.organizationId || undefined, "create", "supervision", relationship.id, { supervisor: `${supervisor.firstName} ${supervisor.lastName}`, reportee: `${reportee.firstName} ${reportee.lastName}` }, req);
       res.json(relationship);
     } catch (error: any) {
+      console.error("Failed to create supervision relationship:", error);
       res.status(500).json({ error: "Failed to create supervision relationship" });
     }
   });
