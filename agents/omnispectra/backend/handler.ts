@@ -78,6 +78,7 @@ export const registerRoutes = (app: any) => {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
+        // Get LLM config (optional - only needed for scanned PDF OCR)
         const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
         
         const parsed = await FileParserService.parseFile(
@@ -86,6 +87,11 @@ export const registerRoutes = (app: any) => {
           req.file.mimetype,
           llmConfig || undefined
         );
+
+        // Warn if scanned PDF detected without LLM config
+        if (parsed.isScannedPdf && !llmConfig) {
+          console.warn(`[OmniSpectra] Scanned PDF upload without LLM config - OCR unavailable for org ${req.user!.organizationId}`);
+        }
 
         res.json({ 
           success: true,
