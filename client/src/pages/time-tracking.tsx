@@ -125,7 +125,7 @@ export default function TimeTrackingPage() {
                     <SelectItem value="none">No Client</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {client.companyName}
                       </SelectItem>
                     ))}
                   </SelectContent>
