@@ -26,6 +26,9 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Organizations with isTestAccount=true bypass all subscription limits and feature gates for unlimited access.
 - Subscription add-ons now fully integrated into feature gating. Features and resource limits from active add-ons merge with base plan entitlements.
 - Dynamic permission filtering based on subscription features. Role permissions automatically restricted when organization lacks required subscription features.
+- **Email Sanitization**: All email fields (fromEmail, subject, organizationName, roleName, inviteUrl) sanitized using `sanitizeForEmail()` to replace Unicode smart quotes and special characters with ASCII equivalents, preventing Resend ByteString conversion errors.
+- **Error Handling**: Team creation and other endpoints use `instanceof ZodError` for reliable validation error detection, returning 400 status with detailed validation messages.
+- **Duplicate Relationship Prevention**: Supervision endpoint includes pre-flight duplicate check, returning 409 Conflict for existing relationships instead of 500 database constraint errors.
 
 ### System Architecture
 
