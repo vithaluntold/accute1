@@ -1401,6 +1401,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Convert dateOfBirth string to Date object if provided
+      if (updateData.dateOfBirth && typeof updateData.dateOfBirth === 'string') {
+        updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+      }
+
       // Handle password update separately with hashing
       if (req.body.password) {
         updateData.password = await hashPassword(req.body.password);
