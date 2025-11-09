@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare, Store } from "lucide-react";
+import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare, Store, Upload } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -86,6 +86,8 @@ export default function ParityAgent() {
   
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // Read marketplace template params from URL
   useEffect(() => {
@@ -317,6 +319,66 @@ export default function ParityAgent() {
         title: "Download started",
         description: "Your document is being downloaded."
       });
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploadedFile(file);
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setMessages(prev => [...prev, {
+        role: "user",
+        content: `📄 Uploaded document: ${file.name}`
+      }]);
+
+      const response = await fetch("/api/agents/parity/upload-document", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const data = await response.json();
+      
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `I've processed your document "${file.name}". The extracted content is ready. What would you like me to do with it? I can:\n\n• Generate a professional document based on this content\n• Analyze the document structure\n• Create templates from it\n• Answer questions about it\n\nJust let me know how I can help!`
+      }]);
+
+      toast({
+        title: "Document uploaded",
+        description: `Successfully processed ${file.name}`
+      });
+
+      setUploadedFile(null);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to process document. Please try again.",
+        variant: "destructive"
+      });
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `Sorry, I couldn't process that document. ${error.message || 'Please try again'}.`
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
     }
   };
 
@@ -599,6 +661,24 @@ export default function ParityAgent() {
           {/* Input Area */}
           <div className="border-t p-4">
             <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.xls,.csv,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                variant="outline"
+                size="icon"
+                title="Upload document to analyze"
+                data-testid="button-upload-document"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
               <Input
                 placeholder="Describe the document you need..."
                 value={input}
