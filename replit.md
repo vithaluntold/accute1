@@ -34,6 +34,7 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - **Workspace Creation**: Full workspace creation flow with dialog UI, auto-slug generation, and organization setup. Updates creator's organizationId and requires re-authentication to access new workspace.
 - **Luca Chat File Attachments**: Full file upload functionality in Luca chat widget supporting PDF, DOCX, XLSX, XLS, CSV, TXT files. FileParserService extracts text content, which is appended to messages. Includes attachment display, removal, and safe fallback handling.
 - **Automatic Chat Title Generation**: Chat sessions automatically generate contextual titles after the first message exchange, similar to ChatGPT. Uses LLM to create 3-6 word descriptive titles based on conversation content (POST /api/luca-chat-sessions/:id/generate-title).
+- **Strict Agent Role Boundaries**: All 10 AI agents enforce strict domain boundaries with polite refusals for out-of-scope questions. Each agent's system prompt includes STRICT ROLE BOUNDARIES section listing allowed/prohibited topics and standardized refusal templates that redirect users to appropriate specialists. Prevents agents from answering questions outside their expertise (e.g., Luca refusing police complaint questions, Cadence refusing tax advice).
 
 ### System Architecture
 
