@@ -635,21 +635,27 @@ export function LucaChatWidget() {
                 </Button>
               )}
               
-              {!isMobile && (
+              {!isMobile && !isFullScreen && (
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
-                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  onClick={() => setIsFullScreen(true)}
                   data-testid="button-toggle-fullscreen"
                 >
-                  {isFullScreen ? (
-                    <Minimize2 className="h-3.5 w-3.5" />
-                  ) : (
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  )}
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </Button>
               )}
+              
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+                onClick={() => setIsExpanded(false)}
+                data-testid="button-minimize-chat"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
               
               <Button
                 size="icon"
