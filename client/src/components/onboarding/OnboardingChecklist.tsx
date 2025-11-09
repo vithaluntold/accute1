@@ -14,7 +14,8 @@ import {
   Target, 
   Star,
   ChevronRight,
-  Calendar
+  Calendar,
+  Rocket
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -87,6 +88,26 @@ export function OnboardingChecklist() {
     retry: false,
   });
 
+  const startOnboardingMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/onboarding/progress', {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/onboarding/progress'] });
+      toast({
+        title: "Welcome aboard!",
+        description: "Your 21-day journey has begun. Let's get started!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to start onboarding",
+        description: error.message || "Please try again",
+      });
+    },
+  });
+
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
       return await apiRequest(`/api/onboarding/tasks/${taskId}/complete`, {
@@ -131,11 +152,37 @@ export function OnboardingChecklist() {
     return (
       <Card data-testid="card-onboarding-error">
         <CardHeader>
-          <CardTitle className="text-destructive">Onboarding Not Started</CardTitle>
+          <CardTitle>Onboarding Not Started</CardTitle>
           <CardDescription>
             Your onboarding journey hasn't been initialized yet.
           </CardDescription>
         </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center py-8">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-[#e5a660] to-[#d76082] flex items-center justify-center mx-auto mb-4">
+              <Rocket className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Ready to Begin?</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              Start your 21-day journey to master Accute. Complete tasks, earn points, and unlock powerful features.
+            </p>
+            <Button
+              size="lg"
+              onClick={() => startOnboardingMutation.mutate()}
+              disabled={startOnboardingMutation.isPending}
+              data-testid="button-start-onboarding"
+            >
+              {startOnboardingMutation.isPending ? (
+                "Initializing..."
+              ) : (
+                <>
+                  <Rocket className="w-4 h-4 mr-2" />
+                  Get Started
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     );
   }
