@@ -895,6 +895,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark OTP as verified
       await storage.verifyOtp(otpRecord.id);
 
+      // CRITICAL: Update user's phoneVerified status
+      // Find user by phone number and update their phoneVerified field
+      const user = await storage.getUserByPhone(phone);
+      if (user) {
+        await storage.updateUser(user.id, { 
+          phoneVerified: true,
+          phoneVerifiedAt: new Date()
+        });
+      }
+
       res.json({ 
         success: true,
         message: "Phone number verified successfully",
@@ -1427,6 +1437,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Failed to update user profile:", error);
       res.status(500).json({ error: "Failed to update user profile" });
     }
+  });
+
+  // Upload KYC documents (ID proof and Address proof)
+  app.post("/api/users/me/kyc/documents", requireAuth, (req: AuthRequest, res: Response) => {
+    upload.single('document')(req, res, async (err) => {
+      try {
+        if (err) {
+          console.error("KYC document upload error:", err);
+          return res.status(400).json({ error: err.message || "File upload failed" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        const documentType = req.body.documentType; // 'idDocument' or 'addressProof'
+        
+        if (!documentType || !['idDocument', 'addressProof'].includes(documentType)) {
+          // Clean up uploaded file if validation fails
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json({ error: "Invalid document type. Must be 'idDocument' or 'addressProof'" });
+        }
+
+        // Get current user to check existing documents
+        const currentUser = await storage.getUser(req.userId!);
+        if (!currentUser) {
+          fs.unlinkSync(req.file.path);
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        // Build relative file path for database storage
+        const relativePath = `/uploads/${req.file.filename}`;
+
+        // Update the appropriate field based on document type
+        const updateData: any = {};
+        if (documentType === 'idDocument') {
+          updateData.idDocumentUrl = relativePath;
+        } else {
+          updateData.addressProofUrl = relativePath;
+        }
+
+        // Update user with new document URL
+        const updatedUser = await storage.updateUser(req.userId!, updateData);
+        if (!updatedUser) {
+          fs.unlinkSync(req.file.path);
+          return res.status(500).json({ error: "Failed to update user profile" });
+        }
+
+        // CRITICAL: Fetch fresh user data to verify BOTH documents actually exist
+        // This prevents race conditions and ensures we validate against actual DB state
+        const freshUser = await storage.getUser(req.userId!);
+        if (!freshUser) {
+          return res.status(500).json({ error: "Failed to verify document status" });
+        }
+
+        // Check if both documents are now uploaded and auto-update kycStatus to "submitted"
+        // Only transition if BOTH URLs are present in the database AND status is still pending
+        const hasIdDocument = !!freshUser.idDocumentUrl;
+        const hasAddressProof = !!freshUser.addressProofUrl;
+
+        if (hasIdDocument && hasAddressProof && freshUser.kycStatus === 'pending') {
+          const finalUser = await storage.updateUser(req.userId!, { kycStatus: 'submitted' });
+          if (finalUser) {
+            freshUser.kycStatus = 'submitted';
+          }
+        }
+
+        await logActivity(
+          req.userId,
+          req.user!.organizationId || undefined,
+          "update",
+          "user",
+          updatedUser.id,
+          { action: "kyc_document_upload", documentType, filename: req.file.filename },
+          req
+        );
+
+        res.json({
+          success: true,
+          message: "Document uploaded successfully",
+          documentType,
+          user: { ...updatedUser, password: undefined }
+        });
+      } catch (error: any) {
+        // Clean up uploaded file on error
+        if (req.file) {
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (cleanupError) {
+            console.error("Failed to clean up file:", cleanupError);
+          }
+        }
+        console.error("KYC document upload error:", error);
+        res.status(500).json({ error: "Failed to upload document" });
+      }
+    });
   });
 
   app.post("/api/users", requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {

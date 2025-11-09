@@ -178,8 +178,75 @@ export default function EmployeeProfile() {
     },
   });
 
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async ({ file, documentType }: { file: File; documentType: 'idDocument' | 'addressProof' }) => {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('documentType', documentType);
+
+      const res = await fetch('/api/users/me/kyc/documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      return res.json();
+    },
+    onSuccess: (data, variables) => {
+      const docName = variables.documentType === 'idDocument' ? 'ID document' : 'Address proof';
+      toast({
+        title: "Document uploaded",
+        description: `Your ${docName} has been uploaded successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+    onError: (error: any, variables) => {
+      const docName = variables.documentType === 'idDocument' ? 'ID document' : 'Address proof';
+      toast({
+        title: "Upload failed",
+        description: `Failed to upload ${docName}: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: KycFormData) => {
     updateProfileMutation.mutate(data);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, documentType: 'idDocument' | 'addressProof') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 50MB",
+        variant: "destructive",
+      });
+      event.target.value = ''; // Reset input
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF or image file (PNG, JPEG)",
+        variant: "destructive",
+      });
+      event.target.value = ''; // Reset input
+      return;
+    }
+
+    uploadDocumentMutation.mutate({ file, documentType });
   };
 
   const handleSendOtp = () => {
@@ -587,34 +654,46 @@ export default function EmployeeProfile() {
         <Card>
           <CardHeader>
             <CardTitle>Document Verification</CardTitle>
-            <CardDescription>Upload your identity and address proof documents</CardDescription>
+            <CardDescription>Upload your identity and address proof documents (PDF or Image, max 50MB)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>ID Proof (Passport, Driver's License, etc.)</Label>
-              <div className="mt-2 flex items-center gap-2">
-                <Input type="file" accept="image/*,application/pdf" data-testid="input-id-proof" />
-                <Button type="button" variant="outline" data-testid="button-upload-id">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload
-                </Button>
+              <Label>ID Proof (PAN Card, Passport, Driver's License, etc.)</Label>
+              <div className="mt-2">
+                <Input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => handleFileUpload(e, 'idDocument')}
+                  disabled={uploadDocumentMutation.isPending}
+                  data-testid="input-id-proof"
+                  className="cursor-pointer"
+                />
               </div>
+              {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'idDocument' && (
+                <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
+              )}
               {currentUser?.idDocumentUrl && (
-                <p className="text-sm text-muted-foreground mt-1">✓ Document uploaded</p>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Document uploaded</p>
               )}
             </div>
 
             <div>
               <Label>Address Proof (Utility Bill, Bank Statement, etc.)</Label>
-              <div className="mt-2 flex items-center gap-2">
-                <Input type="file" accept="image/*,application/pdf" data-testid="input-address-proof" />
-                <Button type="button" variant="outline" data-testid="button-upload-address">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload
-                </Button>
+              <div className="mt-2">
+                <Input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => handleFileUpload(e, 'addressProof')}
+                  disabled={uploadDocumentMutation.isPending}
+                  data-testid="input-address-proof"
+                  className="cursor-pointer"
+                />
               </div>
+              {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'addressProof' && (
+                <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
+              )}
               {currentUser?.addressProofUrl && (
-                <p className="text-sm text-muted-foreground mt-1">✓ Document uploaded</p>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Document uploaded</p>
               )}
             </div>
           </CardContent>
