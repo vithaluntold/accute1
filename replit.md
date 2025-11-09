@@ -36,6 +36,7 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - **Automatic Chat Title Generation**: Chat sessions automatically generate contextual titles after the first message exchange, similar to ChatGPT. Uses LLM to create 3-6 word descriptive titles based on conversation content (POST /api/luca-chat-sessions/:id/generate-title).
 - **Strict Agent Role Boundaries**: All 10 AI agents enforce strict domain boundaries with polite refusals for out-of-scope questions. Each agent's system prompt includes STRICT ROLE BOUNDARIES section listing allowed/prohibited topics and standardized refusal templates that redirect users to appropriate specialists. Luca explicitly includes IRS, tax authorities, and tax law as core allowed topics (NOT prohibited).
 - **Automatic Day 1 Task Creation**: When users start onboarding via POST /api/onboarding/progress, the system automatically creates 3 Day 1 tasks (Explore Client Management 50pts, Complete Your Profile 100pts, Explore Your Dashboard 30pts) with idempotency checks to prevent duplicates.
+- **Admin Template Deletion**: Admin and Super Admin users have explicit bypass for template deletion (both email and message templates) regardless of subscription-based permission filtering. Non-admin users still require templates.delete permission via RBAC.
 
 ### System Architecture
 

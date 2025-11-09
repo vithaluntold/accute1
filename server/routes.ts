@@ -7962,28 +7962,46 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
-  app.delete("/api/email-templates/:id", requireAuth, requirePermission("templates.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/email-templates/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      // Get user to check role
+      const user = await storage.getUser(req.user!.id);
+      const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+      
+      // Admins and Super Admins can ALWAYS delete templates
+      if (!isAdmin) {
+        // Non-admins need templates.delete permission
+        const { getEffectivePermissions } = await import('./rbac-subscription-bridge');
+        const effectivePermissions = await getEffectivePermissions(
+          req.user!.id,
+          req.user!.roleId,
+          req.user!.organizationId
+        );
+        const hasPermission = effectivePermissions.some(p => p.name === 'templates.delete');
+        
+        if (!hasPermission) {
+          return res.status(403).json({ 
+            error: "Insufficient permissions", 
+            required: "templates.delete" 
+          });
+        }
+      }
+      
       const existing = await storage.getEmailTemplate(req.params.id, req.user!.organizationId!);
       if (!existing) {
         return res.status(404).json({ error: "Email template not found" });
       }
       
-      // Check if user is trying to delete a global template
-      if (existing.organizationId === null) {
-        // Only admins can delete global templates
-        const user = await storage.getUser(req.user!.id);
-        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
-        
-        if (!isAdmin) {
-          return res.status(403).json({ error: "Only admins can delete global templates" });
-        }
+      // Only admins can delete global templates (organizationId === null)
+      if (existing.organizationId === null && !isAdmin) {
+        return res.status(403).json({ error: "Only admins can delete global templates" });
       }
 
       await storage.deleteEmailTemplate(req.params.id, req.user!.organizationId!);
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "email_template", req.params.id, {}, req);
       res.json({ success: true, message: "Email template deleted successfully" });
     } catch (error: any) {
+      console.error('Delete email template error:', error);
       res.status(500).json({ error: "Failed to delete email template" });
     }
   });
@@ -8073,28 +8091,46 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
-  app.delete("/api/message-templates/:id", requireAuth, requirePermission("templates.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/message-templates/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      // Get user to check role
+      const user = await storage.getUser(req.user!.id);
+      const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
+      
+      // Admins and Super Admins can ALWAYS delete templates
+      if (!isAdmin) {
+        // Non-admins need templates.delete permission
+        const { getEffectivePermissions } = await import('./rbac-subscription-bridge');
+        const effectivePermissions = await getEffectivePermissions(
+          req.user!.id,
+          req.user!.roleId,
+          req.user!.organizationId
+        );
+        const hasPermission = effectivePermissions.some(p => p.name === 'templates.delete');
+        
+        if (!hasPermission) {
+          return res.status(403).json({ 
+            error: "Insufficient permissions", 
+            required: "templates.delete" 
+          });
+        }
+      }
+      
       const existing = await storage.getMessageTemplate(req.params.id, req.user!.organizationId!);
       if (!existing) {
         return res.status(404).json({ error: "Message template not found" });
       }
       
-      // Check if user is trying to delete a global template
-      if (existing.organizationId === null) {
-        // Only admins can delete global templates
-        const user = await storage.getUser(req.user!.id);
-        const isAdmin = user?.role?.name === "Admin" || user?.role?.name === "Super Admin";
-        
-        if (!isAdmin) {
-          return res.status(403).json({ error: "Only admins can delete global templates" });
-        }
+      // Only admins can delete global templates (organizationId === null)
+      if (existing.organizationId === null && !isAdmin) {
+        return res.status(403).json({ error: "Only admins can delete global templates" });
       }
 
       await storage.deleteMessageTemplate(req.params.id, req.user!.organizationId!);
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "message_template", req.params.id, {}, req);
       res.json({ success: true, message: "Message template deleted successfully" });
     } catch (error: any) {
+      console.error('Delete message template error:', error);
       res.status(500).json({ error: "Failed to delete message template" });
     }
   });
