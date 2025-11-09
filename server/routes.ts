@@ -8856,6 +8856,39 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // Create workflow task
+  app.post("/api/workflow-tasks", requireAuth, requirePermission("workflows.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const validatedData = schema.insertWorkflowTaskSchema.parse(req.body);
+      
+      // Verify the step exists and belongs to user's organization
+      const step = await storage.getWorkflowStep(validatedData.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+      
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+      
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized access to workflow" });
+      }
+      
+      const task = await storage.createWorkflowTask(validatedData);
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "workflow_task", task.id, task, req);
+      res.status(201).json(task);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid task data", details: error.errors });
+      }
+      console.error('Error creating workflow task:', error);
+      res.status(500).json({ error: "Failed to create workflow task" });
+    }
+  });
+
   // Get subtasks for a task
   app.get("/api/tasks/:taskId/subtasks", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
     try {
