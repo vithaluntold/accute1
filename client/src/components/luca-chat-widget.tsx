@@ -363,22 +363,33 @@ export function LucaChatWidget() {
               loadSessionMessages(currentSessionId);
               
               // Generate title for new chats after first message exchange
-              const currentSession = sessions.find(s => s.id === currentSessionId);
-              if (currentSession && currentSession.title === "New Chat") {
-                // Wait a bit for messages to be saved, then generate title
-                setTimeout(async () => {
-                  try {
-                    await apiRequest(`/api/luca-chat-sessions/${currentSessionId}/generate-title`, 'POST', {});
-                    // Invalidate sessions to show new title
-                    queryClient.invalidateQueries({ 
-                      queryKey: ["/api/luca-chat-sessions"] 
-                    });
-                  } catch (error) {
-                    console.log('[Luca Chat] Could not auto-generate title:', error);
-                    // Silently fail - this is not critical
+              // Wait for messages to be saved, then check and generate title
+              setTimeout(async () => {
+                try {
+                  // Fetch the session to check its current title
+                  const sessionResponse = await fetch(`/api/luca-chat-sessions/${currentSessionId}`, {
+                    credentials: 'include'
+                  });
+                  
+                  if (sessionResponse.ok) {
+                    const sessionData = await sessionResponse.json();
+                    
+                    // Only generate title if it's still "New Chat"
+                    if (sessionData.title === "New Chat") {
+                      console.log('[Luca Chat] Auto-generating title for session:', currentSessionId);
+                      await apiRequest(`/api/luca-chat-sessions/${currentSessionId}/generate-title`, 'POST', {});
+                      
+                      // Invalidate sessions to show new title
+                      queryClient.invalidateQueries({ 
+                        queryKey: ["/api/luca-chat-sessions"] 
+                      });
+                    }
                   }
-                }, 1000);
-              }
+                } catch (error) {
+                  console.log('[Luca Chat] Could not auto-generate title:', error);
+                  // Silently fail - this is not critical
+                }
+              }, 1500);
               
               // Also invalidate sessions list to update timestamps
               queryClient.invalidateQueries({ 
