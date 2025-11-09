@@ -857,17 +857,6 @@ export function LucaChatWidget() {
             maxWidth: isMobile ? 'calc(100vw - 32px)' : '400px',
           }}
         >
-          {/* Close button */}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-full bg-card/95 backdrop-blur-sm border shadow-lg hover-elevate mb-3 ml-auto block"
-            onClick={() => setIsOpen(false)}
-            data-testid="button-close-luca-preview"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-
           {/* Palm Leaf Stack with Thread */}
           <div className="relative flex flex-col items-end gap-5">
             {/* Decorative Thread Line */}
