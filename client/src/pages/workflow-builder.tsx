@@ -670,9 +670,10 @@ export default function WorkflowBuilder() {
                     <Badge variant="outline">{selectedTask.priority}</Badge>
                   </div>
                 </div>
+              </div>
 
-                </div>
-
+              {/* Scrollable Subtasks and Checklists Section */}
+              <ScrollArea className="flex-1 overflow-y-auto">
               {/* Subtasks Section */}
               <div className="border-b p-4 bg-background">
                 <div className="flex items-center justify-between mb-2">
@@ -774,6 +775,7 @@ export default function WorkflowBuilder() {
                   </div>
                 )}
               </div>
+              </ScrollArea>
 
               {/* Automation Canvas - Key forces remount on task switch for proper state isolation */}
               <div className="flex-1 overflow-hidden">
