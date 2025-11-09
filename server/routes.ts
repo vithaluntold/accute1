@@ -2232,6 +2232,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate title for a chat session based on conversation content
+  app.post("/api/luca-chat-sessions/:id/generate-title", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getLucaChatSession(req.params.id);
+      
+      if (!existing || existing.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+
+      // Get messages from the session
+      const messages = await storage.getLucaChatMessagesBySession(req.params.id);
+      
+      if (messages.length < 2) {
+        return res.status(400).json({ error: "Not enough messages to generate title" });
+      }
+
+      // Get first user message and assistant response
+      const firstUserMessage = messages.find(m => m.role === 'user')?.content || '';
+      const firstAssistantMessage = messages.find(m => m.role === 'assistant')?.content || '';
+
+      // Get LLM config
+      const llmConfig = existing.llmConfigId 
+        ? await storage.getLlmConfiguration(existing.llmConfigId)
+        : await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+
+      if (!llmConfig) {
+        return res.status(400).json({ error: "No LLM configuration available" });
+      }
+
+      // Generate title using LLM
+      const { LLMService } = await import('./llm-service');
+      const llmService = new LLMService(llmConfig);
+      
+      const titlePrompt = `Generate a short, descriptive title (3-6 words max) for this conversation. Return ONLY the title, nothing else.
+
+User: ${firstUserMessage.substring(0, 500)}
+Assistant: ${firstAssistantMessage.substring(0, 500)}
+
+Title:`;
+
+      const generatedTitle = await llmService.generateCompletion(titlePrompt, {
+        maxTokens: 20,
+        temperature: 0.7,
+      });
+
+      // Clean up title - remove quotes, extra whitespace, etc.
+      let title = generatedTitle.trim()
+        .replace(/^["']|["']$/g, '')  // Remove surrounding quotes
+        .replace(/\n.*/g, '')  // Take only first line
+        .substring(0, 100);  // Max 100 chars
+
+      // Update session with generated title
+      const updated = await storage.updateLucaChatSession(req.params.id, { title });
+      res.json({ title: updated.title });
+    } catch (error: any) {
+      console.error('[Luca Chat] Error generating title:', error);
+      res.status(500).json({ error: "Failed to generate title" });
+    }
+  });
+
   // Update a chat session (rename, pin, etc.)
   app.patch("/api/luca-chat-sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
@@ -2270,6 +2330,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[Luca Chat] Error deleting session:', error);
       res.status(500).json({ error: "Failed to delete chat session" });
+    }
+  });
+
+  // Get messages for a chat session
+  app.get("/api/luca-chat-sessions/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const session = await storage.getLucaChatSession(req.params.id);
+      
+      if (!session || session.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+      
+      const messages = await storage.getLucaChatMessagesBySession(session.id);
+      res.json(messages);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error fetching messages:', error);
+      res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
 

@@ -48,7 +48,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   Calculator,
-  FileText
+  FileText,
+  Paperclip
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -91,6 +92,13 @@ interface ChatMessage {
   createdAt: Date;
 }
 
+interface AttachedFile {
+  name: string;
+  size: number;
+  type: string;
+  parsedText?: string;
+}
+
 export function LucaChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -104,10 +112,13 @@ export function LucaChatWidget() {
   const [isMobile, setIsMobile] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Get time-based greeting
@@ -350,6 +361,25 @@ export function LucaChatWidget() {
             // Reload the current session to sync with database-persisted messages
             if (currentSessionId) {
               loadSessionMessages(currentSessionId);
+              
+              // Generate title for new chats after first message exchange
+              const currentSession = sessions.find(s => s.id === currentSessionId);
+              if (currentSession && currentSession.title === "New Chat") {
+                // Wait a bit for messages to be saved, then generate title
+                setTimeout(async () => {
+                  try {
+                    await apiRequest(`/api/luca-chat-sessions/${currentSessionId}/generate-title`, 'POST', {});
+                    // Invalidate sessions to show new title
+                    queryClient.invalidateQueries({ 
+                      queryKey: ["/api/luca-chat-sessions"] 
+                    });
+                  } catch (error) {
+                    console.log('[Luca Chat] Could not auto-generate title:', error);
+                    // Silently fail - this is not critical
+                  }
+                }, 1000);
+              }
+              
               // Also invalidate sessions list to update timestamps
               queryClient.invalidateQueries({ 
                 queryKey: ["/api/luca-chat-sessions"] 
@@ -403,9 +433,91 @@ export function LucaChatWidget() {
     }
   }, [messages]);
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
+      'text/plain'
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload PDF, DOCX, XLSX, XLS, CSV, or TXT files only",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Maximum file size is 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploadingFile(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/agents/luca/upload-document', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+
+      setAttachedFiles((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          parsedText: data.extractedText || "",
+        },
+      ]);
+
+      toast({
+        title: "File Attached",
+        description: `${file.name} uploaded successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async (messageText?: string) => {
     const textToSend = messageText || input.trim();
-    if (!textToSend || isStreaming) {
+    if ((!textToSend && attachedFiles.length === 0) || isStreaming) {
       return;
     }
 
@@ -425,6 +537,15 @@ export function LucaChatWidget() {
       sessionId = newSession.id;
     }
 
+    let finalMessage = textToSend;
+    
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles
+        .map((file) => `\n\n[Attached File: ${file.name}]\n${file.parsedText || '(File content could not be extracted)'}`)
+        .join('\n');
+      finalMessage = textToSend + fileContext;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -438,10 +559,12 @@ export function LucaChatWidget() {
       addMessageMutation.mutate({
         sessionId,
         role: "user",
-        content: textToSend,
+        content: finalMessage,
       });
     }
     
+    setInput("");
+    setAttachedFiles([]);
     setIsStreaming(true);
 
     const ws = connectWebSocket();
@@ -451,7 +574,7 @@ export function LucaChatWidget() {
         ws.send(JSON.stringify({
           type: 'execute_agent',
           agentName: 'luca',
-          input: textToSend,
+          input: finalMessage,
           llmConfigId: selectedLlmConfig,
           lucaSessionId: sessionId,
         }));
@@ -460,13 +583,12 @@ export function LucaChatWidget() {
       ws.send(JSON.stringify({
         type: 'execute_agent',
         agentName: 'luca',
-        input: textToSend,
+        input: finalMessage,
         llmConfigId: selectedLlmConfig,
         lucaSessionId: sessionId,
       }));
     }
 
-    setInput("");
     setIsExpanded(true);
   };
 
@@ -780,7 +902,61 @@ export function LucaChatWidget() {
 
         {/* Input Area */}
         <div className="border-t p-4">
+          {/* Attached Files Display */}
+          {attachedFiles.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {attachedFiles.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-muted border"
+                  data-testid={`attached-file-${index}`}
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 flex-shrink-0"
+                    onClick={() => handleRemoveFile(index)}
+                    data-testid={`button-remove-file-${index}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.xlsx,.xls,.csv,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+            data-testid="input-file"
+          />
+
           <div className="flex gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-11 w-11 flex-shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || isUploadingFile}
+              data-testid="button-attach-file"
+            >
+              {isUploadingFile ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
+            </Button>
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -798,7 +974,7 @@ export function LucaChatWidget() {
             />
             <Button
               onClick={() => handleSend()}
-              disabled={!input.trim() || isStreaming}
+              disabled={(!input.trim() && attachedFiles.length === 0) || isStreaming}
               size="icon"
               className="h-11 w-11 flex-shrink-0"
               data-testid="button-send-message"
