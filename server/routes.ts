@@ -11246,7 +11246,54 @@ ${msg.bodyText || msg.bodyHtml || ''}
         organizationId: req.user!.organizationId,
       });
       
-      await logActivity(req.userId, req.user!.organizationId, "create", "onboarding_progress", progress.id, { day: 1 }, req);
+      // Check if Day 1 tasks already exist (idempotency)
+      const existingTasks = await storage.getOnboardingTasksByDay(progress.id, 1);
+      
+      if (existingTasks.length === 0) {
+        // Create Day 1 tasks automatically (only schema-compliant fields)
+        const day1Tasks = [
+          {
+            progressId: progress.id,
+            day: 1,
+            taskId: 'view-client-overview',
+            taskType: 'exploration',
+            title: 'Explore Client Management',
+            description: 'Take a tour of the Clients page to understand how to manage your client relationships',
+            requiredForDay: true,
+            points: 50,
+          },
+          {
+            progressId: progress.id,
+            day: 1,
+            taskId: 'complete-profile',
+            taskType: 'profile',
+            title: 'Complete Your Profile',
+            description: 'Add your personal details and preferences to personalize your experience',
+            requiredForDay: true,
+            points: 100,
+          },
+          {
+            progressId: progress.id,
+            day: 1,
+            taskId: 'explore-dashboard',
+            taskType: 'exploration',
+            title: 'Explore Your Dashboard',
+            description: 'Get familiar with your dashboard and understand key metrics',
+            requiredForDay: false,
+            points: 30,
+          },
+        ];
+        
+        // Create all Day 1 tasks
+        for (const task of day1Tasks) {
+          await storage.createOnboardingTask(task);
+        }
+        
+        await logActivity(req.userId, req.user!.organizationId, "create", "onboarding_progress", progress.id, { day: 1, tasksCreated: day1Tasks.length }, req);
+      } else {
+        await logActivity(req.userId, req.user!.organizationId, "create", "onboarding_progress", progress.id, { day: 1, tasksCreated: 0, note: 'Tasks already exist' }, req);
+      }
+      
       res.status(201).json(progress);
     } catch (error: any) {
       console.error('Create onboarding progress error:', error);
