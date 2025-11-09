@@ -654,9 +654,15 @@ export default function EmployeeProfile() {
         <Card>
           <CardHeader>
             <CardTitle>Document Verification</CardTitle>
-            <CardDescription>Upload your identity and address proof documents (PDF or Image, max 50MB)</CardDescription>
+            <CardDescription>Upload your identity and address proof documents (PDF or Image, max 50MB) - Saved automatically</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>ℹ️ Auto-Save:</strong> Your documents are saved immediately after upload. No need to click the "Save Changes" button below - that's only for profile details.
+              </p>
+            </div>
+
             <div>
               <Label>ID Proof (PAN Card, Passport, Driver's License, etc.)</Label>
               <div className="mt-2">
@@ -673,7 +679,10 @@ export default function EmployeeProfile() {
                 <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
               )}
               {currentUser?.idDocumentUrl && (
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Document uploaded</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+                </div>
               )}
             </div>
 
@@ -693,7 +702,10 @@ export default function EmployeeProfile() {
                 <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
               )}
               {currentUser?.addressProofUrl && (
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">✓ Document uploaded</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+                </div>
               )}
             </div>
           </CardContent>
