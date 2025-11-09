@@ -7087,11 +7087,28 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
-  app.post("/api/conversations", requireAuth, requirePermission("messaging.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/conversations", requireAuth, requirePermission("conversations.create"), async (req: AuthRequest, res: Response) => {
     try {
+      const { clientId, subject, status } = req.body;
+
+      if (!subject || typeof subject !== 'string' || subject.trim().length === 0) {
+        return res.status(400).json({ error: "Subject is required" });
+      }
+
+      let validatedClientId = null;
+      if (clientId && typeof clientId === 'string' && clientId.trim().length > 0) {
+        const client = await storage.getClient(clientId);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "Client not found" });
+        }
+        validatedClientId = clientId;
+      }
+
       const conversation = await storage.createConversation({
-        ...req.body,
-        organizationId: req.user!.organizationId!
+        organizationId: req.user!.organizationId!,
+        clientId: validatedClientId,
+        subject: subject.trim(),
+        status: status || "active"
       });
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "conversation", conversation.id, conversation, req);
       res.status(201).json(conversation);
@@ -7125,7 +7142,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
-  app.post("/api/conversations/:id/messages", requireAuth, requirePermission("messaging.send"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/conversations/:id/messages", requireAuth, requirePermission("conversations.send"), async (req: AuthRequest, res: Response) => {
     try {
       const conversation = await storage.getConversation(req.params.id);
       if (!conversation || conversation.organizationId !== req.user!.organizationId) {
@@ -7640,9 +7657,45 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   app.post("/api/appointments", requireAuth, requirePermission("appointments.create"), async (req: AuthRequest, res: Response) => {
     try {
+      const { title, description, clientId, startTime, endTime, location, status } = req.body;
+
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+
+      if (!startTime || !endTime) {
+        return res.status(400).json({ error: "Start time and end time are required" });
+      }
+
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date/time format" });
+      }
+
+      if (end <= start) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      let validatedClientId = null;
+      if (clientId && clientId !== "none" && typeof clientId === 'string' && clientId.trim().length > 0) {
+        const client = await storage.getClient(clientId);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ error: "Client not found" });
+        }
+        validatedClientId = clientId;
+      }
+
       const appointment = await storage.createAppointment({
-        ...req.body,
         organizationId: req.user!.organizationId!,
+        title: String(title).trim(),
+        description: description && typeof description === 'string' ? description.trim() : null,
+        clientId: validatedClientId,
+        startTime: start,
+        endTime: end,
+        location: location && typeof location === 'string' ? location.trim() : null,
+        status: status || "scheduled",
         createdBy: req.user!.id
       });
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "appointment", appointment.id, appointment, req);

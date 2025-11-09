@@ -34,6 +34,8 @@ export default function MessagesPage() {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const [selectedStageId, setSelectedStageId] = useState<string>("");
   const [selectedStepId, setSelectedStepId] = useState<string>("");
+  const [newConversationClientId, setNewConversationClientId] = useState<string>("none");
+  const [newConversationSubject, setNewConversationSubject] = useState("");
   const { toast } = useToast();
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -74,6 +76,8 @@ export default function MessagesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
       setNewConversationOpen(false);
+      setNewConversationClientId("none");
+      setNewConversationSubject("");
       toast({ title: "Conversation created successfully" });
     },
     onError: () => {
@@ -156,22 +160,22 @@ export default function MessagesPage() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
                 createConversationMutation.mutate({
-                  clientId: formData.get("clientId"),
-                  subject: formData.get("subject"),
+                  clientId: newConversationClientId === "none" ? null : newConversationClientId,
+                  subject: newConversationSubject,
                   status: "active",
                 });
               }}
               className="space-y-4"
             >
               <div>
-                <label className="text-sm font-medium">Client</label>
-                <Select name="clientId" required>
+                <label className="text-sm font-medium">Client (Optional)</label>
+                <Select value={newConversationClientId} onValueChange={setNewConversationClientId}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">No Client</SelectItem>
                     {clients?.filter((client: any) => client.status === 'active').map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.companyName}
@@ -183,7 +187,8 @@ export default function MessagesPage() {
               <div>
                 <label className="text-sm font-medium">Subject</label>
                 <Input
-                  name="subject"
+                  value={newConversationSubject}
+                  onChange={(e) => setNewConversationSubject(e.target.value)}
                   placeholder="Conversation subject"
                   required
                   data-testid="input-subject"

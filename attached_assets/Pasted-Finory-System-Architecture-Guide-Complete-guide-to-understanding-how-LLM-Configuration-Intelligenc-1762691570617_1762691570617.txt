@@ -1,0 +1,379 @@
+Finory System Architecture Guide
+Complete guide to understanding how LLM Configuration, Intelligence Forge, Module Forge, and Modules work together
+
+🎯 Quick Navigation
+The homepage is / (dashboard). You can also navigate using:
+
+Logo → Dashboard
+Sidebar → Different sections (Build Mode / ERP Mode)
+Top navigation → Settings, Profile
+📚 Table of Contents
+System Overview
+LLM Configuration Explained
+Intelligence Forge
+Module Forge
+Modules Section
+How Everything Connects
+System Overview
+Finory has two main modes:
+
+🏗️ Build Mode (for System Admins/Builders)
+Module Forge - Build new ERP modules using AI
+Intelligence Forge - Configure AI agents
+LLM Configuration - Set up AI model providers
+Modules - View/edit module definitions
+💼 ERP Mode (for Business Users)
+Dashboard - Business metrics
+Invoices, Purchase Orders, etc. - Operational modules
+Intelligence Forge - Access AI assistants
+LLM Configuration Explained
+Location: Build Mode → LLM Configuration
+
+What is it?
+The control panel for AI capabilities in Finory. Think of it as the "brain configuration center."
+
+Three Key Concepts:
+1️⃣ LLM Providers
+What: The companies that provide AI models
+
+OpenAI (GPT-4, GPT-5)
+Anthropic (Claude)
+Google (Gemini)
+Custom providers
+Purpose: Tell Finory where to get AI intelligence from
+
+Example:
+
+Provider: OpenAI
+Base URL: https://api.openai.com/v1
+API Key: sk-xxx... (managed via Replit integration)
+Status: Active
+
+2️⃣ Models
+What: Specific AI brains from providers
+
+GPT-4o (fast, balanced)
+GPT-5 (most advanced)
+Claude-3.5 (great at analysis)
+Purpose: Different AI models have different strengths
+
+Attributes:
+
+Name: "gpt-4o", "gpt-5"
+Type: Chat, Completion, Embedding
+Context Window: How much text it can "remember" (e.g., 128k tokens)
+Cost: Price per 1M tokens
+Example:
+
+Model: gpt-5
+Provider: OpenAI
+Context: 128,000 tokens
+Best for: Complex reasoning, module generation
+Cost: $2.50 per 1M input tokens
+
+3️⃣ Agent Configurations
+What: Pre-configured AI personalities/roles for specific tasks
+
+Purpose: Different jobs need different AI behaviors
+
+Built-in Agent Configs:
+
+Builder - Understands ERP requirements, builds modules
+Coordinator - Orchestrates other agents
+Analyst - Analyzes data and processes
+SME (Subject Matter Expert) - Domain expertise
+Reviewer - Quality checks
+Strategy - High-level planning
+Structure:
+
+{
+  "role": "builder",
+  "modelId": "gpt-5",
+  "systemPrompt": "You are an expert ERP module builder...",
+  "temperature": 0.7,
+  "maxTokens": 4000
+}
+
+Why separate configs?
+
+A Builder agent needs creativity (higher temperature)
+A Reviewer agent needs precision (lower temperature)
+Each uses the same model but with different "personalities"
+Intelligence Forge
+Location: Build Mode OR ERP Mode → Intelligence Forge
+
+What is it?
+The place to manage and create AI agents that help with business tasks.
+
+Two Types of AI Agents:
+🏗️ Builder Agents (Build Mode only)
+Purpose: Help build the ERP system itself
+
+Create new modules
+Generate workflows
+Design data structures
+Write code
+Example Use:
+
+User: "I need a vendor management system"
+Builder Agent: 
+  ├─ Analyzes requirement
+  ├─ Creates vendor data structure
+  ├─ Generates approval workflows
+  └─ Publishes module
+
+🤖 Assistant Agents (Both modes)
+Purpose: Help with day-to-day business tasks
+
+Answer questions about invoices
+Analyze financial data
+Suggest optimal vendors
+Process document approvals
+Example Use:
+
+User: "Which vendor gives us the best pricing?"
+Assistant Agent:
+  ├─ Queries vendor database
+  ├─ Analyzes purchase history
+  ├─ Calculates average costs
+  └─ Recommends top 3 vendors
+
+Agent Profile Structure:
+{
+  "name": "Purchase Order Assistant",
+  "role": "assistant",
+  "agentConfigId": "builder-config",  // Links to Agent Config
+  "capabilities": [
+    "answer_questions",
+    "create_documents",
+    "analyze_data"
+  ],
+  "systemPrompt": "You help users manage purchase orders...",
+  "permissions": ["read:purchase_orders", "create:purchase_orders"]
+}
+
+Module Forge
+Location: Build Mode → Module Forge
+
+What is it?
+The AI-powered module creation studio. This is where you describe a business process in plain language, and AI helps you build a complete ERP module.
+
+The Workflow:
+┌─────────────────────────────────────────────┐
+│ 1. User describes requirements              │
+│    "I need to track purchase orders from    │
+│     vendors with 3-level approvals"         │
+└──────────────────┬──────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────┐
+│ 2. Requirements Engine                      │
+│    ├─ Matches template (P2P)                │
+│    ├─ Extracts entities (Vendor, PO)        │
+│    ├─ Identifies personas (Buyer, Manager)  │
+│    └─ Maps processes (Create → Approve)     │
+└──────────────────┬──────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────┐
+│ 3. Blueprint Service                        │
+│    ├─ Converts to module blueprint          │
+│    ├─ Defines fields (vendor_name, amount)  │
+│    ├─ Creates workflows                     │
+│    └─ Sets permissions                      │
+└──────────────────┬──────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────┐
+│ 4. Code Generation (optional)               │
+│    ├─ Backend API routes                    │
+│    ├─ Frontend UI components                │
+│    ├─ Database migrations                   │
+│    └─ Tests                                 │
+└──────────────────┬──────────────────────────┘
+                   ↓
+┌─────────────────────────────────────────────┐
+│ 5. Publishing                               │
+│    ├─ Creates module in database            │
+│    ├─ Adds fields                           │
+│    ├─ Sets up workflows                     │
+│    └─ Module now available in ERP Mode!     │
+└─────────────────────────────────────────────┘
+
+UI Panels:
+Left: Session history Center: Chat with builders Right: Tabs showing:
+
+Plan - Process flow diagram
+Documents - Document templates being created
+Approvals - Approval checkpoints
+Code - Generated code (if enabled)
+Behind the Scenes:
+The Module Forge uses 6-Phase Roundtable Orchestration:
+
+Coordinator - Understands user request
+Builder - Designs the solution
+Analyst - Checks feasibility
+SME - Provides domain expertise
+Reviewer - Quality assurance
+Strategy - Final decisions
+Each phase uses an Agent Config from LLM Configuration!
+
+Modules Section
+Location: Build Mode → Modules
+
+What are Modules?
+The building blocks of your ERP system. Each module represents a business capability.
+
+Pre-built Modules (Examples):
+Purchase Order - Manage buying from vendors
+Invoice - Track customer invoices
+Module Structure:
+Module: Purchase Order
+├─ Fields
+│  ├─ vendor_name (text)
+│  ├─ amount (money)
+│  ├─ status (select: draft, approved, sent)
+│  └─ approval_level (integer)
+│
+├─ Workflows
+│  ├─ Create → Submit → Approve → Send
+│  └─ Conditions: amount > $10,000 needs 2 approvals
+│
+└─ Permissions
+   ├─ Buyer: can create, view
+   ├─ Manager: can approve level 1
+   └─ Director: can approve level 2
+
+Why Modules?
+Flexibility: Build exactly what your business needs
+Reusability: Same module, multiple tenants
+Customization: Each tenant can add custom fields
+AI-Generated: Module Forge creates these automatically
+How Everything Connects
+The Complete Picture:
+┌─────────────────────────────────────────────────────────────────┐
+│                      LLM Configuration                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │  Providers   │→ │   Models     │→ │  Agent Configs       │  │
+│  │  (OpenAI)    │  │  (GPT-5)     │  │  (Builder, Analyst)  │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+└────────────────┬────────────────────────────┬───────────────────┘
+                 │                            │
+                 ↓                            ↓
+      ┌──────────────────────┐    ┌────────────────────────┐
+      │  Intelligence Forge  │    │     Module Forge       │
+      │                      │    │                        │
+      │  Create AI Agents    │    │  Build ERP Modules     │
+      │  ├─ Builder agents   │←───│  Uses builder agents   │
+      │  └─ Assistant agents │    │  to generate modules   │
+      └──────────┬───────────┘    └───────────┬────────────┘
+                 │                            │
+                 │                            ↓
+                 │                ┌────────────────────────┐
+                 │                │       Modules          │
+                 │                │                        │
+                 │                │  Finished ERP modules  │
+                 │                │  ├─ Purchase Orders    │
+                 │                │  └─ Invoices          │
+                 │                └───────────┬────────────┘
+                 │                            │
+                 └────────────────────────────┘
+                                  ↓
+                      ┌────────────────────────┐
+                      │      ERP Mode          │
+                      │                        │
+                      │  Business users work   │
+                      │  with:                 │
+                      │  ├─ Modules            │
+                      │  └─ Assistant Agents   │
+                      └────────────────────────┘
+
+Example End-to-End Flow:
+Scenario: CEO wants a custom expense approval system
+
+Admin goes to LLM Configuration
+
+Ensures OpenAI provider is configured
+Verifies GPT-5 model is available
+Checks "Builder" agent config exists
+Admin opens Intelligence Forge
+
+Sees list of existing builder agents
+(Optional) Creates specialized "Expense Expert" agent
+Admin goes to Module Forge
+
+Chats: "Create expense approval system with receipt uploads"
+AI builders (using configs from step 1):
+Ask clarifying questions
+Design data structure
+Create approval workflow
+Generate module
+Module is published to Modules section
+
+"Expense Approval" module now exists
+Has fields: amount, category, receipt, approver
+Has workflow: Submit → Manager → Finance → CEO
+Employees use it in ERP Mode
+
+Navigate to Expense Approval module
+Submit expense claims
+Assistant agents help:
+"Which expenses need my approval?"
+"What's our travel policy?"
+Settings Section
+Location: Sidebar → Settings
+
+What's there?
+User Profile: Name, email, avatar
+Organization Settings: Company info, jurisdiction
+Preferences: Theme, language
+API Keys: For integrations
+Audit Logs: Track changes
+Key Takeaways
+1. LLM Configuration = AI Setup
+Providers: Where AI comes from
+Models: Which AI brain to use
+Agent Configs: How AI should behave
+2. Intelligence Forge = AI Agent Factory
+Create builder agents (build system)
+Create assistant agents (help users)
+Agents use configs from LLM Configuration
+3. Module Forge = Module Builder Studio
+Describe business need in chat
+AI builders create module
+Uses builder agents from Intelligence Forge
+4. Modules = What Gets Built
+Actual ERP capabilities
+Used by business users in ERP Mode
+Can be AI-generated or manually created
+5. Navigation:
+/ or /dashboard = Homepage
+Logo = Dashboard
+Sidebar = Mode switcher (Build/ERP)
+Cmd+K = Quick search
+FAQ
+Q: Do I need to understand LLM Configuration to use Module Forge? A: No! As long as an admin has configured it once, Module Forge will work automatically.
+
+Q: Can I use the same agent config for multiple agents? A: Yes! You can have 10 agents all using the "Builder" config, each with different names/purposes.
+
+Q: What's the difference between Module Forge and Intelligence Forge? A:
+
+Module Forge = Build ERP modules (Purchase Orders, Invoices)
+Intelligence Forge = Build AI agents (assistants to help users)
+Q: Where do I see modules I've created? A: Build Mode → Modules (to edit), ERP Mode → Use them operationally
+
+Q: Can I customize AI agent behavior? A: Yes! Edit the agent config's system prompt, temperature, and max tokens in LLM Configuration.
+
+Next Steps
+Try it yourself:
+
+Go to Module Forge
+Describe a simple business process
+Watch AI build it!
+Customize:
+
+Visit LLM Configuration
+Create custom agent configs
+Fine-tune behavior
+Scale:
+
+Build multiple modules
+Train users
+Grow your ERP system

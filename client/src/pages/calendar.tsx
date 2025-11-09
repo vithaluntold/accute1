@@ -27,6 +27,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "
 export default function CalendarPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedClientId, setSelectedClientId] = useState<string>("none");
   const { toast } = useToast();
 
   const { data: appointments } = useQuery({
@@ -42,6 +43,7 @@ export default function CalendarPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       setDialogOpen(false);
+      setSelectedClientId("none");
       toast({ 
         title: "Success",
         description: "Appointment created successfully" 
@@ -59,11 +61,10 @@ export default function CalendarPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const clientId = formData.get("clientId") as string;
     createAppointmentMutation.mutate({
       title: formData.get("title"),
       description: formData.get("description"),
-      clientId: clientId === "none" ? null : clientId || null,
+      clientId: selectedClientId === "none" ? null : selectedClientId || null,
       startTime: new Date(formData.get("startTime") as string),
       endTime: new Date(formData.get("endTime") as string),
       location: formData.get("location"),
@@ -111,7 +112,7 @@ export default function CalendarPage() {
               </div>
               <div>
                 <Label>Client (Optional)</Label>
-                <Select name="clientId" disabled={isLoadingClients}>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={isLoadingClients}>
                   <SelectTrigger data-testid="select-client">
                     <SelectValue placeholder={
                       isLoadingClients ? "Loading clients..." : 
@@ -123,7 +124,7 @@ export default function CalendarPage() {
                     <SelectItem value="none">No Client</SelectItem>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {client.companyName}
                       </SelectItem>
                     ))}
                   </SelectContent>
