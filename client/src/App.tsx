@@ -535,6 +535,15 @@ function Router() {
           </RoleGuard>
         </ProtectedRoute>
       </Route>
+      <Route path="/workflow-builder/:id">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <WorkflowBuilder />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
       <Route path="/workflows/new">
         <ProtectedRoute>
           <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
