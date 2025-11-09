@@ -1684,6 +1684,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Organization Routes ====================
+
+  app.post("/api/organizations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, slug: providedSlug } = req.body;
+      
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: "Organization name is required" });
+      }
+
+      // Auto-generate slug from name if not provided
+      let slug = providedSlug?.trim();
+      if (!slug) {
+        slug = name.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
+
+      // Check slug uniqueness
+      const existing = await storage.getOrganizationBySlug(slug);
+      if (existing) {
+        return res.status(409).json({ error: "Organization slug already exists. Please choose a different name." });
+      }
+
+      // Create organization
+      const organization = await storage.createOrganization({
+        name: name.trim(),
+        slug,
+        tags: [],
+        isTestAccount: false,
+      });
+
+      // Update creator's organizationId to make them part of the new workspace
+      await storage.updateUser(req.userId, {
+        organizationId: organization.id,
+      });
+
+      await logActivity(req.userId, organization.id, "create", "organization", organization.id, { name: organization.name }, req);
+
+      res.status(201).json(organization);
+    } catch (error: any) {
+      console.error("Failed to create organization:", error);
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors 
+        });
+      }
+      res.status(500).json({ error: "Failed to create organization" });
+    }
+  });
+
   // ==================== Role Routes ====================
   
   app.get("/api/roles", requireAuth, async (req: AuthRequest, res: Response) => {

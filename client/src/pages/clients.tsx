@@ -112,7 +112,7 @@ export default function Clients() {
         // Strip auxiliary form-only fields and create clean client data
         const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...cleanClientData } = data;
         
-        createdClient = await apiRequest("POST", "/api/clients", cleanClientData);
+        createdClient = await apiRequest("/api/clients", "POST", cleanClientData);
         
         // Only create primary contact if we're creating a new client
         if (data.isCreating && data.primaryContactFirstName) {
@@ -127,11 +127,11 @@ export default function Clients() {
           };
           
           try {
-            await apiRequest("POST", "/api/contacts", contactData);
+            await apiRequest("/api/contacts", "POST", contactData);
           } catch (contactError: any) {
             // If contact creation fails, delete the created client to maintain consistency
             try {
-              await apiRequest("DELETE", `/api/clients/${createdClient.id}`);
+              await apiRequest(`/api/clients/${createdClient.id}`, "DELETE");
             } catch (rollbackError) {
               console.error("Failed to rollback client creation:", rollbackError);
             }
@@ -165,7 +165,7 @@ export default function Clients() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClient> }) => {
-      return apiRequest("PATCH", `/api/clients/${id}`, data);
+      return apiRequest(`/api/clients/${id}`, "PATCH", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
@@ -188,7 +188,7 @@ export default function Clients() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/clients/${id}`);
+      return apiRequest(`/api/clients/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
@@ -234,6 +234,33 @@ export default function Clients() {
     );
   });
 
+  const handleCreate = () => {
+    setEditingClient(null);
+    form.reset({
+      companyName: "",
+      contactName: "",
+      email: "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "US",
+      taxId: "",
+      status: "active" as const,
+      industry: "",
+      notes: "",
+      assignedTo: undefined,
+      metadata: {},
+      primaryContactFirstName: "",
+      primaryContactLastName: "",
+      primaryContactEmail: "",
+      primaryContactPhone: "",
+      isCreating: true, // Creating new client
+    });
+    setDialogOpen(true);
+  };
+
   const handleEdit = (client: Client) => {
     setEditingClient(client);
     form.reset({
@@ -258,13 +285,14 @@ export default function Clients() {
   };
 
   const onSubmit = (data: z.infer<typeof clientFormSchema>) => {
-    // Strip auxiliary fields that don't belong in the backend schema
-    const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...clientData } = data;
-    
     if (editingClient) {
+      // Editing existing client
+      const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...clientData } = data;
       updateMutation.mutate({ id: editingClient.id, data: clientData });
+    } else {
+      // Creating new client
+      createMutation.mutate(data);
     }
-    // Note: Client creation now happens via AI Client Onboarding page
   };
 
   return (
@@ -276,12 +304,29 @@ export default function Clients() {
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients by company, email, contact name, or tax ID..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-search"
+            />
+          </div>
+          <Button onClick={handleCreate} data-testid="button-create-client">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Client
+          </Button>
+        </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Client</DialogTitle>
+              <DialogTitle>{editingClient ? "Edit Client" : "Create Client"}</DialogTitle>
               <DialogDescription>
-                Update client information
+                {editingClient ? "Update client information" : "Add a new client to your organization"}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -511,18 +556,6 @@ export default function Clients() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search clients by company, email, contact name, or tax ID..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          data-testid="input-search"
-        />
-      </div>
 
       {isLoading ? (
         <div className="text-center py-12">Loading clients...</div>

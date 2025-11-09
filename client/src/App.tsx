@@ -1,7 +1,7 @@
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -13,6 +13,15 @@ import { isAuthenticated, getUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +38,7 @@ import { LucaChatWidget } from "@/components/luca-chat-widget";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const Landing = lazy(() => import("@/pages/landing"));
@@ -128,6 +137,10 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const user = getUser();
   const { isMobile } = useMobileDetect();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceSlug, setWorkspaceSlug] = useState("");
 
   const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
@@ -135,6 +148,56 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   });
 
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
+
+  const createWorkspaceMutation = useMutation({
+    mutationFn: async (data: { name: string; slug: string }) => {
+      return apiRequest("/api/organizations", "POST", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+      toast({
+        title: "Workspace created",
+        description: "Your new workspace has been created successfully. Please log in again to access it.",
+      });
+      setWorkspaceDialogOpen(false);
+      setWorkspaceName("");
+      setWorkspaceSlug("");
+      // Redirect to login to refresh auth state
+      window.location.href = "/login";
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create workspace",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateWorkspace = () => {
+    if (!workspaceName.trim()) {
+      toast({
+        title: "Error",
+        description: "Workspace name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    createWorkspaceMutation.mutate({ 
+      name: workspaceName.trim(), 
+      slug: workspaceSlug.trim() || workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    });
+  };
+
+  const handleWorkspaceNameChange = (value: string) => {
+    setWorkspaceName(value);
+    // Auto-generate slug from name
+    if (!workspaceSlug) {
+      const generatedSlug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      setWorkspaceSlug(generatedSlug);
+    }
+  };
 
   return (
     <>
@@ -174,11 +237,66 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                     Current Organization
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem data-testid="menu-item-create-workspace">
+                  <DropdownMenuItem 
+                    data-testid="menu-item-create-workspace"
+                    onClick={() => setWorkspaceDialogOpen(true)}
+                  >
                     Create New Workspace
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <Dialog open={workspaceDialogOpen} onOpenChange={setWorkspaceDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Workspace</DialogTitle>
+                    <DialogDescription>
+                      Create a new workspace to organize your team and clients
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="workspace-name">Workspace Name *</Label>
+                      <Input
+                        id="workspace-name"
+                        placeholder="e.g., Acme Accounting"
+                        value={workspaceName}
+                        onChange={(e) => handleWorkspaceNameChange(e.target.value)}
+                        data-testid="input-workspace-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="workspace-slug">Workspace URL Slug</Label>
+                      <Input
+                        id="workspace-slug"
+                        placeholder="acme-accounting"
+                        value={workspaceSlug}
+                        onChange={(e) => setWorkspaceSlug(e.target.value)}
+                        data-testid="input-workspace-slug"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto-generated from workspace name. Must be unique.
+                      </p>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setWorkspaceDialogOpen(false)}
+                        data-testid="button-cancel-workspace"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreateWorkspace}
+                        disabled={createWorkspaceMutation.isPending}
+                        data-testid="button-submit-workspace"
+                      >
+                        Create Workspace
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <Badge variant="outline" data-testid="badge-role-indicator" className="hidden md:flex">
                 {user?.role || 'User'}
