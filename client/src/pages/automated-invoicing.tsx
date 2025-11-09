@@ -279,7 +279,7 @@ export default function AutomatedInvoicing() {
                 <SelectContent>
                   {clients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {client.companyName}
                     </SelectItem>
                   ))}
                 </SelectContent>

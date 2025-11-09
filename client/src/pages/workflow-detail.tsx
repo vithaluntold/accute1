@@ -237,7 +237,7 @@ export default function WorkflowDetail() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setLocation(`/workflow-builder?id=${workflowId}`)}
+                  onClick={() => setLocation(`/workflow-builder/${workflowId}`)}
                   data-testid="button-edit-automation"
                 >
                   <Edit className="h-4 w-4 mr-2" />

@@ -119,7 +119,7 @@ export default function InvoicesPage() {
                   <SelectContent>
                     {clients?.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                        {client.companyName}
                       </SelectItem>
                     ))}
                   </SelectContent>
