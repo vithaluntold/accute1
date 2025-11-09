@@ -29,6 +29,9 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - **Email Sanitization**: All email fields (fromEmail, subject, organizationName, roleName, inviteUrl) sanitized using `sanitizeForEmail()` to replace Unicode smart quotes and special characters with ASCII equivalents, preventing Resend ByteString conversion errors.
 - **Error Handling**: Team creation and other endpoints use `instanceof ZodError` for reliable validation error detection, returning 400 status with detailed validation messages.
 - **Duplicate Relationship Prevention**: Supervision endpoint includes pre-flight duplicate check, returning 409 Conflict for existing relationships instead of 500 database constraint errors.
+- **Manual Client Creation**: Full client creation workflow with "Create Client" button, form validation, and primary contact creation. Includes atomic rollback on contact creation failure.
+- **Inline Tag Creation**: TagSelector component supports on-the-fly tag creation with color picker dialog when no tags exist or when creating new tags from dropdown.
+- **Workspace Creation**: Full workspace creation flow with dialog UI, auto-slug generation, and organization setup. Updates creator's organizationId and requires re-authentication to access new workspace.
 
 ### System Architecture
 
