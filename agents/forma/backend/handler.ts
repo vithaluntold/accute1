@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
 import { LLMService } from "../../../server/llm-service";
+import { FileParserService } from "../../../server/file-parser-service";
 import multer from "multer";
 import * as pdfParse from "pdf-parse";
 import mammoth from "mammoth";
@@ -290,43 +291,31 @@ Great! I've added an email field for you. What other information do you need to 
           return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
         }
 
-      // Get LLM configuration
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+        // Get LLM configuration (required for form generation via AI)
+        const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+        if (!llmConfig) {
+          return res.status(400).json({ 
+            error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
+          });
+        }
 
-      // Parse document based on file type
-      let documentText = "";
-      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+        // Parse document using centralized FileParserService
+        const parsed = await FileParserService.parseFile(
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype,
+          llmConfig
+        );
 
-      if (fileExtension === "pdf") {
-        const pdfData = await (pdfParse as any)(req.file.buffer);
-        documentText = pdfData.text;
-      } else if (fileExtension === "docx") {
-        const result = await mammoth.extractRawText({ buffer: req.file.buffer });
-        documentText = result.value;
-      } else if (fileExtension === "txt") {
-        documentText = req.file.buffer.toString('utf-8');
-      } else if (fileExtension === "xlsx" || fileExtension === "xls") {
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        let allText = "";
-        
-        workbook.SheetNames.forEach(sheetName => {
-          const sheet = workbook.Sheets[sheetName];
-          const csvData = XLSX.utils.sheet_to_csv(sheet);
-          allText += `\n--- Sheet: ${sheetName} ---\n${csvData}\n`;
-        });
-        
-        documentText = allText;
-      } else {
-        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, XLSX, or TXT files." });
-      }
+        // Warn if scanned PDF detected without LLM config
+        if (parsed.isScannedPdf && !llmConfig) {
+          console.warn(`[Forma] Scanned PDF upload without LLM config - OCR unavailable for org ${req.user!.organizationId}`);
+        }
 
-      // Use AI to extract questions and create form
-      const llmService = new LLMService(llmConfig);
+        const documentText = parsed.text;
+
+        // Use AI to extract questions and create form
+        const llmService = new LLMService(llmConfig);
 
       const systemPrompt = `You are Forma, an AI form builder. You analyze documents containing questions or data requirements and convert them into structured forms.
 
