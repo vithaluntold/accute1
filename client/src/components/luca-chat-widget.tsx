@@ -377,7 +377,7 @@ export function LucaChatWidget() {
                     // Only generate title if it's still "New Chat"
                     if (sessionData.title === "New Chat") {
                       console.log('[Luca Chat] Auto-generating title for session:', currentSessionId);
-                      await apiRequest(`/api/luca-chat-sessions/${currentSessionId}/generate-title`, 'POST', {});
+                      await apiRequest('POST', `/api/luca-chat-sessions/${currentSessionId}/generate-title`, {});
                       
                       // Invalidate sessions to show new title
                       queryClient.invalidateQueries({ 
