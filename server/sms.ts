@@ -1,16 +1,18 @@
 /**
- * SMS Helper Module for OTP verification via MSG91
+ * SMS Helper Module for OTP verification via Plivo
  * 
  * Sends 6-digit OTP codes for mobile number verification during account setup.
- * Uses MSG91 for reliable international SMS delivery with strong India support.
+ * Uses Plivo for reliable international SMS delivery - NO IP WHITELISTING REQUIRED.
  * 
  * To enable SMS functionality:
- * 1. Configure MSG91_AUTH_KEY in Replit Secrets (from MSG91 dashboard)
- * 2. Configure MSG91_SENDER_ID (default: "ACCUTE" - register this in MSG91 console)
- * 3. Configure MSG91_TEMPLATE_ID (from registered DLT template in MSG91)
+ * 1. Sign up at plivo.com
+ * 2. Configure PLIVO_AUTH_ID in Replit Secrets (from Plivo dashboard)
+ * 3. Configure PLIVO_AUTH_TOKEN in Replit Secrets (from Plivo dashboard)
+ * 4. Configure PLIVO_PHONE_NUMBER (your Plivo phone number, e.g., +15551234567)
  */
 
 import crypto from 'crypto';
+import plivo from 'plivo';
 
 const DEFAULT_SENDER_ID = "ACCUTE";
 const OTP_LENGTH = 6;
@@ -34,7 +36,7 @@ export function getOTPExpiry(): Date {
 
 /**
  * Format phone number for international SMS (E.164 format)
- * Ensures phone number has country code for MSG91
+ * Ensures phone number has country code for Plivo
  */
 function formatPhoneNumber(phone: string): string {
   // Remove all non-digit characters except +
@@ -49,70 +51,59 @@ function formatPhoneNumber(phone: string): string {
 }
 
 /**
- * Send OTP verification code via SMS using MSG91 OTP API
+ * Send OTP verification code via SMS using Plivo API
  */
 export async function sendOTP(phone: string, otp: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Check if MSG91 is configured
-    const authKey = process.env.MSG91_AUTH_KEY;
-    const templateId = process.env.MSG91_TEMPLATE_ID;
+    // Check if Plivo is configured
+    const authId = process.env.PLIVO_AUTH_ID;
+    const authToken = process.env.PLIVO_AUTH_TOKEN;
+    const fromNumber = process.env.PLIVO_PHONE_NUMBER;
 
-    if (!authKey) {
-      console.warn("MSG91 not configured. SMS functionality disabled. Please set MSG91_AUTH_KEY.");
+    if (!authId || !authToken) {
+      console.warn("Plivo not configured. SMS functionality disabled. Please set PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN.");
       return { 
         success: false, 
-        error: "SMS functionality not configured. Please set up MSG91 credentials." 
+        error: "SMS functionality not configured. Please set up Plivo credentials." 
       };
     }
 
-    if (!templateId) {
-      console.warn("MSG91_TEMPLATE_ID not configured. Required for OTP sending.");
+    if (!fromNumber) {
+      console.warn("PLIVO_PHONE_NUMBER not configured. Required for sending SMS.");
       return {
         success: false,
-        error: "MSG91 template ID required. Please configure MSG91_TEMPLATE_ID in your environment."
+        error: "Plivo phone number required. Please configure PLIVO_PHONE_NUMBER in your environment."
       };
     }
 
     // Format phone number to E.164
     const formattedPhone = formatPhoneNumber(phone);
-    
-    // Remove + prefix for MSG91 API (it expects just digits with country code)
-    const phoneForAPI = formattedPhone.replace('+', '');
 
-    // Prepare request payload for MSG91 OTP API
-    // Use template_id for DLT compliance and structured OTP sending
-    const payload: any = {
-      template_id: templateId,
-      mobile: phoneForAPI,
-      otp: otp, // Send our pre-generated OTP
-      otp_length: OTP_LENGTH,
-      otp_expiry: OTP_EXPIRY_MINUTES
-    };
+    // Initialize Plivo client
+    const client = new plivo.Client(authId, authToken);
 
-    // Send OTP via MSG91 OTP API (v5)
-    const response = await fetch('https://control.msg91.com/api/v5/otp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'authkey': authKey
-      },
-      body: JSON.stringify(payload)
+    // Prepare SMS message
+    const messageText = `Your Accute verification code is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes.\n\nIf you didn't request this code, please ignore this message.`;
+
+    // Send SMS via Plivo
+    const response = await client.messages.create({
+      src: fromNumber,
+      dst: formattedPhone,
+      text: messageText,
     });
 
-    const result = await response.json();
-
-    if (!response.ok || result.type === 'error') {
-      console.error('MSG91 OTP API error:', result);
+    if (!response || response.error) {
+      console.error('Plivo SMS API error:', response);
       return {
         success: false,
-        error: result.message || 'Failed to send OTP via MSG91'
+        error: response?.error || 'Failed to send OTP via Plivo'
       };
     }
 
-    console.log(`OTP sent successfully to ${phone} via MSG91. Type: ${result.type}`);
+    console.log(`OTP sent successfully to ${phone} via Plivo. Message UUID: ${response.messageUuid}`);
     return { success: true };
   } catch (error: any) {
-    console.error("Failed to send OTP SMS via MSG91:", error.message);
+    console.error("Failed to send OTP SMS via Plivo:", error.message);
     return { 
       success: false, 
       error: error.message || "Failed to send OTP SMS" 
@@ -124,5 +115,5 @@ export async function sendOTP(phone: string, otp: string): Promise<{ success: bo
  * Check if SMS service is configured
  */
 export function isSMSConfigured(): boolean {
-  return !!process.env.MSG91_AUTH_KEY;
+  return !!(process.env.PLIVO_AUTH_ID && process.env.PLIVO_AUTH_TOKEN && process.env.PLIVO_PHONE_NUMBER);
 }
