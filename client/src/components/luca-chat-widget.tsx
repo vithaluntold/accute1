@@ -661,17 +661,18 @@ export function LucaChatWidget() {
                 <ChevronDown className="h-3.5 w-3.5" />
               </Button>
               
-              {isFullScreen && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
-                  onClick={() => setIsFullScreen(false)}
-                  data-testid="button-close-fullscreen"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+                onClick={() => {
+                  setIsExpanded(false);
+                  setIsFullScreen(false);
+                }}
+                data-testid="button-close-chat"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
             </div>
           </div>
 
