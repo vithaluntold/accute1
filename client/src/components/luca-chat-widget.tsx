@@ -622,16 +622,16 @@ export function LucaChatWidget() {
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {showSidebar && !isMobile && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+                  className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                   onClick={() => setShowSidebar(false)}
                   data-testid="button-hide-sidebar"
                 >
-                  <PanelLeftClose className="h-4 w-4" />
+                  <PanelLeftClose className="h-3.5 w-3.5" />
                 </Button>
               )}
               
@@ -639,14 +639,14 @@ export function LucaChatWidget() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+                  className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                   onClick={() => setIsFullScreen(!isFullScreen)}
                   data-testid="button-toggle-fullscreen"
                 >
                   {isFullScreen ? (
-                    <Minimize2 className="h-4 w-4" />
+                    <Minimize2 className="h-3.5 w-3.5" />
                   ) : (
-                    <Maximize2 className="h-4 w-4" />
+                    <Maximize2 className="h-3.5 w-3.5" />
                   )}
                 </Button>
               )}
@@ -654,7 +654,7 @@ export function LucaChatWidget() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
+                className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0"
                 onClick={() => {
                   if (isFullScreen) {
                     setIsFullScreen(false);
@@ -664,7 +664,7 @@ export function LucaChatWidget() {
                 }}
                 data-testid="button-minimize-chat"
               >
-                {isFullScreen ? <X className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {isFullScreen ? <X className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </Button>
             </div>
           </div>
