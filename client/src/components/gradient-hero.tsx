@@ -32,20 +32,20 @@ export function GradientHero({
       data-testid={testId}
     >
       <div className="absolute inset-0 gradient-hero" aria-hidden="true"></div>
-      <div className="relative container mx-auto p-6 md:p-8">
+      <div className="relative container mx-auto p-4 md:p-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="max-w-4xl flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <Icon className="h-10 w-10 text-white" aria-hidden="true" />
+            <div className="flex items-center gap-2 mb-1">
+              <Icon className="h-7 w-7 text-white" aria-hidden="true" />
               <h1
-                className="text-4xl md:text-5xl font-display font-bold text-white"
+                className="text-2xl md:text-3xl font-display font-bold text-white"
                 data-testid={`${testId}-title`}
               >
                 {title}
               </h1>
             </div>
             <p
-              className="text-white/90 text-lg"
+              className="text-white/90 text-sm md:text-base"
               data-testid={`${testId}-description`}
             >
               {description}
