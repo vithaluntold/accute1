@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an AI-native accounting workflow automation platform for modern accounting firms. It uses specialized AI agents to automate tasks, boosting efficiency, ensuring compliance, and enhancing accounting practices. Key features include multi-agent orchestration with 10 specialized AI agents, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. It offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, aiming to revolutionize accounting workflows through AI-driven automation.
+Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It leverages specialized AI agents to automate tasks, aiming to boost efficiency, ensure compliance, and enhance accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. The platform offers global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, with the overarching goal of revolutionizing accounting workflows through AI-driven automation and providing a significant market advantage.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory
@@ -11,7 +11,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - Comprehensive audit trail for compliance
 - **CRITICAL**: ENCRYPTION_KEY environment variable must be stable across deployments to prevent LLM credential decryption failures
 - WebSocket Management: WebSockets now lazy-load on-demand when chat sessions start, not at server startup to prevent initialization errors
-- Subscription System: Full subscription UI and routes now enabled for testing (previously disabled, re-enabled Nov 8, 2025)
+- Subscription System: Full subscription UI and routes now enabled for testing
 - Luca Agent Personality: Luca now asks follow-up questions BEFORE answering to narrow down exact requirements
 - Luca Agent Approach: Luca asks 2-3 targeted clarifying questions to understand context
 - Cadence Workflow Builder: Now supports FULL hierarchy extraction (Stages → Steps → Tasks → Subtasks → Checklists) from uploaded documents and conversational building
@@ -30,13 +30,13 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 ### System Architecture
 
 #### UI/UX Decisions
-The UI is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
+The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
 
 #### Technical Implementations
-The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is Node.js, Express, and TypeScript. Data is stored in PostgreSQL (Neon) via Drizzle ORM. Authentication uses JWT and bcrypt, with AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript. PostgreSQL (Neon) is used for data storage via Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
 #### Feature Specifications
-- **Multi-tenant Architecture**: Provides isolated data and distinct roles.
+- **Multi-tenant Architecture**: Isolated data and distinct roles.
 - **Role-Based Access Control**: Four-tier system (Super Admin, Admin, Employee, Client).
 - **Client Portal**: Dedicated interface for client interactions.
 - **AI Client Onboarding System**: Privacy-first, conversational, AI-driven onboarding.
@@ -54,15 +54,15 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Subscription Management System**: Four-tier model with regional pricing and automated billing.
 - **Invoice Generation System**: Auto-generates invoices for subscription events.
 - **Payment Security**: AES-256-GCM encryption, HTTPS, rate limiting, and audit logging.
-- **Multi-Factor Authentication (MFA)**: TOTP-based MFA using Google Authenticator/Authy with QR code setup, backup codes, trusted devices, and device fingerprinting.
+- **Multi-Factor Authentication (MFA)**: TOTP-based MFA with QR code setup, backup codes, trusted devices, and device fingerprinting.
 - **Comprehensive Pricing & Subscription Management**: Enterprise-grade system with product families, SKU-based plans, add-ons, coupons, regional pricing, and volume tiers.
 - **Multi-Gateway Payment Processing**: Organizations configure their own payment gateways (Razorpay, Stripe, PayU, Payoneer) with encrypted credentials.
-- **Service Plans Marketplace (Fiverr-style)**: Admins create service offerings with various pricing models, deliverables tracking, and client review systems.
-- **Multi-Tier Authorization System**: 7-layer protection for service plan purchases to prevent data leakage and unauthorized access.
-- **Subscription-Based Feature Gating**: Production-ready feature visibility and quota enforcement system with shared entitlement contract. Backend middleware and frontend hooks manage access and quotas. Real-time usage tracking via `UsageTrackingService`. Fail-closed security design.
+- **Service Plans Marketplace**: Admins create service offerings with various pricing models, deliverables tracking, and client review systems.
+- **Multi-Tier Authorization System**: 7-layer protection for service plan purchases.
+- **Subscription-Based Feature Gating**: Production-ready feature visibility and quota enforcement via backend middleware and frontend hooks, with real-time usage tracking and a fail-closed security design.
 
 #### System Design Choices
-The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation.
+The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent.
 
 ### External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
@@ -79,99 +79,3 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **pdf-parse**: PDF text extraction.
 - **mammoth**: DOCX text extraction.
 - **xlsx**: Excel file parsing (XLSX, XLS).
-
-### Critical Environment Variables
-- **ENCRYPTION_KEY**: AES-256-GCM encryption key for LLM credentials (MUST be 32+ chars, stable across deployments)
-  - LLM API keys are stored encrypted in database per organization
-  - If ENCRYPTION_KEY changes, existing credentials cannot be decrypted
-  - Server validates this at startup and fails fast if missing/invalid
-
-### Critical Production Deployment Requirements
-- **AI Agent Backends Must Be Compiled**: Production cannot load TypeScript files directly
-  - Development: `tsx` transpiles `.ts` files on-the-fly
-  - Production: Needs compiled `.js` files in `dist/agents/*/backend/index.js`
-  - **SOLUTION**: Run `./scripts/build-production.sh` before deploying
-  - Without this, all AI agents will fail with "Cannot find module" errors in production
-
-### File Attachment System for AI Agents
-All 8 conversational AI agents now support file attachments with automatic text extraction:
-
-#### FileParserService (`server/file-parser-service.ts`)
-Centralized parsing service supporting multiple file formats:
-- **PDF**: Text extraction with fallback detection for scanned/image-only PDFs
-- **DOCX**: Extracts text from paragraphs, tables, headers, and footers
-- **Excel (XLSX/XLS)**: Converts sheets to CSV-style formatted text
-- **CSV**: Automatic delimiter detection and parsing
-- **TXT**: Direct text reading
-- **Scanned PDFs**: Placeholder for OCR implementation (TODO: requires multimodal AI)
-
-Security & Validation:
-- MIME type validation (application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, etc.)
-- 10MB file size limit
-- Error handling with descriptive messages
-- Returns parsed text, filename, and metadata
-
-#### FileAttachment UI Component (`client/src/components/shared/FileAttachment.tsx`)
-Reusable React component for file uploads:
-- Client-side validation (size, type)
-- Real-time upload progress tracking with status messages
-- Success/error toast notifications
-- File removal capability
-- Accessible with proper ARIA labels
-- Test IDs:
-  - `input-file-upload`: Hidden file input element
-  - `button-attach-file`: Main upload button
-  - `text-attached-filename`: Display of attached file name
-  - `button-remove-file`: Button to remove selected file
-
-Usage Example:
-```tsx
-import { FileAttachment } from "@/components/shared/FileAttachment";
-
-<FileAttachment
-  uploadEndpoint="/api/agents/luca/upload-document"
-  onFileProcessed={(extractedText) => {
-    // Handle extracted text - add to chat, analyze, etc.
-  }}
-/>
-```
-
-#### Agent Upload Endpoints
-All 8 agents have consistent `/api/agents/{agent}/upload-document` endpoints:
-- **Agents**: Echo, Relay, Lynk, Luca, Parity, Scribe, Radar, OmniSpectra
-- **Method**: POST with multipart/form-data
-- **Field Name**: `file`
-- **Authentication**: Required (requireAuth middleware)
-- **File Size Limit**: 10MB
-- **Supported Types**: PDF, DOCX, XLSX, XLS, CSV, TXT
-- **Response**: `{ success: true, extractedText: string, filename: string, metadata: object }`
-
-Implementation Pattern:
-```typescript
-// Backend (agents/{agent}/backend/handler.ts)
-import multer from "multer";
-import { FileParserService } from "../../../server/file-parser-service";
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-app.post("/api/agents/{agent}/upload-document", requireAuth, (req, res) => {
-  upload.single("file")(req, res, async (err) => {
-    // Parse file and return extracted text
-  });
-});
-```
-
-#### Future Enhancements
-- Extract multer configuration into shared middleware (prevent config drift)
-- Implement OCR for scanned PDFs using Claude 3.5 Sonnet or GPT-4 Vision
-- Add automated tests for upload endpoints and parsing logic
-- Add file extension validation in addition to MIME type checks
-- Implement global rate limiting for file upload endpoints
-
-### Recent Fixes (November 2025)
-- **WebSocket Agent Execution (Nov 7, 2025)**: Fixed dev mode agent chat by replacing dynamic imports with static agent factory. Created `server/agent-static-factory.ts` with static imports of all agent classes for reliable operation in both development (tsx) and production (compiled JS).
-- **Lynk AI Agent & Document Upload Fix (Nov 8, 2025)**: Implemented Lynk messaging intelligence agent (mirrors Relay for emails) with chat interface, task extraction, and LLM integration. Fixed client portal document upload to use correct endpoint `/api/documents`.
-- **Onboarding WelcomeModal API Bug (Nov 8, 2025)**: Fixed critical bug in `WelcomeModal.tsx` where `apiRequest` was called with incorrect parameter order, causing "not a valid HTTP method" error on "Get Started" button click. Corrected from `apiRequest(url, options)` to `apiRequest('POST', url, data)` to match function signature.
