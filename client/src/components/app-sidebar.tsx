@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { clearAuth, getUser } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 // Platform-scoped menu (Super Admin) - SaaS provider features
@@ -243,7 +244,16 @@ const clientPortalMenuCategories = [
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const user = getUser();
+  
+  // Use React Query to make sidebar reactive to user data changes
+  const { data: queryUser } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+    enabled: !!getUser(), // Only fetch if user is logged in
+    staleTime: 0, // Always check for updates
+  });
+  
+  // Fall back to localStorage if query hasn't loaded yet
+  const user = queryUser || getUser();
 
   // Determine which menu to show based on user role
   const getMenuCategories = () => {

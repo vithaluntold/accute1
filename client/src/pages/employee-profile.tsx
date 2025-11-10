@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { GradientHero } from "@/components/gradient-hero";
+import { getToken, setAuth } from "@/lib/auth";
 import {
   Dialog,
   DialogContent,
@@ -198,11 +199,19 @@ export default function EmployeeProfile() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
       toast({
         title: "Profile picture updated",
         description: "Your profile picture has been uploaded successfully.",
       });
+      
+      // Update localStorage so sidebar shows new avatar immediately
+      const token = getToken();
+      if (token && updatedUser) {
+        setAuth(token, updatedUser);
+      }
+      
+      //  Invalidate queries to update avatar in UI
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
