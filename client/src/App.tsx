@@ -48,6 +48,7 @@ const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const Settings = lazy(() => import("@/pages/settings"));
+const OrganizationSettings = lazy(() => import("@/pages/organization-settings"));
 const Analytics = lazy(() => import("@/pages/analytics"));
 const Workflows = lazy(() => import("@/pages/workflows"));
 const WorkflowDetail = lazy(() => import("@/pages/workflow-detail"));
@@ -439,6 +440,17 @@ function Router() {
             <Settings />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/organization-settings">
+        <ProtectedRoute>
+          <OrganizationRoute>
+            <RoleGuard allowedRoles={["Super Admin", "Admin"]}>
+              <AppLayout>
+                <OrganizationSettings />
+              </AppLayout>
+            </RoleGuard>
+          </OrganizationRoute>
+        </ProtectedRoute>
       </Route>
       <Route path="/profile">
         <ProtectedRoute>

@@ -166,7 +166,8 @@ const organizationMenuCategories = [
       { title: "Roles & Permissions", url: "/roles", icon: Shield, permission: "roles.view" },
       { title: "Analytics", url: "/analytics", icon: BarChart3, permission: "analytics.view" },
       { title: "Subscription", url: "/subscription", icon: CreditCard, permission: null },
-      { title: "Settings", url: "/settings", icon: Settings, permission: null },
+      { title: "Workspace Settings", url: "/organization-settings", icon: Building2, permission: null },
+      { title: "My Settings", url: "/settings", icon: Settings, permission: null },
       { title: "Mobile Apps", url: "/mobile-apps", icon: Smartphone, permission: null },
     ]
   }
@@ -415,6 +416,14 @@ function WorkspaceSwitcher({ user }: { user: any }) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => setLocation("/organization-settings")}
+            data-testid="manage-workspace-button"
+            disabled={switchWorkspace.isPending}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Manage Workspace
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => setLocation("/organizations/create")}
             data-testid="create-workspace-button"
