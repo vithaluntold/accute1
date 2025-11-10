@@ -151,7 +151,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
   const createWorkspaceMutation = useMutation({
     mutationFn: async (data: { name: string; slug: string }) => {
-      return apiRequest("/api/organizations", "POST", data);
+      return apiRequest("POST", "/api/organizations", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/organizations"] });
