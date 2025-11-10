@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -23,9 +23,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { clearAuth, getUser } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 // Platform-scoped menu (Super Admin) - SaaS provider features
@@ -242,6 +252,183 @@ const clientPortalMenuCategories = [
   }
 ];
 
+// Workspace Switcher Component
+function WorkspaceSwitcher({ user }: { user: any }) {
+  const { toast } = useToast();
+  const [location, setLocation] = useLocation();
+
+  // Fetch user's workspaces (always fetch for authenticated users)
+  const { data: memberships, isLoading } = useQuery<any[]>({
+    queryKey: ["/api/user/workspaces"],
+    select: (data) => data ?? [], // Ensure we always have an array
+  });
+
+  // Determine current workspace using cascading fallback
+  const currentWorkspaceId = 
+    user?.defaultOrganizationId ||  // 1. Prefer defaultOrganizationId
+    memberships?.find(m => m.isDefault)?.organizationId || // 2. Find membership marked isDefault
+    memberships?.[0]?.organizationId; // 3. Fall back to first membership
+
+  // Get current organization from memberships (no separate fetch needed)
+  const currentOrg = memberships?.find(m => m.organizationId === currentWorkspaceId)?.organization;
+
+  // Switch workspace mutation
+  const switchWorkspace = useMutation({
+    mutationFn: async (organizationId: string) => {
+      return await apiRequest("POST", `/api/user/workspaces/${organizationId}/switch`);
+    },
+    onSuccess: async () => {
+      // Invalidate all relevant caches
+      await queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/user/workspaces"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/organizations"] });
+      
+      toast({
+        title: "Workspace switched",
+        description: "Your workspace has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to switch workspace",
+        description: error.message || "An error occurred",
+      });
+    },
+  });
+
+  const handleSwitchWorkspace = (organizationId: string) => {
+    if (organizationId === currentWorkspaceId) return; // Already on this workspace
+    switchWorkspace.mutate(organizationId);
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <SidebarMenuItem>
+        <div className="px-2 py-2">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading workspaces...</span>
+          </div>
+        </div>
+      </SidebarMenuItem>
+    );
+  }
+
+  // No workspaces - show Create Workspace CTA
+  if (memberships.length === 0) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton 
+          onClick={() => setLocation("/organizations/create")}
+          data-testid="create-first-workspace-button"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Create Workspace</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
+
+  // Single workspace - show simple label
+  if (memberships.length === 1) {
+    return (
+      <SidebarMenuItem>
+        <div className="px-2 py-2">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {currentOrg?.logoUrl ? (
+                <Avatar className="h-5 w-5 shrink-0">
+                  <AvatarImage src={currentOrg.logoUrl} alt={currentOrg.name} />
+                  <AvatarFallback className="text-xs bg-primary/10">
+                    {currentOrg.name?.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+              <span className="text-sm font-medium truncate" data-testid="current-workspace-name">
+                {currentOrg?.name || "Loading..."}
+              </span>
+            </div>
+          </div>
+        </div>
+      </SidebarMenuItem>
+    );
+  }
+
+  // Show dropdown for multiple workspaces
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton 
+            className="w-full" 
+            data-testid="workspace-switcher-trigger"
+            disabled={switchWorkspace.isPending}
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {currentOrg?.logoUrl ? (
+                <Avatar className="h-5 w-5 shrink-0">
+                  <AvatarImage src={currentOrg.logoUrl} alt={currentOrg.name} />
+                  <AvatarFallback className="text-xs bg-primary/10">
+                    {currentOrg.name?.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <Building2 className="h-4 w-4 shrink-0" />
+              )}
+              <span className="flex-1 truncate text-left">{currentOrg?.name || "Select Workspace"}</span>
+            </div>
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56" data-testid="workspace-switcher-menu">
+          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {memberships.map((membership: any) => (
+            <DropdownMenuItem
+              key={membership.organizationId}
+              onClick={() => handleSwitchWorkspace(membership.organizationId)}
+              data-testid={`workspace-option-${membership.organizationId}`}
+              className="cursor-pointer"
+              disabled={switchWorkspace.isPending}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {membership.organization?.logoUrl ? (
+                  <Avatar className="h-5 w-5 shrink-0">
+                    <AvatarImage src={membership.organization.logoUrl} alt={membership.organization.name} />
+                    <AvatarFallback className="text-xs bg-primary/10">
+                      {membership.organization.name?.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <Building2 className="h-4 w-4 shrink-0" />
+                )}
+                <span className="flex-1 truncate">{membership.organization?.name}</span>
+                {membership.organizationId === currentWorkspaceId && (
+                  <Check className="h-4 w-4 text-primary shrink-0" data-testid="current-workspace-check" />
+                )}
+              </div>
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => setLocation("/organizations/create")}
+            data-testid="create-workspace-button"
+            disabled={switchWorkspace.isPending}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Workspace
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   
@@ -332,6 +519,12 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          {/* Workspace Switcher - Multi-Workspace Support */}
+          {user && (
+            <WorkspaceSwitcher user={user} />
+          )}
+
+          {/* User Info */}
           {user && (
             <SidebarMenuItem>
               <div className="px-2 py-3 border-t">
@@ -359,6 +552,8 @@ export function AppSidebar() {
               </div>
             </SidebarMenuItem>
           )}
+
+          {/* Logout */}
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} data-testid="button-logout">
               <LogOut />
