@@ -2184,14 +2184,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Luca Chat Session Routes ====================
 
-  // Get all chat sessions for current user
+  // Get all chat sessions for current user (excluding archived by default)
   app.get("/api/luca-chat-sessions", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      const includeArchived = req.query.includeArchived === 'true';
       const sessions = await storage.getLucaChatSessionsByUser(req.user!.id);
-      res.json(sessions);
+      
+      // Filter out archived sessions unless explicitly requested
+      const filteredSessions = includeArchived 
+        ? sessions 
+        : sessions.filter((s: any) => !s.isArchived);
+      
+      res.json(filteredSessions);
     } catch (error: any) {
       console.error('[Luca Chat] Error fetching sessions:', error);
       res.status(500).json({ error: "Failed to fetch chat sessions" });
+    }
+  });
+
+  // Search chat sessions by title and content (must be before /:id route)
+  app.get("/api/luca-chat-sessions/search", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const query = (req.query.q as string || '').trim();
+      
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      // Get all sessions (including archived for search)
+      const sessions = await storage.getLucaChatSessionsByUser(req.user!.id);
+      
+      // Search in titles first
+      const titleMatches = sessions.filter((s: any) => 
+        s.title.toLowerCase().includes(query.toLowerCase())
+      );
+
+      // Also search in message content for deeper search
+      const sessionIds = sessions.map((s: any) => s.id);
+      const contentMatches: any[] = [];
+
+      for (const sessionId of sessionIds) {
+        const messages = await storage.getLucaChatMessagesBySession(sessionId);
+        const hasContentMatch = messages.some((m: any) =>
+          m.content.toLowerCase().includes(query.toLowerCase())
+        );
+
+        if (hasContentMatch) {
+          const session = sessions.find((s: any) => s.id === sessionId);
+          if (session && !titleMatches.find((t: any) => t.id === sessionId)) {
+            contentMatches.push(session);
+          }
+        }
+      }
+
+      // Combine and sort results (title matches first)
+      const results = [...titleMatches, ...contentMatches]
+        .sort((a: any, b: any) => 
+          new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+        );
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error searching sessions:', error);
+      res.status(500).json({ error: "Failed to search chat sessions" });
     }
   });
 
@@ -2292,7 +2347,7 @@ Title:`;
     }
   });
 
-  // Update a chat session (rename, pin, etc.)
+  // Update a chat session (rename, pin, archive, etc.)
   app.patch("/api/luca-chat-sessions/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const existing = await storage.getLucaChatSession(req.params.id);
@@ -2301,12 +2356,13 @@ Title:`;
         return res.status(404).json({ error: "Chat session not found" });
       }
       
-      const { title, isPinned, isActive } = req.body;
+      const { title, isPinned, isActive, isArchived } = req.body;
       const updates: any = {};
       
       if (title !== undefined) updates.title = title;
       if (isPinned !== undefined) updates.isPinned = isPinned;
       if (isActive !== undefined) updates.isActive = isActive;
+      if (isArchived !== undefined) updates.isArchived = isArchived;
       
       const session = await storage.updateLucaChatSession(req.params.id, updates);
       res.json(session);
@@ -2330,6 +2386,29 @@ Title:`;
     } catch (error: any) {
       console.error('[Luca Chat] Error deleting session:', error);
       res.status(500).json({ error: "Failed to delete chat session" });
+    }
+  });
+
+  // Archive/Unarchive a chat session
+  app.patch("/api/luca-chat-sessions/:id/archive", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await storage.getLucaChatSession(req.params.id);
+      
+      if (!existing || existing.userId !== req.user!.id) {
+        return res.status(404).json({ error: "Chat session not found" });
+      }
+
+      const { isArchived } = req.body;
+
+      if (typeof isArchived !== 'boolean') {
+        return res.status(400).json({ error: "isArchived must be a boolean" });
+      }
+
+      const updated = await storage.updateLucaChatSession(req.params.id, { isArchived });
+      res.json(updated);
+    } catch (error: any) {
+      console.error('[Luca Chat] Error archiving session:', error);
+      res.status(500).json({ error: "Failed to archive chat session" });
     }
   });
 

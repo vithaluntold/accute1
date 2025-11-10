@@ -711,12 +711,14 @@ export const lucaChatSessions = pgTable("luca_chat_sessions", {
   llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id, { onDelete: "set null" }), // Which AI provider was used - preserve chat history even if config deleted
   isActive: boolean("is_active").notNull().default(true),
   isPinned: boolean("is_pinned").notNull().default(false),
+  isArchived: boolean("is_archived").notNull().default(false), // Archived chats are hidden from main list but still searchable
   lastMessageAt: timestamp("last_message_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   userIdx: index("luca_chat_sessions_user_idx").on(table.userId),
   userActiveIdx: index("luca_chat_sessions_user_active_idx").on(table.userId, table.isActive),
+  userArchivedIdx: index("luca_chat_sessions_user_archived_idx").on(table.userId, table.isArchived),
 }));
 
 // Luca Chat Messages - Individual messages within sessions

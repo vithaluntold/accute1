@@ -338,25 +338,80 @@ async function handleAgentExecution(
     let assistantMessageId: string;
     if (isLucaAgent && lucaSessionId) {
       // Save to Luca-specific chat messages table
-      console.log('[Luca WebSocket] Saving assistant message to luca_chat_messages...');
-      console.log('[Luca WebSocket] Session ID:', lucaSessionId);
-      console.log('[Luca WebSocket] Response length:', fullResponse.length);
-      
-      const lucaMessage = await storage.createLucaChatMessage({
-        sessionId: lucaSessionId,
-        role: "assistant",
-        content: fullResponse,
-        metadata: { executionTimeMs: executionTime, llmConfigId: llmConfig.id }
-      });
-      assistantMessageId = lucaMessage.id;
-      
-      console.log('[Luca WebSocket] ✅ Assistant message saved! Message ID:', assistantMessageId);
+      try {
+        console.log('[Luca WebSocket] === SAVING ASSISTANT MESSAGE ===');
+        console.log('[Luca WebSocket] Session ID:', lucaSessionId);
+        console.log('[Luca WebSocket] Response length:', fullResponse.length);
+        console.log('[Luca WebSocket] Full response preview:', fullResponse.substring(0, 200));
+        
+        const lucaMessage = await storage.createLucaChatMessage({
+          sessionId: lucaSessionId,
+          role: "assistant",
+          content: fullResponse,
+          metadata: { executionTimeMs: executionTime, llmConfigId: llmConfig.id }
+        });
+        assistantMessageId = lucaMessage.id;
+        
+        console.log('[Luca WebSocket] ✅ Assistant message saved! Message ID:', assistantMessageId);
 
-      // Update session's lastMessageAt
-      await storage.updateLucaChatSession(lucaSessionId, {
-        lastMessageAt: new Date(),
-      });
-      console.log('[Luca WebSocket] ✅ Session timestamp updated');
+        // Update session's lastMessageAt
+        await storage.updateLucaChatSession(lucaSessionId, {
+          lastMessageAt: new Date(),
+        });
+        console.log('[Luca WebSocket] ✅ Session timestamp updated');
+
+        // Verify message was saved by fetching it back
+        const messages = await storage.getLucaChatMessagesBySession(lucaSessionId);
+        console.log('[Luca WebSocket] ✅ Message count in session:', messages.length);
+        
+        // Auto-generate title after first exchange (user + assistant messages)
+        if (messages.length === 2) {
+          console.log('[Luca WebSocket] 🎯 First exchange complete! Auto-generating title...');
+          try {
+            const session = await storage.getLucaChatSession(lucaSessionId);
+            if (session && session.title === 'New Chat') {
+              // Get first user and assistant messages
+              const firstUserMsg = messages.find(m => m.role === 'user');
+              const firstAssistantMsg = messages.find(m => m.role === 'assistant');
+              
+              if (firstUserMsg && firstAssistantMsg) {
+                // Generate title using LLM
+                const { LLMService } = await import('./llm-service');
+                const titleLlmService = new LLMService(llmConfig);
+                
+                const titlePrompt = `Generate a short, descriptive title (3-6 words max) for this conversation. Return ONLY the title, nothing else.
+
+User: ${firstUserMsg.content.substring(0, 500)}
+Assistant: ${firstAssistantMsg.content.substring(0, 500)}
+
+Title:`;
+
+                const generatedTitle = await titleLlmService.generateCompletion(titlePrompt, {
+                  maxTokens: 20,
+                  temperature: 0.7,
+                });
+
+                // Clean up title
+                const title = generatedTitle.trim()
+                  .replace(/^["']|["']$/g, '')
+                  .replace(/\n.*/g, '')
+                  .substring(0, 100);
+
+                // Update session with generated title
+                await storage.updateLucaChatSession(lucaSessionId, { title });
+                console.log('[Luca WebSocket] 🎯 ✅ Title auto-generated:', title);
+              }
+            }
+          } catch (titleError: any) {
+            console.error('[Luca WebSocket] ⚠️  Failed to auto-generate title:', titleError.message);
+            // Don't throw - title generation is not critical
+          }
+        }
+      } catch (error: any) {
+        console.error('[Luca WebSocket] ❌ CRITICAL ERROR saving assistant message:', error);
+        console.error('[Luca WebSocket] Error stack:', error.stack);
+        throw error; // Re-throw to send error to client
+      }
     } else if (conversation) {
       // Save to standard AI agent messages table
       const assistantMessage = await storage.createAiMessage({
