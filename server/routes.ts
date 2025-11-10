@@ -11313,13 +11313,19 @@ ${msg.bodyText || msg.bodyHtml || ''}
       // Get all tasks for this progress
       const tasks = await storage.getOnboardingTasksByProgress(progress.id);
       
+      // Transform tasks to match frontend interface (requiredForDay → isRequired)
+      const transformedTasks = tasks.map(task => ({
+        ...task,
+        isRequired: task.requiredForDay,
+      }));
+      
       // Get active nudges (not dismissed)
       const nudges = await storage.getOnboardingNudgesByProgress(progress.id);
       const activeNudges = nudges.filter(n => !n.isDismissed);
       
       res.json({
         progress,
-        tasks,
+        tasks: transformedTasks,
         activeNudges,
       });
     } catch (error: any) {
