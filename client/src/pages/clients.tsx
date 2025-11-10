@@ -74,8 +74,16 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
+  // Get current user for workspace context
+  const { data: user } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
+  const orgId = user?.defaultOrganizationId;
+
+  // Workspace-scoped client query
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", orgId],
+    enabled: !!orgId, // Only fetch when we have an organization context
   });
 
   const form = useForm<z.infer<typeof clientFormSchema>>({
@@ -145,8 +153,8 @@ export default function Clients() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", orgId] });
       toast({
         title: "Success",
         description: "Client and primary contact created successfully",
@@ -168,7 +176,7 @@ export default function Clients() {
       return apiRequest(`/api/clients/${id}`, "PATCH", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", orgId] });
       toast({
         title: "Success",
         description: "Client updated successfully",
@@ -191,7 +199,7 @@ export default function Clients() {
       return apiRequest(`/api/clients/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/clients", orgId] });
     },
     onError: (error: any) => {
       toast({
