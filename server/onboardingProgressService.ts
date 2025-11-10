@@ -73,7 +73,10 @@ export class OnboardingProgressService {
       tasksCreated = await this.createTasksForDay(progressId, nextDay);
       console.log(`[Onboarding] Created ${tasksCreated} tasks for Day ${nextDay}`);
     } else {
-      console.log(`[Onboarding] No task templates defined for Day ${nextDay} yet`);
+      // SAFEGUARD: Graceful degradation for missing templates
+      console.warn(`[Onboarding] ⚠️ WARNING: No task templates defined for Day ${nextDay}!`);
+      console.warn(`[Onboarding] User will see 0 tasks on Day ${nextDay}. Please populate templates.`);
+      // Continue advancing anyway - don't block user progression
     }
 
     return {

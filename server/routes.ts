@@ -11517,7 +11517,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   
   // Complete an onboarding task (awards points, updates progress, checks day advancement)
   // SECURITY: Verify task belongs to authenticated user's progress
-  app.post("/api/onboarding/tasks/:taskId/complete", requireAuth, async (req: AuthRequest, res: Response) => {
+  // RATE LIMIT: Prevent abuse and race conditions (20 completions per minute)
+  app.post("/api/onboarding/tasks/:taskId/complete", requireAuth, rateLimit(20, 60 * 1000), async (req: AuthRequest, res: Response) => {
     try {
       // SECURITY: Get authenticated user's progress
       const progress = await storage.getOnboardingProgressByUser(req.userId!);

@@ -110,9 +110,7 @@ export function OnboardingChecklist() {
 
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      return await apiRequest(`/api/onboarding/tasks/${taskId}/complete`, {
-        method: 'POST',
-      });
+      return await apiRequest('POST', `/api/onboarding/tasks/${taskId}/complete`, {});
     },
     onSuccess: async (result, taskId) => {
       const task = data?.tasks.find(t => t.id === taskId);
