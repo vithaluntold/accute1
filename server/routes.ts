@@ -1797,21 +1797,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error("User not found");
       }
 
+      // Check if user has existing workspace memberships
+      const existingMemberships = await storage.getUserOrganizations(req.userId);
+      const isFirstWorkspace = existingMemberships.length === 0;
+
       // Create userOrganizations membership entry for the creator
       await storage.createUserOrganization({
         userId: req.userId,
         organizationId: organization.id,
         roleId: user.roleId, // Use their existing role (typically Admin)
         status: 'active',
-        isDefault: true, // First workspace is default
+        isDefault: isFirstWorkspace, // Only set as default if it's the user's first workspace
         joinedAt: new Date(),
       });
 
-      // Update creator's organizationId (legacy) and defaultOrganizationId for quick login routing
-      await storage.updateUser(req.userId, {
-        organizationId: organization.id,
-        defaultOrganizationId: organization.id,
-      });
+      // Update creator's organizationId (legacy) and defaultOrganizationId only if first workspace
+      if (isFirstWorkspace) {
+        await storage.updateUser(req.userId, {
+          organizationId: organization.id,
+          defaultOrganizationId: organization.id,
+        });
+      }
 
       await logActivity(req.userId, organization.id, "create", "organization", organization.id, { name: organization.name }, req);
 
