@@ -1983,8 +1983,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/workflows/:id", requireAuth, requirePermission("workflows.delete"), async (req: AuthRequest, res: Response) => {
+  app.delete("/api/workflows/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
+      const role = await storage.getRole(req.user!.roleId);
+      const isAdmin = role?.name === 'Admin' || role?.scope === 'platform';
+      
+      // Admins and Super Admins can ALWAYS delete workflows (with ownership checks below)
+      if (!isAdmin) {
+        // Non-admins need workflows.delete permission
+        const { getEffectivePermissions } = await import('./rbac-subscription-bridge');
+        const effectivePermissions = await getEffectivePermissions(
+          req.user!.id,
+          req.user!.roleId,
+          req.user!.organizationId
+        );
+        const hasPermission = effectivePermissions.some(p => p.name === 'workflows.delete');
+        
+        if (!hasPermission) {
+          return res.status(403).json({ 
+            error: "Insufficient permissions", 
+            required: "workflows.delete" 
+          });
+        }
+      }
+      
       const existing = await storage.getWorkflow(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Workflow not found" });
