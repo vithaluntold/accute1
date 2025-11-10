@@ -672,6 +672,7 @@ export default function Clients() {
         onConfirm={confirm}
         onClose={cancel}
       />
+      </div>
     </div>
   );
 }
