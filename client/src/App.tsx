@@ -147,6 +147,12 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     enabled: !!user,
   });
 
+  // Fetch current organization data
+  const { data: currentOrg } = useQuery<any>({
+    queryKey: ["/api/organizations", user?.organizationId],
+    enabled: !!user?.organizationId,
+  });
+
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
   const createWorkspaceMutation = useMutation({
@@ -226,21 +232,25 @@ function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" data-testid="button-workspace-switcher" className="gap-2">
                     <Building2 className="h-4 w-4" />
-                    <span className="hidden md:inline">Workspace</span>
+                    <span className="hidden md:inline">{currentOrg?.name || 'Workspace'}</span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Switch Workspace</DropdownMenuLabel>
+                  <DropdownMenuLabel>Current Workspace</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem data-testid="menu-item-current-workspace">
-                    Current Organization
+                  <DropdownMenuItem data-testid="menu-item-current-workspace" disabled>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{currentOrg?.name || 'Loading...'}</span>
+                      <span className="text-xs text-muted-foreground">/{currentOrg?.slug}</span>
+                    </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     data-testid="menu-item-create-workspace"
                     onClick={() => setWorkspaceDialogOpen(true)}
                   >
+                    <Building2 className="h-4 w-4 mr-2" />
                     Create New Workspace
                   </DropdownMenuItem>
                 </DropdownMenuContent>

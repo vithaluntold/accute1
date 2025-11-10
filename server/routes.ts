@@ -1811,6 +1811,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get organization by ID
+  app.get("/api/organizations/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organization = await storage.getOrganization(req.params.id);
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Users can only view their own organization (unless they're super admin)
+      const isSuperAdmin = !req.user!.organizationId;
+      if (!isSuperAdmin && organization.id !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(organization);
+    } catch (error: any) {
+      console.error("Failed to fetch organization:", error);
+      res.status(500).json({ error: "Failed to fetch organization" });
+    }
+  });
+
   // ==================== Role Routes ====================
   
   app.get("/api/roles", requireAuth, async (req: AuthRequest, res: Response) => {
