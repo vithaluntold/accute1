@@ -1271,7 +1271,13 @@ export const llmConfigurations = pgTable("llm_configurations", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  orgIdx: index("llm_configurations_org_idx").on(table.organizationId),
+}));
+
+// Partial unique index to ensure only one default LLM config per organization (defined separately for Drizzle)
+// This prevents organizations from having multiple is_default=true configurations
+// CREATE UNIQUE INDEX llm_configurations_default_unique ON llm_configurations (organization_id) WHERE is_default = true;
 
 // Clients for accounting firms
 export const clients = pgTable("clients", {

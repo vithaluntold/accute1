@@ -76,6 +76,15 @@ export interface IStorage {
   updateOrganization(id: string, org: Partial<InsertOrganization>): Promise<Organization | undefined>;
   getAllOrganizations(): Promise<Organization[]>;
 
+  // User-Organization Memberships (Multi-Workspace)
+  getUserOrganizations(userId: string): Promise<schema.UserOrganization[]>;
+  getUserOrganizationMembership(userId: string, organizationId: string): Promise<schema.UserOrganization | undefined>;
+  createUserOrganization(membership: schema.InsertUserOrganization): Promise<schema.UserOrganization>;
+  updateUserOrganization(id: string, updates: Partial<schema.InsertUserOrganization>): Promise<schema.UserOrganization | undefined>;
+  setDefaultWorkspace(userId: string, organizationId: string): Promise<void>;
+  removeUserFromOrganization(userId: string, organizationId: string): Promise<void>;
+  acceptOrganizationInvite(userId: string, organizationId: string): Promise<schema.UserOrganization | undefined>;
+
   // Platform Subscriptions (Super Admin)
   getPlatformSubscriptionByOrganization(organizationId: string): Promise<schema.PlatformSubscription | undefined>;
   getAllPlatformSubscriptions(): Promise<schema.PlatformSubscription[]>;
@@ -774,6 +783,85 @@ export class DbStorage implements IStorage {
 
   async getAllOrganizations(): Promise<Organization[]> {
     return await db.select().from(schema.organizations);
+  }
+
+  // User-Organization Memberships (Multi-Workspace)
+  async getUserOrganizations(userId: string): Promise<schema.UserOrganization[]> {
+    return await db.select()
+      .from(schema.userOrganizations)
+      .where(eq(schema.userOrganizations.userId, userId))
+      .orderBy(desc(schema.userOrganizations.isDefault));
+  }
+
+  async getUserOrganizationMembership(userId: string, organizationId: string): Promise<schema.UserOrganization | undefined> {
+    const result = await db.select()
+      .from(schema.userOrganizations)
+      .where(and(
+        eq(schema.userOrganizations.userId, userId),
+        eq(schema.userOrganizations.organizationId, organizationId)
+      ));
+    return result[0];
+  }
+
+  async createUserOrganization(membership: schema.InsertUserOrganization): Promise<schema.UserOrganization> {
+    const result = await db.insert(schema.userOrganizations).values(membership).returning();
+    return result[0];
+  }
+
+  async updateUserOrganization(id: string, updates: Partial<schema.InsertUserOrganization>): Promise<schema.UserOrganization | undefined> {
+    const result = await db.update(schema.userOrganizations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.userOrganizations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async setDefaultWorkspace(userId: string, organizationId: string): Promise<void> {
+    // First, verify the user is a member of this organization
+    const membership = await this.getUserOrganizationMembership(userId, organizationId);
+    if (!membership) {
+      throw new Error('User is not a member of this organization');
+    }
+
+    // Clear all existing defaults for this user
+    await db.update(schema.userOrganizations)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(eq(schema.userOrganizations.userId, userId));
+
+    // Set the new default
+    await db.update(schema.userOrganizations)
+      .set({ isDefault: true, updatedAt: new Date() })
+      .where(and(
+        eq(schema.userOrganizations.userId, userId),
+        eq(schema.userOrganizations.organizationId, organizationId)
+      ));
+
+    // Update user's defaultOrganizationId for quick login routing
+    await this.updateUser(userId, { defaultOrganizationId: organizationId });
+  }
+
+  async removeUserFromOrganization(userId: string, organizationId: string): Promise<void> {
+    await db.delete(schema.userOrganizations)
+      .where(and(
+        eq(schema.userOrganizations.userId, userId),
+        eq(schema.userOrganizations.organizationId, organizationId)
+      ));
+  }
+
+  async acceptOrganizationInvite(userId: string, organizationId: string): Promise<schema.UserOrganization | undefined> {
+    const result = await db.update(schema.userOrganizations)
+      .set({
+        status: 'active',
+        joinedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(schema.userOrganizations.userId, userId),
+        eq(schema.userOrganizations.organizationId, organizationId),
+        eq(schema.userOrganizations.status, 'invited')
+      ))
+      .returning();
+    return result[0];
   }
 
   // Platform Subscriptions (Super Admin)

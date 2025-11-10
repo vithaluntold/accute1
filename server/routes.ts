@@ -1791,9 +1791,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isTestAccount: false,
       });
 
-      // Update creator's organizationId to make them part of the new workspace
+      // Get creator's role (should be Admin for new workspace)
+      const user = await storage.getUser(req.userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Create userOrganizations membership entry for the creator
+      await storage.createUserOrganization({
+        userId: req.userId,
+        organizationId: organization.id,
+        roleId: user.roleId, // Use their existing role (typically Admin)
+        status: 'active',
+        isDefault: true, // First workspace is default
+        joinedAt: new Date(),
+      });
+
+      // Update creator's organizationId (legacy) and defaultOrganizationId for quick login routing
       await storage.updateUser(req.userId, {
         organizationId: organization.id,
+        defaultOrganizationId: organization.id,
       });
 
       await logActivity(req.userId, organization.id, "create", "organization", organization.id, { name: organization.name }, req);
@@ -1829,6 +1846,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Failed to fetch organization:", error);
       res.status(500).json({ error: "Failed to fetch organization" });
+    }
+  });
+
+  // Update organization settings (Company Profile, Branding, etc.)
+  app.patch("/api/organizations/:id", requireAuth, requirePermission("organization.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organization = await storage.getOrganization(id);
+      
+      if (!organization) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      // Verify user has access to this organization
+      const membership = await storage.getUserOrganizationMembership(req.userId, id);
+      const isSuperAdmin = !req.user!.organizationId; // Super Admin has no org
+      
+      // Only members of this organization or Super Admins can update settings
+      if (!membership && !isSuperAdmin) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Ensure membership is active (if not Super Admin)
+      if (membership && membership.status !== 'active') {
+        return res.status(403).json({ error: "Organization membership is not active" });
+      }
+
+      // Validate the update payload
+      const updateSchema = insertOrganizationSchema.partial();
+      const validatedData = updateSchema.parse(req.body);
+
+      const updated = await storage.updateOrganization(id, validatedData);
+      await logActivity(req.userId, id, "update", "organization", id, validatedData, req);
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update organization:", error);
+      if (error instanceof ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors 
+        });
+      }
+      res.status(500).json({ error: "Failed to update organization" });
+    }
+  });
+
+  // Get user's workspaces (multi-workspace memberships)
+  app.get("/api/user/workspaces", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const memberships = await storage.getUserOrganizations(req.userId);
+      
+      // Enrich with organization details
+      const workspaces = await Promise.all(
+        memberships.map(async (membership) => {
+          const org = await storage.getOrganization(membership.organizationId);
+          const role = await storage.getRole(membership.roleId);
+          return {
+            ...membership,
+            organization: org,
+            role: role
+          };
+        })
+      );
+
+      res.json(workspaces);
+    } catch (error: any) {
+      console.error("Failed to fetch user workspaces:", error);
+      res.status(500).json({ error: "Failed to fetch workspaces" });
+    }
+  });
+
+  // Switch to a different workspace (set as default)
+  app.post("/api/user/workspaces/:organizationId/switch", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { organizationId } = req.params;
+
+      // Verify membership
+      const membership = await storage.getUserOrganizationMembership(req.userId, organizationId);
+      if (!membership) {
+        return res.status(403).json({ error: "You are not a member of this workspace" });
+      }
+
+      if (membership.status !== 'active') {
+        return res.status(403).json({ error: "Workspace membership is not active" });
+      }
+
+      // Set as default workspace
+      await storage.setDefaultWorkspace(req.userId, organizationId);
+
+      await logActivity(req.userId, organizationId, "switch", "workspace", organizationId, {}, req);
+
+      res.json({ success: true, organizationId });
+    } catch (error: any) {
+      console.error("Failed to switch workspace:", error);
+      res.status(500).json({ error: "Failed to switch workspace" });
+    }
+  });
+
+  // Get organization members (via userOrganizations join table)
+  app.get("/api/organizations/:id/members", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify user has access to this organization
+      const membership = await storage.getUserOrganizationMembership(req.userId, id);
+      const isSuperAdmin = !req.user!.organizationId;
+      
+      // Only active members or Super Admins can view organization members
+      if (!isSuperAdmin) {
+        if (!membership) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        if (membership.status !== 'active') {
+          return res.status(403).json({ error: "Organization membership is not active" });
+        }
+      }
+
+      // Get all memberships for this organization
+      const memberships = await db.select()
+        .from(schema.userOrganizations)
+        .where(eq(schema.userOrganizations.organizationId, id));
+
+      // Enrich with user and role details
+      const members = await Promise.all(
+        memberships.map(async (membership) => {
+          const user = await storage.getUser(membership.userId);
+          const role = await storage.getRole(membership.roleId);
+          return {
+            ...membership,
+            user,
+            role
+          };
+        })
+      );
+
+      res.json(members);
+    } catch (error: any) {
+      console.error("Failed to fetch organization members:", error);
+      res.status(500).json({ error: "Failed to fetch members" });
     }
   });
 
