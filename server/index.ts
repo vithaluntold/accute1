@@ -257,6 +257,19 @@ app.use((req, res, next) => {
       console.warn('⚠️  Server running with limited functionality');
     }
     
+    // Serve uploaded files from /uploads directory
+    // MUST be before Vite/static middleware to prevent HTML fallback
+    const uploadsPath = path.resolve(process.cwd(), "uploads");
+    app.use("/uploads", express.static(uploadsPath, {
+      fallthrough: false,
+      setHeaders: (res) => {
+        // Allow browser to determine content type from file extension
+        // Don't force application/octet-stream as it prevents image display
+      }
+    }));
+    console.log('✅ Upload serving initialized');
+    console.log(`   Serving from: ${uploadsPath}`);
+    
     // Setup static file serving AFTER initialization
     // This ensures agent routes are registered before the catch-all middleware
     const distPath = path.resolve(moduleDir, "public");
