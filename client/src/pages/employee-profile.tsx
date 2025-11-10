@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { User, Shield, Upload, CheckCircle, XCircle, AlertCircle, Phone } from "lucide-react";
+import { User, Shield, Upload, CheckCircle, XCircle, AlertCircle, Phone, Camera } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Form,
   FormControl,
@@ -63,6 +64,7 @@ export default function EmployeeProfile() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpId, setOtpId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: currentUser, isLoading } = useQuery<any>({
     queryKey: ["/api/users/me"],
@@ -177,6 +179,68 @@ export default function EmployeeProfile() {
       });
     },
   });
+
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      
+      const response = await fetch('/api/users/me/avatar', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload avatar');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile picture updated",
+        description: "Your profile picture has been uploaded successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (JPEG, PNG, GIF, or WebP)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    uploadAvatarMutation.mutate(file);
+  };
 
   const uploadDocumentMutation = useMutation({
     mutationFn: async ({ file, documentType }: { file: File; documentType: 'idDocument' | 'addressProof' }) => {
@@ -387,6 +451,43 @@ export default function EmployeeProfile() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Profile Picture */}
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={currentUser?.avatarUrl || ''} alt={`${currentUser?.firstName} ${currentUser?.lastName}`} />
+                    <AvatarFallback className="text-2xl">
+                      {currentUser?.firstName?.[0]}{currentUser?.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-2">Profile Picture</p>
+                    <p className="text-sm text-muted-foreground mb-3">Upload a photo to personalize your profile</p>
+                    <div className="flex gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                        data-testid="input-avatar"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadAvatarMutation.isPending}
+                        data-testid="button-upload-avatar"
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        {uploadAvatarMutation.isPending ? "Uploading..." : "Change Picture"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
                 {/* Basic Information */}
                 <div className="grid grid-cols-2 gap-4">
                   <FormField

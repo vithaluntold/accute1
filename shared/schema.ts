@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   phoneVerified: boolean("phone_verified").notNull().default(false),
   phoneVerifiedAt: timestamp("phone_verified_at"),
+  avatarUrl: text("avatar_url"), // Profile picture URL
   
   // KYC fields for employee verification
   dateOfBirth: timestamp("date_of_birth"),

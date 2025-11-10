@@ -1439,6 +1439,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload profile picture
+  app.post("/api/users/me/avatar", requireAuth, (req: AuthRequest, res: Response) => {
+    upload.single('avatar')(req, res, async (err) => {
+      try {
+        if (err) {
+          console.error("Avatar upload error:", err);
+          return res.status(400).json({ error: err.message || "File upload failed" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+
+        // Validate file type (images only)
+        const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedMimeTypes.includes(req.file.mimetype)) {
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json({ error: "Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed" });
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (req.file.size > maxSize) {
+          fs.unlinkSync(req.file.path);
+          return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
+        }
+
+        // Build relative file path for database storage
+        const relativePath = `/uploads/${req.file.filename}`;
+
+        // Get current user to delete old avatar if it exists
+        const currentUser = await storage.getUser(req.userId!);
+        if (!currentUser) {
+          fs.unlinkSync(req.file.path);
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        // Delete old avatar file if it exists
+        if (currentUser.avatarUrl && currentUser.avatarUrl.startsWith('/uploads/')) {
+          // Normalize path: remove leading slash and resolve from cwd
+          const oldAvatarPath = path.join(process.cwd(), currentUser.avatarUrl.replace(/^\//, ''));
+          if (fs.existsSync(oldAvatarPath)) {
+            try {
+              fs.unlinkSync(oldAvatarPath);
+            } catch (error) {
+              console.error('Failed to delete old avatar:', error);
+              // Continue with upload even if old file deletion fails
+            }
+          }
+        }
+
+        // Update user with new avatar URL
+        const updatedUser = await storage.updateUser(req.userId!, { avatarUrl: relativePath });
+        if (!updatedUser) {
+          fs.unlinkSync(req.file.path);
+          return res.status(500).json({ error: "Failed to update user profile" });
+        }
+
+        await logActivity(req.userId, req.user!.organizationId || undefined, "update", "user", updatedUser.id, { action: "avatar_upload" }, req);
+
+        res.json({ 
+          success: true,
+          avatarUrl: relativePath,
+          user: { ...updatedUser, password: undefined }
+        });
+      } catch (error: any) {
+        console.error("Avatar upload error:", error);
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: "Failed to upload avatar" });
+      }
+    });
+  });
+
   // Upload KYC documents (ID proof and Address proof)
   app.post("/api/users/me/kyc/documents", requireAuth, (req: AuthRequest, res: Response) => {
     upload.single('document')(req, res, async (err) => {

@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { clearAuth, getUser } from "@/lib/auth";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
@@ -325,9 +326,12 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <div className="px-2 py-3 border-t">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <UserCircle className="h-6 w-6 text-primary" />
-                  </div>
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={user.avatarUrl || ''} alt={`${user.firstName} ${user.lastName}`} />
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {user.firstName?.[0]}{user.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" data-testid="user-display-name">
                       {user.firstName} {user.lastName}
