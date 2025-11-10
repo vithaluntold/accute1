@@ -39,7 +39,8 @@ export const users = pgTable("users", {
   kycRejectionReason: text("kyc_rejection_reason"),
   
   roleId: varchar("role_id").notNull().references(() => roles.id),
-  organizationId: varchar("organization_id").references(() => organizations.id),
+  organizationId: varchar("organization_id").references(() => organizations.id), // Legacy - for backward compatibility during migration
+  defaultOrganizationId: varchar("default_organization_id").references(() => organizations.id), // Default workspace on login (NOTE: Application must verify membership via userOrganizations)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -86,12 +87,82 @@ export const trustedDevices = pgTable("trusted_devices", {
   userDeviceIdx: index("trusted_devices_user_device_idx").on(table.userId, table.deviceId),
 }));
 
+// User-Organization Membership (Multi-Workspace Support)
+// Allows users to belong to multiple organizations with different roles
+export const userOrganizations = pgTable("user_organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  roleId: varchar("role_id").notNull().references(() => roles.id),
+  
+  // Membership status
+  status: text("status").notNull().default("active"), // 'active', 'invited', 'suspended'
+  isDefault: boolean("is_default").notNull().default(false), // Default workspace on login
+  
+  // Invitation metadata
+  invitedBy: varchar("invited_by").references(() => users.id),
+  invitedAt: timestamp("invited_at"),
+  joinedAt: timestamp("joined_at"),
+  lastActiveAt: timestamp("last_active_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("user_organizations_user_idx").on(table.userId),
+  orgUserIdx: index("user_organizations_org_idx").on(table.organizationId),
+  // Ensure a user can only have one membership per organization
+  userOrgUnique: unique("user_organizations_user_org_unique").on(table.userId, table.organizationId),
+}));
+
+// Partial unique index to ensure only one default workspace per user (defined separately for Drizzle)
+// This prevents users from having multiple is_default=true memberships
+// CREATE UNIQUE INDEX user_organizations_default_unique ON user_organizations (user_id) WHERE is_default = true;
+
 // Organizations for multi-tenancy
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
+  name: text("name").notNull(), // Display name (can be changed easily)
+  legalName: text("legal_name"), // Legal business name
   slug: text("slug").notNull().unique(),
   tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  
+  // Company Profile / Branding
+  logoUrl: text("logo_url"), // Company logo
+  faviconUrl: text("favicon_url"), // Custom favicon
+  primaryColor: text("primary_color").default("#1e3a8a"), // Brand primary color
+  secondaryColor: text("secondary_color").default("#10b981"), // Brand secondary color
+  
+  // Business Information
+  industry: text("industry"), // e.g., 'accounting', 'legal', 'consulting'
+  businessType: text("business_type"), // e.g., 'llc', 'corporation', 'partnership'
+  taxId: text("tax_id"), // EIN/TIN for tax purposes
+  website: text("website"),
+  
+  // Contact Information
+  email: text("email"), // Company email
+  phone: text("phone"), // Company phone
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  country: text("country").default("US"),
+  
+  // Localization
+  timezone: text("timezone").default("America/New_York"),
+  locale: text("locale").default("en-US"), // Language/region
+  currency: text("currency").default("USD"),
+  dateFormat: text("date_format").default("MM/DD/YYYY"),
+  
+  // Billing
+  billingEmail: text("billing_email"),
+  billingAddress: text("billing_address"),
+  
+  // Custom Domain Support
+  customDomain: text("custom_domain"), // e.g., 'app.company.com'
+  customDomainVerified: boolean("custom_domain_verified").default(false),
+  
+  // Workspace Settings (JSONB for flexibility)
+  settings: jsonb("settings").default(sql`'{}'::jsonb`), // Custom workspace settings
   
   // Test account flag - grants unlimited access to all features (for testing)
   // Existing test accounts bypass all subscription limits
@@ -2010,6 +2081,13 @@ export const insertTrustedDeviceSchema = createInsertSchema(trustedDevices).omit
   lastUsed: true,
 });
 
+export const insertUserOrganizationSchema = createInsertSchema(userOrganizations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastActiveAt: true,
+});
+
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   id: true,
   createdAt: true,
@@ -2255,6 +2333,8 @@ export type InsertUserMFA = z.infer<typeof insertUserMFASchema>;
 export type UserMFA = typeof userMFA.$inferSelect;
 export type InsertTrustedDevice = z.infer<typeof insertTrustedDeviceSchema>;
 export type TrustedDevice = typeof trustedDevices.$inferSelect;
+export type InsertUserOrganization = z.infer<typeof insertUserOrganizationSchema>;
+export type UserOrganization = typeof userOrganizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizations.$inferSelect;
 export type InsertRole = z.infer<typeof insertRoleSchema>;
