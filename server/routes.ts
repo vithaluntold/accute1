@@ -11515,7 +11515,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
   
-  // Complete an onboarding task (awards points, updates progress)
+  // Complete an onboarding task (awards points, updates progress, checks day advancement)
   // SECURITY: Verify task belongs to authenticated user's progress
   app.post("/api/onboarding/tasks/:taskId/complete", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
@@ -11550,7 +11550,20 @@ ${msg.bodyText || msg.bodyHtml || ''}
       });
       
       await logActivity(req.userId, req.user!.organizationId, "complete", "onboarding_task", task.id, { points: task.points }, req);
-      res.json({ task: completedTask, newScore });
+      
+      // Check if all required tasks for current day are complete and advance if needed
+      const { OnboardingProgressService } = await import('./onboardingProgressService');
+      const progressService = new OnboardingProgressService(storage);
+      const advanceResult = await progressService.checkAndAdvance(progress.id);
+      
+      res.json({ 
+        task: completedTask, 
+        newScore,
+        dayAdvancement: advanceResult.advanced ? {
+          newDay: advanceResult.newDay,
+          tasksCreated: advanceResult.tasksCreated,
+        } : undefined,
+      });
     } catch (error: any) {
       console.error('Complete onboarding task error:', error);
       res.status(500).json({ error: "Failed to complete task" });

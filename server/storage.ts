@@ -581,6 +581,7 @@ export interface IStorage {
 
   // Onboarding System
   createOnboardingProgress(progress: schema.InsertOnboardingProgress): Promise<schema.OnboardingProgress>;
+  getOnboardingProgress(id: string): Promise<schema.OnboardingProgress | undefined>;
   getOnboardingProgressByUser(userId: string): Promise<schema.OnboardingProgress | undefined>;
   getOnboardingProgressByOrganization(organizationId: string): Promise<schema.OnboardingProgress[]>;
   getAllOnboardingProgress(): Promise<schema.OnboardingProgress[]>; // Super Admin
@@ -1694,6 +1695,12 @@ export class DbStorage implements IStorage {
   // Onboarding System
   async createOnboardingProgress(progress: schema.InsertOnboardingProgress): Promise<schema.OnboardingProgress> {
     const result = await db.insert(schema.onboardingProgress).values(progress).returning();
+    return result[0];
+  }
+
+  async getOnboardingProgress(id: string): Promise<schema.OnboardingProgress | undefined> {
+    const result = await db.select().from(schema.onboardingProgress)
+      .where(eq(schema.onboardingProgress.id, id));
     return result[0];
   }
 
