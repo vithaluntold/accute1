@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ### Overview
-Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. Its primary purpose is to leverage specialized AI agents to automate accounting tasks, thereby boosting efficiency, ensuring compliance, and enhancing overall accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. The platform also features global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, aiming to revolutionize accounting workflows through AI-driven automation and provide a significant market advantage.
+Accute is an AI-native accounting workflow automation platform for modern accounting firms. It leverages specialized AI agents to automate accounting tasks, boosting efficiency, ensuring compliance, and enhancing practices. Key features include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to revolutionize accounting workflows through AI-driven automation, providing a significant market advantage.
 
 ### User Preferences
 - Prefer database-backed storage over in-memory
@@ -46,10 +46,10 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 ### System Architecture
 
 #### UI/UX Decisions
-The UI/UX is inspired by Linear and Notion, employing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
+The UI/UX is inspired by Linear and Notion, using the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
 
 #### Technical Implementations
-The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript. PostgreSQL (Neon) is used for data storage via Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript, with PostgreSQL (Neon) for data storage via Drizzle ORM. Authentication uses JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
 #### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data and distinct roles.
@@ -76,8 +76,10 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Service Plans Marketplace**: Admins create service offerings with various pricing models, deliverables tracking, and client review systems.
 - **Multi-Tier Authorization System**: 7-layer protection for service plan purchases.
 - **Subscription-Based Feature Gating**: Production-ready feature visibility and quota enforcement via backend middleware and frontend hooks, with real-time usage tracking and a fail-closed security design.
-- **Task Dependencies System**: Production-ready task dependency management supporting all 4 dependency types (finish-to-start, start-to-start, finish-to-finish, start-to-finish) with lag/lead time support. Includes circular dependency detection via DFS algorithm, critical path calculation using topological sort with actual task durations (estimatedHours/actualHours), and same-workflow security isolation to prevent cross-tenant linkage vulnerabilities. Service layer provides 6 secure API endpoints for dependency CRUD, validation, and advanced scheduling analytics.
-- **Document Version Control System**: Enterprise-grade document versioning with SHA-256 hash integrity verification of actual file bytes, optional PKI digital signatures (RSA-2048), and compliance-focused approval workflows (pending/approved/rejected states). Supports unlimited version history, rollback to any previous version (creates new version preserving history), version comparison metadata for client-side diff generation, and configurable retention policies. Each version tracks change type (major/minor/patch), change description, uploader, and approval chain for full audit compliance. 7 REST API endpoints enable version creation, history retrieval, approval/rejection workflows, and cross-version comparisons.
+- **Task Dependencies System**: Production-ready task dependency management supporting all 4 dependency types with lag/lead time support, circular dependency detection, and critical path calculation.
+- **Document Version Control System**: Enterprise-grade document versioning with SHA-256 hash integrity, optional PKI digital signatures, and compliance-focused approval workflows.
+- **Gantt Chart View**: Interactive Gantt chart visualization for workflow task management with dependency highlighting and critical path detection.
+- **Timeline View**: Stage-level roadmap visualization with milestone tracking and progress monitoring.
 
 #### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent.
