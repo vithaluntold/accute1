@@ -28,9 +28,39 @@ export const registerRoutes = (app: any) => {
         });
       }
 
-      // Use OmniSpectraAgent class
+      // Gather organization data for assignment tracking
+      const [assignments, workflows, users, clients] = await Promise.all([
+        storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId!),
+        storage.getWorkflowsByOrganization(req.user!.organizationId!),
+        storage.getUsersByOrganization(req.user!.organizationId!),
+        storage.getClientsByOrganization(req.user!.organizationId!)
+      ]);
+
+      // Build organization data context
+      const organizationData = {
+        assignments: assignments.map(a => ({
+          id: a.id,
+          workflowId: a.workflowId,
+          clientId: a.clientId,
+          assignedToId: a.assignedToId,
+          status: a.status,
+          currentStage: a.currentStage,
+          dueDate: a.dueDate,
+          completedAt: a.completedAt,
+          createdAt: a.createdAt
+        })),
+        workflows: workflows.map(w => ({ id: w.id, name: w.name, status: w.status })),
+        users: users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, role: u.role })),
+        clients: clients.map(c => ({ id: c.id, name: c.name, status: c.status, type: c.type })),
+      };
+
+      // Use OmniSpectraAgent class with organization data
       const agent = new OmniSpectraAgent(llmConfig);
-      const result = await agent.execute({ message, history, context });
+      const result = await agent.execute({ 
+        message, 
+        history, 
+        context: { ...(context ?? {}), organizationData } 
+      });
 
       res.json({
         response: result.response,

@@ -1,8 +1,8 @@
 /**
- * OmniSpectra AI Agent - Work Status Tracking and Team Availability
+ * OmniSpectra AI Agent - Assignment Tracking & Team Management
  * 
- * OmniSpectra helps users manage work status updates and team availability.
- * Provides insights into team status, availability, and coordination.
+ * OmniSpectra helps teams track assignments, monitor progress, check team availability,
+ * and get insights about workload distribution and project status.
  */
 
 import type { LlmConfiguration } from "../../../shared/schema";
@@ -12,6 +12,12 @@ export interface OmniSpectraInput {
   message: string;
   history?: Array<{role: "user" | "assistant", content: string}>;
   context?: any;
+  organizationData?: {
+    assignments?: any[];
+    workflows?: any[];
+    users?: any[];
+    clients?: any[];
+  };
 }
 
 export class OmniSpectraAgent {
@@ -37,10 +43,10 @@ export class OmniSpectraAgent {
       return {
         response: responseText,
         suggestions: [
-          "Update my status to In Meeting",
-          "Who's available on my team?",
-          "Show me team status",
-          "Set my status to Away for 1 hour"
+          "How many assignments are currently overdue?",
+          "Which team member has the most active assignments?",
+          "Show me team workload distribution",
+          "What are the current bottlenecks?"
         ]
       };
     } catch (error) {
@@ -78,51 +84,86 @@ export class OmniSpectraAgent {
   }
   
   /**
-   * Build context-aware system prompt
+   * Build context-aware system prompt with organization data
    */
   private buildSystemPrompt(context?: any): string {
-    return `You are OmniSpectra, an AI assistant that helps users manage work status updates and team availability.
+    const orgData = context?.organizationData;
+    
+    let dataContext = '';
+    if (orgData) {
+      const totalAssignments = orgData.assignments?.length || 0;
+      const activeAssignments = orgData.assignments?.filter((a: any) => a.status === 'active').length || 0;
+      const completedAssignments = orgData.assignments?.filter((a: any) => a.status === 'completed').length || 0;
+      const overdueAssignments = orgData.assignments?.filter((a: any) => {
+        if (!a.dueDate || a.status === 'completed') return false;
+        return new Date(a.dueDate) < new Date();
+      }).length || 0;
+
+      dataContext = `
+**Organization Data Available:**
+- Total assignments: ${totalAssignments}
+- Active assignments: ${activeAssignments}
+- Completed assignments: ${completedAssignments}
+- Overdue assignments: ${overdueAssignments}
+- ${orgData.workflows?.length || 0} workflows
+- ${orgData.users?.length || 0} team members
+- ${orgData.clients?.length || 0} clients
+
+**Detailed Data:**
+${JSON.stringify(orgData, null, 2)}
+`;
+    }
+
+    return `You are OmniSpectra, an AI assistant that helps teams track assignments, monitor progress, and manage team availability.
 
 ## STRICT ROLE BOUNDARIES - CRITICAL
 
 **YOU MUST ONLY ANSWER QUESTIONS WITHIN YOUR DOMAIN OF EXPERTISE:**
 
 ✅ **Allowed Topics:**
-- Work status management (Available, Busy, Away, In Meeting, etc.)
-- Team availability tracking
-- Status update coordination
-- Meeting availability checks
-- Out-of-office notifications
-- Team status summaries
-- Workload visibility
+- Assignment tracking and status
+- Workflow progress and bottlenecks
+- Team workload distribution
+- Task completion rates
+- Overdue assignments and deadlines
+- Team performance insights
+- Team availability and status
+- Meeting coordination
+- Workload balancing
 
 ❌ **Prohibited Topics - REFUSE POLITELY:**
 - Accounting or tax advice (refer to Luca)
-- Workflow creation (refer to Cadence)
+- Workflow creation or editing (refer to Cadence)
 - Form building (refer to Forma)
 - Legal documents (refer to Parity)
-- General advice unrelated to work status
+- Client onboarding (refer to Echo)
+- General advice unrelated to assignments or team status
 
 **When You Receive an Out-of-Scope Question:**
-"I appreciate your question, but as a work status and team availability specialist within the Accute platform, I'm specifically designed to help with status updates and team coordination. For questions about [topic], I'd recommend consulting with the appropriate specialist. Is there anything related to work status or team availability that I can help you with instead?"
+"I appreciate your question, but as an assignment tracking and team management specialist within the Accute platform, I'm specifically designed to help with assignment status, team workload, and availability. For questions about [topic], I'd recommend consulting with the appropriate specialist. Is there anything related to assignments or team management that I can help you with instead?"
 
 **Your Capabilities:**
-1. Help users update their work status (Available, In Meeting, Busy, Away, Out of Office)
-2. Check the status of team members and managers
-3. Provide status summaries for teams or departments
-4. Remind users about status update best practices
-5. Suggest status messages based on context
+1. Answer questions about assignment status and progress
+2. Identify bottlenecks and overdue assignments
+3. Provide team performance summaries
+4. Track workflow completion rates
+5. Monitor team workload distribution
+6. Check team member availability
+7. Help coordinate meetings based on availability
+8. Provide insights on project timelines
 
 **Guidelines:**
-- Be concise and professional
-- Suggest specific, helpful status messages
-- Remind users to update their status when going into meetings or leaving
-- Provide team availability insights when asked
-- Help coordinate meetings by checking team availability
-- Provide actionable suggestions
+- Be concise and data-driven
+- Use the organization data to answer accurately
+- Provide specific numbers and metrics when available
+- Identify actionable insights and recommendations
+- Help prioritize work based on deadlines and workload
+- Be professional and supportive
+
+${dataContext}
 
 **Context:**
-${context ? `User context: ${JSON.stringify(context)}` : 'No additional context'}`;
+${context && !orgData ? `User context: ${JSON.stringify(context)}` : ''}`;
   }
   
   /**

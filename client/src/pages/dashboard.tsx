@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2, Smartphone, Download, X, Rocket, Sparkles } from "lucide-react";
+import { CheckCircle2, Clock, AlertCircle, ListTodo, TrendingUp, Users, Briefcase, Building2, Smartphone, Download, X, Rocket, Sparkles, Bot, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { getUser } from "@/lib/auth";
 import { useIsPWA } from "@/hooks/use-mobile-detect";
@@ -124,6 +124,12 @@ export default function Dashboard() {
     queryKey: ['/api/tasks/due-soon'],
   });
 
+  // Check if Omnispectra is installed
+  const { data: installedAgents = [] } = useQuery<any[]>({
+    queryKey: ['/api/ai-agents/installed'],
+  });
+  const hasOmnispectra = installedAgents.some((agent: any) => agent.agent?.slug === 'omnispectra');
+
   if (myStatsLoading || myTasksLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -186,6 +192,46 @@ export default function Dashboard() {
             <Button variant="outline" onClick={dismissOnboardingBanner} data-testid="button-maybe-later">
               Maybe Later
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Omnispectra Quick Access Widget */}
+      {hasOmnispectra && (
+        <Card className="border-primary bg-gradient-to-r from-[#e5a660]/10 to-[#d76082]/10" data-testid="card-omnispectra-widget">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <Bot className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="flex items-center gap-2">
+                    OmniSpectra AI Assistant
+                    <Badge variant="secondary" className="text-xs">Installed</Badge>
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Ask questions about assignments, workload, and team availability
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Link href="/ai-agents/omnispectra">
+                <Button 
+                  className="gap-2" 
+                  data-testid="button-open-omnispectra"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Open OmniSpectra
+                </Button>
+              </Link>
+              <div className="flex-1 text-sm text-muted-foreground flex items-center">
+                Track assignments, monitor team workload, and get instant insights
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

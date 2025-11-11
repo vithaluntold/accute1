@@ -58,7 +58,6 @@ const AgentDetail = lazy(() => import("@/pages/agent-detail"));
 const Marketplace = lazy(() => import("@/pages/marketplace"));
 const Assignments = lazy(() => import("@/pages/assignments"));
 const AssignmentDetail = lazy(() => import("@/pages/assignment-detail"));
-const AssignmentBot = lazy(() => import("@/pages/assignment-bot"));
 const ClientOnboarding = lazy(() => import("@/pages/client-onboarding"));
 const Kanban = lazy(() => import("@/pages/kanban"));
 const Team = lazy(() => import("@/pages/team"));
@@ -635,13 +634,6 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
-      </Route>
-      <Route path="/assignment-bot">
-        <OrganizationRoute>
-          <AppLayout>
-            <AssignmentBot />
-          </AppLayout>
-        </OrganizationRoute>
       </Route>
       <Route path="/client-onboarding">
         <ProtectedRoute>

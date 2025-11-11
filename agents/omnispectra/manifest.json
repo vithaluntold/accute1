@@ -1,15 +1,15 @@
 {
   "slug": "omnispectra",
   "name": "OmniSpectra",
-  "description": "AI assistant for managing work status updates, checking team availability, and providing status summaries across your organization",
+  "description": "AI assistant for tracking workflow assignments, monitoring team workload, checking availability, and providing insights on project progress and bottlenecks",
   "category": "productivity",
   "provider": "openai",
   "frontendEntry": "./frontend/OmniSpectra.tsx",
   "backendEntry": "./backend/handler.ts",
-  "capabilities": ["chat", "status-tracking", "team-monitoring"],
+  "capabilities": ["chat", "assignment-tracking", "team-monitoring", "workload-analysis"],
   "subscriptionMinPlan": "free",
   "defaultScope": "user",
   "pricingModel": "free",
-  "version": "1.0.0",
-  "tags": ["productivity", "collaboration", "status", "team-management"]
+  "version": "1.1.0",
+  "tags": ["productivity", "collaboration", "assignments", "team-management", "workload"]
 }

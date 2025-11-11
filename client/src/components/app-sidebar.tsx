@@ -111,7 +111,6 @@ const organizationMenuCategories = [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
       { title: "Agent Integration Guide", url: "/agent-integration-guide", icon: FileText, permission: null },
       { title: "AI Roundtable", url: "/roundtable", icon: Users, permission: "roundtable.access" },
-      { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
       { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
     ]
   },
@@ -195,7 +194,6 @@ const employeeMenuCategories = [
     title: "AI & Tools",
     items: [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
-      { title: "Assignment Bot", url: "/assignment-bot", icon: MessageSquare, permission: null },
     ]
   },
   {

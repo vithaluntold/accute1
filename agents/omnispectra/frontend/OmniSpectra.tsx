@@ -19,16 +19,16 @@ export default function OmniSpectra() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm OmniSpectra. I can help you manage your work status, check team availability, and coordinate with your colleagues. How can I help you today?",
+      content: "Hi! I'm OmniSpectra. I can help you track assignments, monitor team workload, check availability, and answer questions about project progress. How can I help you today?",
       timestamp: new Date().toISOString(),
     },
   ]);
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([
-    "Update my status to In Meeting",
-    "Who's available on my team?",
-    "Show me team status",
-    "Set my status to Away for 1 hour",
+    "How many assignments are currently overdue?",
+    "Which team member has the most active assignments?",
+    "Show me team workload distribution",
+    "What are the current bottlenecks?",
   ]);
 
   const chatMutation = useMutation({
