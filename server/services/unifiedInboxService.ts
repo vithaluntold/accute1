@@ -1,5 +1,5 @@
 import { db } from "@db";
-import { emailMessages, teamChatMessages, liveChatMessages, liveChatConversations, users, clients } from "@shared/schema";
+import { emailMessages, teamChatMessages, liveChatMessages, liveChatConversations, users, clients, teams } from "@shared/schema";
 import { eq, desc, or, and, sql, like, inArray } from "drizzle-orm";
 
 export interface UnifiedConversation {
@@ -88,51 +88,79 @@ export class UnifiedInboxService {
       }
     }
 
-    // Fetch team chat conversations (grouped by teamId/clientId)
+    // Fetch team chat conversations (grouped by teamId/clientId with org scoping)
     if (!filters?.type || filters.type === 'team_chat') {
-      const teamChats = await db
-        .select({
-          teamId: teamChatMessages.teamId,
-          clientId: teamChatMessages.clientId,
-          clientName: clients.name,
-          lastMessageAt: sql<Date>`MAX(${teamChatMessages.createdAt})`,
-          preview: sql<string>`substring((array_agg(${teamChatMessages.message} ORDER BY ${teamChatMessages.createdAt} DESC))[1], 1, 150)`,
-          messageCount: sql<number>`COUNT(*)`,
-          participants: sql<string[]>`array_agg(DISTINCT ${teamChatMessages.senderId})`,
-        })
-        .from(teamChatMessages)
-        .leftJoin(clients, eq(teamChatMessages.clientId, clients.id))
-        .where(
-          and(
-            or(
-              teamChatMessages.teamId !== null,
-              teamChatMessages.clientId !== null
-            ),
-            filters?.search ? like(teamChatMessages.message, `%${filters.search}%`) : undefined
+      // Get organization's teams for scoping
+      const orgTeams = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(eq(teams.organizationId, organizationId));
+      
+      const teamIds = orgTeams.map(t => t.id);
+
+      // Get organization's clients for scoping
+      const orgClients = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(eq(clients.organizationId, organizationId));
+      
+      const clientIds = orgClients.map(c => c.id);
+
+      // Only query if we have teams or clients
+      if (teamIds.length > 0 || clientIds.length > 0) {
+        const teamChats = await db
+          .select({
+            teamId: teamChatMessages.teamId,
+            clientId: teamChatMessages.clientId,
+            clientName: clients.name,
+            lastMessageAt: sql<Date>`MAX(${teamChatMessages.createdAt})`,
+            preview: sql<string>`substring((array_agg(${teamChatMessages.message} ORDER BY ${teamChatMessages.createdAt} DESC))[1], 1, 150)`,
+            messageCount: sql<number>`COUNT(*)`,
+            unreadCount: sql<number>`SUM(CASE WHEN (${teamChatMessages.metadata}->>'read' IS NULL OR ${teamChatMessages.metadata}->>'read' = 'false') THEN 1 ELSE 0 END)`,
+            participants: sql<string[]>`array_agg(DISTINCT ${teamChatMessages.senderId})`,
+          })
+          .from(teamChatMessages)
+          .leftJoin(clients, eq(teamChatMessages.clientId, clients.id))
+          .where(
+            and(
+              or(
+                teamIds.length > 0 ? inArray(teamChatMessages.teamId, teamIds) : undefined,
+                clientIds.length > 0 ? inArray(teamChatMessages.clientId, clientIds) : undefined
+              ),
+              filters?.search ? like(teamChatMessages.message, `%${filters.search}%`) : undefined
+            )
           )
-        )
-        .groupBy(teamChatMessages.teamId, teamChatMessages.clientId, clients.name)
-        .orderBy(desc(sql`MAX(${teamChatMessages.createdAt})`));
+          .groupBy(teamChatMessages.teamId, teamChatMessages.clientId, clients.name)
+          .orderBy(desc(sql`MAX(${teamChatMessages.createdAt})`));
 
-      for (const chat of teamChats) {
-        const subject = chat.clientName 
-          ? `Chat with ${chat.clientName}`
-          : chat.teamId 
-            ? `Team Chat ${chat.teamId.substring(0, 8)}`
-            : 'Group Chat';
+        for (const chat of teamChats) {
+          // Apply filters before processing
+          if (filters?.unreadOnly && chat.unreadCount === 0) continue;
+          if (filters?.starredOnly) continue; // Team chat doesn't support starring yet
+          
+          // Create deterministic conversation ID (no random UUIDs!)
+          const conversationId = chat.clientId || chat.teamId;
+          if (!conversationId) continue; // Skip if neither exists
+          
+          const subject = chat.clientName 
+            ? `Chat with ${chat.clientName}`
+            : chat.teamId 
+              ? `Team Chat ${chat.teamId.substring(0, 8)}`
+              : 'Group Chat';
 
-        conversations.push({
-          id: chat.clientId || chat.teamId || crypto.randomUUID(),
-          type: 'team_chat',
-          subject,
-          preview: chat.preview,
-          participants: chat.participants,
-          lastMessageAt: chat.lastMessageAt,
-          unreadCount: 0, // Team chat doesn't track read status yet
-          clientId: chat.clientId || undefined,
-          clientName: chat.clientName || undefined,
-          metadata: { messageCount: chat.messageCount },
-        });
+          conversations.push({
+            id: conversationId,
+            type: 'team_chat',
+            subject,
+            preview: chat.preview,
+            participants: chat.participants,
+            lastMessageAt: chat.lastMessageAt,
+            unreadCount: chat.unreadCount,
+            clientId: chat.clientId || undefined,
+            clientName: chat.clientName || undefined,
+            metadata: { messageCount: chat.messageCount },
+          });
+        }
       }
     }
 
@@ -243,6 +271,10 @@ export class UnifiedInboxService {
         .orderBy(desc(teamChatMessages.createdAt));
 
       for (const chat of chats) {
+        // Read status from metadata (default to false for unread)
+        const metadata = (chat.message.metadata as any) || {};
+        const isRead = metadata.read === true || metadata.read === 'true';
+        
         messages.push({
           id: chat.message.id,
           conversationId,
@@ -254,7 +286,7 @@ export class UnifiedInboxService {
             email: chat.senderEmail || undefined,
           },
           createdAt: chat.message.createdAt,
-          isRead: true, // Team chat doesn't track read status
+          isRead,
           attachments: [],
           metadata: chat.message.metadata || {},
         });
@@ -294,12 +326,25 @@ export class UnifiedInboxService {
     return messages;
   }
 
-  async markAsRead(conversationId: string, type: 'email' | 'live_chat'): Promise<void> {
+  async markAsRead(conversationId: string, type: 'email' | 'team_chat' | 'live_chat'): Promise<void> {
     if (type === 'email') {
       await db
         .update(emailMessages)
         .set({ isRead: true })
         .where(eq(emailMessages.threadId, conversationId));
+    } else if (type === 'team_chat') {
+      // Bulk update: Set metadata->read = true for all messages in conversation
+      await db
+        .update(teamChatMessages)
+        .set({ 
+          metadata: sql`jsonb_set(COALESCE(${teamChatMessages.metadata}, '{}'::jsonb), '{read}', 'true'::jsonb)` 
+        })
+        .where(
+          or(
+            eq(teamChatMessages.teamId, conversationId),
+            eq(teamChatMessages.clientId, conversationId)
+          )
+        );
     } else if (type === 'live_chat') {
       await db
         .update(liveChatMessages)
