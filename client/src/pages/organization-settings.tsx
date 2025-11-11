@@ -211,7 +211,7 @@ export default function OrganizationSettings() {
   // Create LLM Config Mutation
   const createLlmMutation = useMutation({
     mutationFn: async (data: LlmConfigFormData) => {
-      return await apiRequest("/api/llm-configurations", "POST", { ...data, scope: 'workspace' });
+      return await apiRequest("POST", "/api/llm-configurations", { ...data, scope: 'workspace' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=workspace", orgId] });
@@ -234,7 +234,7 @@ export default function OrganizationSettings() {
   // Delete LLM Config Mutation
   const deleteLlmMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/llm-configurations/${id}`, "DELETE");
+      return await apiRequest("DELETE", `/api/llm-configurations/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=workspace", orgId] });
