@@ -164,13 +164,13 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       toast({
         title: "Workspace created",
-        description: "Your new workspace has been created successfully. Please log in again to access it.",
+        description: "Your new workspace has been created successfully. Switching to it now...",
       });
       setWorkspaceDialogOpen(false);
       setWorkspaceName("");
       setWorkspaceSlug("");
-      // Redirect to login to refresh auth state
-      window.location.href = "/login";
+      // Redirect to login to refresh auth state with new workspace
+      window.location.href = "/auth/login";
     },
     onError: (error: any) => {
       toast({

@@ -1807,16 +1807,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationId: organization.id,
         roleId: user.roleId, // Use their existing role (typically Admin)
         status: 'active',
-        isDefault: isFirstWorkspace, // Only set as default if it's the user's first workspace
+        isDefault: true, // Always set new workspace as default
         joinedAt: new Date(),
       });
 
-      // Update creator's organizationId (legacy) and defaultOrganizationId only if first workspace
-      if (isFirstWorkspace) {
-        await storage.updateUser(req.userId, {
-          organizationId: organization.id,
-          defaultOrganizationId: organization.id,
-        });
+      // CRITICAL: Always update user's organizationId and defaultOrganizationId to new workspace
+      // This ensures they're switched to the new workspace after re-authentication
+      await storage.updateUser(req.userId, {
+        organizationId: organization.id,
+        defaultOrganizationId: organization.id,
+      });
+      
+      // If user has other workspaces, unset their isDefault flag
+      if (!isFirstWorkspace) {
+        for (const membership of existingMemberships) {
+          if (membership.organizationId !== organization.id) {
+            await storage.updateUserOrganization(membership.id, {
+              isDefault: false,
+            });
+          }
+        }
       }
 
       await logActivity(req.userId, organization.id, "create", "organization", organization.id, { name: organization.name }, req);
