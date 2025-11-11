@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react";
 import { GradientHero } from "@/components/gradient-hero";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const locales = {
   "en-US": require("date-fns/locale/en-US"),
@@ -27,41 +30,98 @@ interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  type: "task" | "project" | "meeting" | "deadline";
+  type: "task" | "project" | "meeting" | "deadline" | "workflow-task" | "assignment";
   status?: string;
   assignedTo?: string;
   project?: string;
 }
 
 export default function CalendarView() {
+  const { toast } = useToast();
   const [view, setView] = useState<View>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterType, setFilterType] = useState<string>("all");
 
   // Fetch workflow tasks
-  const { data: workflowTasks } = useQuery<any[]>({
+  const { data: workflowTasks, isLoading: workflowLoading } = useQuery<any[]>({
     queryKey: ["/api/workflow-tasks"],
   });
 
   // Fetch project tasks
-  const { data: projectTasks } = useQuery<any[]>({
+  const { data: projectTasks, isLoading: tasksLoading } = useQuery<any[]>({
     queryKey: ["/api/tasks"],
   });
 
   // Fetch projects
-  const { data: projects } = useQuery<any[]>({
+  const { data: projects, isLoading: projectsLoading } = useQuery<any[]>({
     queryKey: ["/api/projects"],
+  });
+
+  // Fetch assignments
+  const { data: assignments, isLoading: assignmentsLoading } = useQuery<any[]>({
+    queryKey: ["/api/assignments"],
+  });
+
+  // Update dates on drag-drop - route to correct endpoint based on type
+  const updateDatesMutation = useMutation({
+    mutationFn: async ({ id, start, end, type }: { id: string; start: Date; end: Date; type: string }) => {
+      if (type === 'workflow-task') {
+        // Workflow tasks have their own endpoint
+        await apiRequest(`/api/workflow-tasks/${id}`, {
+          method: 'PATCH',
+          body: { dueDate: end }, // Workflow tasks only have dueDate
+        });
+      } else if (type === 'task') {
+        // Project tasks
+        await apiRequest(`/api/tasks/${id}`, {
+          method: 'PATCH',
+          body: { startDate: start, dueDate: end },
+        });
+      } else if (type === 'project' || type === 'deadline') {
+        // Projects
+        await apiRequest(`/api/projects/${id}`, {
+          method: 'PATCH',
+          body: { startDate: start, deadline: end },
+        });
+      } else if (type === 'assignment') {
+        // Workflow assignments
+        await apiRequest(`/api/assignments/${id}`, {
+          method: 'PATCH',
+          body: { startDate: start, dueDate: end },
+        });
+      }
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate only the relevant query based on type
+      if (variables.type === 'workflow-task') {
+        queryClient.invalidateQueries({ queryKey: ["/api/workflow-tasks"] });
+      } else if (variables.type === 'task') {
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      } else if (variables.type === 'project' || variables.type === 'deadline') {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      } else if (variables.type === 'assignment') {
+        queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      }
+      toast({ title: "Date updated successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update date",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Transform data into calendar events
   const events: CalendarEvent[] = [
-    // Workflow tasks
+    // Workflow tasks - preserve "workflow-task" type for correct routing
     ...(workflowTasks?.filter(t => t.dueDate).map(task => ({
       id: task.id,
       title: task.name,
       start: new Date(task.dueDate),
       end: new Date(task.dueDate),
-      type: "task" as const,
+      type: "workflow-task" as const,
       status: task.status,
       assignedTo: task.assignedTo,
     })) || []),
@@ -86,7 +146,20 @@ export default function CalendarView() {
       type: "deadline" as const,
       status: project.status,
     })) || []),
+
+    // Assignments - preserve "assignment" type for correct routing
+    ...(assignments?.filter(a => a.dueDate).map(assignment => ({
+      id: assignment.id,
+      title: assignment.workflowName || 'Assignment',
+      start: assignment.startDate ? new Date(assignment.startDate) : new Date(assignment.dueDate),
+      end: new Date(assignment.dueDate),
+      type: "assignment" as const,
+      status: assignment.status,
+      assignedTo: assignment.assignedToName,
+    })) || []),
   ];
+
+  const isLoading = workflowLoading || tasksLoading || projectsLoading || assignmentsLoading;
 
   // Filter events
   const filteredEvents = filterType === "all" 
@@ -130,6 +203,19 @@ export default function CalendarView() {
   const handleViewChange = (newView: View) => {
     setView(newView);
   };
+
+  // Handle drag-drop event rescheduling
+  const handleEventDrop = useCallback(
+    ({ event, start, end }: { event: CalendarEvent; start: Date; end: Date }) => {
+      updateDatesMutation.mutate({
+        id: event.id,
+        start,
+        end,
+        type: event.type,
+      });
+    },
+    [updateDatesMutation]
+  );
 
   return (
     <div className="flex flex-col h-screen">
@@ -240,24 +326,32 @@ export default function CalendarView() {
           </CardHeader>
 
           <CardContent className="flex-1 overflow-hidden pt-6">
-            <div className="h-full calendar-container">
-              <Calendar
-                localizer={localizer}
-                events={filteredEvents}
-                startAccessor="start"
-                endAccessor="end"
-                style={{ height: "100%" }}
-                view={view}
-                onView={handleViewChange}
-                date={currentDate}
-                onNavigate={handleNavigate}
-                eventPropGetter={eventStyleGetter}
-                views={["month", "week", "day", "agenda"]}
-                popup
-                selectable
-                data-testid="calendar-component"
-              />
-            </div>
+            {isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <div className="h-full calendar-container">
+                <Calendar
+                  localizer={localizer}
+                  events={filteredEvents}
+                  startAccessor="start"
+                  endAccessor="end"
+                  style={{ height: "100%" }}
+                  view={view}
+                  onView={handleViewChange}
+                  date={currentDate}
+                  onNavigate={handleNavigate}
+                  eventPropGetter={eventStyleGetter}
+                  views={["month", "week", "day", "agenda"]}
+                  popup
+                  selectable
+                  draggableAccessor={() => true}
+                  resizable
+                  onEventDrop={handleEventDrop}
+                  onEventResize={handleEventDrop}
+                  data-testid="calendar-component"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

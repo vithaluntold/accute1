@@ -62,6 +62,7 @@ import Stripe from "stripe";
 import { PricingService } from "@shared/pricing-service";
 import { getLLMConfigService } from "./llm-config-service";
 import { mfaService } from "./services/mfaService";
+import { unifiedInboxService } from "./services/unifiedInboxService";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -5194,6 +5195,70 @@ Title:`;
       res.json(messages);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch team chat messages" });
+    }
+  });
+
+  // ==================== Unified Inbox Routes ====================
+  
+  // Get all conversations across email, team chat, and live chat
+  app.get("/api/unified-inbox/conversations", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(400).json({ error: "Organization ID required" });
+      }
+
+      const filters = {
+        type: req.query.type as string | undefined,
+        search: req.query.search as string | undefined,
+        unreadOnly: req.query.unreadOnly === 'true',
+        starredOnly: req.query.starredOnly === 'true',
+      };
+
+      const conversations = await unifiedInboxService.getConversations(
+        req.user!.organizationId,
+        filters
+      );
+
+      res.json(conversations);
+    } catch (error: any) {
+      console.error("Failed to fetch unified inbox conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get messages for a specific conversation
+  app.get("/api/unified-inbox/conversations/:id/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { type } = req.query;
+      if (!type || !['email', 'team_chat', 'live_chat'].includes(type as string)) {
+        return res.status(400).json({ error: "Valid conversation type required" });
+      }
+
+      const messages = await unifiedInboxService.getMessages(
+        req.params.id,
+        type as 'email' | 'team_chat' | 'live_chat'
+      );
+
+      res.json(messages);
+    } catch (error: any) {
+      console.error("Failed to fetch conversation messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Mark conversation as read
+  app.patch("/api/unified-inbox/conversations/:id/read", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { type } = req.body;
+      if (!type || !['email', 'live_chat'].includes(type)) {
+        return res.status(400).json({ error: "Valid conversation type required (email or live_chat)" });
+      }
+
+      await unifiedInboxService.markAsRead(req.params.id, type);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to mark conversation as read:", error);
+      res.status(500).json({ error: "Failed to mark as read" });
     }
   });
 
