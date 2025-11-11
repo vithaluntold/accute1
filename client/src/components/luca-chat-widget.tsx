@@ -172,11 +172,20 @@ export function LucaChatWidget() {
     enabled: isOpen || isFullScreen,
   });
 
-  // Auto-select default LLM config
+  // Auto-select default LLM config (prefer default, fallback to first active config)
   useEffect(() => {
-    const defaultConfig = llmConfigs.find((c) => c.isDefault);
-    if (defaultConfig && !selectedLlmConfig) {
-      setSelectedLlmConfig(defaultConfig.id);
+    if (llmConfigs.length === 0 || selectedLlmConfig) return;
+    
+    // Try to find default config
+    let configToSelect = llmConfigs.find((c) => c.isDefault);
+    
+    // Fallback to first active config if no default
+    if (!configToSelect) {
+      configToSelect = llmConfigs[0];
+    }
+    
+    if (configToSelect) {
+      setSelectedLlmConfig(configToSelect.id);
     }
   }, [llmConfigs, selectedLlmConfig]);
 
