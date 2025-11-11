@@ -65,29 +65,39 @@ export default function CalendarView() {
   // Update dates on drag-drop - route to correct endpoint based on type
   const updateDatesMutation = useMutation({
     mutationFn: async ({ id, start, end, type }: { id: string; start: Date; end: Date; type: string }) => {
+      // Convert dates to ISO strings for proper serialization
+      const startISO = start.toISOString();
+      const endISO = end.toISOString();
+
       if (type === 'workflow-task') {
-        // Workflow tasks have their own endpoint
+        // Workflow tasks have their own endpoint - only dueDate field
         await apiRequest(`/api/workflow-tasks/${id}`, {
           method: 'PATCH',
-          body: { dueDate: end }, // Workflow tasks only have dueDate
+          body: { dueDate: endISO },
         });
       } else if (type === 'task') {
-        // Project tasks
+        // Project tasks - use startDate and dueDate fields
         await apiRequest(`/api/tasks/${id}`, {
           method: 'PATCH',
-          body: { startDate: start, dueDate: end },
+          body: { startDate: startISO, dueDate: endISO },
         });
-      } else if (type === 'project' || type === 'deadline') {
-        // Projects
+      } else if (type === 'deadline') {
+        // Deadlines are project entities - only update deadline field
         await apiRequest(`/api/projects/${id}`, {
           method: 'PATCH',
-          body: { startDate: start, deadline: end },
+          body: { deadline: endISO },
+        });
+      } else if (type === 'project') {
+        // Projects use startDate and dueDate (not deadline) when rescheduling
+        await apiRequest(`/api/projects/${id}`, {
+          method: 'PATCH',
+          body: { startDate: startISO, dueDate: endISO },
         });
       } else if (type === 'assignment') {
-        // Workflow assignments
+        // Workflow assignments - use startDate and dueDate fields
         await apiRequest(`/api/assignments/${id}`, {
           method: 'PATCH',
-          body: { startDate: start, dueDate: end },
+          body: { startDate: startISO, dueDate: endISO },
         });
       }
     },

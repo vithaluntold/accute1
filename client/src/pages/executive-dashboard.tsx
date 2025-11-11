@@ -37,40 +37,42 @@ export default function ExecutiveDashboard() {
     const previousMonthStart = startOfMonth(subMonths(now, 1));
     const previousMonthEnd = endOfMonth(subMonths(now, 1));
 
-    // Revenue trends
+    // Revenue trends - use 'total' field from schema, not 'amount'
     const currentRevenue = invoices
       .filter(inv => {
-        const date = new Date(inv.createdAt || inv.invoiceDate);
+        const date = new Date(inv.createdAt || inv.issueDate);
         return isWithinInterval(date, { start: currentMonthStart, end: currentMonthEnd });
       })
-      .reduce((sum, inv) => sum + (inv.amount || 0), 0);
+      .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
 
     const previousRevenue = invoices
       .filter(inv => {
-        const date = new Date(inv.createdAt || inv.invoiceDate);
+        const date = new Date(inv.createdAt || inv.issueDate);
         return isWithinInterval(date, { start: previousMonthStart, end: previousMonthEnd });
       })
-      .reduce((sum, inv) => sum + (inv.amount || 0), 0);
+      .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
 
+    // Guard against division by zero
     const revenueChange = previousRevenue > 0 
       ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 
       : currentRevenue > 0 ? 100 : 0;
 
-    // Hours trends
+    // Hours trends - explicitly cast hours to Number for proper addition
     const currentHours = timeEntries
       .filter(entry => {
         const date = new Date(entry.date || entry.createdAt);
         return isWithinInterval(date, { start: currentMonthStart, end: currentMonthEnd });
       })
-      .reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      .reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
 
     const previousHours = timeEntries
       .filter(entry => {
         const date = new Date(entry.date || entry.createdAt);
         return isWithinInterval(date, { start: previousMonthStart, end: previousMonthEnd });
       })
-      .reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      .reduce((sum, entry) => sum + (Number(entry.hours) || 0), 0);
 
+    // Guard against division by zero
     const hoursChange = previousHours > 0 
       ? ((currentHours - previousHours) / previousHours) * 100 
       : currentHours > 0 ? 100 : 0;
@@ -90,19 +92,22 @@ export default function ExecutiveDashboard() {
     };
   }, [invoices, timeEntries, projects]);
 
-  // Sort projects by budget
+  // Sort projects by budget - use Number() to ensure numeric comparison
   const topProjects = useMemo(() => {
     if (!projects) return [];
     return [...projects]
-      .filter(p => p.budget && p.budget > 0)
-      .sort((a, b) => (b.budget || 0) - (a.budget || 0))
+      .filter(p => p.budget && Number(p.budget) > 0)
+      .sort((a, b) => (Number(b.budget) || 0) - (Number(a.budget) || 0))
       .slice(0, 5);
   }, [projects]);
 
   const isLoading = workloadLoading || projectsLoading || invoicesLoading || timeLoading;
 
   const TrendIndicator = ({ value }: { value: number }) => {
-    if (Math.abs(value) < 0.1) return <span className="text-muted-foreground">No change</span>;
+    // Guard against NaN or Infinity
+    if (!isFinite(value) || Math.abs(value) < 0.1) {
+      return <span className="text-muted-foreground text-xs">No change</span>;
+    }
     
     const Icon = value > 0 ? TrendingUp : TrendingDown;
     const color = value > 0 ? "text-green-600" : "text-red-600";
