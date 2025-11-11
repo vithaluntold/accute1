@@ -119,6 +119,17 @@ const TeamDetailPage = lazy(() => import("@/pages/team-detail"));
 const TeamHierarchyPage = lazy(() => import("@/pages/team-hierarchy"));
 const ManagerDashboardPage = lazy(() => import("@/pages/manager-dashboard"));
 const AutomatedInvoicing = lazy(() => import("@/pages/automated-invoicing"));
+
+// MVP Score 9.0 Features - Visualization
+const CalendarView = lazy(() => import("@/pages/calendar-view"));
+const TimelineView = lazy(() => import("@/pages/timeline-view"));
+const GanttView = lazy(() => import("@/pages/gantt-view"));
+const WorkloadView = lazy(() => import("@/pages/workload-view"));
+const UnifiedInbox = lazy(() => import("@/pages/unified-inbox"));
+const ExecutiveDashboard = lazy(() => import("@/pages/executive-dashboard"));
+const ReportBuilder = lazy(() => import("@/pages/report-builder"));
+const ProfitabilityView = lazy(() => import("@/pages/profitability-view"));
+const ResourceAllocation = lazy(() => import("@/pages/resource-allocation"));
 const SubscriptionPricing = lazy(() => import("@/pages/subscription-pricing"));
 const EmployeeProfile = lazy(() => import("@/pages/employee-profile"));
 const LiveChat = lazy(() => import("@/pages/live-chat"));
@@ -634,6 +645,77 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
+      </Route>
+      
+      {/* MVP Score 9.0 Features */}
+      <Route path="/calendar-view">
+        <OrganizationRoute>
+          <AppLayout>
+            <CalendarView />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/timeline-view">
+        <OrganizationRoute>
+          <AppLayout>
+            <TimelineView />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/gantt-view">
+        <OrganizationRoute>
+          <AppLayout>
+            <GanttView />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/workload-view">
+        <OrganizationRoute>
+          <AppLayout>
+            <WorkloadView />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/unified-inbox">
+        <OrganizationRoute>
+          <AppLayout>
+            <UnifiedInbox />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/executive-dashboard">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <ExecutiveDashboard />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/report-builder">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <ReportBuilder />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/profitability-view">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <ProfitabilityView />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/resource-allocation">
+        <OrganizationRoute>
+          <AppLayout>
+            <ResourceAllocation />
+          </AppLayout>
+        </OrganizationRoute>
       </Route>
       <Route path="/client-onboarding">
         <ProtectedRoute>
