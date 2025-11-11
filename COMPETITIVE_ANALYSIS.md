@@ -469,6 +469,393 @@ Each platform scored 0-10 in each category (10 = market leader, 0 = missing enti
 
 ---
 
-**Document Version**: 2.0 (Side-by-Side Comparison)  
+## Comprehensive 2026 Implementation Roadmap
+
+### Overview
+
+This roadmap delivers **37 competitive parity features** across 4 quarters (Q1-Q4 2026), requiring **162 developer-weeks** (~37.5 developer-months) to close feature gaps with TaxDome, ClickUp, and Trulio while maintaining AI leadership.
+
+### Resource Plan
+
+**Team Structure** (23 people total):
+- **3 Feature Squads** (5 engineers each = 15 eng)
+  - Workflow Squad
+  - Collaboration Squad  
+  - Intelligence Squad
+- **Shared Platform Pod** (3 engineers)
+- **Security/Compliance Pod** (2 engineers)
+- **Support Staff**: QA (3), Design (2), PM (3, one per squad), Compliance Manager (1)
+
+**Workload Distribution**:
+- Frontend: 80% (UI-heavy features)
+- Backend: 20% (APIs, data models, integrations)
+
+---
+
+### Q1 2026: Workflow Foundations (34 dev-weeks)
+
+**Goal**: Eliminate churn drivers and unlock dependency-based planning
+
+#### Features (8 total)
+
+| Feature | Effort | Technical Approach | Business Impact |
+|---------|--------|-------------------|-----------------|
+| **Task Dependencies** | 8 weeks | New `task_dependencies` junction table with type enum (FS/SS/FF/SF), critical path calculation engine, extend event triggers | **CRITICAL** - Can't model complex workflows without this |
+| **Visual Automation Builder** | 7 weeks | React Flow canvas, drag-drop nodes, condition branches, server-side validation, versioning | **HIGH** - Match ClickUp's automation UX |
+| **Gantt Chart** | 6 weeks | `@planview/react-gantt` library, TanStack Query data feeds, dependency arrows | **HIGH** - Standard project planning tool |
+| **Workload Capacity View** | 5 weeks | Integrate existing workload insights API, capacity bars (allocated/available hours) | **MEDIUM** - Resource planning essential |
+| **Timeline View** | 4 weeks | High-level project roadmap visualization, milestone tracking | **MEDIUM** - Executive-level overview |
+| **Calendar View** | 4 weeks | `react-big-calendar`, ICS export, sync with external calendars | **MEDIUM** - Standard scheduling tool |
+| **Resource Allocation %** | 4 weeks | Analytics layer for % time per project/task, allocation reporting | **MEDIUM** - Enables workload balancing |
+| **Enhanced Conditional Routing** | 4 weeks | Visual condition builder, multi-branch IF-THEN-ELSE logic | **MEDIUM** - Upgrade from tag-only routing |
+
+**Rationale**: Dependencies are the foundation for Gantt charts, critical path, and workload calculations. Must implement first.
+
+**Success Criteria**:
+- Users can create task dependencies and see critical path
+- Gantt chart shows dependency arrows and timelines
+- Workload view prevents over-allocation
+- Churn rate: 8% → 5%
+
+---
+
+### Q2 2026: Collaboration & Document Control (38 dev-weeks)
+
+**Goal**: Match TaxDome's unified communication experience and document collaboration
+
+#### Features (8 total)
+
+| Feature | Effort | Technical Approach | Business Impact |
+|---------|--------|-------------------|-----------------|
+| **Unified Inbox** | 8 weeks | Message bus architecture, normalized `conversations`/`messages` tables, IMAP/webhook bridges, unified notification service | **CRITICAL** - TaxDome's #1 competitive advantage |
+| **Video Conferencing** | 6 weeks | WebRTC peer-to-peer + Zoom/Teams bridge for enterprise, recording support | **HIGH** - Remote collaboration essential |
+| **Enhanced Email Integration** | 5 weeks | OAuth refresh tokens, better Gmail/Outlook sync, email templates in unified inbox | **HIGH** - Consolidate email with other channels |
+| **Approval Workflows** | 5 weeks | State machine engine, multi-stage approvals, notifications, audit trail | **HIGH** - Compliance requirement |
+| **Document Version Control** | 5 weeks | `file_versions` table, diff storage, rollback functionality | **HIGH** - Compliance and collaboration |
+| **Document Comparison** | 4 weeks | Diff service for side-by-side comparison, highlight changes | **MEDIUM** - Useful for contract review |
+| **Track Changes** | 4 weeks | Word-style redlining, embedded annotations, accept/reject workflow | **MEDIUM** - Document collaboration |
+| **Threaded Conversations** | 3 weeks | Shared `conversation_id` across email/chat/portal, deep threading | **MEDIUM** - Better context in communications |
+
+**Rationale**: Unified inbox consolidates 4 separate systems (email, SMS, chat, portal). Must do early to prevent feature sprawl.
+
+**Success Criteria**:
+- All communications (email/SMS/chat/portal) in one inbox
+- Users can compare document versions and track changes
+- Multi-stage approval workflows operational
+- Customer satisfaction: 7.5/10 → 8.5/10
+
+---
+
+### Q3 2026: Analytics, Resource Intelligence & Enterprise (44 dev-weeks)
+
+**Goal**: Enable enterprise sales with reporting, forecasting, and compliance features
+
+#### Features (11 total)
+
+| Feature | Effort | Technical Approach | Business Impact |
+|---------|--------|-------------------|-----------------|
+| **Custom Report Builder** | 8 weeks | Modular query DSL, drag-drop interface, custom fields, SQL generation | **CRITICAL** - Enterprise requirement |
+| **Skill-Based Assignment Engine** | 7 weeks | Skills matrix, matching algorithm, auto-suggest assignees | **HIGH** - Intelligent resource allocation |
+| **Dashboards** | 6 weeks | Widget framework, customizable layouts, real-time metrics | **HIGH** - Executive visibility |
+| **Forecasting** | 6 weeks | ML-lite projections, trend analysis, revenue prediction | **MEDIUM** - Strategic planning |
+| **SSO/SAML** | 5 weeks | SAML 2.0 integration, Azure AD/Okta connectors | **CRITICAL** - Enterprise security requirement |
+| **Client Profitability** | 5 weeks | Cost allocation engine, revenue vs time tracking, margin analysis | **MEDIUM** - Business intelligence |
+| **Super Admin Reports** | 4 weeks | Cross-tenant aggregation, platform-level analytics | **MEDIUM** - Platform management |
+| **Enhanced Time Tracking** | 4 weeks | Enhanced reporting, billable hours analysis, time sheets | **MEDIUM** - Revenue optimization |
+| **Scheduled Reports** | 4 weeks | Cron-driven delivery, email distribution, report subscriptions | **MEDIUM** - Automated insights |
+| **IP Whitelisting** | 3 weeks | Policy middleware, IP range management, access control | **HIGH** - Enterprise security |
+| **SOC 2 Compliance** (Part 1) | 12 weeks* | Security controls, audit trail, penetration testing, evidence collection | **CRITICAL** - Enterprise trust (continues Q4) |
+
+*SOC 2 is a 12-week program split across Q3 (6w) and Q4 (6w)
+
+**Rationale**: Custom reporting and SSO/SAML unlock enterprise deals ($500K+ ACV). SOC 2 is long-lead-time compliance work.
+
+**Success Criteria**:
+- Custom report builder supports 50+ report types
+- SSO/SAML operational with Azure AD and Okta
+- Close 5+ enterprise deals ($500K+ each)
+- SOC 2 readiness assessment complete
+
+---
+
+### Q4 2026: Client Experience, Integrations & Mobile (46 dev-weeks)
+
+**Goal**: Enhance client self-service and mobile experience, complete compliance
+
+#### Features (10 total)
+
+| Feature | Effort | Technical Approach | Business Impact |
+|---------|--------|-------------------|-----------------|
+| **External Integrations** | 8 weeks | Zapier connectors, QuickBooks/Xero OAuth, webhook framework | **HIGH** - Data portability |
+| **Mobile Offline Access** | 6 weeks | Local DB (IndexedDB), sync engine, conflict resolution | **HIGH** - Field work enablement |
+| **SOC 2 Compliance** (Part 2) | 6 weeks* | Final evidence collection, third-party audit, certification | **CRITICAL** - Enterprise trust (completes Q3 work) |
+| **AI Quotes/Proposals Bot** | 5 weeks | LLM template generation, pricing rules engine, PDF export | **HIGH** - AI differentiation |
+| **Client Booking** | 5 weeks | Calendly-style scheduler, availability management, reminders | **MEDIUM** - Self-service improvement |
+| **Payment Portal UI** | 4 weeks | PCI-compliant client-facing payment flow, invoice display | **MEDIUM** - Client experience |
+| **Enhanced Client Self-Service** | 4 weeks | Portal widgets, service request forms, knowledge base | **MEDIUM** - Reduce support load |
+| **Mobile Document Scanning OCR** | 4 weeks | Vision SDK integration, OCR text extraction, auto-upload | **MEDIUM** - Field productivity |
+| **Time-Off Calendar** | 4 weeks | Resource availability sync, vacation tracking, capacity impact | **MEDIUM** - Accurate workload planning |
+| **Mobile Push Notifications** | 3 weeks | FCM/APNS integration, notification preferences | **HIGH** - Mobile engagement |
+| **Mobile Voice Input** | 3 weeks | Speech SDK, voice-to-text, AI agent voice commands | **LOW** - Nice-to-have innovation |
+
+*SOC 2 total: 12 weeks across Q3-Q4
+
+**Rationale**: Complete enterprise compliance (SOC 2), enhance client experience, enable mobile field work. Integrations unlock ecosystem value.
+
+**Success Criteria**:
+- SOC 2 Type II certification achieved
+- Zapier + QuickBooks + Xero integrations live
+- 40% of users on mobile monthly
+- AI Quotes Bot generates 100+ proposals
+- Native mobile apps with offline access
+
+---
+
+## Implementation Details
+
+### Task Dependencies (Q1, 8 weeks)
+
+**Database Schema**:
+```typescript
+// New table
+task_dependencies:
+  id: serial
+  predecessorTaskId: varchar (FK to workflow_tasks)
+  successorTaskId: varchar (FK to workflow_tasks)  
+  dependencyType: enum('finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish')
+  lagDays: integer (optional delay)
+  createdAt: timestamp
+
+// Add to workflow_tasks
+criticalPathFlag: boolean
+totalSlack: integer (hours)
+```
+
+**Features**:
+- Visual dependency editor in task details
+- Critical path calculation engine
+- Gantt chart dependency arrows
+- "Blocked by" and "Blocking" badges
+- Auto-update dependent task dates when predecessor changes
+
+**Testing**: Create 10-task workflow with dependencies, verify critical path highlighting
+
+---
+
+### Unified Inbox (Q2, 8 weeks)
+
+**Architecture**:
+```typescript
+// Normalized schema
+conversations:
+  id: varchar
+  organizationId: varchar
+  clientId: varchar (optional)
+  subject: string
+  type: enum('email', 'sms', 'chat', 'portal')
+  participants: json (user IDs)
+  lastMessageAt: timestamp
+  
+messages:
+  id: varchar
+  conversationId: varchar (FK)
+  senderId: varchar
+  content: text
+  messageType: enum('email', 'sms', 'chat', 'portal')
+  isRead: boolean
+  receivedAt: timestamp
+  attachments: json
+```
+
+**Components**:
+- Unified message list (combines all channels)
+- Filter by channel, client, read/unread
+- Threaded view with conversation history
+- Compose new message (choose channel)
+- @mentions with auto-complete
+- Real-time updates via WebSocket
+
+**Integration Points**:
+- Email: IMAP sync worker
+- SMS: Twilio webhook
+- Chat: Existing WebSocket
+- Portal: New message endpoint
+
+---
+
+### Custom Report Builder (Q3, 8 weeks)
+
+**Query DSL**:
+```typescript
+{
+  entity: 'time_entries' | 'invoices' | 'clients' | 'projects',
+  filters: [
+    { field: 'status', operator: 'equals', value: 'paid' },
+    { field: 'date', operator: 'between', value: ['2026-01-01', '2026-12-31'] }
+  ],
+  groupBy: ['clientId', 'month'],
+  aggregations: [
+    { field: 'hours', function: 'sum', alias: 'total_hours' },
+    { field: 'revenue', function: 'sum', alias: 'total_revenue' }
+  ],
+  orderBy: [{ field: 'total_revenue', direction: 'desc' }]
+}
+```
+
+**UI**:
+- Drag-drop fields from entity list
+- Visual filter builder (no SQL knowledge required)
+- Aggregation selector (sum, avg, count, min, max)
+- Chart type selector (bar, line, pie, table)
+- Save as template
+- Schedule delivery
+
+---
+
+### External Integrations (Q4, 8 weeks)
+
+**Zapier Connectors**:
+- Triggers: New client, Invoice paid, Task completed, Document uploaded
+- Actions: Create task, Send message, Update client
+- OAuth 2.0 authentication
+- Webhook delivery with retry logic
+
+**QuickBooks/Xero**:
+- OAuth connection flow
+- Sync invoices (bi-directional)
+- Sync clients and contacts
+- Map chart of accounts
+- Real-time sync vs scheduled batch
+
+**Webhook Framework**:
+```typescript
+webhooks:
+  id: varchar
+  organizationId: varchar
+  url: string
+  events: string[] (array of event types)
+  secret: string (for HMAC signature)
+  isActive: boolean
+```
+
+---
+
+## Prioritization Framework
+
+### Churn Prevention (Must-Have)
+1. **Task Dependencies** - Can't model complex workflows
+2. **Gantt Charts** - Standard planning tool
+3. **Unified Inbox** - TaxDome's killer feature
+4. **Document Version Control** - Compliance requirement
+
+### Enterprise Sales Enablers
+1. **SSO/SAML** - Enterprise security requirement
+2. **SOC 2 Compliance** - Enterprise trust
+3. **Custom Report Builder** - Decision-making
+4. **IP Whitelisting** - Enterprise security
+
+### Competitive Differentiators
+1. **Visual Automation Builder** - Better than ClickUp
+2. **AI Quotes/Proposals Bot** - AI advantage
+3. **Forecasting** - Predictive intelligence
+4. **Skill-Based Assignment** - Smart resource allocation
+
+### Technical Dependencies
+```
+Task Dependencies → Gantt Chart → Workload View
+Task Dependencies → Timeline View
+Unified Inbox → Threaded Conversations
+Unified Inbox → Scheduled Reports (delivery)
+Document Version Control → Document Comparison → Track Changes
+Time Tracking → Resource Allocation → Workload View
+```
+
+---
+
+## Quick Wins (1-2 weeks each)
+
+These can be implemented immediately for fast impact:
+
+1. **Calendar View** (4 weeks → can be 2 weeks with off-the-shelf library)
+2. **Time-Off Calendar** (4 weeks → can be 2 weeks leveraging existing calendar)
+3. **Payment Portal UI** (4 weeks → can be 2 weeks using existing Stripe integration)
+4. **Enhanced Client Self-Service** (4 weeks → can be 2 weeks adding forms to existing portal)
+5. **Mobile Push Notifications** (3 weeks → can be 1 week with FCM)
+6. **Threaded Conversations** (3 weeks → can be 2 weeks adding conversation_id)
+
+**Total Quick Wins**: 6 features in 10-12 weeks
+
+---
+
+## Risk Mitigation
+
+### Technical Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| **SOC 2 audit delays** | HIGH | Start Q3, hire compliance expert, use pre-audit checklist |
+| **Unified inbox data migration** | MEDIUM | Build migration scripts, test with sample data, rollback plan |
+| **Gantt library limitations** | MEDIUM | Evaluate 3 libraries (Planview, react-gantt, custom), prototype early |
+| **QuickBooks API rate limits** | LOW | Implement queue system, batch operations, caching |
+
+### Resource Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| **Team burnout (162 weeks)** | HIGH | 20% buffer time, rotate features, avoid crunch |
+| **Key engineer attrition** | MEDIUM | Knowledge sharing, documentation, pair programming |
+| **Scope creep** | MEDIUM | Strict feature freeze per quarter, defer to next quarter |
+
+---
+
+## Success Metrics
+
+### Q1 2026 Targets
+- ✅ Task dependencies on 80% of workflows
+- ✅ Gantt chart adoption by 60% of users
+- ✅ Churn rate: 8% → 5%
+- ✅ NPS: 35 → 45
+
+### Q2 2026 Targets
+- ✅ Unified inbox processes 10K+ messages/day
+- ✅ Document version control on 50% of documents
+- ✅ Customer satisfaction: 7.5/10 → 8.5/10
+- ✅ Average response time: 4 hours → 1 hour
+
+### Q3 2026 Targets
+- ✅ Custom reports: 500+ created
+- ✅ SSO adoption: 30% of enterprise customers
+- ✅ Close 5+ enterprise deals ($500K+ ACV)
+- ✅ SOC 2 readiness: 95%
+
+### Q4 2026 Targets
+- ✅ SOC 2 Type II certification achieved
+- ✅ QuickBooks integration: 1000+ syncs
+- ✅ Mobile users: 40% of total
+- ✅ AI Quotes Bot: 100+ proposals generated
+- ✅ Revenue growth: 150% YoY
+
+---
+
+## Long-Term Vision (2027+)
+
+After completing the 37 parity features in 2026, focus shifts to:
+
+1. **AI Marketplace Expansion** - 100+ custom agents
+2. **Advanced Forecasting** - ML-powered predictions
+3. **Global Expansion** - Multi-language, regional compliance
+4. **API Platform** - Open API for third-party developers
+5. **White-Label** - Full customization for enterprise
+
+---
+
+**Roadmap Version**: 1.0  
+**Created**: November 11, 2025  
+**Owner**: Product Team  
+**Next Review**: Monthly (first Monday of each month)
+
+---
+
+**Document Version**: 3.0 (Comprehensive Roadmap Included)  
 **Last Updated**: November 11, 2025  
 **Next Review**: February 2026 (quarterly)
