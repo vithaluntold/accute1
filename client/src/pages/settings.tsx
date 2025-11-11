@@ -169,19 +169,19 @@ export default function Settings() {
   const selectedLlmProvider = llmForm.watch("provider");
 
   const { data: llmConfigs = [], isLoading: llmLoading } = useQuery<any[]>({
-    queryKey: ["/api/llm-configurations"],
+    queryKey: ["/api/llm-configurations?scope=user"],
   });
 
   // LLM Configuration mutations
   const createLlmMutation = useMutation({
     mutationFn: async (data: LlmConfigFormData) => {
-      return apiRequest("POST", "/api/llm-configurations", data);
+      return apiRequest("POST", "/api/llm-configurations", { ...data, scope: 'user' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=user"] });
       toast({
         title: "Success",
-        description: "LLM configuration created successfully",
+        description: "User-level LLM configuration created successfully",
       });
       llmForm.reset();
       setShowLlmForm(false);
@@ -200,10 +200,10 @@ export default function Settings() {
       return apiRequest("DELETE", `/api/llm-configurations/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=user"] });
       toast({
         title: "Success",
-        description: "LLM configuration removed successfully",
+        description: "User-level LLM configuration removed successfully",
       });
       setDeleteLlmTarget(null);
     },

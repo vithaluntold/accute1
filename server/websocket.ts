@@ -212,7 +212,11 @@ async function handleAgentExecution(
     // Get LLM configuration using centralized service
     const { getLLMConfigService } = await import('./llm-config-service');
     const llmConfigService = getLLMConfigService();
-    const llmConfig = await llmConfigService.getConfig(ws.organizationId, llmConfigId);
+    const llmConfig = await llmConfigService.getConfig({ 
+      organizationId: ws.organizationId,
+      userId: ws.userId,
+      configId: llmConfigId 
+    });
 
     // Handle Luca agent specially with its dedicated chat system
     const normalizedAgentName = agentName.toLowerCase().replace(/\s+/g, '');

@@ -41,6 +41,7 @@ Accute is an AI-native accounting workflow automation platform for modern accoun
 - Admin Template Deletion: Admin and Super Admin users have explicit bypass for ALL template deletion (workflows, email templates, message templates, document templates, forms) regardless of subscription-based permission filtering. Ownership checks still apply.
 - 21-Day Onboarding Journey: Complete gamified onboarding system with 21 days of accounting workflow tasks. Each day includes 2 required tasks and 0-1 optional tasks. System features automatic day advancement, point accumulation, streak tracking, feature unlocking, and realistic accounting curriculum.
 - Profile Picture Upload: Full user avatar upload system with multipart/form-data handling via multer. Backend validates image types (JPEG, PNG, GIF, WebP), enforces 5MB file size limit, and automatically deletes old avatars on replacement.
+- Two-Level LLM Configuration System: Supports both user-level (shared across all user's workspaces) and workspace-level (workspace-specific) LLM configurations. User-level configs created in "My Settings" are portable across workspaces. Workspace-level configs created in "Workspace Settings" provide data residency isolation. AI agents check workspace-level configs first, falling back to user-level. Enables centralized LLM management for multi-branch firms while allowing workspace-specific overrides for data tenancy requirements.
 
 ### System Architecture
 

@@ -2216,11 +2216,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/llm-configurations", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      // Super Admin (no organizationId) can see all configurations
-      // Regular users only see their organization's configurations
-      const configs = req.user!.organizationId
-        ? await storage.getLlmConfigurationsByOrganization(req.user!.organizationId)
-        : await storage.getAllLlmConfigurations();
+      const scope = req.query.scope as string; // 'user' | 'workspace' | undefined
+      const isSuperAdmin = !req.user!.organizationId;
+      
+      let configs: any[] = [];
+      
+      if (scope === 'user') {
+        // Get user-level configurations
+        configs = await storage.getLlmConfigurationsByUser(req.user!.id);
+      } else if (scope === 'workspace') {
+        // Get workspace-level configurations
+        if (isSuperAdmin) {
+          // Super Admin: see all workspace configs
+          configs = (await storage.getAllLlmConfigurations()).filter(c => c.scope === 'workspace');
+        } else {
+          configs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
+        }
+      } else {
+        // No scope specified: return appropriate configs based on user type
+        if (isSuperAdmin) {
+          // Super Admin: see all configs
+          configs = await storage.getAllLlmConfigurations();
+        } else {
+          // Regular user: return BOTH user-level and workspace-level configs
+          const userConfigs = await storage.getLlmConfigurationsByUser(req.user!.id);
+          const workspaceConfigs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
+          configs = [...workspaceConfigs, ...userConfigs]; // Workspace configs first (higher priority)
+        }
+      }
+      
       // Don't send back the encrypted API keys in the list
       // Map modelVersion → azureApiVersion for UI compatibility
       const sanitized = configs.map(c => ({
@@ -2237,29 +2261,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/llm-configurations", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { encrypt } = await import('./llm-service');
-      const { apiKey, azureApiVersion, ...rest } = req.body;
+      const { apiKey, azureApiVersion, scope, ...rest } = req.body;
+      
+      // Validate scope
+      if (!scope || (scope !== 'user' && scope !== 'workspace')) {
+        return res.status(400).json({ error: "Invalid scope. Must be 'user' or 'workspace'" });
+      }
       
       // Encrypt the API key before storing
       const encryptedKey = encrypt(apiKey);
       
-      // Map azureApiVersion → modelVersion for database storage
-      const config = await storage.createLlmConfiguration({
+      // Prepare config data based on scope
+      const configData: any = {
         ...rest,
+        scope,
         modelVersion: azureApiVersion, // Map UI field to DB field
         apiKeyEncrypted: encryptedKey,
-        organizationId: req.user!.organizationId!,
         createdBy: req.user!.id
-      });
+      };
+      
+      if (scope === 'workspace') {
+        // Workspace-level config
+        if (!req.user!.organizationId) {
+          return res.status(400).json({ error: "Workspace-level config requires an organization" });
+        }
+        configData.organizationId = req.user!.organizationId;
+        configData.userId = null;
+      } else {
+        // User-level config
+        configData.userId = req.user!.id;
+        configData.organizationId = null;
+      }
+      
+      const config = await storage.createLlmConfiguration(configData);
       
       // Clear cache so new/updated default configs are picked up immediately
       const llmConfigService = getLLMConfigService();
-      llmConfigService.clearCache(req.user!.organizationId!);
+      llmConfigService.clearCache({ 
+        organizationId: scope === 'workspace' ? req.user!.organizationId : undefined,
+        userId: scope === 'user' ? req.user!.id : undefined
+      });
       
-      await logActivity(req.user!.id, req.user!.organizationId!, "create", "llm_configuration", config.id, {}, req);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "create", "llm_configuration", config.id, { scope }, req);
       
       // Don't send back the encrypted key
       res.json({ ...config, apiKeyEncrypted: '[ENCRYPTED]' });
     } catch (error: any) {
+      console.error('Failed to create LLM configuration:', error);
       res.status(500).json({ error: "Failed to create LLM configuration" });
     }
   });
@@ -2290,7 +2338,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Clear cache so updated configs are picked up immediately
       const llmConfigService = getLLMConfigService();
-      llmConfigService.clearCache(req.user!.organizationId!);
+      llmConfigService.clearCache({ 
+        organizationId: existing.scope === 'workspace' ? req.user!.organizationId : undefined,
+        userId: existing.scope === 'user' ? req.user!.id : undefined
+      });
       
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "llm_configuration", req.params.id, {}, req);
       
@@ -2311,21 +2362,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "LLM configuration not found" });
       }
       
-      if (existing.organizationId !== req.user!.organizationId) {
-        console.log(`❌ [LLM DELETE] Organization mismatch: config org ${existing.organizationId}, user org ${req.user!.organizationId}`);
-        return res.status(404).json({ error: "LLM configuration not found" });
+      // Check ownership based on scope
+      if (existing.scope === 'workspace') {
+        // Workspace-level config: must match user's organization
+        if (existing.organizationId !== req.user!.organizationId) {
+          console.log(`❌ [LLM DELETE] Organization mismatch: config org ${existing.organizationId}, user org ${req.user!.organizationId}`);
+          return res.status(404).json({ error: "LLM configuration not found" });
+        }
+      } else if (existing.scope === 'user') {
+        // User-level config: must match user's ID
+        if (existing.userId !== req.user!.id) {
+          console.log(`❌ [LLM DELETE] User mismatch: config user ${existing.userId}, current user ${req.user!.id}`);
+          return res.status(404).json({ error: "LLM configuration not found" });
+        }
       }
       
-      console.log(`🗑️  [LLM DELETE] Deleting config ${req.params.id} from org ${req.user!.organizationId}`);
+      console.log(`🗑️  [LLM DELETE] Deleting ${existing.scope}-level config ${req.params.id}`);
       await storage.deleteLlmConfiguration(req.params.id);
       
       // Clear cache so deletions are reflected immediately
       const llmConfigService = getLLMConfigService();
-      llmConfigService.clearCache(req.user!.organizationId!);
+      llmConfigService.clearCache({ 
+        organizationId: existing.scope === 'workspace' ? req.user!.organizationId : undefined,
+        userId: existing.scope === 'user' ? req.user!.id : undefined
+      });
       
-      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "llm_configuration", req.params.id, {}, req);
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "delete", "llm_configuration", req.params.id, { scope: existing.scope }, req);
       
-      console.log(`✅ [LLM DELETE] Successfully deleted config ${req.params.id}`);
+      console.log(`✅ [LLM DELETE] Successfully deleted ${existing.scope}-level config ${req.params.id}`);
       res.json({ success: true });
     } catch (error: any) {
       console.error(`❌ [LLM DELETE] Failed to delete LLM configuration:`, error);
@@ -2824,7 +2888,11 @@ Title:`;
       
       // Get LLM configuration - use specified or default
       const llmConfigService = getLLMConfigService();
-      const llmConfig = await llmConfigService.getConfig(req.user!.organizationId!, llmConfigId);
+      const llmConfig = await llmConfigService.getConfig({ 
+        organizationId: req.user!.organizationId,
+        userId: req.user!.id,
+        configId: llmConfigId 
+      });
       
       // Find or create conversation
       let conversation;

@@ -1253,9 +1253,13 @@ export const invitations = pgTable("invitations", {
 });
 
 // LLM Configurations for user-managed AI credentials
+// Supports two scopes: 'user' (shared across all user's workspaces) and 'workspace' (workspace-specific)
 export const llmConfigurations = pgTable("llm_configurations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  // Scope: 'user' = user-level (shared across all user's workspaces), 'workspace' = workspace-specific
+  scope: text("scope").notNull().default("workspace"), // 'user' | 'workspace'
+  organizationId: varchar("organization_id").references(() => organizations.id), // Required for workspace scope, null for user scope
+  userId: varchar("user_id").references(() => users.id), // Required for user scope, null for workspace scope
   name: text("name").notNull(), // User-friendly name for this configuration
   provider: text("provider").notNull(), // 'openai', 'anthropic', 'azure'
   // Encrypted API credentials
@@ -1266,13 +1270,15 @@ export const llmConfigurations = pgTable("llm_configurations", {
   modelVersion: text("model_version"), // Optional version specification
   // Settings
   isActive: boolean("is_active").notNull().default(true),
-  isDefault: boolean("is_default").notNull().default(false), // Default config for organization
+  isDefault: boolean("is_default").notNull().default(false), // Default config for scope (user or workspace)
   // Metadata
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   orgIdx: index("llm_configurations_org_idx").on(table.organizationId),
+  userIdx: index("llm_configurations_user_idx").on(table.userId),
+  scopeIdx: index("llm_configurations_scope_idx").on(table.scope),
 }));
 
 // Partial unique index to ensure only one default LLM config per organization (defined separately for Drizzle)

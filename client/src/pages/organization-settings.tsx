@@ -110,7 +110,7 @@ export default function OrganizationSettings() {
 
   // Fetch LLM configurations (workspace-scoped)
   const { data: llmConfigs = [], isLoading: llmLoading } = useQuery<any[]>({
-    queryKey: ["/api/llm-configurations", orgId],
+    queryKey: ["/api/llm-configurations?scope=workspace", orgId],
     enabled: !!orgId,
   });
 
@@ -211,13 +211,13 @@ export default function OrganizationSettings() {
   // Create LLM Config Mutation
   const createLlmMutation = useMutation({
     mutationFn: async (data: LlmConfigFormData) => {
-      return await apiRequest("/api/llm-configurations", "POST", data);
+      return await apiRequest("/api/llm-configurations", "POST", { ...data, scope: 'workspace' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=workspace", orgId] });
       toast({
         title: "Success",
-        description: "LLM configuration created successfully",
+        description: "Workspace-level LLM configuration created successfully",
       });
       setShowLlmForm(false);
       llmForm.reset();
@@ -237,10 +237,10 @@ export default function OrganizationSettings() {
       return await apiRequest(`/api/llm-configurations/${id}`, "DELETE");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/llm-configurations?scope=workspace", orgId] });
       toast({
         title: "Success",
-        description: "LLM configuration deleted successfully",
+        description: "Workspace-level LLM configuration deleted successfully",
       });
       setDeleteLlmTarget(null);
     },

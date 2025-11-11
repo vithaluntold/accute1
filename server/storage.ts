@@ -553,6 +553,7 @@ export interface IStorage {
   createLlmConfiguration(config: schema.InsertLlmConfiguration): Promise<schema.LlmConfiguration>;
   getLlmConfiguration(id: string): Promise<schema.LlmConfiguration | undefined>;
   getLlmConfigurationsByOrganization(organizationId: string): Promise<schema.LlmConfiguration[]>;
+  getLlmConfigurationsByUser(userId: string): Promise<schema.LlmConfiguration[]>; // User-level configs
   getAllLlmConfigurations(): Promise<schema.LlmConfiguration[]>; // Super Admin: get all configs
   getDefaultLlmConfiguration(organizationId: string): Promise<schema.LlmConfiguration | undefined>;
   updateLlmConfiguration(id: string, config: Partial<schema.InsertLlmConfiguration>): Promise<schema.LlmConfiguration | undefined>;
@@ -4897,8 +4898,24 @@ export class DbStorage implements IStorage {
 
   async getLlmConfigurationsByOrganization(organizationId: string): Promise<schema.LlmConfiguration[]> {
     return await db.select().from(schema.llmConfigurations)
-      .where(eq(schema.llmConfigurations.organizationId, organizationId))
-      .orderBy(schema.llmConfigurations.isDefault);
+      .where(
+        and(
+          eq(schema.llmConfigurations.organizationId, organizationId),
+          eq(schema.llmConfigurations.scope, 'workspace')
+        )
+      )
+      .orderBy(desc(schema.llmConfigurations.isDefault));
+  }
+
+  async getLlmConfigurationsByUser(userId: string): Promise<schema.LlmConfiguration[]> {
+    return await db.select().from(schema.llmConfigurations)
+      .where(
+        and(
+          eq(schema.llmConfigurations.userId, userId),
+          eq(schema.llmConfigurations.scope, 'user')
+        )
+      )
+      .orderBy(desc(schema.llmConfigurations.isDefault));
   }
 
   async getAllLlmConfigurations(): Promise<schema.LlmConfiguration[]> {

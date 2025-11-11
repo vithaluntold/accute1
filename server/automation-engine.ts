@@ -395,7 +395,11 @@ export class AutomationEngine {
     // Get LLM configuration using centralized service
     const { getLLMConfigService } = await import('./llm-config-service');
     const llmConfigService = getLLMConfigService();
-    const llmConfig = await llmConfigService.getConfig(context.organizationId, llmConfigId);
+    const llmConfig = await llmConfigService.getConfig({ 
+      organizationId: context.organizationId,
+      userId: context.userId,
+      configId: llmConfigId 
+    });
 
     // Load and execute agent (simplified - actual implementation would use dynamic imports)
     const llmService = new LLMService(llmConfig);
