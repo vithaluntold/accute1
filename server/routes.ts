@@ -65,6 +65,7 @@ import { mfaService } from "./services/mfaService";
 import { unifiedInboxService } from "./services/unifiedInboxService";
 import { TaskDependenciesService } from "./services/taskDependenciesService";
 import { DocumentVersionsService } from "./services/documentVersionsService";
+import { workflowStagesService } from "./services/workflowStagesService";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -2224,6 +2225,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to delete workflow" });
+    }
+  });
+
+  // Get workflow stages with computed metrics (for Timeline View)
+  app.get("/api/workflows/:workflowId/stages", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Verify workflow exists and user has access
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      // Security: Check organization access (unless super admin)
+      if (req.user!.organizationId && workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized access to workflow" });
+      }
+
+      // Parse optional includeSteps query parameter (default to true for Timeline View)
+      const includeSteps = req.query.includeSteps !== 'false'; // Include steps by default
+
+      // Fetch stages with computed metrics
+      const stages = await workflowStagesService.getStagesWithMetrics(
+        req.params.workflowId,
+        includeSteps
+      );
+
+      res.json(stages);
+    } catch (error: any) {
+      console.error("Failed to fetch workflow stages:", error);
+      res.status(500).json({ error: "Failed to fetch workflow stages", details: error.message });
     }
   });
 
