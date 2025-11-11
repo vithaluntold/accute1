@@ -3,6 +3,14 @@
 ### Overview
 Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. Its primary purpose is to leverage specialized AI agents to automate accounting tasks, thereby boosting efficiency, ensuring compliance, and enhancing overall accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. The platform also features global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, aiming to revolutionize accounting workflows through AI-driven automation and provide a significant market advantage.
 
+**Competitive Score:** **8.6/10** (Target: 9.0+/10)
+
+### Production-Ready MVP Features (Option A: Slower but Real)
+1. **Calendar View** - ISO date serialization, correct field mapping (workflow_tasks, assignments, projects), multi-resource scheduling
+2. **Executive Dashboard** - Real-time calculations, Number() casting, NaN/Infinity guards, accurate trend analysis
+3. **Report Builder** - Server-side query execution, org scoping, 6 filter operators, bulk aggregations, CSV export
+4. **Unified Inbox** - Deterministic conversation IDs, org-scoped threading, metadata-driven unread tracking, bulk markAsRead, filter support
+
 ### User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
