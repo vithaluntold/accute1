@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -156,6 +156,20 @@ const organizationMenuCategories = [
     ]
   },
   {
+    title: "Analytics & Insights",
+    items: [
+      { title: "Unified Inbox", url: "/unified-inbox", icon: InboxIcon, permission: null },
+      { title: "Calendar View", url: "/calendar-view", icon: CalendarDays, permission: null },
+      { title: "Timeline View", url: "/timeline-view", icon: GanttChartSquare, permission: null },
+      { title: "Gantt Chart", url: "/gantt-view", icon: GanttChartSquare, permission: null },
+      { title: "Workload View", url: "/workload-view", icon: Users, permission: null },
+      { title: "Resource Allocation", url: "/resource-allocation", icon: UserCog, permission: null },
+      { title: "Executive Dashboard", url: "/executive-dashboard", icon: BarChart3, permission: "analytics.view" },
+      { title: "Report Builder", url: "/report-builder", icon: FileBarChart2, permission: "analytics.view" },
+      { title: "Profitability View", url: "/profitability-view", icon: TrendingUp, permission: "analytics.view" },
+    ]
+  },
+  {
     title: "Administration",
     items: [
       { title: "Employees", url: "/team", icon: Users, permission: "users.view" },
@@ -210,6 +224,14 @@ const employeeMenuCategories = [
       { title: "Messages", url: "/messages", icon: MessageSquare, permission: "messaging.send" },
       { title: "Team Chat", url: "/team-chat", icon: MessagesSquare, permission: null },
       { title: "Calendar", url: "/calendar", icon: Calendar, permission: "appointments.view" },
+    ]
+  },
+  {
+    title: "Analytics & Insights",
+    items: [
+      { title: "Unified Inbox", url: "/unified-inbox", icon: InboxIcon, permission: null },
+      { title: "Calendar View", url: "/calendar-view", icon: CalendarDays, permission: null },
+      { title: "Workload View", url: "/workload-view", icon: Users, permission: null },
     ]
   },
   {
