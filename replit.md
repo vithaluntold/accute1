@@ -3,14 +3,6 @@
 ### Overview
 Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. Its primary purpose is to leverage specialized AI agents to automate accounting tasks, thereby boosting efficiency, ensuring compliance, and enhancing overall accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. The platform also features global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management, aiming to revolutionize accounting workflows through AI-driven automation and provide a significant market advantage.
 
-**Competitive Score:** **8.6/10** (Target: 9.0+/10)
-
-### Production-Ready MVP Features (Option A: Slower but Real)
-1. **Calendar View** - ISO date serialization, correct field mapping (workflow_tasks, assignments, projects), multi-resource scheduling
-2. **Executive Dashboard** - Real-time calculations, Number() casting, NaN/Infinity guards, accurate trend analysis
-3. **Report Builder** - Server-side query execution, org scoping, 6 filter operators, bulk aggregations, CSV export
-4. **Unified Inbox** - Deterministic conversation IDs, org-scoped threading, metadata-driven unread tracking, bulk markAsRead, filter support
-
 ### User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
@@ -91,7 +83,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 ### External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
 - **OpenAI API**: AI model integration.
-- **Azure OpenAI API**: AI model integration (default for AI agents).
+- **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
 - **Resend**: Transactional email service.
 - **MSG91**: SMS service for OTP verification.
@@ -103,16 +95,3 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **pdf-parse**: PDF text extraction.
 - **mammoth**: DOCX text extraction.
 - **xlsx**: Excel file parsing (XLSX, XLS).
-
-### Competitive Analysis & 2026 Roadmap
-See **[COMPETITIVE_ANALYSIS.md](./COMPETITIVE_ANALYSIS.md)** for comprehensive feature comparison vs TaxDome, ClickUp, and Trulio:
-- **4-Way Comparison Tables**: Side-by-side feature comparison across 12 categories (workflow, AI, views, communication, documents, reporting, resources, security, mobile, pricing)
-- **Template Functionality Verification**: Proof that AI-created templates are fully functional with database integration
-- **Unique Strengths**: 10 competitive advantages that competitors lack (AI agents, two-level LLM, PKI signatures, multi-gateway payments)
-- **Missing Features Analysis**: 37 feature gaps with business impact and implementation priorities
-- **2026 Implementation Roadmap**: Comprehensive 4-quarter plan (162 dev-weeks, 23-person team) to achieve competitive parity:
-  - **Q1 2026 (34 dev-weeks)**: Workflow foundations - Task Dependencies, Gantt Charts, Visual Automation Builder, Workload Views
-  - **Q2 2026 (38 dev-weeks)**: Collaboration - Unified Inbox, Video Conferencing, Document Version Control, Approval Workflows
-  - **Q3 2026 (44 dev-weeks)**: Analytics & Enterprise - Custom Report Builder, Dashboards, SSO/SAML, SOC 2 (Part 1)
-  - **Q4 2026 (46 dev-weeks)**: Client Experience & Mobile - External Integrations (Zapier, QuickBooks, Xero), Offline Access, SOC 2 (Part 2)
-- **Strategic Positioning**: Market analysis, competitive positioning statements, go-to-market strategy, and success metrics
