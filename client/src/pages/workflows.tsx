@@ -126,8 +126,9 @@ export default function Workflows() {
     mutationFn: async (id: string) => {
       return apiRequest('DELETE', `/api/workflows/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/workflows'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/workflows'] });
       toast({
         title: 'Success',
         description: 'Workflow deleted successfully',

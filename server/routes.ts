@@ -2196,12 +2196,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Workflow not found" });
       }
       
-      // Check ownership: Super Admin can delete global workflows, regular users can delete their org's workflows
-      const isSuperAdmin = !req.user!.organizationId;
-      const isOwnOrganizationWorkflow = existing.organizationId === req.user!.organizationId;
-      
-      if (!isSuperAdmin && !isOwnOrganizationWorkflow) {
-        return res.status(403).json({ error: "Access denied" });
+      // Check ownership:
+      // - Admin and Super Admin can delete ANY workflow (global or organization-specific)
+      // - Regular users can only delete their own organization's workflows
+      if (!isAdmin) {
+        const isOwnOrganizationWorkflow = existing.organizationId === req.user!.organizationId;
+        if (!isOwnOrganizationWorkflow) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
       
       await storage.deleteWorkflow(req.params.id);
