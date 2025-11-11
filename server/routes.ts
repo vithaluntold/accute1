@@ -2305,6 +2305,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         configData.organizationId = null;
       }
       
+      // Auto-set as default if this is the first config in this scope
+      const existingConfigs = scope === 'workspace'
+        ? await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!)
+        : await storage.getLlmConfigurationsByUser(req.user!.id);
+      
+      const isFirstConfig = existingConfigs.length === 0;
+      const shouldBeDefault = configData.isDefault === true || isFirstConfig;
+      
+      // If setting as default, unset all other defaults in this scope
+      if (shouldBeDefault) {
+        for (const existingConfig of existingConfigs) {
+          if (existingConfig.isDefault) {
+            await storage.updateLlmConfiguration(existingConfig.id, { isDefault: false });
+          }
+        }
+        configData.isDefault = true;
+      } else {
+        configData.isDefault = false;
+      }
+      
       const config = await storage.createLlmConfiguration(configData);
       
       // Clear cache so new/updated default configs are picked up immediately
@@ -2329,7 +2349,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { encrypt } = await import('./llm-service');
       const existing = await storage.getLlmConfiguration(req.params.id);
       
-      if (!existing || existing.organizationId !== req.user!.organizationId) {
+      // Validate ownership based on scope
+      if (!existing) {
+        return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      if (existing.scope === 'workspace' && existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "LLM configuration not found" });
+      }
+      
+      if (existing.scope === 'user' && existing.userId !== req.user!.id) {
         return res.status(404).json({ error: "LLM configuration not found" });
       }
       
@@ -2344,6 +2373,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If a new API key is provided, encrypt it
       if (apiKey && apiKey !== '[ENCRYPTED]') {
         updates.apiKeyEncrypted = encrypt(apiKey);
+      }
+      
+      // If setting as default, unset all other defaults in this scope
+      if (updates.isDefault === true) {
+        const existingConfigs = existing.scope === 'workspace'
+          ? await storage.getLlmConfigurationsByOrganization(existing.organizationId!)
+          : await storage.getLlmConfigurationsByUser(existing.userId!);
+        
+        for (const existingConfig of existingConfigs) {
+          if (existingConfig.id !== req.params.id && existingConfig.isDefault) {
+            await storage.updateLlmConfiguration(existingConfig.id, { isDefault: false });
+          }
+        }
       }
       
       const config = await storage.updateLlmConfiguration(req.params.id, updates);
