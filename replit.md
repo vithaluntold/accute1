@@ -95,3 +95,11 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **pdf-parse**: PDF text extraction.
 - **mammoth**: DOCX text extraction.
 - **xlsx**: Excel file parsing (XLSX, XLS).
+
+### Competitive Analysis
+See **[COMPETITIVE_ANALYSIS.md](./COMPETITIVE_ANALYSIS.md)** for comprehensive feature comparison vs TaxDome, ClickUp, and Trulio:
+- **Template Functionality Verification**: Proof that AI-created templates are fully functional with database integration
+- **Missing Features Analysis**: 12 feature gaps with business impact and implementation priorities
+- **Unique Strengths**: 10 competitive advantages that competitors lack (AI agents, two-level LLM, PKI signatures)
+- **Priority Roadmap**: HIGH/MEDIUM/LOW feature recommendations with effort estimates
+- **Strategic Positioning**: Market analysis, go-to-market strategy, and success metrics
