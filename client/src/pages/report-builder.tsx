@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileBarChart2, Plus, Play, Download, X } from "lucide-react";
 import { GradientHero } from "@/components/gradient-hero";
-import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -37,138 +39,39 @@ interface ReportResult {
 }
 
 export default function ReportBuilder() {
+  const { toast } = useToast();
   const [dataSource, setDataSource] = useState("");
   const [filters, setFilters] = useState<Filter[]>([]);
   const [groupBy, setGroupBy] = useState("");
-  const [executed, setExecuted] = useState(false);
+  const [reportResults, setReportResults] = useState<ReportResult | null>(null);
 
-  // Fetch all data sources
-  const { data: timeEntries, isLoading: timeLoading } = useQuery<any[]>({
-    queryKey: ["/api/time-entries"],
-    enabled: dataSource === "time_entries",
-  });
-
-  const { data: invoices, isLoading: invoicesLoading } = useQuery<any[]>({
-    queryKey: ["/api/invoices"],
-    enabled: dataSource === "invoices",
-  });
-
-  const { data: clients, isLoading: clientsLoading } = useQuery<any[]>({
-    queryKey: ["/api/clients"],
-    enabled: dataSource === "clients",
-  });
-
-  const { data: projects, isLoading: projectsLoading } = useQuery<any[]>({
-    queryKey: ["/api/projects"],
-    enabled: dataSource === "projects",
-  });
-
-  const { data: tasks, isLoading: tasksLoading } = useQuery<any[]>({
-    queryKey: ["/api/tasks"],
-    enabled: dataSource === "tasks",
-  });
-
-  // Get raw data based on selected source
-  const rawData = useMemo(() => {
-    if (dataSource === "time_entries") return timeEntries || [];
-    if (dataSource === "invoices") return invoices || [];
-    if (dataSource === "clients") return clients || [];
-    if (dataSource === "projects") return projects || [];
-    if (dataSource === "tasks") return tasks || [];
-    return [];
-  }, [dataSource, timeEntries, invoices, clients, projects, tasks]);
-
-  // Apply filters to data
-  const filteredData = useMemo(() => {
-    if (!executed) return [];
-    
-    return rawData.filter(item => {
-      return filters.every(filter => {
-        const value = item[filter.field];
-        
-        if (filter.operator === "equals") {
-          return value === filter.value;
-        } else if (filter.operator === "contains") {
-          return String(value || "").toLowerCase().includes(filter.value.toLowerCase());
-        } else if (filter.operator === "greater_than") {
-          return Number(value) > Number(filter.value);
-        } else if (filter.operator === "less_than") {
-          return Number(value) < Number(filter.value);
-        } else if (filter.operator === "after") {
-          return new Date(value) > new Date(filter.value);
-        } else if (filter.operator === "before") {
-          return new Date(value) < new Date(filter.value);
-        }
-        
-        return true;
+  // Execute report server-side
+  const executeReportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("/api/reports/execute", {
+        method: "POST",
+        body: {
+          dataSource,
+          filters,
+          groupBy,
+        },
       });
-    });
-  }, [rawData, filters, executed]);
+      return response as ReportResult;
+    },
+    onSuccess: (data) => {
+      setReportResults(data);
+      toast({ title: "Report generated successfully" });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to execute report",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    },
+  });
 
-  // Compute report results with grouping and aggregations
-  const reportResults: ReportResult = useMemo(() => {
-    if (!executed || !filteredData.length) {
-      return { grouped: [], totals: { count: 0 } };
-    }
-
-    // Group data if groupBy is selected
-    const grouped = groupBy
-      ? Object.entries(
-          filteredData.reduce((acc, item) => {
-            let key = "Ungrouped";
-            
-            if (groupBy === "client") {
-              key = item.clientName || item.companyName || "No Client";
-            } else if (groupBy === "project") {
-              key = item.projectName || item.name || "No Project";
-            } else if (groupBy === "month") {
-              key = item.date || item.createdAt
-                ? format(new Date(item.date || item.createdAt), "MMM yyyy")
-                : "No Date";
-            } else if (groupBy === "user") {
-              key = item.userName || item.assignedToName || "No User";
-            } else if (groupBy === "status") {
-              key = item.status || "No Status";
-            }
-
-            if (!acc[key]) {
-              acc[key] = [];
-            }
-            acc[key].push(item);
-            return acc;
-          }, {} as Record<string, any[]>)
-        ).map(([groupKey, items]) => ({
-          group: groupKey,
-          count: items.length,
-          sumHours: items.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-          sumRevenue: items.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0),
-          avgHours: items.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / items.length,
-          avgRevenue: items.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0) / items.length,
-          items,
-        }))
-      : [
-          {
-            group: "All Records",
-            count: filteredData.length,
-            sumHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-            sumRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0),
-            avgHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / filteredData.length,
-            avgRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0) / filteredData.length,
-            items: filteredData,
-          },
-        ];
-
-    // Compute totals
-    const totals = {
-      count: filteredData.length,
-      sumHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-      sumRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0),
-      avgHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / filteredData.length || 0,
-      avgRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.amount) || 0), 0) / filteredData.length || 0,
-    };
-
-    return { grouped, totals };
-  }, [filteredData, groupBy, executed]);
+  // No client-side data fetching or filtering - all done server-side for security
 
   // Add a new filter
   const addFilter = () => {
@@ -188,14 +91,14 @@ export default function ReportBuilder() {
     setFilters(filters.map(f => (f.id === id ? { ...f, ...updates } : f)));
   };
 
-  // Run the report
+  // Run the report - server-side execution
   const runReport = () => {
-    setExecuted(true);
+    executeReportMutation.mutate();
   };
 
   // Export to CSV
   const exportToCSV = () => {
-    if (!reportResults.grouped.length) return;
+    if (!reportResults || !reportResults.grouped.length) return;
 
     const headers = ["Group", "Count", "Total Hours", "Total Revenue", "Avg Hours", "Avg Revenue"];
     const rows = reportResults.grouped.map(g => [
@@ -256,8 +159,6 @@ export default function ReportBuilder() {
     return [];
   };
 
-  const isLoading = timeLoading || invoicesLoading || clientsLoading || projectsLoading || tasksLoading;
-
   return (
     <div className="flex flex-col h-screen">
       <GradientHero
@@ -274,7 +175,7 @@ export default function ReportBuilder() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Data Source</label>
-                <Select value={dataSource} onValueChange={(v) => { setDataSource(v); setExecuted(false); }}>
+                <Select value={dataSource} onValueChange={(v) => { setDataSource(v); setReportResults(null); }}>
                   <SelectTrigger data-testid="select-data-source">
                     <SelectValue placeholder="Select data source" />
                   </SelectTrigger>
@@ -362,11 +263,8 @@ export default function ReportBuilder() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No Grouping</SelectItem>
-                    <SelectItem value="client">Client</SelectItem>
-                    <SelectItem value="project">Project</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
+                    <SelectItem value="month">Month</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -375,7 +273,7 @@ export default function ReportBuilder() {
                 <Button
                   className="flex-1"
                   onClick={runReport}
-                  disabled={!dataSource || isLoading}
+                  disabled={!dataSource || executeReportMutation.isPending}
                   data-testid="button-run-report"
                 >
                   <Play className="h-4 w-4 mr-2" />
@@ -384,7 +282,7 @@ export default function ReportBuilder() {
                 <Button
                   variant="outline"
                   onClick={exportToCSV}
-                  disabled={!executed || !reportResults.grouped.length}
+                  disabled={!reportResults || !reportResults.grouped.length}
                   data-testid="button-export-csv"
                 >
                   <Download className="h-4 w-4 mr-2" />
@@ -405,13 +303,13 @@ export default function ReportBuilder() {
                   <p className="text-lg font-medium mb-2">Select a Data Source</p>
                   <p className="text-sm">Choose a data source to begin building your report</p>
                 </div>
-              ) : !executed ? (
+              ) : !reportResults ? (
                 <div className="text-center text-muted-foreground py-12">
                   <FileBarChart2 className="h-16 w-16 mx-auto mb-4 opacity-50" />
                   <p className="text-lg font-medium mb-2">Ready to Run</p>
                   <p className="text-sm">Click "Run Report" to see results</p>
                 </div>
-              ) : isLoading ? (
+              ) : executeReportMutation.isPending ? (
                 <div className="space-y-2">
                   {[...Array(5)].map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full" />
