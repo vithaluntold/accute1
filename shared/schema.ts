@@ -918,7 +918,13 @@ export const workflowTasks = pgTable("workflow_tasks", {
   assignedTo: varchar("assigned_to").references(() => users.id), // User assigned to this task
   aiAgentId: varchar("ai_agent_id").references(() => aiAgents.id), // AI agent for automated tasks
   priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'urgent'
-  dueDate: timestamp("due_date"),
+  
+  // Task scheduling and duration (for dependency management and critical path)
+  startDate: timestamp("start_date"), // Planned/actual start date
+  dueDate: timestamp("due_date"), // Planned/actual end date
+  estimatedHours: numeric("estimated_hours", { precision: 10, scale: 2 }), // Estimated duration in hours
+  actualHours: numeric("actual_hours", { precision: 10, scale: 2 }), // Actual duration in hours (for completed tasks)
+  
   completedAt: timestamp("completed_at"),
   completedBy: varchar("completed_by").references(() => users.id),
   
@@ -995,6 +1001,33 @@ export const taskChecklists = pgTable("task_checklists", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// Task Dependencies - Track task relationships and critical path
+export const taskDependencies = pgTable("task_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => workflowTasks.id, { onDelete: "cascade" }), // The dependent task (waits for predecessor)
+  dependsOnTaskId: varchar("depends_on_task_id").notNull().references(() => workflowTasks.id, { onDelete: "cascade" }), // The predecessor task
+  
+  // Dependency type determines when the dependent task can start/finish
+  // ENUM constraint: Must be one of the 4 valid dependency types
+  dependencyType: text("dependency_type", { 
+    enum: ["finish-to-start", "start-to-start", "finish-to-finish", "start-to-finish"] 
+  }).notNull().default("finish-to-start"),
+  
+  // Lag/lead time (in minutes)
+  lag: integer("lag").notNull().default(0), // Positive = delay, Negative = lead time (task can start before predecessor finishes)
+  
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id), // SECURITY: Ensure both tasks in same workflow
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  taskIdx: index("task_dependencies_task_idx").on(table.taskId),
+  dependsOnIdx: index("task_dependencies_depends_on_idx").on(table.dependsOnTaskId),
+  orgIdx: index("task_dependencies_org_idx").on(table.organizationId),
+  workflowIdx: index("task_dependencies_workflow_idx").on(table.workflowId),
+  // Prevent duplicate dependencies
+  taskDependencyUnique: unique("task_dependencies_unique").on(table.taskId, table.dependsOnTaskId),
+}));
 
 // AI Agents in marketplace - Enhanced for Foundry
 export const aiAgents = pgTable("ai_agents", {
@@ -1173,6 +1206,45 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Document Versions for version control and audit trail
+export const documentVersions = pgTable("document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  versionNumber: integer("version_number").notNull(), // Sequential version (1, 2, 3...)
+  
+  // Version metadata
+  name: text("name").notNull(), // Filename at this version
+  type: text("type").notNull(), // MIME type
+  size: integer("size").notNull(), // File size in bytes
+  url: text("url").notNull(), // Storage URL for this version
+  
+  // Change tracking
+  changeDescription: text("change_description"), // User-provided description of changes
+  changeType: text("change_type").notNull().default("minor"), // 'major', 'minor', 'patch'
+  
+  // Security and integrity
+  documentHash: text("document_hash").notNull(), // SHA-256 hash for verification
+  digitalSignature: text("digital_signature"), // RSA signature
+  encryptedContent: text("encrypted_content"), // AES-256 encrypted content
+  
+  // Metadata
+  uploadedBy: varchar("uploaded_by").notNull().references(() => users.id),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Approval workflow (for compliance)
+  approvalStatus: text("approval_status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  documentIdx: index("document_versions_document_idx").on(table.documentId),
+  orgIdx: index("document_versions_org_idx").on(table.organizationId),
+  // Ensure unique version numbers per document
+  documentVersionUnique: unique("document_versions_unique").on(table.documentId, table.versionNumber),
+}));
 
 // Document Templates for reusable engagement letters and contracts
 export const documentTemplates = pgTable("document_templates", {
@@ -2173,6 +2245,11 @@ export const insertTaskChecklistSchema = createInsertSchema(taskChecklists).omit
   createdAt: true,
 });
 
+export const insertTaskDependencySchema = createInsertSchema(taskDependencies).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
   id: true,
   createdAt: true,
@@ -2183,6 +2260,11 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertDocumentTemplateSchema = createInsertSchema(documentTemplates).omit({
@@ -2367,11 +2449,15 @@ export type InsertTaskSubtask = z.infer<typeof insertTaskSubtaskSchema>;
 export type TaskSubtask = typeof taskSubtasks.$inferSelect;
 export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;
 export type TaskChecklist = typeof taskChecklists.$inferSelect;
+export type InsertTaskDependency = z.infer<typeof insertTaskDependencySchema>;
+export type TaskDependency = typeof taskDependencies.$inferSelect;
 
 export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 export type AiAgent = typeof aiAgents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
 export type InsertDocumentTemplate = z.infer<typeof insertDocumentTemplateSchema>;
 export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;

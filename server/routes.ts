@@ -63,6 +63,8 @@ import { PricingService } from "@shared/pricing-service";
 import { getLLMConfigService } from "./llm-config-service";
 import { mfaService } from "./services/mfaService";
 import { unifiedInboxService } from "./services/unifiedInboxService";
+import { TaskDependenciesService } from "./services/taskDependenciesService";
+import { DocumentVersionsService } from "./services/documentVersionsService";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -4632,6 +4634,165 @@ Title:`;
     } catch (error: any) {
       console.error("Failed to generate engagement letter:", error);
       res.status(500).json({ error: "Failed to generate engagement letter PDF" });
+    }
+  });
+
+  // ==================== Document Versions Routes ====================
+  
+  // Create a new version of a document
+  app.post("/api/documents/:id/versions", requireAuth, requirePermission("documents.upload"), upload.single('file'), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: documentId } = req.params;
+      const { changeDescription, changeType } = req.body;
+      
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      
+      // Calculate hash of uploaded file
+      const crypto = await import('crypto');
+      const documentHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
+      
+      // Optional: Calculate digital signature (if PKI service available)
+      let digitalSignature: string | undefined;
+      try {
+        const cryptoUtils = await import('./crypto-utils');
+        digitalSignature = await cryptoUtils.signDocumentHash(documentHash, req.user!.organizationId!);
+      } catch (error) {
+        // PKI not available, continue without signature
+        console.warn("Digital signature not available:", error);
+      }
+      
+      // Save file
+      const filename = `${Date.now()}-${req.file.originalname}`;
+      const filepath = path.join(process.cwd(), 'uploads', filename);
+      fs.writeFileSync(filepath, req.file.buffer);
+      
+      // Create version
+      const version = await DocumentVersionsService.createVersion(
+        documentId,
+        req.user!.organizationId!,
+        {
+          name: req.file.originalname,
+          type: req.file.mimetype,
+          size: req.file.size,
+          url: `/uploads/${filename}`,
+          uploadedBy: req.userId!,
+          documentHash,
+          digitalSignature,
+          changeDescription,
+          changeType: changeType || 'minor',
+        }
+      );
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "create", "document_version", version.id, { documentId, versionNumber: version.versionNumber }, req);
+      res.json(version);
+    } catch (error: any) {
+      console.error("Failed to create document version:", error);
+      res.status(500).json({ error: error.message || "Failed to create document version" });
+    }
+  });
+  
+  // Get version history for a document
+  app.get("/api/documents/:id/versions", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: documentId } = req.params;
+      const versions = await DocumentVersionsService.getVersionHistory(documentId, req.user!.organizationId!);
+      res.json(versions);
+    } catch (error: any) {
+      console.error("Failed to get version history:", error);
+      res.status(500).json({ error: error.message || "Failed to get version history" });
+    }
+  });
+  
+  // Get a specific version
+  app.get("/api/document-versions/:versionId", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { versionId } = req.params;
+      const version = await DocumentVersionsService.getVersion(versionId, req.user!.organizationId!);
+      res.json(version);
+    } catch (error: any) {
+      console.error("Failed to get version:", error);
+      res.status(500).json({ error: error.message || "Failed to get version" });
+    }
+  });
+  
+  // Rollback to a previous version
+  app.post("/api/documents/:id/versions/:versionNumber/rollback", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: documentId, versionNumber } = req.params;
+      const version = await DocumentVersionsService.rollbackToVersion(
+        documentId,
+        parseInt(versionNumber),
+        req.user!.organizationId!,
+        req.userId!
+      );
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "document", documentId, { action: "rollback", targetVersion: versionNumber }, req);
+      res.json(version);
+    } catch (error: any) {
+      console.error("Failed to rollback version:", error);
+      res.status(500).json({ error: error.message || "Failed to rollback version" });
+    }
+  });
+  
+  // Approve a version (compliance workflow)
+  app.post("/api/document-versions/:versionId/approve", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { versionId } = req.params;
+      const version = await DocumentVersionsService.approveVersion(
+        versionId,
+        req.user!.organizationId!,
+        req.userId!
+      );
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "document_version", versionId, { action: "approve" }, req);
+      res.json(version);
+    } catch (error: any) {
+      console.error("Failed to approve version:", error);
+      res.status(500).json({ error: error.message || "Failed to approve version" });
+    }
+  });
+  
+  // Reject a version (compliance workflow)
+  app.post("/api/document-versions/:versionId/reject", requireAuth, requirePermission("documents.upload"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { versionId } = req.params;
+      const { rejectionReason } = req.body;
+      
+      if (!rejectionReason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
+      
+      const version = await DocumentVersionsService.rejectVersion(
+        versionId,
+        req.user!.organizationId!,
+        req.userId!,
+        rejectionReason
+      );
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "update", "document_version", versionId, { action: "reject", reason: rejectionReason }, req);
+      res.json(version);
+    } catch (error: any) {
+      console.error("Failed to reject version:", error);
+      res.status(500).json({ error: error.message || "Failed to reject version" });
+    }
+  });
+  
+  // Compare two versions
+  app.get("/api/documents/:id/versions/:version1/compare/:version2", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: documentId, version1, version2 } = req.params;
+      const comparison = await DocumentVersionsService.compareVersions(
+        documentId,
+        parseInt(version1),
+        parseInt(version2),
+        req.user!.organizationId!
+      );
+      res.json(comparison);
+    } catch (error: any) {
+      console.error("Failed to compare versions:", error);
+      res.status(500).json({ error: error.message || "Failed to compare versions" });
     }
   });
 
@@ -10275,6 +10436,188 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       res.json(tasksDueSoon);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch tasks due soon" });
+    }
+  });
+
+  // ==================== Task Dependencies Routes ====================
+
+  // Create a task dependency
+  app.post("/api/tasks/:taskId/dependencies", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const { dependsOnTaskId, dependencyType, lag } = req.body;
+      
+      if (!dependsOnTaskId) {
+        return res.status(400).json({ error: "dependsOnTaskId is required" });
+      }
+
+      const dependency = await TaskDependenciesService.createDependency(
+        req.params.taskId,
+        dependsOnTaskId,
+        req.user!.organizationId,
+        dependencyType || "finish-to-start",
+        lag || 0
+      );
+
+      res.status(201).json(dependency);
+    } catch (error: any) {
+      if (error.message.includes("Unauthorized") || error.message.includes("same workflow")) {
+        return res.status(403).json({ error: error.message });
+      }
+      res.status(400).json({ error: error.message || "Failed to create dependency" });
+    }
+  });
+
+  // Delete a task dependency
+  app.delete("/api/task-dependencies/:id", requireAuth, requirePermission("workflows.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      await TaskDependenciesService.deleteDependency(req.params.id, req.user!.organizationId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(404).json({ error: error.message || "Dependency not found" });
+    }
+  });
+
+  // Get dependencies for a specific task
+  app.get("/api/tasks/:taskId/dependencies", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const dependencies = await TaskDependenciesService.getTaskDependencies(
+        req.params.taskId,
+        req.user!.organizationId
+      );
+
+      res.json(dependencies);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch dependencies" });
+    }
+  });
+
+  // Get all dependencies in a workflow
+  app.get("/api/workflows/:workflowId/dependencies", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      // Get all tasks in the workflow
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      if (workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized access to workflow" });
+      }
+
+      // Get all task IDs in this workflow
+      const stages = await storage.getWorkflowStages(req.params.workflowId);
+      const taskIds: string[] = [];
+      
+      for (const stage of stages) {
+        const steps = await storage.getWorkflowSteps(stage.id);
+        for (const step of steps) {
+          const tasks = await storage.getWorkflowTasks(step.id);
+          taskIds.push(...tasks.map(t => t.id));
+        }
+      }
+
+      const dependencies = await TaskDependenciesService.getWorkflowDependencies(
+        taskIds,
+        req.user!.organizationId
+      );
+
+      res.json(dependencies);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch workflow dependencies" });
+    }
+  });
+
+  // Calculate critical path for a workflow
+  app.post("/api/workflows/:workflowId/critical-path", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      if (workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized access to workflow" });
+      }
+
+      // Get all task IDs in this workflow
+      const stages = await storage.getWorkflowStages(req.params.workflowId);
+      const taskIds: string[] = [];
+      
+      for (const stage of stages) {
+        const steps = await storage.getWorkflowSteps(stage.id);
+        for (const step of steps) {
+          const tasks = await storage.getWorkflowTasks(step.id);
+          taskIds.push(...tasks.map(t => t.id));
+        }
+      }
+
+      const result = await TaskDependenciesService.calculateCriticalPath(
+        taskIds,
+        req.user!.organizationId
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to calculate critical path" });
+    }
+  });
+
+  // Validate workflow dependencies (check for cycles)
+  app.post("/api/workflows/:workflowId/validate-dependencies", requireAuth, requirePermission("workflows.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const workflow = await storage.getWorkflow(req.params.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+
+      if (workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized access to workflow" });
+      }
+
+      // Get all task IDs in this workflow
+      const stages = await storage.getWorkflowStages(req.params.workflowId);
+      const taskIds: string[] = [];
+      
+      for (const stage of stages) {
+        const steps = await storage.getWorkflowSteps(stage.id);
+        for (const step of steps) {
+          const tasks = await storage.getWorkflowTasks(step.id);
+          taskIds.push(...tasks.map(t => t.id));
+        }
+      }
+
+      const validation = await TaskDependenciesService.validateWorkflowDependencies(
+        taskIds,
+        req.user!.organizationId
+      );
+
+      res.json(validation);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to validate dependencies" });
     }
   });
 
