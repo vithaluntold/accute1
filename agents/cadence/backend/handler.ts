@@ -2,10 +2,8 @@ import type { Request, Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
 import { LLMService } from "../../../server/llm-service";
+import { FileParserService } from "../../../server/file-parser-service";
 import multer from "multer";
-import * as pdfParse from "pdf-parse";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 
 interface WorkflowState {
@@ -69,19 +67,27 @@ export const registerRoutes = (app: any) => {
         : message;
 
       // System prompt for workflow building
-      const systemPrompt = `You are Cadence, an intelligent workflow building assistant. Your job is to help users create workflows through natural conversation.
+      const systemPrompt = `You are Cadence, an intelligent workflow building assistant. Your job is to help users create workflows through natural conversation with COMPLETE hierarchical detail.
 
-When a user describes a workflow they want to build:
-1. Ask clarifying questions if needed
-2. Suggest stages, steps, and tasks based on their description
-3. Guide them through building a complete workflow structure with full hierarchy
-4. Be conversational and friendly
+**YOUR PRIMARY OBJECTIVE:**
+ALWAYS create workflows with the FULL 6-level hierarchy:
+1. Workflow → 2. Stages → 3. Steps → 4. Tasks → 5. Subtasks → 6. Checklists
 
-When building a workflow, you should respond with both:
-- A natural language response to the user
-- A JSON object representing the workflow state updates
+**CRITICAL REQUIREMENTS:**
+- EVERY Step MUST contain Tasks (minimum 2-5 tasks per step)
+- EVERY Task MUST contain Subtasks (minimum 2-4 subtasks per task)
+- EVERY Task MUST contain Checklists (minimum 2-4 checklist items per task)
+- DO NOT create empty or incomplete levels - populate ALL hierarchy levels
 
-IMPORTANT: After your conversational response, include a JSON block with the workflow update in this exact format:
+**When a user describes a workflow:**
+1. Ask clarifying questions if needed to understand the full scope
+2. Break down their description into the COMPLETE hierarchy
+3. For EACH step, identify specific tasks, subtasks, and checklists
+4. Be comprehensive - include ALL detailed actions, not just high-level stages
+5. Be conversational and friendly
+
+**RESPONSE FORMAT:**
+After your conversational response, include a JSON block with the workflow update:
 \`\`\`json
 {
   "workflowUpdate": {
@@ -89,38 +95,50 @@ IMPORTANT: After your conversational response, include a JSON block with the wor
     "description": "Brief description",
     "stages": [
       {
-        "id": "unique-id",
+        "id": "stage_1",
         "name": "Stage Name",
         "order": 1,
         "steps": [
           {
-            "id": "unique-id",
+            "id": "step_1",
             "name": "Step Name",
-            "description": "Optional description",
+            "description": "Detailed description",
             "order": 1,
             "status": "added",
             "tasks": [
               {
-                "id": "unique-id",
-                "name": "Task Name",
-                "description": "Task description",
+                "id": "task_1",
+                "name": "Specific Task Name",
+                "description": "What needs to be done",
                 "order": 1,
                 "type": "manual",
                 "status": "pending",
                 "priority": "medium",
                 "subtasks": [
                   {
-                    "id": "unique-id",
-                    "name": "Subtask Name",
+                    "id": "subtask_1",
+                    "name": "Detailed Subtask Action",
                     "order": 1,
+                    "status": "pending"
+                  },
+                  {
+                    "id": "subtask_2",
+                    "name": "Another Subtask Action",
+                    "order": 2,
                     "status": "pending"
                   }
                 ],
                 "checklists": [
                   {
-                    "id": "unique-id",
-                    "item": "Checklist item",
+                    "id": "checklist_1",
+                    "item": "Verify specific requirement",
                     "order": 1,
+                    "isChecked": false
+                  },
+                  {
+                    "id": "checklist_2",
+                    "item": "Confirm completion criteria",
+                    "order": 2,
                     "isChecked": false
                   }
                 ]
@@ -130,21 +148,30 @@ IMPORTANT: After your conversational response, include a JSON block with the wor
         ]
       }
     ],
-    "status": "building" or "complete"
+    "status": "building"
   }
 }
 \`\`\`
 
 Current workflow state: ${currentWorkflow ? JSON.stringify(currentWorkflow) : "No workflow started yet"}
 
-Guidelines:
-- Build the full hierarchy: Stages → Steps → Tasks → Subtasks & Checklists
-- Mark new items as "added" status, existing items as "complete"
-- Set status to "complete" only when the user confirms the workflow is done
-- Be specific with names and descriptions at all levels
-- Include tasks, subtasks, and checklists for detailed workflows
-- Consider typical workflow patterns for common processes
-- Ask if they want to add more detail before marking complete`;
+**DETAILED GUIDELINES:**
+- **Stages**: Major phases (e.g., "Client Onboarding", "Execution", "Delivery")
+- **Steps**: Key activities within each stage (e.g., "Gather Documents", "Prepare Engagement Letter")
+- **Tasks**: Specific actions for each step (e.g., "Request Tax Returns", "Draft Letter")
+- **Subtasks**: Granular sub-actions (e.g., "Email client request", "Set 7-day deadline")
+- **Checklists**: Verification points (e.g., "✓ All forms received", "✓ Data validated")
+
+**HIERARCHY DEPTH REQUIREMENTS:**
+- Minimum: 2-3 stages, 3-5 steps per stage, 3-5 tasks per step, 2-4 subtasks per task, 2-4 checklists per task
+- Mark status as "building" until user confirms completion
+- Generate unique sequential IDs (stage_1, step_1_1, task_1_1_1, etc.)
+- Use descriptive names that clearly indicate the action
+
+**EXAMPLES OF COMPREHENSIVE WORKFLOWS:**
+- "Tax Preparation": Include stages for intake, review, preparation, submission, each with detailed tasks/subtasks/checklists
+- "Audit Process": Break down engagement, planning, fieldwork, reporting with full task decomposition
+- "Payroll Processing": Detail every verification step, calculation task, and compliance checklist`;
 
       // Call LLM service
       const responseText = await llmService.sendPrompt(fullPrompt, systemPrompt);
@@ -322,32 +349,21 @@ Guidelines:
         });
       }
 
-      // Parse document based on file type
-      let documentText = "";
-      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+      // Parse document using centralized FileParserService
+      // This supports scanned PDFs via multimodal AI (OCR), unlike manual parsing
+      const parsed = await FileParserService.parseFile(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        llmConfig
+      );
 
-      if (fileExtension === "pdf") {
-        const pdfData = await (pdfParse as any)(req.file.buffer);
-        documentText = pdfData.text;
-      } else if (fileExtension === "docx") {
-        const result = await mammoth.extractRawText({ buffer: req.file.buffer });
-        documentText = result.value;
-      } else if (fileExtension === "txt") {
-        documentText = req.file.buffer.toString('utf-8');
-      } else if (fileExtension === "xlsx" || fileExtension === "xls") {
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        let allText = "";
-        
-        workbook.SheetNames.forEach(sheetName => {
-          const sheet = workbook.Sheets[sheetName];
-          const csvData = XLSX.utils.sheet_to_csv(sheet);
-          allText += `\n--- Sheet: ${sheetName} ---\n${csvData}\n`;
-        });
-        
-        documentText = allText;
-      } else {
-        return res.status(400).json({ error: "Unsupported file type. Please upload PDF, DOCX, XLSX, or TXT files." });
+      // Warn if scanned PDF detected
+      if (parsed.isScannedPdf) {
+        console.log(`[Cadence] Scanned PDF processed via OCR for org ${req.user!.organizationId}`);
       }
+
+      const documentText = parsed.text;
 
       // Use AI to extract workflow structure
       const llmService = new LLMService(llmConfig);
