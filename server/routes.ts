@@ -6378,26 +6378,6 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
-  // ==================== Notification Routes ====================
-  
-  app.get("/api/notifications", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const notifications = await storage.getUserNotifications(req.userId!);
-      res.json(notifications);
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch notifications" });
-    }
-  });
-
-  app.patch("/api/notifications/:id/read", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      await storage.markNotificationAsRead(req.params.id);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: "Failed to mark notification as read" });
-    }
-  });
-
   // ==================== Mention System Routes ====================
 
   app.get("/api/mentions/users", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -7647,7 +7627,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   // ==================== Action Center & Notifications Routes ====================
 
   // Get Action Center - Unified pending items dashboard
-  app.get("/api/client-portal/action-center", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/client-portal/action-center", requireAuth, requirePermission("action_center.view"), async (req: AuthRequest, res: Response) => {
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) {
@@ -7688,7 +7668,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Get all notifications for current user
-  app.get("/api/notifications", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/notifications", requireAuth, requirePermission("notifications.view"), async (req: AuthRequest, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
@@ -7712,7 +7692,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Get unread notification count
-  app.get("/api/notifications/unread-count", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/notifications/unread-count", requireAuth, requirePermission("notifications.view"), async (req: AuthRequest, res: Response) => {
     try {
       const result = await db.select({ count: sql<number>`count(*)` })
         .from(notifications)
@@ -7729,7 +7709,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Mark notification as read
-  app.patch("/api/notifications/:id/read", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.patch("/api/notifications/:id/read", requireAuth, requirePermission("notifications.read"), async (req: AuthRequest, res: Response) => {
     try {
       // Verify notification belongs to user
       const notification = await db.select()
@@ -7756,7 +7736,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Mark all notifications as read
-  app.post("/api/notifications/mark-all-read", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/notifications/mark-all-read", requireAuth, requirePermission("notifications.read"), async (req: AuthRequest, res: Response) => {
     try {
       await db.update(notifications)
         .set({ 

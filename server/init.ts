@@ -337,6 +337,103 @@ export async function initializeSystem(app: Express) {
       { name: "teams.update", resource: "teams", action: "update", description: "Update teams and members" },
       { name: "teams.delete", resource: "teams", action: "delete", description: "Delete teams" },
       { name: "teams.manage", resource: "teams", action: "manage", description: "Manage hierarchical supervision" },
+      
+      // P0 PRIORITY: Notifications (Action Center, Notification Bell)
+      { name: "notifications.view", resource: "notifications", action: "view", description: "View notifications" },
+      { name: "notifications.create", resource: "notifications", action: "create", description: "Create notifications (system-generated)" },
+      { name: "notifications.read", resource: "notifications", action: "read", description: "Mark notifications as read" },
+      { name: "notifications.delete", resource: "notifications", action: "delete", description: "Delete notifications" },
+      
+      // P0 PRIORITY: Action Center (Client Portal)
+      { name: "action_center.view", resource: "action_center", action: "view", description: "View action center dashboard" },
+      { name: "action_center.filter", resource: "action_center", action: "filter", description: "Filter by responsibility (waiting on me/firm)" },
+      
+      // P0 PRIORITY: Payment Collection
+      { name: "payments.request", resource: "payments", action: "request", description: "Request payment from client" },
+      { name: "payments.collect", resource: "payments", action: "collect", description: "Access payment collection UI" },
+      { name: "payments.refund", resource: "payments", action: "refund", description: "Process payment refunds" },
+      { name: "payments.reconcile", resource: "payments", action: "reconcile", description: "Reconcile payment records" },
+      
+      // P0 PRIORITY: Client Portal Access (standardized naming)
+      { name: "client_portal.access", resource: "client_portal", action: "access", description: "Access client portal" },
+      
+      // P1 PRIORITY: Automation
+      { name: "automation.view", resource: "automation", action: "view", description: "View automation rules" },
+      { name: "automation.create", resource: "automation", action: "create", description: "Create automation rules" },
+      { name: "automation.edit", resource: "automation", action: "edit", description: "Edit automation rules" },
+      { name: "automation.delete", resource: "automation", action: "delete", description: "Delete automation rules" },
+      { name: "automation.execute", resource: "automation", action: "execute", description: "Manually trigger automations" },
+      
+      // P1 PRIORITY: Payment Gateways
+      { name: "payment_gateways.view", resource: "payment_gateways", action: "view", description: "View configured payment gateways" },
+      { name: "payment_gateways.create", resource: "payment_gateways", action: "create", description: "Add payment gateway" },
+      { name: "payment_gateways.edit", resource: "payment_gateways", action: "edit", description: "Update gateway credentials" },
+      { name: "payment_gateways.delete", resource: "payment_gateways", action: "delete", description: "Remove payment gateway" },
+      { name: "payment_gateways.test", resource: "payment_gateways", action: "test", description: "Test gateway connection" },
+      
+      // P1 PRIORITY: Documents Advanced
+      { name: "documents.share", resource: "documents", action: "share", description: "Share documents with clients" },
+      { name: "documents.sign", resource: "documents", action: "sign", description: "Sign documents with PKI" },
+      { name: "documents.verify", resource: "documents", action: "verify", description: "Verify document signatures" },
+      { name: "documents.version", resource: "documents", action: "version", description: "Manage document versions" },
+      { name: "documents.approve", resource: "documents", action: "approve", description: "Approve document versions" },
+      { name: "documents.download", resource: "documents", action: "download", description: "Download documents" },
+      
+      // P1 PRIORITY: Reports Advanced
+      { name: "reports.create", resource: "reports", action: "create", description: "Create custom reports" },
+      { name: "reports.export", resource: "reports", action: "export", description: "Export report data" },
+      { name: "reports.schedule", resource: "reports", action: "schedule", description: "Schedule recurring reports" },
+      
+      // P1 PRIORITY: Workload Analytics
+      { name: "workload.view", resource: "workload", action: "view", description: "View team workload analytics" },
+      { name: "workload.assign", resource: "workload", action: "assign", description: "Assign capacity and workload" },
+      
+      // P1 PRIORITY: LLM Configurations
+      { name: "llm_configs.view", resource: "llm_configs", action: "view", description: "View LLM configurations" },
+      { name: "llm_configs.create", resource: "llm_configs", action: "create", description: "Create LLM configurations" },
+      { name: "llm_configs.edit", resource: "llm_configs", action: "edit", description: "Edit LLM credentials" },
+      { name: "llm_configs.delete", resource: "llm_configs", action: "delete", description: "Delete LLM configurations" },
+      { name: "llm_configs.test", resource: "llm_configs", action: "test", description: "Test LLM connections" },
+      
+      // P2: Recurring Schedules
+      { name: "schedules.view", resource: "schedules", action: "view", description: "View recurring schedules" },
+      { name: "schedules.create", resource: "schedules", action: "create", description: "Create recurring schedules" },
+      { name: "schedules.edit", resource: "schedules", action: "edit", description: "Edit schedule frequency" },
+      { name: "schedules.delete", resource: "schedules", action: "delete", description: "Delete schedules" },
+      
+      // P2: Timeline & Gantt Views
+      { name: "timeline.view", resource: "timeline", action: "view", description: "View project timelines" },
+      { name: "timeline.create_milestone", resource: "timeline", action: "create_milestone", description: "Create milestones" },
+      { name: "gantt.view", resource: "gantt", action: "view", description: "View Gantt charts" },
+      { name: "gantt.edit", resource: "gantt", action: "edit", description: "Edit task schedules in Gantt" },
+      
+      // P2: Email Integration
+      { name: "email.view", resource: "email", action: "view", description: "View connected email accounts" },
+      { name: "email.connect", resource: "email", action: "connect", description: "Connect email account via OAuth" },
+      { name: "email.disconnect", resource: "email", action: "disconnect", description: "Disconnect email account" },
+      { name: "email.send", resource: "email", action: "send", description: "Send emails via integration" },
+      
+      // P2: Unified Inbox
+      { name: "inbox.view", resource: "inbox", action: "view", description: "View unified inbox" },
+      { name: "inbox.manage", resource: "inbox", action: "manage", description: "Manage inbox filters and settings" },
+      { name: "inbox.archive", resource: "inbox", action: "archive", description: "Archive conversations" },
+      
+      // P2: Subscriptions
+      { name: "subscriptions.view", resource: "subscriptions", action: "view", description: "View subscription plans" },
+      { name: "subscriptions.manage", resource: "subscriptions", action: "manage", description: "Manage organization subscription" },
+      { name: "subscriptions.billing", resource: "subscriptions", action: "billing", description: "Access billing details" },
+      
+      // P2: Invoice Advanced
+      { name: "invoices.send", resource: "invoices", action: "send", description: "Send invoices to clients" },
+      { name: "invoices.void", resource: "invoices", action: "void", description: "Void invoices" },
+      { name: "invoices.export", resource: "invoices", action: "export", description: "Export invoice data" },
+      
+      // P2: Folders
+      { name: "folders.view", resource: "folders", action: "view", description: "View folder structure" },
+      { name: "folders.create", resource: "folders", action: "create", description: "Create folders" },
+      { name: "folders.edit", resource: "folders", action: "edit", description: "Rename and move folders" },
+      { name: "folders.delete", resource: "folders", action: "delete", description: "Delete folders" },
+      { name: "folders.share", resource: "folders", action: "share", description: "Share folders with clients" },
     ];
 
     const createdPermissions: any[] = [];
@@ -389,7 +486,7 @@ export async function initializeSystem(app: Express) {
       // They can work on their own tasks but not see team/practice statistics
       const employeePermissions = createdPermissions.filter(p =>
         // Document permissions
-        (p.resource === "documents" && (p.action === "view" || p.action === "upload")) ||
+        (p.resource === "documents" && (p.action === "view" || p.action === "upload" || p.action === "download")) ||
         // AI Agent permissions
         (p.resource === "ai_agents" && p.action === "view") ||
         // Form permissions
@@ -401,7 +498,9 @@ export async function initializeSystem(app: Express) {
         // Contact view
         (p.resource === "contacts" && p.action === "view") ||
         // Client view
-        (p.resource === "clients" && p.action === "view")
+        (p.resource === "clients" && p.action === "view") ||
+        // Notifications (own only)
+        (p.resource === "notifications" && (p.action === "view" || p.action === "read" || p.action === "delete"))
       );
       for (const perm of employeePermissions) {
         try {
@@ -416,10 +515,21 @@ export async function initializeSystem(app: Express) {
     }
 
     if (roles.client) {
-      // Client should NOT have workflows.view (team-wide visibility)
-      // They can only see documents and their own assigned tasks
+      // Client portal access with standardized permissions
+      // Clients access their own data through portal features
       const clientPermissions = createdPermissions.filter(p =>
-        p.resource === "documents" // Only document permissions for clients
+        // Document permissions (view, upload, download own documents)
+        (p.resource === "documents" && (p.action === "view" || p.action === "upload" || p.action === "download")) ||
+        // Client Portal Access (main portal entry)
+        (p.resource === "client_portal" && p.action === "access") ||
+        // Action Center (view own pending items)
+        (p.resource === "action_center" && p.action === "view") ||
+        // Notifications (view, read, delete own notifications)
+        (p.resource === "notifications" && (p.action === "view" || p.action === "read" || p.action === "delete")) ||
+        // Forms (submit forms sent to them)
+        (p.resource === "forms" && p.action === "submit") ||
+        // Signatures (sign documents sent to them)
+        (p.resource === "signatures" && p.action === "sign")
       );
       for (const perm of clientPermissions) {
         try {
