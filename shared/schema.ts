@@ -1266,16 +1266,29 @@ export const documentTemplates = pgTable("document_templates", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Notifications
+// Notifications - Enhanced for Action Center
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").references(() => organizations.id),
   title: text("title").notNull(),
   message: text("message").notNull(),
+  // Type: task_assigned, task_due_soon, task_overdue, document_shared, document_request, 
+  // signature_request, form_request, payment_request, message_received, workflow_updated
   type: text("type").notNull(),
+  // Priority: low, medium, high, urgent
+  priority: text("priority").notNull().default("medium"),
+  // Action URL to navigate when clicking notification
+  actionUrl: text("action_url"),
+  // Reference to the source resource (task ID, document ID, etc.)
+  resourceId: varchar("resource_id"),
+  resourceType: text("resource_type"), // task, document, signature, form, payment, message
   isRead: boolean("is_read").notNull().default(false),
+  isActioned: boolean("is_actioned").notNull().default(false), // User completed the action
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  readAt: timestamp("read_at"),
+  actionedAt: timestamp("actioned_at"),
 });
 
 // Activity logs for audit trail
