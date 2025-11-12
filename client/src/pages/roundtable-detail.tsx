@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useRoundtableWebSocket } from '@/hooks/useRoundtableWebSocket';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import {
   Users,
   MessageSquare,
@@ -32,8 +33,9 @@ import { useToast } from '@/hooks/use-toast';
 export default function RoundtableDetail() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const privateMessageInputRef = useRef<HTMLTextAreaElement>(null);
   
   const [messageContent, setMessageContent] = useState('');
   const [privateMessageContent, setPrivateMessageContent] = useState('');
@@ -174,7 +176,13 @@ export default function RoundtableDetail() {
     { slug: 'luca', name: 'Luca', role: 'Project Manager' },
     { slug: 'cadence', name: 'Cadence', role: 'Workflow Specialist' },
     { slug: 'forma', name: 'Forma', role: 'Form Builder' },
+    { slug: 'echo', name: 'Echo', role: 'Email Specialist' },
+    { slug: 'radar', name: 'Radar', role: 'Risk Assessment' },
     { slug: 'parity', name: 'Parity', role: 'Legal Specialist' },
+    { slug: 'scribe', name: 'Scribe', role: 'Document Generator' },
+    { slug: 'relay', name: 'Relay', role: 'Communication Hub' },
+    { slug: 'lynk', name: 'Lynk', role: 'Integration Specialist' },
+    { slug: 'omnispectra', name: 'OmniSpectra', role: 'Analytics Expert' },
   ];
 
   const activeAgentSlugs = allParticipants
@@ -212,10 +220,11 @@ export default function RoundtableDetail() {
         </div>
       </div>
 
-      {/* Main Content - 3 Panel Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Main Content - 3 Panel Layout with Resizable Panels */}
+      <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
         {/* Left Panel - Agents List */}
-        <Card className="w-64 shrink-0 rounded-none border-l-0 border-t-0 border-b-0">
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+          <Card className="h-full rounded-none border-l-0 border-t-0 border-b-0">
           <div className="flex h-full flex-col">
             <div className="border-b p-4">
               <div className="flex items-center gap-2">
@@ -276,9 +285,13 @@ export default function RoundtableDetail() {
             </div>
           </div>
         </Card>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
 
         {/* Center Panel - Main Discussion */}
-        <div className="flex flex-1 flex-col">
+        <ResizablePanel defaultSize={50} minSize={30}>
+        <div className="flex h-full flex-col">
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full p-4">
               <div className="space-y-4">
@@ -316,9 +329,9 @@ export default function RoundtableDetail() {
           </div>
 
           {/* Message Input */}
-          <div className="border-t p-4">
-            <div className="flex gap-2">
-              <Input
+          <div className="border-t p-4 shrink-0">
+            <div className="flex gap-2 items-end">
+              <Textarea
                 ref={messageInputRef}
                 placeholder="Type your message..."
                 value={messageContent}
@@ -332,10 +345,20 @@ export default function RoundtableDetail() {
                     handleSendMessage();
                   }
                 }}
+                className="min-h-[40px] max-h-[96px] resize-none overflow-y-auto"
+                rows={1}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  const newHeight = Math.min(target.scrollHeight, 96);
+                  target.style.height = newHeight + 'px';
+                }}
                 data-testid="input-main-message"
               />
               <Button 
                 onClick={handleSendMessage}
+                size="icon"
+                className="shrink-0"
                 data-testid="button-send-message"
               >
                 <Send className="h-4 w-4" />
@@ -348,9 +371,13 @@ export default function RoundtableDetail() {
             )}
           </div>
         </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
 
         {/* Right Panel - Private Chats */}
-        <Card className="w-80 shrink-0 rounded-none border-r-0 border-t-0 border-b-0">
+        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+        <Card className="h-full rounded-none border-r-0 border-t-0 border-b-0">
           <Tabs value={selectedPrivateChat || undefined} className="h-full flex flex-col">
             <div className="border-b p-4 shrink-0">
               <div className="flex items-center gap-2">
@@ -402,21 +429,31 @@ export default function RoundtableDetail() {
                   </ScrollArea>
 
                   <div className="border-t p-4 shrink-0">
-                    <div className="flex gap-2">
-                      <Input
+                    <div className="flex gap-2 items-end">
+                      <Textarea
+                        ref={privateMessageInputRef}
                         placeholder="Private message..."
                         value={privateMessageContent}
                         onChange={(e) => setPrivateMessageContent(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             handleSendPrivateMessage();
                           }
                         }}
+                        className="min-h-[40px] max-h-[96px] resize-none overflow-y-auto"
+                        rows={1}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          const newHeight = Math.min(target.scrollHeight, 96);
+                          target.style.height = newHeight + 'px';
+                        }}
                         data-testid="input-private-message"
                       />
                       <Button 
-                        size="icon" 
+                        size="icon"
+                        className="shrink-0"
                         onClick={handleSendPrivateMessage}
                         data-testid="button-send-private-message"
                       >
@@ -429,7 +466,8 @@ export default function RoundtableDetail() {
             </div>
           </Tabs>
         </Card>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       {/* Bottom Panel - Screenshare/Presentation */}
       {currentPresentation && (
