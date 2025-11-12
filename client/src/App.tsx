@@ -79,6 +79,8 @@ const Messages = lazy(() => import("@/pages/messages"));
 const TimeTracking = lazy(() => import("@/pages/time-tracking"));
 const Invoices = lazy(() => import("@/pages/invoices"));
 const Payments = lazy(() => import("@/pages/payments"));
+const PaymentCollect = lazy(() => import("@/pages/payment-collect"));
+const ClientPaymentPortal = lazy(() => import("@/pages/client-payment-portal"));
 const Signatures = lazy(() => import("@/pages/signatures"));
 const Projects = lazy(() => import("@/pages/projects"));
 const ProjectDetail = lazy(() => import("@/pages/project-detail"));
@@ -1016,6 +1018,17 @@ function Router() {
             <Payments />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/payments/collect">
+        <OrganizationRoute>
+          <AppLayout>
+            <PaymentCollect />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      {/* Public client payment portal - no authentication required */}
+      <Route path="/pay/:invoiceId">
+        <ClientPaymentPortal />
       </Route>
       <Route path="/signatures">
         <OrganizationRoute>

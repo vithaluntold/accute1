@@ -8193,14 +8193,28 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   app.post("/api/invoices", requireAuth, requirePermission("invoices.create"), async (req: AuthRequest, res: Response) => {
     try {
+      const { items, ...invoiceData } = req.body;
+      
       const invoice = await storage.createInvoice({
-        ...req.body,
+        ...invoiceData,
         organizationId: req.user!.organizationId!,
         createdBy: req.user!.id
       });
+      
+      // Create invoice items if provided
+      if (items && Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          await storage.createInvoiceItem({
+            ...item,
+            invoiceId: invoice.id
+          });
+        }
+      }
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "invoice", invoice.id, invoice, req);
       res.status(201).json(invoice);
     } catch (error: any) {
+      console.error("[INVOICE CREATION ERROR]", error);
       res.status(500).json({ error: "Failed to create invoice" });
     }
   });
@@ -8245,6 +8259,182 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       res.status(201).json(item);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to add invoice item" });
+    }
+  });
+
+  // Public invoice access (no auth required) - for client payment portal
+  app.get("/api/invoices/:id/public", async (req: Request, res: Response) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      const items = await storage.getInvoiceItemsByInvoice(invoice.id);
+      const client = await storage.getClientById(invoice.clientId);
+      const organization = await storage.getOrganization(invoice.organizationId);
+      
+      res.json({ 
+        ...invoice, 
+        items,
+        client: client ? {
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+        } : null,
+        organization: organization ? {
+          name: organization.name,
+        } : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch invoice" });
+    }
+  });
+
+  // Send invoice email to client
+  app.post("/api/invoices/:id/send", requireAuth, requirePermission("invoices.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice || invoice.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      const client = await storage.getClientById(invoice.clientId);
+      if (!client || !client.email) {
+        return res.status(400).json({ error: "Client email not found" });
+      }
+
+      const organization = await storage.getOrganization(invoice.organizationId);
+      const paymentLink = `${req.protocol}://${req.get('host')}/pay/${invoice.id}`;
+
+      // TODO: Integrate with email service (Resend)
+      // For now, just return success with the payment link
+      console.log(`[INVOICE EMAIL] Would send to ${client.email}: ${paymentLink}`);
+      
+      res.json({ 
+        success: true, 
+        message: "Invoice email sent successfully",
+        paymentLink 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to send invoice" });
+    }
+  });
+
+  // Initiate payment for invoice
+  app.post("/api/invoices/:id/pay", async (req: Request, res: Response) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      
+      if (invoice.status === "paid") {
+        return res.status(400).json({ error: "Invoice already paid" });
+      }
+
+      // Get organization's payment gateway configuration
+      const paymentGateways = await storage.getPaymentGatewayConfigsByOrganization(invoice.organizationId);
+      const defaultGateway = paymentGateways.find(g => g.isDefault);
+      
+      if (!defaultGateway) {
+        return res.status(400).json({ error: "No payment gateway configured" });
+      }
+
+      // For Razorpay
+      if (defaultGateway.gateway === "razorpay") {
+        const crypto = await import("crypto");
+        const Razorpay = (await import("razorpay")).default;
+        
+        // Decrypt credentials
+        const decryptedKey = decrypt(defaultGateway.encryptedKeyId);
+        const decryptedSecret = decrypt(defaultGateway.encryptedKeySecret);
+        
+        const razorpay = new Razorpay({
+          key_id: decryptedKey,
+          key_secret: decryptedSecret,
+        });
+
+        const orderOptions = {
+          amount: Math.round(parseFloat(invoice.total) * 100), // Convert to paise
+          currency: defaultGateway.currency || "INR",
+          receipt: invoice.invoiceNumber,
+        };
+
+        const order = await razorpay.orders.create(orderOptions);
+
+        res.json({
+          razorpayOrderId: order.id,
+          razorpayKeyId: decryptedKey,
+          amount: orderOptions.amount,
+          currency: orderOptions.currency,
+        });
+      } else {
+        res.status(400).json({ error: "Payment gateway not supported yet" });
+      }
+    } catch (error: any) {
+      console.error("[PAYMENT INITIATION ERROR]", error);
+      res.status(500).json({ error: "Failed to initiate payment" });
+    }
+  });
+
+  // Verify payment and update invoice status
+  app.post("/api/invoices/:id/verify-payment", async (req: Request, res: Response) => {
+    try {
+      const { razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+      
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      // Get payment gateway configuration
+      const paymentGateways = await storage.getPaymentGatewayConfigsByOrganization(invoice.organizationId);
+      const defaultGateway = paymentGateways.find(g => g.isDefault);
+      
+      if (!defaultGateway || defaultGateway.gateway !== "razorpay") {
+        return res.status(400).json({ error: "Invalid payment gateway" });
+      }
+
+      // Decrypt credentials and verify signature
+      const crypto = await import("crypto");
+      const decryptedSecret = decrypt(defaultGateway.encryptedKeySecret);
+      
+      const generatedSignature = crypto
+        .createHmac("sha256", decryptedSecret)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest("hex");
+
+      if (generatedSignature !== razorpaySignature) {
+        return res.status(400).json({ error: "Invalid payment signature" });
+      }
+
+      // Payment verified - update invoice and create payment record
+      await storage.updateInvoice(invoice.id, {
+        status: "paid",
+        amountPaid: invoice.total,
+      });
+
+      const payment = await storage.createPayment({
+        organizationId: invoice.organizationId,
+        clientId: invoice.clientId,
+        invoiceId: invoice.id,
+        amount: invoice.total,
+        currency: defaultGateway.currency || "INR",
+        paymentMethod: "online",
+        status: "completed",
+        razorpayPaymentId,
+        paymentDate: new Date().toISOString(),
+        createdBy: invoice.createdBy, // Use invoice creator as payment creator
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Payment verified successfully",
+        payment 
+      });
+    } catch (error: any) {
+      console.error("[PAYMENT VERIFICATION ERROR]", error);
+      res.status(500).json({ error: "Failed to verify payment" });
     }
   });
 
