@@ -1160,6 +1160,16 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/client-portal/action-center">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Client"]}>
+            <AppLayout>
+              <ActionCenter />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+
       <Route component={NotFound} />
       </Switch>
     </Suspense>
