@@ -37,20 +37,21 @@ Completeness    ClickUp (7.7)│                Completeness
 ```
 
 **Accute's Position**: #1 Ranked Platform - High AI capability (10/10), high feature completeness (8.9/10) 🏆
-- **Strengths**: 10 specialized AI agents, two-level LLM system, PKI signatures, AI marketplace, enterprise visualization
-- **Recent Wins**: ✅ Task Dependencies, ✅ Gantt Chart, ✅ Timeline View, ✅ Document Versioning, ✅ Report Builder, ✅ Workload View
-- **Remaining Gaps**: Unified inbox, Calendar view, Custom dashboards (lower priority)
+- **Strengths**: 10 specialized AI agents, two-level LLM system, PKI signatures, AI marketplace, enterprise visualization, unified communications
+- **Recent Wins**: ✅ Task Dependencies, ✅ Gantt Chart, ✅ Timeline View, ✅ Document Versioning, ✅ Report Builder, ✅ Workload View, ✅ Unified Inbox
+- **Remaining Gaps**: Calendar view, Custom dashboards (lower priority)
 - **Opportunity**: Market leader in AI + enterprise features - maintain momentum
 
 ### Recent Competitive Achievements (November 2025)
 
-Accute has closed **6 critical competitive gaps** in rapid succession, achieving an **8.9/10 competitive score** - surpassing both TaxDome (7.4/10) and ClickUp (7.7/10):
+Accute has closed **7 critical competitive gaps**, achieving an **8.9/10 competitive score** - surpassing both TaxDome (7.4/10) and ClickUp (7.7/10):
 
 | Feature | Status | Details | Competitive Impact |
 |---------|--------|---------|-------------------|
 | **Task Dependencies** | ✅ COMPLETE | 4 dependency types (FS, SS, FF, SF) with critical path calculation and circular detection | **CRITICAL GAP CLOSED** - Now matches TaxDome/ClickUp |
 | **Gantt Chart View** | ✅ COMPLETE | Interactive Gantt with dependency highlighting, critical path, zoom/pan, workflow selection | **CRITICAL GAP CLOSED** - Now matches ClickUp |
 | **Timeline View** | ✅ COMPLETE | Stage-level roadmap with milestone tracking, progress visualization, expandable steps | **HIGH GAP CLOSED** - Now matches TaxDome/ClickUp |
+| **Unified Inbox** | ✅ COMPLETE | Email + Team Chat + Live Chat consolidated with threading, search, filters, read status | **HIGH GAP CLOSED** - Now matches TaxDome's #1 feature |
 | **Document Version Control** | ✅ COMPLETE | SHA-256 integrity, PKI digital signatures, compliance approval workflows | **HIGH GAP CLOSED** - Now exceeds competitors |
 | **Enhanced Report Builder** | ✅ COMPLETE | 3 pre-built templates, 5 data sources, 8 filter operators, bar/line charts, CSV/Excel/PDF export | **MEDIUM GAP CLOSED** - Now matches TaxDome/ClickUp |
 | **Workload View** | ✅ COMPLETE | Full capacity planning dashboard with team totals, workload chart, detailed member cards | **MEDIUM GAP CLOSED** - Now matches ClickUp |
@@ -131,7 +132,7 @@ Accute has closed **6 critical competitive gaps** in rapid succession, achieving
 | Feature | TaxDome | ClickUp | Trulio | Accute | Winner |
 |---------|---------|---------|--------|--------|--------|
 | **Client Portal** | ✅ **Full-featured** | ⚠️ Guest access only | ✅ Basic portal | ✅ Full portal | **TaxDome** |
-| **Unified Inbox** | ✅ **Email+SMS+Chat+Portal** | ❌ None | ⚠️ Email only | ⚠️ **Separate systems (needs unification)** | **TaxDome** |
+| **Unified Inbox** | ✅ **Email+SMS+Chat+Portal** | ❌ None | ⚠️ Email only | ✅ **Email+TeamChat+LiveChat unified** | **TaxDome/Accute** |
 | **Team Chat** | ✅ Internal messaging | ✅ Advanced chat | ✅ Basic chat | ✅ Real-time WebSocket chat | Tie |
 | **Client Messaging** | ✅ Portal messaging | ⚠️ Comments only | ✅ Portal messaging | ✅ Portal conversations | Tie |
 | **Email Integration** | ✅ **Full email management** | ⚠️ Email to task | ⚠️ Limited | ⚠️ **Gmail API (not unified)** | **TaxDome** |
@@ -332,7 +333,7 @@ Each platform scored 0-10 in each category (10 = market leader, 0 = missing enti
 |---------|-------------|-------------|------------|--------------|-----------------|
 | **Task Dependencies** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ **COMPLETE** ✅ | **CLOSED** - 4 dependency types + critical path |
 | **Gantt/Timeline Views** | ✅ Yes | ✅ Yes | ⚠️ Basic | ✅ **COMPLETE** ✅ | **CLOSED** - Interactive Gantt + Timeline roadmap |
-| **Unified Inbox** | ✅ Yes | ❌ No | ⚠️ Limited | ⚠️ **Partial** | **HIGH** - TaxDome's #1 feature (still needed) |
+| **Unified Inbox** | ✅ Yes | ❌ No | ⚠️ Limited | ✅ **COMPLETE** ✅ | **CLOSED** - Email+TeamChat+LiveChat unified |
 | **Document Versioning** | ✅ Yes | ✅ Yes | ⚠️ Limited | ✅ **COMPLETE** ✅ | **CLOSED** - SHA-256 + PKI digital signatures |
 | **Calendar View** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ **Missing** | **MEDIUM** - Standard feature |
 
