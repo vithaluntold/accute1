@@ -7644,6 +7644,137 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Action Center & Notifications Routes ====================
+
+  // Get Action Center - Unified pending items dashboard
+  app.get("/api/client-portal/action-center", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const filter = req.query.filter as string || 'all'; // 'waiting_on_me', 'waiting_on_firm', 'all'
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // Aggregate all pending items
+      const actionItems: any[] = [];
+
+      // TODO: Implement real data fetching
+      // For now, return structure for frontend development
+      const actionCenter = {
+        summary: {
+          totalPending: 0,
+          waitingOnMe: 0,
+          waitingOnFirm: 0,
+          overdueCount: 0,
+        },
+        items: actionItems,
+        filter: filter,
+      };
+
+      res.json(actionCenter);
+    } catch (error: any) {
+      console.error("[ACTION CENTER ERROR]", error);
+      res.status(500).json({ error: "Failed to fetch action center data" });
+    }
+  });
+
+  // Get all notifications for current user
+  app.get("/api/notifications", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const unreadOnly = req.query.unreadOnly === 'true';
+
+      const result = await db.select()
+        .from(notifications)
+        .where(and(
+          eq(notifications.userId, req.user!.id),
+          unreadOnly ? eq(notifications.isRead, false) : sql`true`
+        ))
+        .orderBy(sql`${notifications.createdAt} DESC`)
+        .limit(limit)
+        .offset(offset);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[NOTIFICATIONS GET ERROR]", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get unread notification count
+  app.get("/api/notifications/unread-count", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(and(
+          eq(notifications.userId, req.user!.id),
+          eq(notifications.isRead, false)
+        ));
+
+      res.json({ count: result[0]?.count || 0 });
+    } catch (error: any) {
+      console.error("[UNREAD COUNT ERROR]", error);
+      res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      // Verify notification belongs to user
+      const notification = await db.select()
+        .from(notifications)
+        .where(eq(notifications.id, req.params.id))
+        .limit(1);
+
+      if (!notification.length || notification[0].userId !== req.user!.id) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+
+      await db.update(notifications)
+        .set({ 
+          isRead: true,
+          readAt: sql`now()`
+        })
+        .where(eq(notifications.id, req.params.id));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[MARK READ ERROR]", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      await db.update(notifications)
+        .set({ 
+          isRead: true,
+          readAt: sql`now()`
+        })
+        .where(and(
+          eq(notifications.userId, req.user!.id),
+          eq(notifications.isRead, false)
+        ));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[MARK ALL READ ERROR]", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
   // ==================== Document Collection Tracking Routes ====================
 
   // Get all document requests for organization
