@@ -6429,129 +6429,75 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
 
   // ==================== Report Builder Routes ====================
 
-  app.post("/api/reports/execute", requireAuth, requirePermission("analytics.view"), async (req: AuthRequest, res: Response) => {
+  // Get available report templates
+  app.get("/api/reports/templates", requireAuth, requirePermission("analytics.view"), async (req: AuthRequest, res: Response) => {
     try {
-      const { dataSource, filters, groupBy } = req.body;
-      
+      const { ReportService } = await import("./services/reportService");
+      const templates = ReportService.getTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      console.error("Failed to fetch report templates:", error);
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  // Execute pre-built template report
+  app.post("/api/reports/run-template/:templateId", requireAuth, requirePermission("analytics.view"), async (req: AuthRequest, res: Response) => {
+    try {
       if (!req.user!.organizationId) {
         return res.status(403).json({ error: "Organization required" });
       }
+
+      const { ReportService } = await import("./services/reportService");
+      const { templateId } = req.params;
+      const overrides = req.body; // Optional parameter overrides
+
+      const result = await ReportService.executeTemplateReport(
+        req.user!.organizationId,
+        templateId,
+        overrides
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Template report execution error:", error);
+      if (error.message?.includes("not found")) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to execute template report" });
+    }
+  });
+
+  // Execute custom report (existing endpoint - refactored to use ReportService)
+  app.post("/api/reports/execute", requireAuth, requirePermission("analytics.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.status(403).json({ error: "Organization required" });
+      }
+
+      const { dataSource, filters, groupBy } = req.body;
 
       if (!dataSource) {
         return res.status(400).json({ error: "Data source required" });
       }
 
-      // Fetch data based on source (scoped to user's organization)
-      let rawData: any[] = [];
+      const { ReportService } = await import("./services/reportService");
+      
+      const result = await ReportService.executeCustomReport(
+        req.user!.organizationId,
+        {
+          dataSource,
+          filters: filters || [],
+          groupBy,
+        }
+      );
 
-      if (dataSource === "time_entries") {
-        rawData = await db.select()
-          .from(schema.timeEntries)
-          .where(eq(schema.timeEntries.organizationId, req.user!.organizationId));
-      } else if (dataSource === "invoices") {
-        rawData = await db.select()
-          .from(schema.invoices)
-          .where(eq(schema.invoices.organizationId, req.user!.organizationId));
-      } else if (dataSource === "clients") {
-        rawData = await db.select()
-          .from(schema.clients)
-          .where(eq(schema.clients.organizationId, req.user!.organizationId));
-      } else if (dataSource === "projects") {
-        rawData = await db.select()
-          .from(schema.projects)
-          .where(eq(schema.projects.organizationId, req.user!.organizationId));
-      } else if (dataSource === "tasks") {
-        const joinedData = await db.select()
-          .from(schema.projectTasks)
-          .innerJoin(schema.projects, eq(schema.projectTasks.projectId, schema.projects.id))
-          .where(eq(schema.projects.organizationId, req.user!.organizationId));
-        
-        // Flatten joined data - extract task fields to top level
-        rawData = joinedData.map(row => ({
-          ...row.project_tasks,
-          projectName: row.projects.name,
-          clientId: row.projects.clientId,
-        }));
-      } else {
-        return res.status(400).json({ error: "Invalid data source" });
-      }
-
-      // Apply filters server-side
-      let filteredData = rawData;
-      if (filters && Array.isArray(filters)) {
-        filteredData = rawData.filter(item => {
-          return filters.every((filter: any) => {
-            const value = item[filter.field];
-            
-            if (filter.operator === "equals") {
-              return String(value) === String(filter.value);
-            } else if (filter.operator === "contains") {
-              return String(value || "").toLowerCase().includes(String(filter.value).toLowerCase());
-            } else if (filter.operator === "greater_than") {
-              return Number(value) > Number(filter.value);
-            } else if (filter.operator === "less_than") {
-              return Number(value) < Number(filter.value);
-            } else if (filter.operator === "after") {
-              return new Date(value) > new Date(filter.value);
-            } else if (filter.operator === "before") {
-              return new Date(value) < new Date(filter.value);
-            }
-            
-            return true;
-          });
-        });
-      }
-
-      // Group and aggregate server-side
-      const grouped = groupBy
-        ? Object.entries(
-            filteredData.reduce((acc, item) => {
-              let key = "Ungrouped";
-              
-              if (groupBy === "status") {
-                key = item.status || "No Status";
-              } else if (groupBy === "month") {
-                const date = item.date || item.createdAt || item.issueDate;
-                key = date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : "No Date";
-              }
-
-              if (!acc[key]) {
-                acc[key] = [];
-              }
-              acc[key].push(item);
-              return acc;
-            }, {} as Record<string, any[]>)
-          ).map(([groupKey, items]) => ({
-            group: groupKey,
-            count: items.length,
-            sumHours: items.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-            sumRevenue: items.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0),
-            avgHours: items.length > 0 ? items.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / items.length : 0,
-            avgRevenue: items.length > 0 ? items.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0) / items.length : 0,
-          }))
-        : [
-            {
-              group: "All Records",
-              count: filteredData.length,
-              sumHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-              sumRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0),
-              avgHours: filteredData.length > 0 ? filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / filteredData.length : 0,
-              avgRevenue: filteredData.length > 0 ? filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0) / filteredData.length : 0,
-            },
-          ];
-
-      // Compute totals
-      const totals = {
-        count: filteredData.length,
-        sumHours: filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0),
-        sumRevenue: filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0),
-        avgHours: filteredData.length > 0 ? filteredData.reduce((sum, i) => sum + (Number(i.hours) || 0), 0) / filteredData.length : 0,
-        avgRevenue: filteredData.length > 0 ? filteredData.reduce((sum, i) => sum + (Number(i.total) || Number(i.budget) || 0), 0) / filteredData.length : 0,
-      };
-
-      res.json({ grouped, totals });
+      res.json(result);
     } catch (error: any) {
       console.error("Report execution error:", error);
+      if (error.message?.includes("Invalid data source")) {
+        return res.status(400).json({ error: error.message });
+      }
       res.status(500).json({ error: "Failed to execute report" });
     }
   });

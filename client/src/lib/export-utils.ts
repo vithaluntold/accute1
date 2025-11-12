@@ -3,6 +3,11 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 
+// Generic data export (for reports, analytics, etc.)
+export interface GenericExportData {
+  [key: string]: string | number;
+}
+
 interface FormSubmission {
   id: string;
   formTemplateId: string;
@@ -228,3 +233,144 @@ export function exportToPDF(submissions: FormSubmission[], formName: string) {
 
   doc.save(getFilename(formName, "pdf"));
 }
+
+// ==================== Generic Export Functions ====================
+
+/**
+ * Export generic data to Excel (for reports, analytics, etc.)
+ * @param data - Array of objects with string/number values
+ * @param filename - Base filename (without extension)
+ * @param sheetName - Name of the Excel sheet
+ */
+export function exportGenericToExcel(
+  data: GenericExportData[],
+  filename: string,
+  sheetName: string = "Data"
+) {
+  if (!data || data.length === 0) {
+    throw new Error("No data to export");
+  }
+
+  // Extract headers from first row
+  const headers = Object.keys(data[0]);
+
+  const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+
+  // Auto-size columns
+  const colWidths = headers.map((header) => {
+    const maxLength = Math.max(
+      header.length,
+      ...data.map((row) => String(row[header] || "").length)
+    );
+    return { wch: Math.min(maxLength + 2, 30) };
+  });
+  worksheet["!cols"] = colWidths;
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  const date = format(new Date(), "yyyy-MM-dd_HH-mm");
+  const sanitizedName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  XLSX.writeFile(workbook, `${sanitizedName}_${date}.xlsx`);
+}
+
+/**
+ * Export generic data to PDF (for reports, analytics, etc.)
+ * @param data - Array of objects with string/number values
+ * @param filename - Base filename (without extension)
+ * @param title - Title to display on PDF
+ */
+export function exportGenericToPDF(
+  data: GenericExportData[],
+  filename: string,
+  title: string
+) {
+  if (!data || data.length === 0) {
+    throw new Error("No data to export");
+  }
+
+  const doc = new jsPDF();
+
+  // Add title
+  doc.setFontSize(16);
+  doc.text(title, 14, 15);
+
+  // Add subtitle
+  doc.setFontSize(10);
+  doc.text(`Generated on ${format(new Date(), "MMM d, yyyy 'at' h:mm a")}`, 14, 22);
+
+  // Prepare table data
+  const headers = Object.keys(data[0]);
+  const tableData = data.map((row) =>
+    headers.map((header) => {
+      const value = row[header];
+      // Format numbers with 2 decimals if they're not integers
+      if (typeof value === "number" && !Number.isInteger(value)) {
+        return value.toFixed(2);
+      }
+      // Truncate long strings
+      const str = String(value);
+      return str.length > 30 ? str.substring(0, 27) + "..." : str;
+    })
+  );
+
+  // Add table
+  autoTable(doc, {
+    head: [headers],
+    body: tableData,
+    startY: 30,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+    },
+    headStyles: {
+      fillColor: [66, 66, 66],
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+    margin: { top: 30, right: 14, bottom: 20, left: 14 },
+  });
+
+  const date = format(new Date(), "yyyy-MM-dd_HH-mm");
+  const sanitizedName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  doc.save(`${sanitizedName}_${date}.pdf`);
+}
+
+/**
+ * Export generic data to CSV (for reports, analytics, etc.)
+ * @param data - Array of objects with string/number values
+ * @param filename - Base filename (without extension)
+ */
+export function exportGenericToCSV(
+  data: GenericExportData[],
+  filename: string
+) {
+  if (!data || data.length === 0) {
+    throw new Error("No data to export");
+  }
+
+  const headers = Object.keys(data[0]);
+  const rows = data.map((row) =>
+    headers.map((header) => {
+      const value = row[header];
+      // Format numbers with 2 decimals if they're not integers
+      if (typeof value === "number" && !Number.isInteger(value)) {
+        return value.toFixed(2);
+      }
+      return String(value);
+    })
+  );
+
+  const csvContent = [
+    headers.map((h) => `"${h}"`).join(","),
+    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const date = format(new Date(), "yyyy-MM-dd_HH-mm");
+  const sanitizedName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  downloadFile(blob, `${sanitizedName}_${date}.csv`);
+}
+
