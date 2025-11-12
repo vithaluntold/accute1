@@ -151,10 +151,10 @@ Accute has closed **6 critical competitive gaps** in rapid succession, achieving
 |---------|---------|---------|--------|--------|--------|
 | **Document Storage** | ✅ Unlimited | ✅ Varies by plan | ✅ Generous limits | ✅ Unlimited | Tie |
 | **Encryption** | ✅ AES-256 | ✅ AES-256 | ✅ AES-256 | ✅ **AES-256** | Tie |
-| **Version Control** | ✅ **Full version history** | ✅ Version history | ⚠️ Limited | ❌ **Missing** | **TaxDome** |
+| **Version Control** | ✅ **Full version history** | ✅ Version history | ⚠️ Limited | ✅ **Full version history + SHA-256 integrity** | **Tie** |
 | **Document Comparison** | ✅ Side-by-side diff | ❌ None | ❌ None | ❌ **Missing** | **TaxDome** |
 | **Track Changes** | ✅ Word-style markup | ❌ None | ❌ None | ❌ **Missing** | **TaxDome** |
-| **Approval Workflows** | ✅ **Multi-stage approval** | ⚠️ Via automations | ⚠️ Basic | ❌ **Missing** | **TaxDome** |
+| **Approval Workflows** | ✅ **Multi-stage approval** | ⚠️ Via automations | ⚠️ Basic | ✅ **Compliance approval workflows** | **Tie** |
 | **Digital Signatures** | ✅ E-signature (DocuSign) | ⚠️ Via integrations | ✅ E-signature | ✅ **PKI signatures (RSA-2048)** | **Accute** |
 | **Document Templates** | ✅ Template library | ✅ Doc templates | ✅ Accounting templates | ✅ **AI-generated (Scribe)** | **Accute** |
 | **OCR / Text Extraction** | ✅ Built-in OCR | ⚠️ Via third-party | ✅ Advanced OCR | ✅ **AI-powered (Radar)** | Accute/Trulio |
