@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { RoleGuard } from "@/components/role-guard";
 import { OrganizationRoute } from "@/components/organization-route";
 import { isAuthenticated, getUser } from "@/lib/auth";
+import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,7 @@ const ClientMyTasks = lazy(() => import("@/pages/client-portal/my-tasks"));
 const ClientMyForms = lazy(() => import("@/pages/client-portal/my-forms"));
 const ClientMySignatures = lazy(() => import("@/pages/client-portal/my-signatures"));
 const ClientPortalMessages = lazy(() => import("@/pages/client-portal/messages"));
+const ActionCenter = lazy(() => import("@/pages/client-portal/action-center"));
 const RoundtablePage = lazy(() => import("@/pages/roundtable"));
 const RoundtableDetail = lazy(() => import("@/pages/roundtable-detail"));
 const TeamsPage = lazy(() => import("@/pages/teams"));
@@ -239,6 +241,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex items-center gap-2">
+              <NotificationBell />
               <ThemeToggle />
               
               <DropdownMenu>
