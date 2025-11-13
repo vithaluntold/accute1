@@ -2855,7 +2855,131 @@ export const agentMessages = pgTable("agent_messages", {
   sessionIdx: index("agent_messages_session_idx").on(table.sessionId),
 }));
 
-// Calendar & Appointments
+// ==================== CALENDAR SYSTEM ====================
+
+// Events - Unified calendar events (meetings, tasks, PTO, block time)
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Event details
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default("meeting"), // 'meeting', 'task', 'pto', 'block_time', 'reminder'
+  
+  // Scheduling
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  allDay: boolean("all_day").notNull().default(false),
+  timezone: text("timezone").notNull().default("UTC"),
+  
+  // Location & conferencing
+  location: text("location"),
+  meetingUrl: text("meeting_url"),
+  meetingProvider: text("meeting_provider"), // 'zoom', 'teams', 'google_meet', 'manual'
+  meetingProviderId: text("meeting_provider_id"), // External meeting ID
+  
+  // Relations
+  clientId: varchar("client_id").references(() => clients.id),
+  projectId: varchar("project_id").references(() => projects.id),
+  workflowTaskId: varchar("workflow_task_id").references(() => workflowTasks.id), // Link to task deadlines
+  
+  // Organizer and primary assignee
+  organizerId: varchar("organizer_id").notNull().references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id), // Primary responsible person
+  
+  // Status
+  status: text("status").notNull().default("scheduled"), // 'scheduled', 'confirmed', 'cancelled', 'completed', 'no_show', 'in_progress'
+  
+  // Recurring events
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrenceRule: text("recurrence_rule"), // RRULE format (RFC 5545)
+  recurrenceParentId: varchar("recurrence_parent_id"), // Links recurring instances to parent
+  recurrenceException: boolean("recurrence_exception").notNull().default(false), // Is this an exception to recurring series?
+  
+  // Reminders
+  reminderMinutes: integer("reminder_minutes").array().default(sql`ARRAY[15]::integer[]`), // [15, 60, 1440] = 15min, 1hr, 1day before
+  lastReminderSent: timestamp("last_reminder_sent"),
+  
+  // Additional metadata
+  color: text("color"), // Hex color for calendar display
+  notes: text("notes"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgTimeIdx: index("events_org_time_idx").on(table.organizationId, table.startTime),
+  typeStatusIdx: index("events_type_status_idx").on(table.type, table.status),
+  assignedIdx: index("events_assigned_idx").on(table.assignedTo),
+  recurringIdx: index("events_recurring_idx").on(table.isRecurring, table.recurrenceParentId),
+}));
+
+// Event Attendees - Multi-user participation with RSVP
+export const eventAttendees = pgTable("event_attendees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }), // Null for external attendees
+  email: text("email"), // For external attendees
+  name: text("name"), // For external attendees
+  
+  // RSVP status
+  rsvpStatus: text("rsvp_status").notNull().default("pending"), // 'pending', 'accepted', 'declined', 'tentative'
+  rsvpAt: timestamp("rsvp_at"),
+  
+  // Role
+  isOptional: boolean("is_optional").notNull().default(false),
+  isOrganizer: boolean("is_organizer").notNull().default(false),
+  
+  // Notifications
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  eventUserIdx: index("event_attendees_event_user_idx").on(table.eventId, table.userId),
+  userRsvpIdx: index("event_attendees_user_rsvp_idx").on(table.userId, table.rsvpStatus),
+}));
+
+// Time Off Requests - PTO, vacation, sick leave tracking
+export const timeOffRequests = pgTable("time_off_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // Request details
+  type: text("type").notNull(), // 'vacation', 'sick', 'personal', 'unpaid', 'other'
+  reason: text("reason"),
+  
+  // Dates
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isHalfDay: boolean("is_half_day").notNull().default(false),
+  halfDayPeriod: text("half_day_period"), // 'morning', 'afternoon'
+  totalDays: numeric("total_days", { precision: 5, scale: 2 }).notNull(), // Calculated based on date range
+  
+  // Approval workflow
+  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'denied', 'cancelled'
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  denialReason: text("denial_reason"),
+  
+  // Calendar event link (auto-created when approved)
+  eventId: varchar("event_id").references(() => events.id),
+  
+  // Notifications
+  notifyTeam: boolean("notify_team").notNull().default(true), // Send team notification when approved
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgUserIdx: index("time_off_requests_org_user_idx").on(table.organizationId, table.userId),
+  statusIdx: index("time_off_requests_status_idx").on(table.status),
+  dateRangeIdx: index("time_off_requests_date_range_idx").on(table.startDate, table.endDate),
+}));
+
+// Legacy appointments table (deprecated - migrate to events)
 export const appointments = pgTable("appointments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
@@ -4066,3 +4190,32 @@ export const defaultCouponFormValues: CouponFormData = {
   validUntil: null,
   isActive: true,
 };
+
+// ==================== CALENDAR SCHEMAS ====================
+
+// Events
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+
+// Event Attendees
+export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
+export type EventAttendee = typeof eventAttendees.$inferSelect;
+
+// Time Off Requests
+export const insertTimeOffRequestSchema = createInsertSchema(timeOffRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTimeOffRequest = z.infer<typeof insertTimeOffRequestSchema>;
+export type TimeOffRequest = typeof timeOffRequests.$inferSelect;
