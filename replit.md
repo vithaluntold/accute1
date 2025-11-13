@@ -1,9 +1,9 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
-### Overview
+## Overview
 Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. It leverages specialized AI agents to automate accounting tasks, aiming to boost efficiency, ensure compliance, and enhance practices. The platform offers multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. Accute seeks to revolutionize accounting workflows through AI-driven automation, providing a significant market advantage.
 
-### User Preferences
+## User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
 - Multi-provider AI support essential
@@ -43,16 +43,17 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 - Profile Picture Upload: Full user avatar upload system with multipart/form-data handling via multer. Backend validates image types (JPEG, PNG, GIF, WebP), enforces 5MB file size limit, and automatically deletes old avatars on replacement.
 - Two-Level LLM Configuration System: Supports both user-level (shared across all user's workspaces) and workspace-level (workspace-specific) LLM configurations. User-level configs created in "My Settings" are portable across workspaces. Workspace-level configs created in "Workspace Settings" provide data residency isolation. AI agents check workspace-level configs first, falling back to user-level. Enables centralized LLM management for multi-branch firms while allowing workspace-specific overrides for data tenancy requirements.
 - Client Payment Collection System: Full payment request and collection workflow at /payments/collect. Admins create invoices with line items, tax rates, notes, and payment terms. System generates shareable payment links (/pay/:invoiceId) for client-facing payment portal. Supports Razorpay integration for payment processing with automatic signature verification, invoice status updates, and payment record creation. Email sending functionality for payment request notifications. Public invoice endpoint (no auth) enables secure client access to payment details.
+- Calendar System: Comprehensive calendar implementation using react-big-calendar with multi-source event aggregation. Events normalized to type='event' for routing while preserving originalType for filtering. Supports drag-drop rescheduling, multi-attendee RSVP tracking, recurring events (RFC 5545 RRULE), video conferencing integration (Zoom/Teams), timezone support, 5 event types (meeting/task/PTO/block_time/reminder). CreateEventDialog with full event creation/editing includes attendee management (internal users + external emails), location/meeting URL, client/project linking. Backend validates attendee payloads (userId OR email required) via Zod. Dialog uses useEffect hooks to hydrate attendees and form fields, preventing data loss on edit. Time-off request system with approval workflow.
 
-### System Architecture
+## System Architecture
 
-#### UI/UX Decisions
+### UI/UX Decisions
 The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
 
-#### Technical Implementations
+### Technical Implementations
 The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript, utilizing PostgreSQL (Neon) for data storage via Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
-#### Feature Specifications
+### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data and distinct roles.
 - **Role-Based Access Control**: Four-tier system (Super Admin, Admin, Employee, Client).
 - **Client Portal**: Dedicated interface for client interactions.
@@ -84,11 +85,12 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Enhanced Report Builder**: Production-ready analytics system with pre-built templates and custom query builder.
 - **Workload View**: Comprehensive capacity planning dashboard with team totals summary, workload distribution chart, and detailed team member cards.
 - **Unified Inbox**: Consolidated communication hub aggregating Email, Team Chat, and Live Chat into a single interface.
+- **Calendar & Event Management**: Multi-source calendar view aggregating events from dedicated events table, workflow tasks, project tasks, and assignments.
 
-#### System Design Choices
+### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types (e.g., create_task, run_ai_agent) with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent.
 
-### External Dependencies
+## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
 - **OpenAI API**: AI model integration.
 - **Azure OpenAI API**: AI model integration.
