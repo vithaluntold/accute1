@@ -3526,6 +3526,7 @@ export const emailMessages = pgTable("email_messages", {
   bcc: text("bcc").array(),
   replyTo: text("reply_to"),
   subject: text("subject").notNull(),
+  normalizedSubject: text("normalized_subject"), // For threading: subject without Re:, Fwd:, etc.
   body: text("body").notNull(),
   bodyHtml: text("body_html"),
   
@@ -3558,6 +3559,9 @@ export const emailMessages = pgTable("email_messages", {
   messageIdIdx: index("email_messages_message_id_idx").on(table.messageId),
   threadIdx: index("email_messages_thread_idx").on(table.threadId),
   processedIdx: index("email_messages_processed_idx").on(table.aiProcessed),
+  // Composite indexes for threading performance
+  threadSortIdx: index("email_messages_thread_sort_idx").on(table.organizationId, table.threadId, table.sentAt),
+  subjectLookupIdx: index("email_messages_subject_lookup_idx").on(table.organizationId, table.emailAccountId, table.normalizedSubject),
 }));
 
 // ==================== 21-Day Onboarding System ====================
