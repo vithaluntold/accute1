@@ -17901,6 +17901,691 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Email Integration Routes ====================
+  
+  // ====== Gmail OAuth Flow ======
+  
+  // Initiate Gmail OAuth flow
+  app.get("/api/oauth/gmail/initiate", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { google } = await import('googleapis');
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`;
+      
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GMAIL_CLIENT_ID,
+        process.env.GMAIL_CLIENT_SECRET,
+        redirectUri
+      );
+
+      const state = JSON.stringify({
+        userId,
+        organizationId,
+        nonce: crypto.randomBytes(16).toString('hex')
+      });
+
+      const authUrl = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: [
+          'https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/gmail.send',
+          'https://www.googleapis.com/auth/gmail.modify'
+        ],
+        state: Buffer.from(state).toString('base64'),
+        prompt: 'consent'
+      });
+
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("[OAuth] Gmail initiation failed:", error);
+      res.status(500).json({ error: "Failed to initiate Gmail OAuth" });
+    }
+  });
+
+  // Gmail OAuth callback
+  app.get("/api/oauth/gmail/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.redirect(`/?error=gmail_oauth_${error}`);
+      }
+
+      if (!code || !state) {
+        return res.redirect('/?error=invalid_oauth_response');
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      const { userId, organizationId, nonce } = stateData;
+
+      if (!userId || !organizationId || !nonce) {
+        return res.redirect('/?error=invalid_state');
+      }
+
+      const { google } = await import('googleapis');
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`;
+      
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GMAIL_CLIENT_ID,
+        process.env.GMAIL_CLIENT_SECRET,
+        redirectUri
+      );
+
+      const { tokens } = await oauth2Client.getToken(code as string);
+
+      if (!tokens.access_token || !tokens.refresh_token || !tokens.expiry_date) {
+        return res.redirect('/?error=invalid_tokens');
+      }
+
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      oauth2Client.setCredentials(tokens);
+      
+      const profile = await gmail.users.getProfile({ userId: 'me' });
+      const emailAddress = profile.data.emailAddress;
+
+      if (!emailAddress) {
+        return res.redirect('/?error=no_email_found');
+      }
+
+      const { emailOAuthService } = await import('./services/EmailOAuthService');
+      const encryptedCredentials = emailOAuthService.encryptCredentials({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiry: new Date(tokens.expiry_date)
+      });
+
+      const existingAccount = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.email, emailAddress),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (existingAccount) {
+        await db.update(schema.emailAccounts)
+          .set({
+            encryptedCredentials,
+            status: 'active',
+            lastSyncError: null,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.emailAccounts.id, existingAccount.id));
+      } else {
+        await db.insert(schema.emailAccounts).values({
+          userId,
+          organizationId,
+          email: emailAddress,
+          displayName: emailAddress,
+          provider: 'gmail',
+          authType: 'oauth',
+          encryptedCredentials,
+          status: 'active',
+          syncInterval: 300000
+        });
+      }
+
+      res.redirect('/inbox?success=gmail_connected');
+    } catch (error: any) {
+      console.error("[OAuth] Gmail callback failed:", error);
+      res.redirect(`/?error=gmail_oauth_failed`);
+    }
+  });
+
+  // ====== Outlook OAuth Flow ======
+  
+  // Initiate Outlook OAuth flow
+  app.get("/api/oauth/outlook/initiate", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
+      
+      const state = JSON.stringify({
+        userId,
+        organizationId,
+        nonce: crypto.randomBytes(16).toString('hex')
+      });
+
+      const params = new URLSearchParams({
+        client_id: process.env.AZURE_CLIENT_ID || '',
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        response_mode: 'query',
+        scope: 'https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send offline_access',
+        state: Buffer.from(state).toString('base64'),
+        prompt: 'consent'
+      });
+
+      const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("[OAuth] Outlook initiation failed:", error);
+      res.status(500).json({ error: "Failed to initiate Outlook OAuth" });
+    }
+  });
+
+  // Outlook OAuth callback
+  app.get("/api/oauth/outlook/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.redirect(`/?error=outlook_oauth_${error}`);
+      }
+
+      if (!code || !state) {
+        return res.redirect('/?error=invalid_oauth_response');
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      const { userId, organizationId, nonce } = stateData;
+
+      if (!userId || !organizationId || !nonce) {
+        return res.redirect('/?error=invalid_state');
+      }
+
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
+      
+      const params = new URLSearchParams({
+        client_id: process.env.AZURE_CLIENT_ID || '',
+        client_secret: process.env.AZURE_CLIENT_SECRET || '',
+        code: code as string,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+        scope: 'https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send offline_access'
+      });
+
+      const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to exchange authorization code');
+      }
+
+      const tokens = await tokenResponse.json();
+
+      if (!tokens.access_token || !tokens.refresh_token || !tokens.expires_in) {
+        return res.redirect('/?error=invalid_tokens');
+      }
+
+      const { Client } = await import('@microsoft/microsoft-graph-client');
+      const client = Client.init({
+        authProvider: (done) => {
+          done(null, tokens.access_token);
+        }
+      });
+
+      const user = await client.api('/me').get();
+      const emailAddress = user.mail || user.userPrincipalName;
+
+      if (!emailAddress) {
+        return res.redirect('/?error=no_email_found');
+      }
+
+      const { emailOAuthService } = await import('./services/EmailOAuthService');
+      const encryptedCredentials = emailOAuthService.encryptCredentials({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenExpiry: new Date(Date.now() + tokens.expires_in * 1000)
+      });
+
+      const existingAccount = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.email, emailAddress),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (existingAccount) {
+        await db.update(schema.emailAccounts)
+          .set({
+            encryptedCredentials,
+            status: 'active',
+            lastSyncError: null,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.emailAccounts.id, existingAccount.id));
+      } else {
+        await db.insert(schema.emailAccounts).values({
+          userId,
+          organizationId,
+          email: emailAddress,
+          displayName: user.displayName || emailAddress,
+          provider: 'outlook',
+          authType: 'oauth',
+          encryptedCredentials,
+          status: 'active',
+          syncInterval: 300000
+        });
+      }
+
+      res.redirect('/inbox?success=outlook_connected');
+    } catch (error: any) {
+      console.error("[OAuth] Outlook callback failed:", error);
+      res.redirect(`/?error=outlook_oauth_failed`);
+    }
+  });
+
+  // Get all email accounts for current user
+  app.get("/api/email/accounts", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const accounts = await db.query.emailAccounts.findMany({
+        where: and(
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        ),
+        columns: {
+          id: true,
+          email: true,
+          displayName: true,
+          provider: true,
+          status: true,
+          lastSyncAt: true,
+          lastSyncError: true,
+          syncInterval: true,
+          autoCreateTasks: true,
+          createdAt: true,
+          updatedAt: true,
+        }
+      });
+
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("[Email] Failed to fetch email accounts:", error);
+      res.status(500).json({ error: "Failed to fetch email accounts" });
+    }
+  });
+
+  // Get email account by ID
+  app.get("/api/email/accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const account = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.id, id),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        ),
+        columns: {
+          id: true,
+          email: true,
+          displayName: true,
+          provider: true,
+          status: true,
+          lastSyncAt: true,
+          lastSyncError: true,
+          syncInterval: true,
+          autoCreateTasks: true,
+          defaultWorkflowId: true,
+          createdAt: true,
+          updatedAt: true,
+        }
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      res.json(account);
+    } catch (error: any) {
+      console.error("[Email] Failed to fetch email account:", error);
+      res.status(500).json({ error: "Failed to fetch email account" });
+    }
+  });
+
+  // Update email account settings
+  app.patch("/api/email/accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Verify ownership
+      const account = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.id, id),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      const updateSchema = z.object({
+        displayName: z.string().optional(),
+        syncInterval: z.number().min(60000).max(3600000).optional(),
+        autoCreateTasks: z.boolean().optional(),
+        defaultWorkflowId: z.string().nullable().optional(),
+      });
+
+      const data = updateSchema.parse(req.body);
+
+      const [updated] = await db.update(schema.emailAccounts)
+        .set({
+          ...data,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.emailAccounts.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("[Email] Failed to update email account:", error);
+      res.status(500).json({ error: "Failed to update email account" });
+    }
+  });
+
+  // Delete email account
+  app.delete("/api/email/accounts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Verify ownership
+      const account = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.id, id),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      await db.delete(schema.emailAccounts)
+        .where(eq(schema.emailAccounts.id, id));
+
+      res.json({ success: true, message: "Email account deleted successfully" });
+    } catch (error: any) {
+      console.error("[Email] Failed to delete email account:", error);
+      res.status(500).json({ error: "Failed to delete email account" });
+    }
+  });
+
+  // Trigger manual sync for email account
+  app.post("/api/email/accounts/:id/sync", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Verify ownership
+      const account = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.id, id),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      // Import sync service dynamically
+      const { emailSyncService } = await import('./services/EmailSyncService');
+      const result = await emailSyncService.syncAccount(id);
+
+      res.json({
+        success: true,
+        message: `Sync complete: ${result.newCount} new messages`,
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[Email] Sync failed:", error);
+      res.status(500).json({ error: error.message || "Failed to sync emails" });
+    }
+  });
+
+  // Get emails for an account
+  app.get("/api/email/accounts/:accountId/messages", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { accountId } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+      
+      const { limit = '50', offset = '0', isRead, isStarred, labels } = req.query;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Verify account ownership
+      const account = await db.query.emailAccounts.findFirst({
+        where: and(
+          eq(schema.emailAccounts.id, accountId),
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        )
+      });
+
+      if (!account) {
+        return res.status(404).json({ error: "Email account not found" });
+      }
+
+      const conditions = [eq(schema.emailMessages.emailAccountId, accountId)];
+      
+      if (isRead !== undefined) {
+        conditions.push(eq(schema.emailMessages.isRead, isRead === 'true'));
+      }
+      
+      if (isStarred !== undefined) {
+        conditions.push(eq(schema.emailMessages.isStarred, isStarred === 'true'));
+      }
+
+      const messages = await db.query.emailMessages.findMany({
+        where: and(...conditions),
+        orderBy: desc(schema.emailMessages.receivedAt),
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
+
+      res.json(messages);
+    } catch (error: any) {
+      console.error("[Email] Failed to fetch messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Get single email message
+  app.get("/api/email/messages/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const message = await db.query.emailMessages.findFirst({
+        where: eq(schema.emailMessages.id, id),
+        with: {
+          emailAccount: true,
+        }
+      });
+
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Verify user has access to this message's account
+      if (message.emailAccount.userId !== userId || message.emailAccount.organizationId !== organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(message);
+    } catch (error: any) {
+      console.error("[Email] Failed to fetch message:", error);
+      res.status(500).json({ error: "Failed to fetch message" });
+    }
+  });
+
+  // Update email message (mark as read/starred, etc.)
+  app.patch("/api/email/messages/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const message = await db.query.emailMessages.findFirst({
+        where: eq(schema.emailMessages.id, id),
+        with: {
+          emailAccount: true,
+        }
+      });
+
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+
+      // Verify ownership
+      if (message.emailAccount.userId !== userId || message.emailAccount.organizationId !== organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateSchema = z.object({
+        isRead: z.boolean().optional(),
+        isStarred: z.boolean().optional(),
+        labels: z.array(z.string()).optional(),
+      });
+
+      const data = updateSchema.parse(req.body);
+
+      const [updated] = await db.update(schema.emailMessages)
+        .set(data)
+        .where(eq(schema.emailMessages.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("[Email] Failed to update message:", error);
+      res.status(500).json({ error: "Failed to update message" });
+    }
+  });
+
+  // Search emails
+  app.get("/api/email/search", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const organizationId = req.user?.organizationId;
+      const { q, accountId, from, to, subject } = req.query;
+
+      if (!userId || !organizationId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Get user's email accounts
+      const userAccounts = await db.query.emailAccounts.findMany({
+        where: and(
+          eq(schema.emailAccounts.userId, userId),
+          eq(schema.emailAccounts.organizationId, organizationId)
+        ),
+        columns: { id: true }
+      });
+
+      const accountIds = userAccounts.map(a => a.id);
+
+      if (accountIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Build search conditions
+      const conditions = [
+        sql`${schema.emailMessages.emailAccountId} IN ${accountIds}`
+      ];
+
+      if (accountId && typeof accountId === 'string') {
+        conditions.push(eq(schema.emailMessages.emailAccountId, accountId));
+      }
+
+      if (from && typeof from === 'string') {
+        conditions.push(sql`${schema.emailMessages.from} ILIKE ${'%' + from + '%'}`);
+      }
+
+      if (subject && typeof subject === 'string') {
+        conditions.push(sql`${schema.emailMessages.subject} ILIKE ${'%' + subject + '%'}`);
+      }
+
+      if (q && typeof q === 'string') {
+        conditions.push(sql`(
+          ${schema.emailMessages.subject} ILIKE ${'%' + q + '%'} OR
+          ${schema.emailMessages.body} ILIKE ${'%' + q + '%'} OR
+          ${schema.emailMessages.from} ILIKE ${'%' + q + '%'}
+        )`);
+      }
+
+      const messages = await db.query.emailMessages.findMany({
+        where: and(...conditions),
+        orderBy: desc(schema.emailMessages.receivedAt),
+        limit: 100,
+      });
+
+      res.json(messages);
+    } catch (error: any) {
+      console.error("[Email] Search failed:", error);
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
   // Register pricing management routes (product families, SKUs, add-ons, gateways, service plans)
   registerPricingRoutes(app);
 
