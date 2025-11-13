@@ -17903,6 +17903,65 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ==================== Email Integration Routes ====================
   
+  // ====== OAuth State Helpers (HMAC-based CSRF protection) ======
+  
+  // Derive dedicated HMAC key from ENCRYPTION_KEY to avoid key reuse
+  const OAUTH_HMAC_KEY = crypto.createHash('sha256')
+    .update(process.env.ENCRYPTION_KEY! + ':oauth_state_hmac')
+    .digest();
+  
+  function generateOAuthState(userId: number, organizationId: number): string {
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const timestamp = Date.now();
+    const payload = JSON.stringify({ userId, organizationId, nonce, timestamp });
+    
+    // Sign with HMAC-SHA256 using dedicated OAuth HMAC key
+    const hmac = crypto.createHmac('sha256', OAUTH_HMAC_KEY);
+    hmac.update(payload);
+    const signature = hmac.digest('hex');
+    
+    // Combine payload and signature
+    const state = JSON.stringify({ payload, signature });
+    return Buffer.from(state).toString('base64');
+  }
+  
+  function verifyOAuthState(encodedState: string): { userId: number; organizationId: number; nonce: string; timestamp: number } | null {
+    try {
+      const state = JSON.parse(Buffer.from(encodedState, 'base64').toString());
+      const { payload, signature } = state;
+      
+      // Verify HMAC signature using constant-time comparison
+      const hmac = crypto.createHmac('sha256', OAUTH_HMAC_KEY);
+      hmac.update(payload);
+      const expectedSignature = hmac.digest('hex');
+      
+      // Use timing-safe comparison to prevent timing attacks
+      const signatureBuffer = Buffer.from(signature, 'hex');
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+      
+      if (signatureBuffer.length !== expectedBuffer.length || 
+          !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+        console.error('[OAuth] State signature verification failed');
+        return null;
+      }
+      
+      const data = JSON.parse(payload);
+      const { userId, organizationId, nonce, timestamp } = data;
+      
+      // Verify state is not too old (15 minutes max)
+      const maxAge = 15 * 60 * 1000;
+      if (Date.now() - timestamp > maxAge) {
+        console.error('[OAuth] State has expired');
+        return null;
+      }
+      
+      return { userId, organizationId, nonce, timestamp };
+    } catch (error) {
+      console.error('[OAuth] State verification failed:', error);
+      return null;
+    }
+  }
+  
   // ====== Gmail OAuth Flow ======
   
   // Initiate Gmail OAuth flow
@@ -17924,11 +17983,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
         redirectUri
       );
 
-      const state = JSON.stringify({
-        userId,
-        organizationId,
-        nonce: crypto.randomBytes(16).toString('hex')
-      });
+      const state = generateOAuthState(userId, organizationId);
 
       const authUrl = oauth2Client.generateAuthUrl({
         access_type: 'offline',
@@ -17937,7 +17992,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
           'https://www.googleapis.com/auth/gmail.send',
           'https://www.googleapis.com/auth/gmail.modify'
         ],
-        state: Buffer.from(state).toString('base64'),
+        state,
         prompt: 'consent'
       });
 
@@ -17961,12 +18016,15 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.redirect('/?error=invalid_oauth_response');
       }
 
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      const { userId, organizationId, nonce } = stateData;
-
-      if (!userId || !organizationId || !nonce) {
+      // CRITICAL: Verify HMAC-signed state to prevent CSRF attacks
+      const stateData = verifyOAuthState(state as string);
+      
+      if (!stateData) {
+        console.error('[OAuth] Gmail callback: invalid or forged state');
         return res.redirect('/?error=invalid_state');
       }
+
+      const { userId, organizationId } = stateData;
 
       const { google } = await import('googleapis');
       const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`;
@@ -18052,11 +18110,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
       const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
       
-      const state = JSON.stringify({
-        userId,
-        organizationId,
-        nonce: crypto.randomBytes(16).toString('hex')
-      });
+      const state = generateOAuthState(userId, organizationId);
 
       const params = new URLSearchParams({
         client_id: process.env.AZURE_CLIENT_ID || '',
@@ -18064,7 +18118,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
         redirect_uri: redirectUri,
         response_mode: 'query',
         scope: 'https://graph.microsoft.com/Mail.ReadWrite https://graph.microsoft.com/Mail.Send offline_access',
-        state: Buffer.from(state).toString('base64'),
+        state,
         prompt: 'consent'
       });
 
@@ -18090,12 +18144,15 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.redirect('/?error=invalid_oauth_response');
       }
 
-      const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      const { userId, organizationId, nonce } = stateData;
-
-      if (!userId || !organizationId || !nonce) {
+      // CRITICAL: Verify HMAC-signed state to prevent CSRF attacks
+      const stateData = verifyOAuthState(state as string);
+      
+      if (!stateData) {
+        console.error('[OAuth] Outlook callback: invalid or forged state');
         return res.redirect('/?error=invalid_state');
       }
+
+      const { userId, organizationId } = stateData;
 
       const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
       
