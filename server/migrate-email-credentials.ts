@@ -59,10 +59,11 @@ async function migrateEmailAccounts(dryRun: boolean): Promise<{ updated: number;
   console.log('\n🔄 Migrating email account OAuth credentials...');
   
   // SECURITY: Check if JWT_SECRET is available for legacy decryption
-  if (!process.env.JWT_SECRET) {
+  const hasJwtSecret = !!process.env.JWT_SECRET;
+  if (!hasJwtSecret) {
     console.warn('\n⚠️  JWT_SECRET not found - legacy credential decryption will fail');
     console.warn('   If you have legacy Gmail/Outlook accounts, set JWT_SECRET before running migration');
-    console.warn('   Continuing with migration (new-format accounts will still be processed)...\n');
+    console.warn('   Legacy accounts will be skipped and require manual intervention\n');
   }
   
   const accounts = await db
@@ -86,6 +87,13 @@ async function migrateEmailAccounts(dryRun: boolean): Promise<{ updated: number;
       console.log(`  ⚡ Found legacy credentials for account ${account.id} (${account.email})`);
       
       if (!dryRun) {
+        // Skip legacy accounts if JWT_SECRET is missing (will fail anyway)
+        if (!hasJwtSecret) {
+          failedIds.push(account.id);
+          console.error(`  ⏭️  Skipped account ${account.id} (${account.email}): JWT_SECRET required for legacy decryption`);
+          continue;
+        }
+        
         try {
           // Decrypt using backward-compatible logic (handles both formats)
           const credentials = oauthService.decryptCredentials(account.encryptedCredentials);
@@ -111,8 +119,13 @@ async function migrateEmailAccounts(dryRun: boolean): Promise<{ updated: number;
           console.error(`     Account will remain in legacy format - manual intervention may be required`);
         }
       } else {
-        updated++;
-        console.log(`  📋 Would migrate account ${account.id} (${account.email}) (dry run)`);
+        // In dry-run, warn if JWT_SECRET is missing
+        if (!hasJwtSecret) {
+          console.log(`  ⚠️  Would skip account ${account.id} (${account.email}) - JWT_SECRET required (dry run)`);
+        } else {
+          updated++;
+          console.log(`  📋 Would migrate account ${account.id} (${account.email}) (dry run)`);
+        }
       }
     } else {
       alreadyMigrated++;

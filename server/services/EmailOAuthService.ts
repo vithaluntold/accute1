@@ -74,8 +74,18 @@ export class EmailOAuthService {
       if (isLegacyFormat && legacyPayload) {
         // Legacy format decryption (from gmail-oauth.ts)
         console.log('[EmailOAuthService] Detected legacy credential format, decrypting with legacy key');
+        
+        // SECURITY: Fail early if JWT_SECRET is missing for legacy decryption
+        if (!process.env.JWT_SECRET) {
+          throw new Error(
+            'JWT_SECRET environment variable is required to decrypt legacy OAuth credentials. ' +
+            'Legacy credentials were encrypted with JWT_SECRET. To migrate these credentials, ' +
+            'set JWT_SECRET before running the migration script.'
+          );
+        }
+        
         const { iv, authTag, encrypted } = legacyPayload;
-        const legacyKey = Buffer.from(process.env.JWT_SECRET?.slice(0, 32).padEnd(32, '0') || '0'.repeat(32));
+        const legacyKey = Buffer.from(process.env.JWT_SECRET.slice(0, 32).padEnd(32, '0'));
         
         const decipher = crypto.createDecipheriv(this.algorithm, legacyKey, Buffer.from(iv, 'hex'));
         decipher.setAuthTag(Buffer.from(authTag, 'hex'));
