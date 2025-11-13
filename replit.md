@@ -77,6 +77,13 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Profile Picture Upload**: Full user avatar upload system with image validation, size limits, and old avatar deletion.
 - **Two-Level LLM Configuration System**: Supports user-level (portable) and workspace-level (isolated) LLM configurations with fallback logic.
 - **Client Payment Collection System**: Full payment request and collection workflow with invoice generation, shareable payment links, Razorpay integration, and email notifications.
+- **Email Integration System**: Production-ready OAuth-based email integration with Gmail and Outlook support. Features include:
+  - **OAuth 2.0 Integration**: Secure Gmail and Outlook OAuth flows with HMAC-signed state verification, timing-safe comparisons, and dedicated HMAC key derivation to prevent CSRF attacks
+  - **Token Management**: EmailOAuthService handles AES-256-GCM encrypted credential storage, automatic token refresh with immediate database persistence to prevent token rot, and provider-specific client factories
+  - **Email Sync**: EmailSyncService fetches emails via Gmail API and Microsoft Graph, with incremental sync, message parsing, threading support, and duplicate detection
+  - **API Routes**: Complete REST API for email account management (CRUD), manual sync triggering, message operations (read/star/archive), and full-text search across messages
+  - **Security**: HMAC-SHA256 signed OAuth state with 15-minute TTL, crypto.timingSafeEqual for signature verification, segregated HMAC and encryption keys, and encrypted OAuth credentials at rest
+  - **Multi-Account Support**: Users can connect multiple Gmail and Outlook accounts per organization with automatic account updates during re-authentication
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent. WebSocket management is lazy-loaded on-demand when chat sessions start.
