@@ -9025,6 +9025,371 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Calendar Events ====================
+  
+  // Get all events for organization (meetings, PTO, block time, task deadlines)
+  app.get("/api/events", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { startDate, endDate, type } = req.query;
+      
+      // Build WHERE conditions
+      const conditions: any[] = [eq(schema.events.organizationId, req.user!.organizationId!)];
+      
+      if (startDate) {
+        conditions.push(sql`${schema.events.startTime} >= ${new Date(startDate as string)}`);
+      }
+      if (endDate) {
+        conditions.push(sql`${schema.events.endTime} <= ${new Date(endDate as string)}`);
+      }
+      if (type && type !== 'all') {
+        conditions.push(eq(schema.events.type, type as string));
+      }
+      
+      const events = await db.select().from(schema.events)
+        .where(and(...conditions))
+        .orderBy(schema.events.startTime);
+      
+      res.json(events);
+    } catch (error: any) {
+      console.error("Failed to fetch events:", error);
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  // Get single event with attendees
+  app.get("/api/events/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const event = await db.select().from(schema.events)
+        .where(and(
+          eq(schema.events.id, req.params.id),
+          eq(schema.events.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (!event.length) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      // Fetch attendees
+      const attendees = await db.select().from(schema.eventAttendees)
+        .where(eq(schema.eventAttendees.eventId, req.params.id));
+      
+      res.json({ ...event[0], attendees });
+    } catch (error: any) {
+      console.error("Failed to fetch event:", error);
+      res.status(500).json({ error: "Failed to fetch event" });
+    }
+  });
+
+  // Create new event
+  app.post("/api/events", requireAuth, requirePermission("calendar.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { title, description, type, startTime, endTime, allDay, location, meetingUrl, 
+              clientId, projectId, assignedTo, attendees, reminderMinutes, color } = req.body;
+      
+      if (!title || !startTime || !endTime) {
+        return res.status(400).json({ error: "Title, start time, and end time are required" });
+      }
+      
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date/time format" });
+      }
+      
+      if (end <= start) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+      
+      // Validate attendees if provided
+      const attendeeSchema = z.object({
+        userId: z.string().optional(),
+        email: z.string().email().optional(),
+        name: z.string().optional(),
+        isOptional: z.boolean().optional(),
+      }).refine(data => data.userId || data.email, {
+        message: "Attendee must have either userId or email",
+      });
+      
+      if (attendees && Array.isArray(attendees)) {
+        try {
+          attendees.forEach((a: any) => attendeeSchema.parse(a));
+        } catch (validationError: any) {
+          return res.status(400).json({ 
+            error: "Invalid attendee data", 
+            details: validationError.errors 
+          });
+        }
+      }
+      
+      // Create event
+      const [event] = await db.insert(schema.events).values({
+        organizationId: req.user!.organizationId!,
+        title: String(title).trim(),
+        description: description || null,
+        type: type || 'meeting',
+        startTime: start,
+        endTime: end,
+        allDay: allDay || false,
+        location: location || null,
+        meetingUrl: meetingUrl || null,
+        clientId: clientId || null,
+        projectId: projectId || null,
+        assignedTo: assignedTo || null,
+        organizerId: req.user!.id,
+        reminderMinutes: reminderMinutes || [15],
+        color: color || null,
+        createdBy: req.user!.id,
+      }).returning();
+      
+      // Add attendees if provided
+      if (attendees && Array.isArray(attendees) && attendees.length > 0) {
+        const attendeeRecords = attendees.map((a: any) => ({
+          eventId: event.id,
+          userId: a.userId || null,
+          email: a.email || null,
+          name: a.name || null,
+          isOptional: a.isOptional || false,
+          isOrganizer: a.userId === req.user!.id,
+        }));
+        
+        await db.insert(schema.eventAttendees).values(attendeeRecords);
+      }
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "event", event.id, event, req);
+      res.status(201).json(event);
+    } catch (error: any) {
+      console.error("Failed to create event:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  // Update event
+  app.patch("/api/events/:id", requireAuth, requirePermission("calendar.update"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await db.select().from(schema.events)
+        .where(and(
+          eq(schema.events.id, req.params.id),
+          eq(schema.events.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (!existing.length) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      const [updated] = await db.update(schema.events)
+        .set({
+          ...req.body,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.events.id, req.params.id))
+        .returning();
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "event", req.params.id, req.body, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update event:", error);
+      res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  // Delete event
+  app.delete("/api/events/:id", requireAuth, requirePermission("calendar.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const existing = await db.select().from(schema.events)
+        .where(and(
+          eq(schema.events.id, req.params.id),
+          eq(schema.events.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (!existing.length) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      await db.delete(schema.events).where(eq(schema.events.id, req.params.id));
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "event", req.params.id, null, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete event:", error);
+      res.status(500).json({ error: "Failed to delete event" });
+    }
+  });
+
+  // RSVP to event
+  app.post("/api/events/:id/rsvp", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { rsvpStatus } = req.body; // 'accepted', 'declined', 'tentative'
+      
+      if (!['accepted', 'declined', 'tentative'].includes(rsvpStatus)) {
+        return res.status(400).json({ error: "Invalid RSVP status" });
+      }
+      
+      // Check if attendee record exists
+      const existing = await db.select().from(schema.eventAttendees)
+        .where(and(
+          eq(schema.eventAttendees.eventId, req.params.id),
+          eq(schema.eventAttendees.userId, req.user!.id)
+        ))
+        .limit(1);
+      
+      if (!existing.length) {
+        return res.status(404).json({ error: "You are not invited to this event" });
+      }
+      
+      const [updated] = await db.update(schema.eventAttendees)
+        .set({
+          rsvpStatus,
+          rsvpAt: new Date(),
+        })
+        .where(and(
+          eq(schema.eventAttendees.eventId, req.params.id),
+          eq(schema.eventAttendees.userId, req.user!.id)
+        ))
+        .returning();
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to RSVP:", error);
+      res.status(500).json({ error: "Failed to RSVP" });
+    }
+  });
+
+  // ==================== Time Off Requests ====================
+  
+  // Get all time-off requests for organization
+  app.get("/api/time-off", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { status, userId } = req.query;
+      
+      // Build WHERE conditions
+      const conditions: any[] = [eq(schema.timeOffRequests.organizationId, req.user!.organizationId!)];
+      
+      if (status && status !== 'all') {
+        conditions.push(eq(schema.timeOffRequests.status, status as string));
+      }
+      if (userId) {
+        conditions.push(eq(schema.timeOffRequests.userId, userId as string));
+      }
+      
+      const requests = await db.select().from(schema.timeOffRequests)
+        .where(and(...conditions))
+        .orderBy(desc(schema.timeOffRequests.createdAt));
+      
+      res.json(requests);
+    } catch (error: any) {
+      console.error("Failed to fetch time-off requests:", error);
+      res.status(500).json({ error: "Failed to fetch time-off requests" });
+    }
+  });
+
+  // Create time-off request
+  app.post("/api/time-off", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { type, reason, startDate, endDate, isHalfDay, halfDayPeriod } = req.body;
+      
+      if (!type || !startDate || !endDate) {
+        return res.status(400).json({ error: "Type, start date, and end date are required" });
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+      
+      if (end < start) {
+        return res.status(400).json({ error: "End date must be on or after start date" });
+      }
+      
+      // Calculate total days
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const totalDays = isHalfDay ? 0.5 : daysDiff;
+      
+      const [request] = await db.insert(schema.timeOffRequests).values({
+        organizationId: req.user!.organizationId!,
+        userId: req.user!.id,
+        type,
+        reason: reason || null,
+        startDate: start,
+        endDate: end,
+        isHalfDay: isHalfDay || false,
+        halfDayPeriod: halfDayPeriod || null,
+        totalDays,
+      }).returning();
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "time_off_request", request.id, request, req);
+      res.status(201).json(request);
+    } catch (error: any) {
+      console.error("Failed to create time-off request:", error);
+      res.status(500).json({ error: "Failed to create time-off request" });
+    }
+  });
+
+  // Approve/deny time-off request
+  app.patch("/api/time-off/:id/status", requireAuth, requirePermission("time_off.approve"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { status, denialReason } = req.body;
+      
+      if (!['approved', 'denied'].includes(status)) {
+        return res.status(400).json({ error: "Status must be 'approved' or 'denied'" });
+      }
+      
+      const existing = await db.select().from(schema.timeOffRequests)
+        .where(and(
+          eq(schema.timeOffRequests.id, req.params.id),
+          eq(schema.timeOffRequests.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (!existing.length) {
+        return res.status(404).json({ error: "Time-off request not found" });
+      }
+      
+      const updateData: any = {
+        status,
+        approvedBy: req.user!.id,
+        approvedAt: new Date(),
+      };
+      
+      if (status === 'denied' && denialReason) {
+        updateData.denialReason = denialReason;
+      }
+      
+      // If approved, create calendar event
+      if (status === 'approved') {
+        const [event] = await db.insert(schema.events).values({
+          organizationId: req.user!.organizationId!,
+          title: `${existing[0].type.toUpperCase()} - Time Off`,
+          description: existing[0].reason,
+          type: 'pto',
+          startTime: existing[0].startDate,
+          endTime: existing[0].endDate,
+          allDay: !existing[0].isHalfDay,
+          organizerId: existing[0].userId,
+          assignedTo: existing[0].userId,
+          createdBy: req.user!.id,
+        }).returning();
+        
+        updateData.eventId = event.id;
+      }
+      
+      const [updated] = await db.update(schema.timeOffRequests)
+        .set(updateData)
+        .where(eq(schema.timeOffRequests.id, req.params.id))
+        .returning();
+      
+      await logActivity(req.user!.id, req.user!.organizationId!, status === 'approved' ? "approve" : "deny", "time_off_request", req.params.id, updateData, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update time-off request:", error);
+      res.status(500).json({ error: "Failed to update time-off request" });
+    }
+  });
+
   // Email Templates
   app.get("/api/email-templates", requireAuth, async (req: AuthRequest, res: Response) => {
     try {

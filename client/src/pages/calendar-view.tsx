@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
 import { GradientHero } from "@/components/gradient-hero";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { CreateEventDialog } from "@/components/create-event-dialog";
 
 const locales = {
   "en-US": enUS,
@@ -31,10 +32,12 @@ interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  type: "task" | "project" | "meeting" | "deadline" | "workflow-task" | "assignment";
+  type: "task" | "project" | "meeting" | "deadline" | "workflow-task" | "assignment" | "pto" | "block_time" | "reminder" | "event";
+  originalType?: string; // For events from events table, stores the actual type
   status?: string;
   assignedTo?: string;
   project?: string;
+  color?: string;
 }
 
 export default function CalendarView() {
@@ -42,6 +45,14 @@ export default function CalendarView() {
   const [view, setView] = useState<View>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterType, setFilterType] = useState<string>("all");
+  const [createEventDialogOpen, setCreateEventDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedEvent, setSelectedEvent] = useState<any>(undefined);
+
+  // Fetch calendar events from new API
+  const { data: calendarEvents, isLoading: eventsLoading } = useQuery<any[]>({
+    queryKey: ["/api/events"],
+  });
 
   // Fetch workflow tasks
   const { data: workflowTasks, isLoading: workflowLoading } = useQuery<any[]>({
@@ -100,6 +111,12 @@ export default function CalendarView() {
           method: 'PATCH',
           body: { startDate: startISO, dueDate: endISO },
         });
+      } else if (type === 'event') {
+        // Calendar events from events table
+        await apiRequest(`/api/events/${id}`, {
+          method: 'PATCH',
+          body: { startTime: startISO, endTime: endISO },
+        });
       }
     },
     onSuccess: (_data, variables) => {
@@ -112,6 +129,8 @@ export default function CalendarView() {
         queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       } else if (variables.type === 'assignment') {
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      } else if (variables.type === 'event') {
+        queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       }
       toast({ title: "Date updated successfully" });
     },
@@ -126,6 +145,17 @@ export default function CalendarView() {
 
   // Transform data into calendar events
   const events: CalendarEvent[] = [
+    // NEW: Calendar events from events table - mark them for correct routing
+    ...(calendarEvents?.map(event => ({
+      id: event.id,
+      title: event.title,
+      start: new Date(event.startTime),
+      end: new Date(event.endTime),
+      type: 'event' as const, // Use 'event' type for all events from events table
+      originalType: event.type, // Store original type for display/filtering
+      color: event.color,
+    })) || []),
+    
     // Workflow tasks - preserve "workflow-task" type for correct routing
     ...(workflowTasks?.filter(t => t.dueDate).map(task => ({
       id: task.id,
@@ -170,22 +200,54 @@ export default function CalendarView() {
     })) || []),
   ];
 
-  const isLoading = workflowLoading || tasksLoading || projectsLoading || assignmentsLoading;
+  const isLoading = eventsLoading || workflowLoading || tasksLoading || projectsLoading || assignmentsLoading;
 
-  // Filter events
+  // Filter events - check originalType for events from events table
   const filteredEvents = filterType === "all" 
     ? events 
-    : events.filter(e => e.type === filterType);
+    : events.filter(e => {
+        const typeToCheck = e.originalType || e.type;
+        return typeToCheck === filterType;
+      });
 
   // Event styling
   const eventStyleGetter = (event: CalendarEvent) => {
+    // Use custom color if provided
+    if (event.color) {
+      return {
+        style: {
+          backgroundColor: event.color,
+          borderRadius: "4px",
+          opacity: 0.9,
+          color: "white",
+          border: "none",
+          display: "block",
+        },
+      };
+    }
+    
     let backgroundColor = "hsl(var(--primary))";
     
-    switch (event.type) {
+    // Check originalType for events from events table
+    const typeToCheck = event.originalType || event.type;
+    
+    switch (typeToCheck) {
+      case "meeting":
+        backgroundColor = "hsl(220 70% 55%)";
+        break;
       case "task":
         backgroundColor = event.status === "completed" 
           ? "hsl(var(--success))" 
           : "hsl(var(--primary))";
+        break;
+      case "pto":
+        backgroundColor = "hsl(280 60% 60%)";
+        break;
+      case "block_time":
+        backgroundColor = "hsl(30 80% 55%)";
+        break;
+      case "reminder":
+        backgroundColor = "hsl(160 60% 50%)";
         break;
       case "project":
         backgroundColor = "hsl(var(--accent))";
@@ -222,11 +284,43 @@ export default function CalendarView() {
         id: event.id,
         start,
         end,
-        type: event.type,
+        type: event.type, // Now correctly uses 'event' for events from events table
       });
     },
     [updateDatesMutation]
   );
+
+  // Handle selecting a time slot to create new event
+  const handleSelectSlot = useCallback(({ start }: { start: Date }) => {
+    setSelectedDate(start);
+    setSelectedEvent(undefined);
+    setCreateEventDialogOpen(true);
+  }, []);
+
+  // Handle clicking an event to edit it
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    // Only allow editing calendar events from events table (type === 'event')
+    if (event.type === 'event') {
+      // Need to fetch full event with attendees
+      fetch(`/api/events/${event.id}`, {
+        credentials: 'include',
+      })
+        .then(res => res.json())
+        .then(fullEvent => {
+          setSelectedEvent(fullEvent);
+          setSelectedDate(undefined);
+          setCreateEventDialogOpen(true);
+        })
+        .catch(err => {
+          console.error('Failed to fetch event:', err);
+          toast({
+            title: "Error",
+            description: "Failed to load event details",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [toast]);
 
   return (
     <div className="flex flex-col h-screen">
@@ -246,15 +340,30 @@ export default function CalendarView() {
               </CardTitle>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  onClick={() => {
+                    setSelectedDate(new Date());
+                    setSelectedEvent(undefined);
+                    setCreateEventDialogOpen(true);
+                  }}
+                  data-testid="button-create-event"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Event
+                </Button>
+
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger className="w-[180px]" data-testid="select-filter-type">
                     <SelectValue placeholder="Filter events" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Events</SelectItem>
-                    <SelectItem value="task">Tasks Only</SelectItem>
-                    <SelectItem value="project">Projects Only</SelectItem>
-                    <SelectItem value="deadline">Deadlines Only</SelectItem>
+                    <SelectItem value="meeting">Meetings</SelectItem>
+                    <SelectItem value="task">Tasks</SelectItem>
+                    <SelectItem value="pto">Time Off</SelectItem>
+                    <SelectItem value="block_time">Block Time</SelectItem>
+                    <SelectItem value="deadline">Deadlines</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -323,9 +432,11 @@ export default function CalendarView() {
             </div>
 
             <div className="flex items-center gap-4 mt-4 flex-wrap">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge style={{ backgroundColor: 'hsl(220 70% 55%)' }}>Meeting</Badge>
                 <Badge className="bg-primary">Task</Badge>
-                <Badge className="bg-accent">Project</Badge>
+                <Badge style={{ backgroundColor: 'hsl(280 60% 60%)' }}>PTO</Badge>
+                <Badge style={{ backgroundColor: 'hsl(30 80% 55%)' }}>Block Time</Badge>
                 <Badge className="bg-destructive">Deadline</Badge>
                 <Badge className="bg-success">Completed</Badge>
               </div>
@@ -359,6 +470,8 @@ export default function CalendarView() {
                   resizable
                   onEventDrop={handleEventDrop}
                   onEventResize={handleEventDrop}
+                  onSelectSlot={handleSelectSlot}
+                  onSelectEvent={handleSelectEvent}
                   data-testid="calendar-component"
                 />
               </div>
@@ -366,6 +479,13 @@ export default function CalendarView() {
           </CardContent>
         </Card>
       </div>
+
+      <CreateEventDialog
+        open={createEventDialogOpen}
+        onOpenChange={setCreateEventDialogOpen}
+        defaultDate={selectedDate}
+        event={selectedEvent}
+      />
 
       <style>{`
         .calendar-container .rbc-calendar {
