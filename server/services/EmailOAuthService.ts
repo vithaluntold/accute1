@@ -43,10 +43,55 @@ export class EmailOAuthService {
   }
 
   /**
-   * Decrypts OAuth credentials from format: iv:encryptedData:authTag
+   * Decrypts OAuth credentials with backward compatibility for legacy format
+   * Supports both:
+   * - New format: iv:encryptedData:authTag (colon-delimited, uses ENCRYPTION_KEY)
+   * - Legacy format: JSON with {iv, authTag, encrypted} (uses JWT_SECRET for key derivation)
    */
   decryptCredentials(encryptedData: string): OAuthCredentials {
     try {
+      // SAFE: Detect legacy format by attempting JSON parse and validating structure
+      let isLegacyFormat = false;
+      let legacyPayload: any = null;
+      
+      try {
+        const parsed = JSON.parse(encryptedData);
+        // Legacy format must have these three string properties (may have additional metadata)
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof parsed.iv === 'string' &&
+          typeof parsed.authTag === 'string' &&
+          typeof parsed.encrypted === 'string'
+        ) {
+          isLegacyFormat = true;
+          legacyPayload = parsed;
+        }
+      } catch {
+        // Not JSON, proceed with new format
+      }
+      
+      if (isLegacyFormat && legacyPayload) {
+        // Legacy format decryption (from gmail-oauth.ts)
+        console.log('[EmailOAuthService] Detected legacy credential format, decrypting with legacy key');
+        const { iv, authTag, encrypted } = legacyPayload;
+        const legacyKey = Buffer.from(process.env.JWT_SECRET?.slice(0, 32).padEnd(32, '0') || '0'.repeat(32));
+        
+        const decipher = crypto.createDecipheriv(this.algorithm, legacyKey, Buffer.from(iv, 'hex'));
+        decipher.setAuthTag(Buffer.from(authTag, 'hex'));
+        
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        
+        const credentials = JSON.parse(decrypted);
+        return {
+          accessToken: credentials.access_token,
+          refreshToken: credentials.refresh_token,
+          tokenExpiry: new Date(credentials.expiry_date || credentials.tokenExpiry)
+        };
+      }
+      
+      // New format decryption (colon-delimited)
       const parts = encryptedData.split(':');
       if (parts.length !== 3) {
         throw new Error('Invalid encrypted data format');
@@ -91,7 +136,7 @@ export class EmailOAuthService {
       const oauth2Client = new google.auth.OAuth2(
         process.env.GMAIL_CLIENT_ID,
         process.env.GMAIL_CLIENT_SECRET,
-        `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`
+        `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/email-accounts/oauth/gmail/callback`
       );
 
       oauth2Client.setCredentials({ refresh_token: refreshToken });

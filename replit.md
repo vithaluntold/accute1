@@ -84,6 +84,8 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
   - **API Routes**: Complete REST API for email account management (CRUD), manual sync triggering, message operations (read/star/archive), and full-text search across messages
   - **Security**: HMAC-SHA256 signed OAuth state with 15-minute TTL, crypto.timingSafeEqual for signature verification, segregated HMAC and encryption keys, and encrypted OAuth credentials at rest
   - **Multi-Account Support**: Users can connect multiple Gmail and Outlook accounts per organization with automatic account updates during re-authentication
+  - **Route Consolidation**: Legacy OAuth routes removed to eliminate route shadowing vulnerability; EmailOAuthService is single source of truth for all OAuth flows
+  - **Backward Compatibility**: EmailOAuthService supports both legacy JSON credential format ({iv, authTag, encrypted}) and new colon-delimited format (iv:encrypted:authTag) with automatic format detection and normalization
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent. WebSocket management is lazy-loaded on-demand when chat sessions start.

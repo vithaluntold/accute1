@@ -12130,202 +12130,6 @@ Answer the user's question about assignments, progress, bottlenecks, team perfor
     }
   });
 
-  // ==================== Email OAuth Routes ====================
-
-  // Start OAuth flow for Gmail
-  app.get("/api/email-accounts/oauth/gmail/start", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
-      const service = new GmailOAuthService({
-        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
-      });
-
-      // SECURITY: Create HMAC-signed state to prevent CSRF/forgery
-      const statePayload = JSON.stringify({
-        userId: req.userId,
-        organizationId: req.user!.organizationId,
-        nonce: crypto.randomBytes(16).toString('hex'),
-        timestamp: Date.now()
-      });
-      const signature = crypto
-        .createHmac('sha256', process.env.JWT_SECRET!)
-        .update(statePayload)
-        .digest('hex');
-      const state = Buffer.from(JSON.stringify({ payload: statePayload, signature })).toString('base64');
-
-      const authUrl = service.generateAuthUrl(state);
-      res.json({ authUrl });
-    } catch (error: any) {
-      console.error('Gmail OAuth start error:', error);
-      res.status(500).json({ error: error.message || "Failed to start Gmail OAuth flow" });
-    }
-  });
-
-  // Gmail OAuth callback
-  app.get("/api/email-accounts/oauth/gmail/callback", async (req: Request, res: Response) => {
-    try {
-      const { code, state } = req.query;
-      
-      if (!code || !state) {
-        return res.status(400).send('Missing code or state parameter');
-      }
-
-      // SECURITY: Verify HMAC signature to prevent state forgery
-      const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      const { payload, signature } = decoded;
-      
-      const expectedSignature = crypto
-        .createHmac('sha256', process.env.JWT_SECRET!)
-        .update(payload)
-        .digest('hex');
-      
-      if (signature !== expectedSignature) {
-        return res.status(403).send('Invalid state signature - possible CSRF attack');
-      }
-
-      const stateData = JSON.parse(payload);
-      
-      // SECURITY: Check timestamp to prevent replay attacks (5 minute window)
-      if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
-        return res.status(403).send('State expired - please try again');
-      }
-      
-      const { GmailOAuthService } = await import('./email-sync/gmail-oauth');
-      const service = new GmailOAuthService({
-        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/gmail/callback`
-      });
-
-      const tokens = await service.getTokensFromCode(code as string);
-      const profile = await service.getUserProfile(service.encryptCredentials(tokens));
-      
-      const emailAccount = await storage.createEmailAccount({
-        organizationId: stateData.organizationId,
-        userId: stateData.userId,
-        provider: 'gmail',
-        email: profile.emailAddress,
-        displayName: profile.emailAddress,
-        authType: 'oauth',
-        encryptedCredentials: service.encryptCredentials(tokens),
-        status: 'active'
-      });
-
-      await logActivity(stateData.userId, stateData.organizationId, "create", "email_account", emailAccount.id, { email: emailAccount.email, provider: 'gmail' }, req as any);
-
-      res.send(`
-        <html>
-          <head><title>Gmail Connected</title></head>
-          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h1>✓ Gmail Account Connected</h1>
-            <p>You can close this window and return to Accute.</p>
-            <script>
-              setTimeout(() => window.close(), 2000);
-            </script>
-          </body>
-        </html>
-      `);
-    } catch (error: any) {
-      console.error('Gmail OAuth callback error:', error);
-      res.status(500).send('OAuth callback failed: ' + error.message);
-    }
-  });
-
-  // Start OAuth flow for Outlook
-  app.get("/api/email-accounts/oauth/outlook/start", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
-      const service = new OutlookOAuthService({
-        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
-      });
-
-      // SECURITY: Create HMAC-signed state to prevent CSRF/forgery
-      const statePayload = JSON.stringify({
-        userId: req.userId,
-        organizationId: req.user!.organizationId,
-        nonce: crypto.randomBytes(16).toString('hex'),
-        timestamp: Date.now()
-      });
-      const signature = crypto
-        .createHmac('sha256', process.env.JWT_SECRET!)
-        .update(statePayload)
-        .digest('hex');
-      const state = Buffer.from(JSON.stringify({ payload: statePayload, signature })).toString('base64');
-
-      const authUrl = service.getAuthUrl(state);
-      res.json({ authUrl });
-    } catch (error: any) {
-      console.error('Outlook OAuth start error:', error);
-      res.status(500).json({ error: error.message || "Failed to start Outlook OAuth flow" });
-    }
-  });
-
-  // Outlook OAuth callback
-  app.get("/api/email-accounts/oauth/outlook/callback", async (req: Request, res: Response) => {
-    try {
-      const { code, state } = req.query;
-      
-      if (!code || !state) {
-        return res.status(400).send('Missing code or state parameter');
-      }
-
-      // SECURITY: Verify HMAC signature to prevent state forgery
-      const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      const { payload, signature } = decoded;
-      
-      const expectedSignature = crypto
-        .createHmac('sha256', process.env.JWT_SECRET!)
-        .update(payload)
-        .digest('hex');
-      
-      if (signature !== expectedSignature) {
-        return res.status(403).send('Invalid state signature - possible CSRF attack');
-      }
-
-      const stateData = JSON.parse(payload);
-      
-      // SECURITY: Check timestamp to prevent replay attacks (5 minute window)
-      if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
-        return res.status(403).send('State expired - please try again');
-      }
-      
-      const { OutlookOAuthService } = await import('./email-sync/outlook-oauth');
-      const service = new OutlookOAuthService({
-        redirectUri: `${req.protocol}://${req.get('host')}/api/email-accounts/oauth/outlook/callback`
-      });
-
-      const tokens = await service.getTokensFromCode(code as string);
-      const profile = await service.getUserProfile(service.encryptCredentials(tokens));
-      
-      const emailAccount = await storage.createEmailAccount({
-        organizationId: stateData.organizationId,
-        userId: stateData.userId,
-        provider: 'outlook',
-        email: profile.emailAddress,
-        displayName: profile.displayName,
-        authType: 'oauth',
-        encryptedCredentials: service.encryptCredentials(tokens),
-        status: 'active'
-      });
-
-      await logActivity(stateData.userId, stateData.organizationId, "create", "email_account", emailAccount.id, { email: emailAccount.email, provider: 'outlook' }, req as any);
-
-      res.send(`
-        <html>
-          <head><title>Outlook Connected</title></head>
-          <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h1>✓ Outlook Account Connected</h1>
-            <p>You can close this window and return to Accute.</p>
-            <script>
-              setTimeout(() => window.close(), 2000);
-            </script>
-          </body>
-        </html>
-      `);
-    } catch (error: any) {
-      console.error('Outlook OAuth callback error:', error);
-      res.status(500).send('OAuth callback failed: ' + error.message);
-    }
-  });
-
   // Test IMAP connection
   app.post("/api/email-accounts/test-imap", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
@@ -17964,8 +17768,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   
   // ====== Gmail OAuth Flow ======
   
-  // Initiate Gmail OAuth flow
-  app.get("/api/oauth/gmail/initiate", requireAuth, async (req: AuthRequest, res: Response) => {
+  // Initiate Gmail OAuth flow (UI expects /api/email-accounts/oauth/gmail/start)
+  app.get("/api/email-accounts/oauth/gmail/start", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.user?.id;
       const organizationId = req.user?.organizationId;
@@ -17975,7 +17779,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
 
       const { google } = await import('googleapis');
-      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`;
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/email-accounts/oauth/gmail/callback`;
       
       const oauth2Client = new google.auth.OAuth2(
         process.env.GMAIL_CLIENT_ID,
@@ -18004,7 +17808,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Gmail OAuth callback
-  app.get("/api/oauth/gmail/callback", async (req: Request, res: Response) => {
+  app.get("/api/email-accounts/oauth/gmail/callback", async (req: Request, res: Response) => {
     try {
       const { code, state, error } = req.query;
 
@@ -18027,7 +17831,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
       const { userId, organizationId } = stateData;
 
       const { google } = await import('googleapis');
-      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/gmail/callback`;
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/email-accounts/oauth/gmail/callback`;
       
       const oauth2Client = new google.auth.OAuth2(
         process.env.GMAIL_CLIENT_ID,
@@ -18098,8 +17902,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ====== Outlook OAuth Flow ======
   
-  // Initiate Outlook OAuth flow
-  app.get("/api/oauth/outlook/initiate", requireAuth, async (req: AuthRequest, res: Response) => {
+  // Initiate Outlook OAuth flow (UI expects /api/email-accounts/oauth/outlook/start)
+  app.get("/api/email-accounts/oauth/outlook/start", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.user?.id;
       const organizationId = req.user?.organizationId;
@@ -18108,7 +17912,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/email-accounts/oauth/outlook/callback`;
       
       const state = generateOAuthState(userId, organizationId);
 
@@ -18132,7 +17936,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Outlook OAuth callback
-  app.get("/api/oauth/outlook/callback", async (req: Request, res: Response) => {
+  app.get("/api/email-accounts/oauth/outlook/callback", async (req: Request, res: Response) => {
     try {
       const { code, state, error } = req.query;
 
@@ -18154,7 +17958,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
       const { userId, organizationId } = stateData;
 
-      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/oauth/outlook/callback`;
+      const redirectUri = `${process.env.REPLIT_DOMAINS?.split(',')[0]}/api/email-accounts/oauth/outlook/callback`;
       
       const params = new URLSearchParams({
         client_id: process.env.AZURE_CLIENT_ID || '',
