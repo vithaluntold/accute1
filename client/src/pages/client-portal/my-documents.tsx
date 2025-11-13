@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GradientHero } from "@/components/gradient-hero";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Search, Download, Eye } from "lucide-react";
+import { FileText, Search, Download, Eye, Upload } from "lucide-react";
+import { DragDropUpload } from "@/components/drag-drop-upload";
+import { FilePreviewDialog } from "@/components/file-preview-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface ClientDocument {
   id: string;
@@ -32,10 +36,30 @@ interface ClientDocument {
 
 export default function ClientMyDocuments() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUpload, setShowUpload] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<ClientDocument | null>(null);
+  const { toast } = useToast();
 
   const { data: documents = [], isLoading } = useQuery<ClientDocument[]>({
     queryKey: ["/api/client-portal/documents"],
   });
+
+  const handleUploadComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/client-portal/documents"] });
+    toast({
+      title: "Success",
+      description: "Files uploaded successfully",
+    });
+    setShowUpload(false);
+  };
+
+  const handleUploadError = (error: Error) => {
+    toast({
+      title: "Upload failed",
+      description: error.message,
+      variant: "destructive",
+    });
+  };
 
   const filteredDocuments = documents.filter((doc) =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -58,6 +82,17 @@ export default function ClientMyDocuments() {
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {/* Upload Section */}
+        {showUpload && (
+          <DragDropUpload
+            onComplete={handleUploadComplete}
+            onError={handleUploadError}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
+            maxSize={10 * 1024 * 1024}
+            maxFiles={5}
+          />
+        )}
+
         <Card data-testid="card-documents-list">
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
@@ -67,15 +102,24 @@ export default function ClientMyDocuments() {
                   {filteredDocuments.length} document{filteredDocuments.length !== 1 ? "s" : ""} available
                 </CardDescription>
               </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search documents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-documents"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search documents..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-documents"
+                  />
+                </div>
+                <Button
+                  onClick={() => setShowUpload(!showUpload)}
+                  data-testid="button-toggle-upload"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {showUpload ? "Hide Upload" : "Upload Files"}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -131,6 +175,7 @@ export default function ClientMyDocuments() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={() => setPreviewDoc(doc)}
                             data-testid={`button-view-${doc.id}`}
                           >
                             <Eye className="h-4 w-4" />
@@ -138,6 +183,14 @@ export default function ClientMyDocuments() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={() => {
+                              const link = document.createElement("a");
+                              link.href = doc.fileUrl;
+                              link.download = doc.name;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
                             data-testid={`button-download-${doc.id}`}
                           >
                             <Download className="h-4 w-4" />
@@ -152,6 +205,16 @@ export default function ClientMyDocuments() {
           </CardContent>
         </Card>
       </div>
+
+      {/* File Preview Dialog */}
+      {previewDoc && (
+        <FilePreviewDialog
+          open={!!previewDoc}
+          onOpenChange={(open) => !open && setPreviewDoc(null)}
+          fileName={previewDoc.name}
+          fileUrl={previewDoc.fileUrl}
+        />
+      )}
     </div>
   );
 }

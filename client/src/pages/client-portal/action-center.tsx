@@ -16,7 +16,7 @@ import {
   User,
   Building2
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInDays, differenceInHours } from "date-fns";
 import { useLocation } from "wouter";
 
 interface ActionItem {
@@ -56,6 +56,26 @@ const priorityColors: Record<string, string> = {
   medium: "secondary",
   low: "outline",
 };
+
+// Calculate SLA status based on due date
+function getSLAStatus(dueDate?: string) {
+  if (!dueDate) return null;
+  
+  const now = new Date();
+  const due = new Date(dueDate);
+  const daysRemaining = differenceInDays(due, now);
+  const hoursRemaining = differenceInHours(due, now);
+  
+  if (daysRemaining < 0 || hoursRemaining < 0) {
+    return { status: "overdue", label: "Overdue", color: "text-destructive", bgColor: "bg-destructive/10" };
+  } else if (hoursRemaining < 24) {
+    return { status: "critical", label: "Due Soon", color: "text-orange-600 dark:text-orange-400", bgColor: "bg-orange-500/10" };
+  } else if (daysRemaining <= 3) {
+    return { status: "warning", label: "Due This Week", color: "text-yellow-600 dark:text-yellow-400", bgColor: "bg-yellow-500/10" };
+  } else {
+    return { status: "safe", label: "On Track", color: "text-green-600 dark:text-green-400", bgColor: "bg-green-500/10" };
+  }
+}
 
 export default function ActionCenter() {
   const [filter, setFilter] = useState<"all" | "waiting_on_me" | "waiting_on_firm">("all");
@@ -170,6 +190,7 @@ export default function ActionCenter() {
                 {items.map((item) => {
                   const Icon = typeIcons[item.type] || FileText;
                   const priorityColor = priorityColors[item.priority] || "secondary";
+                  const slaStatus = getSLAStatus(item.dueDate);
 
                   return (
                     <Card
@@ -200,10 +221,12 @@ export default function ActionCenter() {
                             </div>
                             <p className="text-sm text-muted-foreground">{item.description}</p>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              {item.dueDate && (
-                                <div className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Due {formatDistanceToNow(new Date(item.dueDate), { addSuffix: true })}
+                              {item.dueDate && slaStatus && (
+                                <div className={`flex items-center gap-1 px-2 py-1 rounded ${slaStatus.bgColor}`}>
+                                  <Clock className={`h-3 w-3 ${slaStatus.color}`} />
+                                  <span className={slaStatus.color}>
+                                    {slaStatus.label} - Due {formatDistanceToNow(new Date(item.dueDate), { addSuffix: true })}
+                                  </span>
                                 </div>
                               )}
                               {item.assignedBy && (

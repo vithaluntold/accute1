@@ -7529,7 +7529,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Get client portal documents
-  app.get("/api/client-portal/documents", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/client-portal/documents", requireAuth, requirePermission("documents.view"), async (req: AuthRequest, res: Response) => {
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) {
@@ -7552,8 +7552,45 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // Upload client portal documents
+  app.post("/api/client-portal/documents/upload", requireAuth, requirePermission("documents.upload"), upload.array("files", 10), async (req: AuthRequest, res: Response) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files provided" });
+      }
+
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Find client by email
+      const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
+      const client = clients.find((c: any) => c.email.toLowerCase() === user.email.toLowerCase());
+
+      if (!client) {
+        return res.status(404).json({ error: "No client profile found for this user" });
+      }
+
+      // Process uploaded files
+      const uploadedDocs = files.map(file => ({
+        id: Math.random().toString(36).substring(7),
+        name: file.originalname,
+        fileUrl: `/uploads/${file.filename}`,
+        fileSize: file.size,
+        uploadedAt: new Date().toISOString(),
+        status: "uploaded"
+      }));
+
+      res.json({ success: true, documents: uploadedDocs });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to upload documents" });
+    }
+  });
+
   // Get client portal tasks
-  app.get("/api/client-portal/tasks", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/client-portal/tasks", requireAuth, requirePermission("tasks.view"), async (req: AuthRequest, res: Response) => {
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) {
@@ -7577,7 +7614,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Get client portal forms
-  app.get("/api/client-portal/forms", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/client-portal/forms", requireAuth, requirePermission("forms.view"), async (req: AuthRequest, res: Response) => {
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) {
@@ -7601,7 +7638,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   });
 
   // Get client portal signature requests
-  app.get("/api/client-portal/signatures", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get("/api/client-portal/signatures", requireAuth, requirePermission("signatures.view"), async (req: AuthRequest, res: Response) => {
     try {
       const user = await storage.getUser(req.user!.id);
       if (!user) {
