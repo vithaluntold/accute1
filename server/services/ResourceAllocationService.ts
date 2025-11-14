@@ -478,4 +478,76 @@ export class ResourceAllocationService {
 
     return userSummaries;
   }
+
+  /**
+   * Get utilization summary with allocation IDs for UI operations
+   */
+  static async getUtilizationSummary(organizationId: string) {
+    // Fetch all allocations with project details
+    const allocations = await db.query.resourceAllocations.findMany({
+      where: eq(resourceAllocations.organizationId, organizationId),
+      with: {
+        user: {
+          columns: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        project: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: (allocations, { asc }) => [asc(allocations.userId), asc(allocations.projectId)],
+    });
+
+    // Group by user
+    const userMap = new Map<string, {
+      userId: string;
+      userName: string;
+      totalAllocation: number;
+      allocations: {
+        id: string;
+        projectId: string;
+        projectName: string;
+        percentAllocation: number;
+        startDate: string | null;
+        endDate: string | null;
+      }[];
+    }>();
+
+    for (const allocation of allocations) {
+      const userId = allocation.userId;
+      const userName = allocation.user.firstName && allocation.user.lastName
+        ? `${allocation.user.firstName} ${allocation.user.lastName}`
+        : allocation.user.username;
+
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
+          userId,
+          userName,
+          totalAllocation: 0,
+          allocations: [],
+        });
+      }
+
+      const userSummary = userMap.get(userId)!;
+      userSummary.totalAllocation += allocation.allocationPercentage;
+      userSummary.allocations.push({
+        id: allocation.id,
+        projectId: allocation.projectId || "",
+        projectName: allocation.project?.name || "Unknown Project",
+        percentAllocation: allocation.allocationPercentage,
+        startDate: allocation.startDate ? allocation.startDate.toISOString().split("T")[0] : null,
+        endDate: allocation.endDate ? allocation.endDate.toISOString().split("T")[0] : null,
+      });
+    }
+
+    return Array.from(userMap.values());
+  }
 }
