@@ -10,6 +10,7 @@ import { setupWebSocket } from "./websocket";
 import * as schema from "@shared/schema";
 import { registerPricingRoutes } from "./pricing-routes";
 import { registerSubscriptionRoutes } from "./subscription-routes";
+import { registerPerformanceMetricsRoutes } from "./performance-metrics-routes";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
@@ -20149,6 +20150,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
       res.status(500).json({ error: "Failed to find matching users for task" });
     }
   });
+
+  // ==================== PERFORMANCE METRICS ROUTES ====================
+  registerPerformanceMetricsRoutes(app);
 
   const httpServer = createServer(app);
   
