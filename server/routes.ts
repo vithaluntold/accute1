@@ -18531,6 +18531,394 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // Register subscription & feature gating routes
   registerSubscriptionRoutes(app);
 
+  // ==================== FORECASTING SYSTEM ====================
+  
+  // List forecasting models
+  app.get("/api/forecasting/models", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const models = await db.query.forecastingModels.findMany({
+        where: eq(schema.forecastingModels.organizationId, organizationId),
+        orderBy: desc(schema.forecastingModels.createdAt),
+      });
+
+      res.json(models);
+    } catch (error: any) {
+      console.error("[Forecasting] Failed to list models:", error);
+      res.status(500).json({ error: "Failed to fetch forecasting models" });
+    }
+  });
+
+  // Create forecasting model
+  app.post("/api/forecasting/models", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const validated = schema.insertForecastingModelSchema.parse({
+        ...req.body,
+        organizationId,
+        createdBy: userId,
+      });
+
+      const [model] = await db.insert(schema.forecastingModels).values(validated).returning();
+      res.json(model);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Forecasting] Failed to create model:", error);
+      res.status(500).json({ error: "Failed to create forecasting model" });
+    }
+  });
+
+  // Run forecast
+  app.post("/api/forecasting/runs", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const validated = schema.insertForecastingRunSchema.parse({
+        ...req.body,
+        organizationId,
+        runBy: userId,
+      });
+
+      const [run] = await db.insert(schema.forecastingRuns).values(validated).returning();
+      
+      // Generate scenarios and predictions asynchronously
+      setTimeout(async () => {
+        try {
+          const scenarios = [
+            { label: 'best_case', growthRate: '15%' },
+            { label: 'expected', growthRate: '5%' },
+            { label: 'worst_case', growthRate: '-10%' },
+          ];
+
+          for (const scenarioData of scenarios) {
+            const [scenario] = await db.insert(schema.forecastingScenarios).values({
+              runId: run.id,
+              ...scenarioData,
+            }).returning();
+
+            // Generate sample predictions
+            const startDate = new Date(validated.startDate);
+            const endDate = new Date(validated.endDate);
+            const predictions = [];
+
+            for (let date = new Date(startDate); date <= endDate; date.setMonth(date.getMonth() + 1)) {
+              const periodEnd = new Date(date);
+              periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+              predictions.push({
+                runId: run.id,
+                scenarioId: scenario.id,
+                periodStart: new Date(date),
+                periodEnd,
+                metrics: {
+                  predicted_revenue: Math.floor(Math.random() * 100000) + 50000,
+                  confidence: 0.75 + Math.random() * 0.2,
+                },
+                confidenceScore: (0.75 + Math.random() * 0.2).toFixed(2),
+              });
+            }
+
+            await db.insert(schema.forecastingPredictions).values(predictions);
+          }
+
+          await db.update(schema.forecastingRuns).set({
+            status: 'completed',
+            completedAt: new Date(),
+          }).where(eq(schema.forecastingRuns.id, run.id));
+        } catch (error) {
+          console.error("[Forecasting] Failed to generate predictions:", error);
+          await db.update(schema.forecastingRuns).set({
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          }).where(eq(schema.forecastingRuns.id, run.id));
+        }
+      }, 0);
+
+      res.json(run);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Forecasting] Failed to create run:", error);
+      res.status(500).json({ error: "Failed to create forecast run" });
+    }
+  });
+
+  // Get forecast results
+  app.get("/api/forecasting/runs/:runId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { runId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const run = await db.query.forecastingRuns.findFirst({
+        where: and(
+          eq(schema.forecastingRuns.id, runId),
+          eq(schema.forecastingRuns.organizationId, organizationId)
+        ),
+      });
+
+      if (!run) {
+        return res.status(404).json({ error: "Forecast run not found" });
+      }
+
+      const scenarios = await db.query.forecastingScenarios.findMany({
+        where: eq(schema.forecastingScenarios.runId, runId),
+      });
+
+      const predictions = await db.query.forecastingPredictions.findMany({
+        where: eq(schema.forecastingPredictions.runId, runId),
+        orderBy: schema.forecastingPredictions.periodStart,
+      });
+
+      res.json({
+        ...run,
+        scenarios,
+        predictions,
+      });
+    } catch (error: any) {
+      console.error("[Forecasting] Failed to fetch run:", error);
+      res.status(500).json({ error: "Failed to fetch forecast run" });
+    }
+  });
+
+  // ==================== SCHEDULED REPORTS ====================
+  
+  // List scheduled reports
+  app.get("/api/scheduled-reports", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const reports = await db.query.scheduledReports.findMany({
+        where: eq(schema.scheduledReports.organizationId, organizationId),
+        orderBy: desc(schema.scheduledReports.createdAt),
+      });
+
+      res.json(reports);
+    } catch (error: any) {
+      console.error("[Scheduled Reports] Failed to list reports:", error);
+      res.status(500).json({ error: "Failed to fetch scheduled reports" });
+    }
+  });
+
+  // Create scheduled report
+  app.post("/api/scheduled-reports", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const validated = schema.insertScheduledReportSchema.parse({
+        ...req.body,
+        organizationId,
+        createdBy: userId,
+      });
+
+      const [report] = await db.insert(schema.scheduledReports).values(validated).returning();
+      res.json(report);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Scheduled Reports] Failed to create report:", error);
+      res.status(500).json({ error: "Failed to create scheduled report" });
+    }
+  });
+
+  // Update scheduled report
+  app.patch("/api/scheduled-reports/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const [updated] = await db.update(schema.scheduledReports)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(
+          eq(schema.scheduledReports.id, id),
+          eq(schema.scheduledReports.organizationId, organizationId)
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Scheduled report not found" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Scheduled Reports] Failed to update report:", error);
+      res.status(500).json({ error: "Failed to update scheduled report" });
+    }
+  });
+
+  // Delete scheduled report
+  app.delete("/api/scheduled-reports/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const [deleted] = await db.delete(schema.scheduledReports)
+        .where(and(
+          eq(schema.scheduledReports.id, id),
+          eq(schema.scheduledReports.organizationId, organizationId)
+        ))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Scheduled report not found" });
+      }
+
+      res.json({ success: true, message: "Scheduled report deleted" });
+    } catch (error: any) {
+      console.error("[Scheduled Reports] Failed to delete report:", error);
+      res.status(500).json({ error: "Failed to delete scheduled report" });
+    }
+  });
+
+  // ==================== VIDEO CONFERENCING ====================
+  
+  // List OAuth connections
+  app.get("/api/oauth/connections", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const connections = await db.query.oauthConnections.findMany({
+        where: and(
+          eq(schema.oauthConnections.organizationId, organizationId),
+          eq(schema.oauthConnections.userId, userId)
+        ),
+        orderBy: desc(schema.oauthConnections.createdAt),
+      });
+
+      // Don't expose encrypted credentials
+      const sanitized = connections.map(conn => ({
+        ...conn,
+        encryptedCredentials: undefined,
+      }));
+
+      res.json(sanitized);
+    } catch (error: any) {
+      console.error("[OAuth] Failed to list connections:", error);
+      res.status(500).json({ error: "Failed to fetch OAuth connections" });
+    }
+  });
+
+  // Create meeting
+  app.post("/api/meetings", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const validated = schema.insertMeetingRecordSchema.parse({
+        ...req.body,
+        organizationId,
+        hostId: userId,
+      });
+
+      const [meeting] = await db.insert(schema.meetingRecords).values(validated).returning();
+      res.json(meeting);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Meetings] Failed to create meeting:", error);
+      res.status(500).json({ error: "Failed to create meeting" });
+    }
+  });
+
+  // List meetings
+  app.get("/api/meetings", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const meetings = await db.query.meetingRecords.findMany({
+        where: eq(schema.meetingRecords.organizationId, organizationId),
+        orderBy: desc(schema.meetingRecords.startTime),
+        limit: 100,
+      });
+
+      res.json(meetings);
+    } catch (error: any) {
+      console.error("[Meetings] Failed to list meetings:", error);
+      res.status(500).json({ error: "Failed to fetch meetings" });
+    }
+  });
+
+  // Update meeting
+  app.patch("/api/meetings/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const [updated] = await db.update(schema.meetingRecords)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(
+          eq(schema.meetingRecords.id, id),
+          eq(schema.meetingRecords.organizationId, organizationId)
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Meeting not found" });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Meetings] Failed to update meeting:", error);
+      res.status(500).json({ error: "Failed to update meeting" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Setup lazy WebSocket initialization - will initialize on first upgrade request

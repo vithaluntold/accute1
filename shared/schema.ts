@@ -4438,6 +4438,41 @@ export const meetingRecords = pgTable("meeting_records", {
   hostIdx: index("meeting_records_host_idx").on(table.hostId),
 }));
 
+// Zod schemas for scheduled reports
+export const insertScheduledReportSchema = createInsertSchema(scheduledReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastRunAt: true,
+  nextRunAt: true,
+});
+export type InsertScheduledReport = z.infer<typeof insertScheduledReportSchema>;
+export type ScheduledReport = typeof scheduledReports.$inferSelect;
+
+export const insertScheduledReportLogSchema = createInsertSchema(scheduledReportLogs).omit({
+  id: true,
+  executedAt: true,
+});
+export type InsertScheduledReportLog = z.infer<typeof insertScheduledReportLogSchema>;
+export type ScheduledReportLog = typeof scheduledReportLogs.$inferSelect;
+
+// Zod schemas for video conferencing
+export const insertOAuthConnectionSchema = createInsertSchema(oauthConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOAuthConnection = z.infer<typeof insertOAuthConnectionSchema>;
+export type OAuthConnection = typeof oauthConnections.$inferSelect;
+
+export const insertMeetingRecordSchema = createInsertSchema(meetingRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMeetingRecord = z.infer<typeof insertMeetingRecordSchema>;
+export type MeetingRecord = typeof meetingRecords.$inferSelect;
+
 // ==================== SKILL-BASED ASSIGNMENT ====================
 
 // Skills - Skills taxonomy
