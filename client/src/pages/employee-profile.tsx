@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { GradientHero } from "@/components/gradient-hero";
@@ -39,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SkillsExpertiseTab } from "@/components/profile/skills-expertise-tab";
 
 const kycFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -397,13 +399,20 @@ export default function EmployeeProfile() {
       <GradientHero
         icon={User}
         title="Employee Profile"
-        description="Manage your profile information and complete KYC verification"
+        description="Manage your profile information, skills, and complete KYC verification"
         testId="hero-employee-profile"
       />
 
       <div className="p-6 space-y-6">
-        {/* Verification Status Card */}
-        <Card>
+        <Tabs defaultValue="profile" data-testid="tabs-employee-profile">
+          <TabsList>
+            <TabsTrigger value="profile" data-testid="tab-profile">Profile Details</TabsTrigger>
+            <TabsTrigger value="skills" data-testid="tab-skills">Skills & Expertise</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile" className="space-y-6 mt-6">
+            {/* Verification Status Card */}
+            <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -820,6 +829,12 @@ export default function EmployeeProfile() {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="skills" className="mt-6">
+            <SkillsExpertiseTab />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Phone Verification Dialog */}
