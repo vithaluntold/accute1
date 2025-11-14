@@ -4108,7 +4108,21 @@ Title:`;
           const stepsWithTasks = await Promise.all(
             steps.map(async (step) => {
               const tasks = await storage.getAssignmentTasksByStep(step.id);
-              return { ...step, tasks };
+              
+              // Fetch skill matches for each task to enable preloaded ranked recommendations
+              const tasksWithMatches = await Promise.all(
+                tasks.map(async (task) => {
+                  try {
+                    const matches = await skillService.findMatchingUsers(task.id, req.user!.organizationId!);
+                    return { ...task, skillMatches: matches };
+                  } catch (error) {
+                    console.error(`Failed to fetch skill matches for task ${task.id}:`, error);
+                    return { ...task, skillMatches: [] };
+                  }
+                })
+              );
+              
+              return { ...step, tasks: tasksWithMatches };
             })
           );
           return { ...stage, steps: stepsWithTasks };

@@ -38,6 +38,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { SkillBasedAssigneeSelector } from "@/components/skill-based-assignee-selector";
 import { DndContext, DragEndEvent, DragOverlay, closestCorners, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -203,7 +204,7 @@ export default function ProjectDetailPage() {
       description: "",
       status: "todo",
       priority: "medium",
-      assigneeId: "none",
+      assigneeId: "unassigned",
       dueDate: "",
       estimatedHours: "",
     },
@@ -295,7 +296,7 @@ export default function ProjectDetailPage() {
       description: formData.description || null,
       status: formData.status,
       priority: formData.priority,
-      assigneeId: formData.assigneeId === "none" ? null : formData.assigneeId,
+      assigneeId: formData.assigneeId === "unassigned" ? null : formData.assigneeId,
       dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
       estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : null,
     };
@@ -564,19 +565,14 @@ export default function ProjectDetailPage() {
                   name="assigneeId"
                   control={taskForm.control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger data-testid="select-task-assignee">
-                        <SelectValue placeholder="Select assignee" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.username}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SkillBasedAssigneeSelector
+                      taskId={null} 
+                      users={users}
+                      value={field.value || "unassigned"}
+                      onValueChange={field.onChange}
+                      placeholder="Select assignee"
+                      dataTestId="select-task-assignee"
+                    />
                   )}
                 />
               </div>

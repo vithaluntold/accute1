@@ -27,6 +27,16 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
+import { SkillBasedAssigneeSelector } from "@/components/skill-based-assignee-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { UserPlus } from "lucide-react";
 
 interface Task {
   id: string;
@@ -87,10 +97,18 @@ export default function AssignmentDetail() {
   const params = useParams<{ id: string }>();
   const assignmentId = params.id;
   const { toast } = useToast();
+  const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>("unassigned");
 
   const { data: assignment, isLoading } = useQuery<AssignmentDetail>({
     queryKey: [`/api/assignments/${assignmentId}`],
     enabled: !!assignmentId,
+  });
+
+  //  Fetch users for assignment
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
   });
 
   const updateTaskMutation = useMutation({
@@ -112,6 +130,41 @@ export default function AssignmentDetail() {
       });
     },
   });
+
+  const assignTaskMutation = useMutation({
+    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string | null }) => {
+      return await apiRequest("PATCH", `/api/tasks/${id}`, { assignedTo });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/assignments/${assignmentId}`] });
+      toast({
+        title: "Success",
+        description: "Task assigned successfully",
+      });
+      setReassignDialogOpen(false);
+      setSelectedTask(null);
+      setSelectedAssignee("unassigned");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign task",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleReassignTask = (task: Task) => {
+    setSelectedTask(task);
+    setSelectedAssignee(task.assignedTo || "unassigned");
+    setReassignDialogOpen(true);
+  };
+
+  const handleAssignTask = () => {
+    if (!selectedTask) return;
+    const assignedTo = selectedAssignee === "unassigned" ? null : selectedAssignee;
+    assignTaskMutation.mutate({ id: selectedTask.id, assignedTo });
+  };
 
   const updateStepMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -412,6 +465,12 @@ export default function AssignmentDetail() {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
+                                    {task.assignedTo && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <User className="w-3 h-3 mr-1" />
+                                        {users.find((u: any) => u.id === task.assignedTo)?.username || "Assigned"}
+                                      </Badge>
+                                    )}
                                     {task.dueDate && (
                                       <Badge variant="outline" className="text-xs">
                                         <Clock className="w-3 h-3 mr-1" />
@@ -420,6 +479,15 @@ export default function AssignmentDetail() {
                                     )}
                                     {getPriorityBadge(task.priority)}
                                     {getStatusBadge(task.status)}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleReassignTask(task)}
+                                      data-testid={`button-assign-task-${task.id}`}
+                                      title={task.assignedTo ? "Reassign task" : "Assign task"}
+                                    >
+                                      <UserPlus className="w-4 h-4" />
+                                    </Button>
                                     {task.status !== "in_progress" && task.status !== "completed" && (
                                       <Button
                                         size="sm"
@@ -455,6 +523,49 @@ export default function AssignmentDetail() {
           </Accordion>
         </CardContent>
       </Card>
+
+      {/* Task Reassignment Dialog */}
+      <Dialog open={reassignDialogOpen} onOpenChange={setReassignDialogOpen}>
+        <DialogContent data-testid="dialog-reassign-task">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedTask?.assignedTo ? "Reassign Task" : "Assign Task"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedTask && `Select an assignee for "${selectedTask.name}"`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedTask && (
+              <SkillBasedAssigneeSelector
+                taskId={selectedTask.id}
+                users={users}
+                value={selectedAssignee}
+                onValueChange={setSelectedAssignee}
+                placeholder="Select assignee"
+                dataTestId="select-task-assignee-dialog"
+                initialMatches={(selectedTask as any).skillMatches || []}
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReassignDialogOpen(false)}
+              data-testid="button-cancel-reassign"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignTask}
+              disabled={assignTaskMutation.isPending}
+              data-testid="button-confirm-reassign"
+            >
+              {assignTaskMutation.isPending ? "Assigning..." : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
