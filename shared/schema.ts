@@ -4636,34 +4636,6 @@ export const documentChangeEvents = pgTable("document_change_events", {
 
 // ==================== ZOD SCHEMAS FOR NEW FEATURES ====================
 
-// Scheduled Reports
-export const insertScheduledReportSchema = createInsertSchema(scheduledReports).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  lastRunAt: true,
-  nextRunAt: true,
-});
-export type InsertScheduledReport = z.infer<typeof insertScheduledReportSchema>;
-export type ScheduledReport = typeof scheduledReports.$inferSelect;
-
-// Video Conferencing
-export const insertOAuthConnectionSchema = createInsertSchema(oauthConnections).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type InsertOAuthConnection = z.infer<typeof insertOAuthConnectionSchema>;
-export type OAuthConnection = typeof oauthConnections.$inferSelect;
-
-export const insertMeetingRecordSchema = createInsertSchema(meetingRecords).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type InsertMeetingRecord = z.infer<typeof insertMeetingRecordSchema>;
-export type MeetingRecord = typeof meetingRecords.$inferSelect;
-
 // Skills
 export const insertSkillSchema = createInsertSchema(skills).omit({
   id: true,

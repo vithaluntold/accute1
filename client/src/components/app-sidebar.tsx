@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog, Video
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -167,6 +167,14 @@ const organizationMenuCategories = [
       { title: "Executive Dashboard", url: "/executive-dashboard", icon: BarChart3, permission: "analytics.view" },
       { title: "Report Builder", url: "/report-builder", icon: FileBarChart2, permission: "analytics.view" },
       { title: "Profitability View", url: "/profitability-view", icon: TrendingUp, permission: "analytics.view" },
+      { title: "Forecasting", url: "/forecasting", icon: TrendingUp, permission: "analytics.view" },
+      { title: "Scheduled Reports", url: "/scheduled-reports", icon: FileText, permission: "analytics.view" },
+    ]
+  },
+  {
+    title: "Meetings & Collaboration",
+    items: [
+      { title: "Video Conferencing", url: "/video-conferencing", icon: Video, permission: null },
     ]
   },
   {

@@ -140,6 +140,11 @@ const LiveChat = lazy(() => import("@/pages/live-chat"));
 const AgentIntegrationGuide = lazy(() => import("@/pages/agent-integration-guide"));
 const Help = lazy(() => import("@/pages/help"));
 
+// Competitive Gap Features
+const Forecasting = lazy(() => import("@/pages/forecasting"));
+const ScheduledReports = lazy(() => import("@/pages/scheduled-reports"));
+const VideoConferencing = lazy(() => import("@/pages/video-conferencing"));
+
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-screen" data-testid="page-loader">
@@ -1168,6 +1173,29 @@ function Router() {
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
+      </Route>
+
+      {/* Competitive Gap Features */}
+      <Route path="/forecasting">
+        <OrganizationRoute>
+          <AppLayout>
+            <Forecasting />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/scheduled-reports">
+        <OrganizationRoute>
+          <AppLayout>
+            <ScheduledReports />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/video-conferencing">
+        <OrganizationRoute>
+          <AppLayout>
+            <VideoConferencing />
+          </AppLayout>
+        </OrganizationRoute>
       </Route>
 
       <Route component={NotFound} />
