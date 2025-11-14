@@ -39,7 +39,13 @@ Completeness    ClickUp (7.7)│                Completeness
 **Accute's Position**: #1 Ranked Platform - High AI capability (10/10), high feature completeness (9.7/10) 🏆
 - **Strengths**: 10 specialized AI agents, enterprise-grade RBAC (150+ permissions), PKI signatures, production email OAuth, live SLA action center, fail-closed client portal security, **forecasting system**, **automated report scheduling**, **video conferencing integration**, **document comparison/track changes**, **time-off calendar integration**, **client appointment bookings**
 - **Recent Wins**: ✅ Task Dependencies, ✅ Gantt Chart, ✅ Timeline View, ✅ Document Versioning, ✅ Report Builder, ✅ Workload View, ✅ Unified Inbox, ✅ **Enterprise RBAC**, ✅ **Real-Time Notifications**, ✅ **SLA Action Center**, ✅ **Production Email Integration**, ✅ **Calendar View**, ✅ **Client Profitability**, ✅ **Forecasting**, ✅ **Scheduled Reports**, ✅ **Video Conferencing**, ✅ **Document Comparison**, ✅ **Time-Off Calendar**, ✅ **Client Bookings**
-- **Remaining Gaps**: Skill-based resource allocation (lower priority - all other competitive features complete)
+- **Remaining Gaps**: 
+  - ❌ **Skill-based assignment** (ClickUp has custom fields, Accute lacks skill-based routing)
+  - ⚠️ **Threaded conversations** (Email threading only - no Team Chat/Live Chat threading)
+  - ⚠️ **Proposals & Quotes UI** (Backend automation exists, no dedicated UI for creation/management)
+  - ⚠️ **SSO/SAML** (Planned - TaxDome/ClickUp have enterprise SSO)
+  - ✅ **Client Self-Service** - COMPLETE (Document request system)
+  - ✅ **Payment Portal** - COMPLETE (Full client-facing portal with Razorpay)
 - **Opportunity**: Market leader in AI + enterprise security + email integration + analytics + forecasting + document management - maintain dominant position
 
 ### Recent Competitive Achievements (November 2025)
@@ -154,7 +160,7 @@ Accute has closed **19 critical competitive gaps**, achieving a **9.7/10 competi
 | **Email Integration** | ✅ **Full email management** | ⚠️ Email to task | ⚠️ Limited | ✅ **Production OAuth (Gmail/Outlook) + encryption** | **Tie (Accute)** |
 | **SMS Integration** | ✅ Two-way SMS | ❌ None | ⚠️ Notifications only | ✅ Twilio integration | TaxDome/Accute |
 | **@Mentions** | ✅ With notifications | ✅ With notifications | ✅ Basic | ✅ **With auto-notifications** | Tie |
-| **Threaded Conversations** | ✅ Deep threading | ✅ Comments + threads | ⚠️ Limited | ⚠️ **Basic threading** | TaxDome/ClickUp |
+| **Threaded Conversations** | ✅ Deep threading | ✅ Comments + threads | ⚠️ Limited | ⚠️ **Email threading only (no Team/Live Chat)** | TaxDome/ClickUp |
 | **Live Chat Support** | ⚠️ Via third-party | ⚠️ Via third-party | ❌ None | ✅ **Built-in (Edge tier)** | **Accute** |
 | **Video Conferencing** | ⚠️ Via Zoom integration | ⚠️ Via integrations | ❌ None | ✅ **OAuth-integrated (Zoom/Google Meet/Microsoft Teams)** | **Accute** |
 
@@ -234,11 +240,11 @@ Accute has closed **19 critical competitive gaps**, achieving a **9.7/10 competi
 | **Project Management** | ✅ Client projects | ✅ **Advanced projects** | ✅ Engagement tracking | ✅ Projects with workflows | ClickUp |
 | **Pipeline Management** | ✅ **Deal pipelines** | ✅ Sales pipelines | ⚠️ Basic | ✅ Pipeline stages | TaxDome/ClickUp |
 | **Service Plans** | ✅ Service catalog | ❌ N/A | ✅ Service offerings | ✅ **Marketplace with pricing** | TaxDome/Accute |
-| **Proposals & Quotes** | ✅ Quote generator | ⚠️ Via templates | ✅ Proposals | ⚠️ **Manual** | TaxDome |
-| **Client Self-Service** | ✅ **Request forms** | ❌ Limited | ✅ Service requests | ⚠️ **Portal only (no requests)** | **TaxDome** |
+| **Proposals & Quotes** | ✅ Quote generator | ⚠️ Via templates | ✅ Proposals | ⚠️ **Automation-only (no UI)** | TaxDome |
+| **Client Self-Service** | ✅ **Request forms** | ❌ Limited | ✅ Service requests | ✅ **Document request system** | **Tie** |
 | **Client Booking** | ⚠️ Via Calendly | ⚠️ Via integrations | ❌ None | ✅ **Built-in appointment scheduling** | **Accute** |
 
-**Summary**: TaxDome **dominates** client management (CRM, portal, service catalog). Accute has AI advantage for onboarding.
+**Summary**: TaxDome leads in quote generation UI. **Accute now competitive** with document request system and AI-driven onboarding.
 
 ---
 
@@ -249,14 +255,14 @@ Accute has closed **19 critical competitive gaps**, achieving a **9.7/10 competi
 | **Payment Gateways** | ⚠️ Stripe only | ❌ N/A | ✅ Stripe, PayPal | ✅ **Razorpay, Stripe, PayU, Payoneer** | **Accute** |
 | **Multi-Gateway Support** | ❌ Single gateway | ❌ N/A | ❌ Single gateway | ✅ **Org-level gateway selection** | **Accute** |
 | **Invoice Generation** | ✅ **Auto-invoicing** | ❌ N/A | ✅ Invoice creation | ✅ Auto-generation | TaxDame/Accute |
-| **Payment Portal** | ✅ Client pay online | ❌ N/A | ✅ Online payments | ⚠️ **Backend only (no client UI)** | TaxDome/Trulio |
+| **Payment Portal** | ✅ Client pay online | ❌ N/A | ✅ Online payments | ✅ **Full client portal (Razorpay integrated)** | **Tie** |
 | **Recurring Billing** | ✅ Subscription billing | ❌ N/A | ✅ Recurring invoices | ✅ **Subscription system** | Tie |
 | **Payment Tracking** | ✅ Full tracking | ❌ N/A | ✅ Payment status | ✅ Invoice tracking | Tie |
 | **Regional Pricing** | ❌ USD only | ❌ N/A | ⚠️ Limited | ✅ **Multi-currency support** | **Accute** |
 | **Coupon System** | ⚠️ Basic discounts | ❌ N/A | ⚠️ Limited | ✅ **Full coupon system** | **Accute** |
 | **Add-Ons** | ❌ None | ❌ N/A | ❌ None | ✅ **Subscription add-ons** | **Accute** |
 
-**Summary**: Accute **leads** payment flexibility (multi-gateway, regional pricing, add-ons). TaxDome leads client-facing payment.
+**Summary**: **Accute now MATCHES** competitors in payment portal with full client-facing UI and Razorpay integration. Accute **leads** in payment flexibility (multi-gateway, regional pricing, add-ons).
 
 ---
 
