@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -720,6 +720,92 @@ export const servicePlanPurchases = pgTable("service_plan_purchases", {
   statusIdx: index("service_plan_purchases_status_idx").on(table.status),
 }));
 
+// Proposal status enum
+export const proposalStatusEnum = pgEnum("proposal_status", [
+  "draft",
+  "sent", 
+  "viewed",
+  "accepted",
+  "rejected",
+  "expired",
+  "cancelled"
+]);
+
+// Proposals & Quotes - Formal quotes/proposals sent to clients for acceptance
+export const proposals = pgTable("proposals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Proposal details
+  title: text("title").notNull(), // 'Q4 2024 Tax Planning Proposal'
+  description: text("description"), // Brief summary
+  proposalNumber: text("proposal_number"), // 'PROP-2024-001' - auto-generated
+  
+  // Financial (nullable for drafts, calculated when line items added)
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).default(sql`0`),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default(sql`0`),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default(sql`0`),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).default(sql`0`),
+  currency: text("currency").notNull().default("USD"),
+  
+  // Line items (services/products)
+  lineItems: jsonb("line_items").notNull().default(sql`'[]'::jsonb`),
+  // [{name, description, quantity, rate, amount, taxable}]
+  
+  // Content
+  content: text("content"), // Rich text/markdown proposal body
+  termsAndConditions: text("terms_and_conditions"),
+  notes: text("notes"), // Internal notes
+  
+  // Template
+  templateId: varchar("template_id").references(() => documentTemplates.id, { onDelete: "set null" }),
+  
+  // Validity
+  validFrom: timestamp("valid_from").notNull().defaultNow(),
+  validUntil: timestamp("valid_until").notNull(),
+  
+  // Status
+  status: proposalStatusEnum("status").notNull().default("draft"),
+  
+  // Client interaction
+  viewedAt: timestamp("viewed_at"),
+  viewCount: integer("view_count").notNull().default(0),
+  acceptedAt: timestamp("accepted_at"),
+  rejectedAt: timestamp("rejected_at"),
+  clientNotes: text("client_notes"), // Client's reason for rejection or acceptance notes
+  signedBy: varchar("signed_by").references(() => users.id), // Client portal user who accepted
+  signatureUrl: text("signature_url"), // Digital signature image/data
+  
+  // PDF generation
+  pdfUrl: text("pdf_url"), // Generated PDF file path
+  pdfGeneratedAt: timestamp("pdf_generated_at"),
+  
+  // Tracking
+  sentAt: timestamp("sent_at"),
+  sentBy: varchar("sent_by").references(() => users.id), // Internal user who sent
+  reminderSentAt: timestamp("reminder_sent_at"),
+  reminderCount: integer("reminder_count").notNull().default(0),
+  
+  // Conversion to project/invoice
+  convertedToProjectId: varchar("converted_to_project_id").references(() => projects.id),
+  convertedToInvoiceId: varchar("converted_to_invoice_id").references(() => invoices.id),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  clientIdx: index("proposals_client_idx").on(table.clientId),
+  orgIdx: index("proposals_org_idx").on(table.organizationId),
+  statusIdx: index("proposals_status_idx").on(table.status),
+  numberIdx: index("proposals_number_idx").on(table.proposalNumber),
+  validUntilIdx: index("proposals_valid_until_idx").on(table.validUntil),
+  // Composite indexes for common queries
+  orgStatusIdx: index("proposals_org_status_idx").on(table.organizationId, table.status),
+  clientStatusIdx: index("proposals_client_status_idx").on(table.clientId, table.status),
+  uniqueOrgNumber: unique("unique_org_proposal_number").on(table.organizationId, table.proposalNumber),
+}));
+
 // Roles table (Super Admin, Admin, Employee, Client)
 // scope: 'platform' for SaaS-level roles (Super Admin), 'tenant' for organization roles
 export const roles = pgTable("roles", {
@@ -759,6 +845,65 @@ export const sessions = pgTable("sessions", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// SSO/SAML Connections - Enterprise authentication configuration per organization
+export const ssoConnections = pgTable("sso_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  // SAML Configuration
+  provider: text("provider").notNull().default("custom"), // 'okta', 'azure', 'onelogin', 'google', 'custom'
+  entityId: text("entity_id").notNull(), // SP Entity ID (issuer)
+  ssoUrl: text("sso_url").notNull(), // IdP SSO URL (entryPoint)
+  certificate: text("certificate").notNull(), // IdP X.509 certificate (base64)
+  
+  // Optional SAML settings
+  logoutUrl: text("logout_url"), // IdP logout URL
+  signatureAlgorithm: text("signature_algorithm").default("sha256"), // 'sha1', 'sha256', 'sha512'
+  wantAssertionsSigned: boolean("want_assertions_signed").default(true),
+  wantAuthnResponseSigned: boolean("want_authn_response_signed").default(false),
+  
+  // Attribute mapping (SAML attributes to user fields)
+  attributeMappings: jsonb("attribute_mappings").default(sql`'{}'::jsonb`),
+  // Example: { "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress" }
+  
+  // Auto-provisioning settings
+  autoProvision: boolean("auto_provision").default(false), // Auto-create users on first login
+  defaultRoleId: varchar("default_role_id").references(() => roles.id), // Role for auto-provisioned users
+  
+  // Status
+  isEnabled: boolean("is_enabled").default(true),
+  
+  // Metadata
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("sso_connections_org_idx").on(table.organizationId),
+}));
+
+// SSO Sessions - Track active SSO sessions for audit trail
+export const ssoSessions = pgTable("sso_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ssoConnectionId: varchar("sso_connection_id").notNull().references(() => ssoConnections.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  
+  // SAML session data
+  nameId: text("name_id").notNull(), // SAML NameID
+  sessionIndex: text("session_index"), // SAML SessionIndex for SLO
+  
+  // Session metadata
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  
+  // Audit trail
+  loginAt: timestamp("login_at").notNull().defaultNow(),
+  logoutAt: timestamp("logout_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => ({
+  ssoConnectionIdx: index("sso_sessions_connection_idx").on(table.ssoConnectionId),
+  userIdx: index("sso_sessions_user_idx").on(table.userId),
+}));
 
 // OTP Verification - For phone number verification during account setup
 export const otpVerifications = pgTable("otp_verifications", {
@@ -3736,6 +3881,40 @@ export const insertSubscriptionAddonSchema = createInsertSchema(subscriptionAddo
 export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfigs).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertServicePlanSchema = createInsertSchema(servicePlans).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertServicePlanPurchaseSchema = createInsertSchema(servicePlanPurchases).omit({ id: true, createdAt: true, updatedAt: true });
+// Line item schema for proposals
+export const proposalLineItemSchema = z.object({
+  name: z.string().min(1, "Item name is required"),
+  description: z.string().optional(),
+  quantity: z.number().positive("Quantity must be positive"),
+  rate: z.number().nonnegative("Rate must be non-negative"),
+  amount: z.number().nonnegative("Amount must be non-negative"),
+  taxable: z.boolean().default(true),
+});
+
+export const insertProposalSchema = createInsertSchema(proposals).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true,
+  proposalNumber: true, // Auto-generated
+  status: true, // Defaults to 'draft'
+  viewedAt: true,
+  viewCount: true,
+  acceptedAt: true,
+  rejectedAt: true,
+  signedBy: true,
+  signatureUrl: true,
+  pdfUrl: true,
+  pdfGeneratedAt: true,
+  sentAt: true,
+  sentBy: true,
+  reminderSentAt: true,
+  reminderCount: true,
+  convertedToProjectId: true,
+  convertedToInvoiceId: true,
+}).extend({
+  lineItems: z.array(proposalLineItemSchema).default([]),
+  validUntil: z.coerce.date(), // Ensure date conversion
+});
 export const insertOnboardingProgressSchema = createInsertSchema(onboardingProgress).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertOnboardingTaskSchema = createInsertSchema(onboardingTasks).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertOnboardingNudgeSchema = createInsertSchema(onboardingNudges).omit({ id: true, createdAt: true });
@@ -3858,6 +4037,8 @@ export type InsertOnboardingTask = z.infer<typeof insertOnboardingTaskSchema>;
 export type OnboardingTask = typeof onboardingTasks.$inferSelect;
 export type InsertOnboardingNudge = z.infer<typeof insertOnboardingNudgeSchema>;
 export type OnboardingNudge = typeof onboardingNudges.$inferSelect;
+export type InsertProposal = z.infer<typeof insertProposalSchema>;
+export type Proposal = typeof proposals.$inferSelect;
 
 export const subscriptionPlanFormSchema = insertSubscriptionPlanSchema.extend({
   featuresInput: z.string().optional(),
@@ -4700,3 +4881,20 @@ export const insertDocumentChangeEventSchema = createInsertSchema(documentChange
 });
 export type InsertDocumentChangeEvent = z.infer<typeof insertDocumentChangeEventSchema>;
 export type DocumentChangeEvent = typeof documentChangeEvents.$inferSelect;
+
+// SSO/SAML
+export const insertSsoConnectionSchema = createInsertSchema(ssoConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSsoConnection = z.infer<typeof insertSsoConnectionSchema>;
+export type SsoConnection = typeof ssoConnections.$inferSelect;
+
+export const insertSsoSessionSchema = createInsertSchema(ssoSessions).omit({
+  id: true,
+  loginAt: true,
+  logoutAt: true,
+});
+export type InsertSsoSession = z.infer<typeof insertSsoSessionSchema>;
+export type SsoSession = typeof ssoSessions.$inferSelect;

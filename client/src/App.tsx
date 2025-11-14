@@ -79,6 +79,7 @@ const MyDocumentRequests = lazy(() => import("@/pages/my-document-requests"));
 const Messages = lazy(() => import("@/pages/messages"));
 const TimeTracking = lazy(() => import("@/pages/time-tracking"));
 const Invoices = lazy(() => import("@/pages/invoices"));
+const Proposals = lazy(() => import("@/pages/proposals"));
 const Payments = lazy(() => import("@/pages/payments"));
 const PaymentCollect = lazy(() => import("@/pages/payment-collect"));
 const ClientPaymentPortal = lazy(() => import("@/pages/client-payment-portal"));
@@ -1006,6 +1007,13 @@ function Router() {
         <OrganizationRoute>
           <AppLayout>
             <Invoices />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/proposals">
+        <OrganizationRoute>
+          <AppLayout>
+            <Proposals />
           </AppLayout>
         </OrganizationRoute>
       </Route>

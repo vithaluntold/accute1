@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MFASetupDialog } from "@/components/mfa-setup-dialog";
+import { SsoConfigSection } from "@/components/sso-config-section";
 
 // LLM Configuration schema (for AI agents)
 const llmConfigSchema = z.object({
@@ -466,6 +467,9 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* SSO/SAML Configuration Section */}
+      <SsoConfigSection />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">

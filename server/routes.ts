@@ -53,6 +53,7 @@ import {
   insertMessageTemplateSchema,
   insertPlatformSubscriptionSchema,
   insertSupportTicketSchema,
+  insertProposalSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -66,6 +67,9 @@ import { unifiedInboxService } from "./services/unifiedInboxService";
 import { TaskDependenciesService } from "./services/taskDependenciesService";
 import { DocumentVersionsService } from "./services/documentVersionsService";
 import { workflowStagesService } from "./services/workflowStagesService";
+import { samlService } from "./services/SamlService";
+import passport from "passport";
+import { MultiSamlStrategy } from "@node-saml/passport-saml";
 
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
@@ -1354,6 +1358,273 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Revoke invitation error:", error);
       res.status(500).json({ error: "Failed to revoke invitation" });
+    }
+  });
+
+  // ==================== SSO/SAML Routes ====================
+  
+  // SECURITY: Get trusted base URL from environment (prevents host header injection)
+  function getTrustedBaseUrl(): string {
+    // Use REPLIT_DOMAINS in production (Replit standard env var)
+    if (process.env.REPLIT_DOMAINS) {
+      const domains = process.env.REPLIT_DOMAINS.split(',');
+      return `https://${domains[0]}`;
+    }
+    
+    // Fallback to localhost for development
+    if (process.env.NODE_ENV !== 'production') {
+      return 'http://localhost:5000';
+    }
+    
+    // Production fallback - should be set explicitly
+    throw new Error('REPLIT_DOMAINS environment variable not set in production');
+  }
+  
+  // Configure Passport SAML strategy (multi-tenant)
+  passport.use('saml', new MultiSamlStrategy(
+    {
+      passReqToCallback: true,
+      getSamlOptions: async (req, done) => {
+        try {
+          const orgSlug = req.params.orgSlug || req.query.orgSlug as string || req.body?.RelayState;
+          if (!orgSlug) {
+            return done(new Error('Organization slug is required'));
+          }
+
+          // Get organization by slug
+          const org = await db.select().from(schema.organizations)
+            .where(eq(schema.organizations.slug, orgSlug))
+            .limit(1);
+
+          if (!org[0]) {
+            return done(new Error('Organization not found'));
+          }
+
+          const baseUrl = getTrustedBaseUrl();
+          const callbackUrl = `${baseUrl}/auth/saml/${orgSlug}/callback`;
+          const options = await samlService.getSamlOptions(org[0].id, callbackUrl);
+          done(null, options);
+        } catch (error: any) {
+          done(error);
+        }
+      }
+    },
+    async (req: any, profile: any, done: any) => {
+      try {
+        const orgSlug = req.params.orgSlug;
+        const org = await db.select().from(schema.organizations)
+          .where(eq(schema.organizations.slug, orgSlug))
+          .limit(1);
+
+        if (!org[0]) {
+          return done(new Error('Organization not found'));
+        }
+
+        const ipAddress = req.ip || req.connection.remoteAddress;
+        const userAgent = req.get('user-agent') || '';
+        const sessionIndex = profile.sessionIndex;
+
+        const user = await samlService.processProfile(
+          org[0].id,
+          profile,
+          sessionIndex,
+          ipAddress,
+          userAgent
+        );
+
+        done(null, user);
+      } catch (error: any) {
+        done(error);
+      }
+    }
+  ));
+
+  // Get SSO configuration for organization
+  app.get("/api/sso/connections", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const connection = await samlService.getSsoConnection(req.user!.organizationId!);
+      
+      if (!connection) {
+        return res.json(null);
+      }
+
+      // Don't expose the certificate to the frontend
+      res.json({
+        ...connection,
+        certificate: connection.certificate ? '***REDACTED***' : null
+      });
+    } catch (error: any) {
+      console.error("Get SSO connection error:", error);
+      res.status(500).json({ error: "Failed to fetch SSO configuration" });
+    }
+  });
+
+  // Create SSO configuration
+  app.post("/api/sso/connections", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const insertSchema = schema.insertSsoConnectionSchema.extend({
+        organizationId: z.string().optional(),
+        createdBy: z.string().optional(),
+      });
+
+      const data = insertSchema.parse(req.body);
+
+      // Set organizationId and createdBy from authenticated user
+      data.organizationId = req.user!.organizationId!;
+      data.createdBy = req.userId!;
+
+      const [connection] = await db.insert(schema.ssoConnections)
+        .values(data as any)
+        .returning();
+
+      await logActivity(req.userId, req.user!.organizationId, "create", "sso_connection", connection.id, data, req);
+
+      res.json({
+        ...connection,
+        certificate: connection.certificate ? '***REDACTED***' : null
+      });
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Create SSO connection error:", error);
+      res.status(500).json({ error: "Failed to create SSO configuration" });
+    }
+  });
+
+  // Update SSO configuration
+  app.put("/api/sso/connections/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify connection belongs to user's organization
+      const existing = await db.select().from(schema.ssoConnections)
+        .where(and(
+          eq(schema.ssoConnections.id, id),
+          eq(schema.ssoConnections.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+
+      if (!existing[0]) {
+        return res.status(404).json({ error: "SSO configuration not found" });
+      }
+
+      const updateSchema = schema.insertSsoConnectionSchema.partial();
+      const data = updateSchema.parse(req.body);
+
+      const [updated] = await db.update(schema.ssoConnections)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.ssoConnections.id, id))
+        .returning();
+
+      await logActivity(req.userId, req.user!.organizationId, "update", "sso_connection", id, data, req);
+
+      res.json({
+        ...updated,
+        certificate: updated.certificate ? '***REDACTED***' : null
+      });
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      console.error("Update SSO connection error:", error);
+      res.status(500).json({ error: "Failed to update SSO configuration" });
+    }
+  });
+
+  // Delete SSO configuration
+  app.delete("/api/sso/connections/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify connection belongs to user's organization
+      const existing = await db.select().from(schema.ssoConnections)
+        .where(and(
+          eq(schema.ssoConnections.id, id),
+          eq(schema.ssoConnections.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+
+      if (!existing[0]) {
+        return res.status(404).json({ error: "SSO configuration not found" });
+      }
+
+      await db.delete(schema.ssoConnections)
+        .where(eq(schema.ssoConnections.id, id));
+
+      await logActivity(req.userId, req.user!.organizationId, "delete", "sso_connection", id, {}, req);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete SSO connection error:", error);
+      res.status(500).json({ error: "Failed to delete SSO configuration" });
+    }
+  });
+
+  // SAML login endpoint (SP-initiated flow)
+  app.get("/auth/saml/:orgSlug/login", passport.authenticate('saml', { failureRedirect: '/login' }));
+
+  // SAML callback endpoint (receives SAML response from IdP)
+  app.post("/auth/saml/:orgSlug/callback",
+    passport.authenticate('saml', { session: false, failureRedirect: '/login' }),
+    async (req: any, res: Response) => {
+      try {
+        const user = req.user as any;
+
+        // Generate session token
+        const token = generateToken(user.id);
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+        await db.insert(schema.sessions).values({
+          userId: user.id,
+          token,
+          expiresAt,
+        });
+
+        // Set cookie and redirect to dashboard
+        res.cookie('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        res.redirect('/dashboard');
+      } catch (error: any) {
+        console.error('SAML callback error:', error);
+        res.redirect('/login?error=saml_auth_failed');
+      }
+    }
+  );
+
+  // SP metadata endpoint (provide to IdP for configuration)
+  app.get("/auth/saml/:orgSlug/metadata", async (req: Request, res: Response) => {
+    try {
+      const { orgSlug } = req.params;
+
+      const org = await db.select().from(schema.organizations)
+        .where(eq(schema.organizations.slug, orgSlug))
+        .limit(1);
+
+      if (!org[0]) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      const connection = await samlService.getSsoConnection(org[0].id);
+      
+      if (!connection) {
+        return res.status(404).json({ error: "SSO not configured for this organization" });
+      }
+
+      const baseUrl = getTrustedBaseUrl();
+      const acsUrl = `${baseUrl}/auth/saml/${orgSlug}/callback`;
+      const metadata = samlService.generateMetadata(connection.entityId, acsUrl);
+
+      res.type('application/xml');
+      res.send(metadata);
+    } catch (error: any) {
+      console.error("Generate metadata error:", error);
+      res.status(500).json({ error: "Failed to generate metadata" });
     }
   });
 
@@ -8186,6 +8457,261 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       res.json(reviewed);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to review document submission" });
+    }
+  });
+
+  // ==================== Proposals Routes ====================
+  
+  // data-testid: GET /api/proposals - List proposals for organization
+  app.get("/api/proposals", requireAuth, requirePermission("proposals.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { clientId } = req.query;
+
+      let proposals;
+      if (clientId && typeof clientId === 'string') {
+        // Verify client belongs to user's organization
+        const client = await storage.getClient(clientId);
+        if (!client || client.organizationId !== req.user!.organizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        proposals = await storage.getProposalsByClient(clientId);
+      } else {
+        proposals = await storage.getProposalsByOrganization(req.user!.organizationId!);
+      }
+
+      res.json(proposals);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to fetch proposals:", error);
+      res.status(500).json({ error: "Failed to fetch proposals" });
+    }
+  });
+
+  // data-testid: GET /api/proposals/:id - Get single proposal
+  app.get("/api/proposals/:id", requireAuth, requirePermission("proposals.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const proposal = await storage.getProposal(req.params.id);
+
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Verify proposal belongs to user's organization
+      if (proposal.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(proposal);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to fetch proposal:", error);
+      res.status(500).json({ error: "Failed to fetch proposal" });
+    }
+  });
+
+  // data-testid: POST /api/proposals - Create new proposal
+  app.post("/api/proposals", requireAuth, requirePermission("proposals.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Validate request body
+      const validated = insertProposalSchema.omit({ 
+        organizationId: true, 
+        createdBy: true,
+        proposalNumber: true,
+      }).parse(req.body);
+
+      // Verify client belongs to user's organization if clientId is provided
+      if (validated.clientId) {
+        const client = await storage.getClient(validated.clientId);
+        if (!client || client.organizationId !== req.user!.defaultOrganizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      // Generate proposal number
+      const proposalNumber = await storage.generateProposalNumber(req.user!.defaultOrganizationId!);
+
+      // Create proposal
+      const proposal = await storage.createProposal({
+        ...validated,
+        proposalNumber,
+        organizationId: req.user!.defaultOrganizationId!,
+        createdBy: req.userId!,
+      });
+
+      await logActivity(
+        req.userId,
+        req.user!.defaultOrganizationId!,
+        "create",
+        "proposal",
+        proposal.id,
+        { proposalNumber, clientId: validated.clientId },
+        req
+      );
+
+      res.status(201).json(proposal);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to create proposal:", error);
+      res.status(500).json({ error: "Failed to create proposal" });
+    }
+  });
+
+  // data-testid: PUT /api/proposals/:id - Update proposal
+  app.put("/api/proposals/:id", requireAuth, requirePermission("proposals.edit"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Check if proposal exists
+      const existing = await storage.getProposal(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Verify proposal belongs to user's organization
+      if (existing.organizationId !== req.user!.defaultOrganizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Validate request body (partial update)
+      const validated = insertProposalSchema.partial().omit({
+        organizationId: true,
+        createdBy: true,
+        proposalNumber: true,
+      }).parse(req.body);
+
+      // Verify client belongs to user's organization if clientId is being updated
+      if (validated.clientId) {
+        const client = await storage.getClient(validated.clientId);
+        if (!client || client.organizationId !== req.user!.defaultOrganizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      // Update proposal
+      const updated = await storage.updateProposal(req.params.id, validated);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      await logActivity(
+        req.userId,
+        req.user!.defaultOrganizationId!,
+        "update",
+        "proposal",
+        req.params.id,
+        {},
+        req
+      );
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to update proposal:", error);
+      res.status(500).json({ error: "Failed to update proposal" });
+    }
+  });
+
+  // data-testid: DELETE /api/proposals/:id - Delete proposal
+  app.delete("/api/proposals/:id", requireAuth, requirePermission("proposals.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Check if proposal exists
+      const existing = await storage.getProposal(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Verify proposal belongs to user's organization
+      if (existing.organizationId !== req.user!.defaultOrganizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Delete proposal
+      await storage.deleteProposal(req.params.id);
+
+      await logActivity(
+        req.userId,
+        req.user!.defaultOrganizationId!,
+        "delete",
+        "proposal",
+        req.params.id,
+        { proposalNumber: existing.proposalNumber },
+        req
+      );
+
+      res.status(204).send();
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to delete proposal:", error);
+      res.status(500).json({ error: "Failed to delete proposal" });
+    }
+  });
+
+  // data-testid: POST /api/proposals/:id/send - Send proposal to client
+  app.post("/api/proposals/:id/send", requireAuth, requirePermission("proposals.send"), async (req: AuthRequest, res: Response) => {
+    try {
+      // Check if proposal exists
+      const existing = await storage.getProposal(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Verify proposal belongs to user's organization
+      if (existing.organizationId !== req.user!.defaultOrganizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Update proposal status to 'sent'
+      const updated = await storage.updateProposal(req.params.id, {
+        status: 'sent',
+        sentAt: new Date(),
+        sentBy: req.userId!,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      // Create notification for client if clientId exists
+      if (existing.clientId) {
+        const client = await storage.getClient(existing.clientId);
+        if (client && client.userId) {
+          await storage.createNotification({
+            userId: client.userId,
+            title: "New Proposal Received",
+            message: `You have received a new proposal: ${existing.title || existing.proposalNumber}`,
+            type: "info",
+            relatedResource: "proposal",
+            relatedResourceId: existing.id,
+          });
+        }
+      }
+
+      await logActivity(
+        req.userId,
+        req.user!.defaultOrganizationId!,
+        "send",
+        "proposal",
+        req.params.id,
+        { proposalNumber: existing.proposalNumber, clientId: existing.clientId },
+        req
+      );
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Failed to send proposal:", error);
+      res.status(500).json({ error: "Failed to send proposal" });
     }
   });
 

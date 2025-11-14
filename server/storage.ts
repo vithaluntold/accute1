@@ -54,6 +54,8 @@ import type {
   InsertRequiredDocument,
   DocumentSubmission as DocSubmission,
   InsertDocumentSubmission,
+  Proposal,
+  InsertProposal,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -192,6 +194,16 @@ export interface IStorage {
   getDocumentTemplatesByOrganization(organizationId: string): Promise<schema.DocumentTemplate[]>;
   getDocumentTemplatesByCategory(organizationId: string, category: string): Promise<schema.DocumentTemplate[]>;
   incrementTemplateUsage(id: string): Promise<void>;
+
+  // Proposals
+  getProposal(id: string): Promise<Proposal | undefined>;
+  createProposal(proposal: InsertProposal): Promise<Proposal>;
+  updateProposal(id: string, proposal: Partial<InsertProposal>): Promise<Proposal | undefined>;
+  deleteProposal(id: string): Promise<void>;
+  getProposalsByOrganization(organizationId: string): Promise<Proposal[]>;
+  getProposalsByClient(clientId: string): Promise<Proposal[]>;
+  getProposalByNumber(organizationId: string, proposalNumber: string): Promise<Proposal | undefined>;
+  generateProposalNumber(organizationId: string): Promise<string>;
 
   // Notifications
   getNotification(id: string): Promise<Notification | undefined>;
@@ -1533,6 +1545,75 @@ export class DbStorage implements IStorage {
     await db.update(schema.documentTemplates)
       .set({ usageCount: sql`${schema.documentTemplates.usageCount} + 1`, updatedAt: new Date() })
       .where(eq(schema.documentTemplates.id, id));
+  }
+
+  // Proposals
+  async getProposal(id: string): Promise<Proposal | undefined> {
+    const result = await db.select().from(schema.proposals).where(eq(schema.proposals.id, id));
+    return result[0];
+  }
+
+  async createProposal(proposal: InsertProposal): Promise<Proposal> {
+    const result = await db.insert(schema.proposals).values(proposal).returning();
+    return result[0];
+  }
+
+  async updateProposal(id: string, proposal: Partial<InsertProposal>): Promise<Proposal | undefined> {
+    const result = await db.update(schema.proposals)
+      .set({ ...proposal, updatedAt: new Date() })
+      .where(eq(schema.proposals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProposal(id: string): Promise<void> {
+    await db.delete(schema.proposals).where(eq(schema.proposals.id, id));
+  }
+
+  async getProposalsByOrganization(organizationId: string): Promise<Proposal[]> {
+    return await db.select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.organizationId, organizationId))
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  async getProposalsByClient(clientId: string): Promise<Proposal[]> {
+    return await db.select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.clientId, clientId))
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  async getProposalByNumber(organizationId: string, proposalNumber: string): Promise<Proposal | undefined> {
+    const result = await db.select()
+      .from(schema.proposals)
+      .where(and(
+        eq(schema.proposals.organizationId, organizationId),
+        eq(schema.proposals.proposalNumber, proposalNumber)
+      ));
+    return result[0];
+  }
+
+  async generateProposalNumber(organizationId: string): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    
+    const latestProposal = await db.select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.organizationId, organizationId))
+      .orderBy(desc(schema.proposals.createdAt))
+      .limit(1);
+    
+    let nextNumber = 1;
+    
+    if (latestProposal.length > 0 && latestProposal[0].proposalNumber) {
+      const match = latestProposal[0].proposalNumber.match(/PROP-\d{4}-(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+    
+    const paddedNumber = nextNumber.toString().padStart(3, '0');
+    return `PROP-${currentYear}-${paddedNumber}`;
   }
 
   // Marketplace Items
