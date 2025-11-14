@@ -17,6 +17,7 @@ Accute is an AI-native accounting workflow automation platform designed to revol
 - Error Handling: Team creation and other endpoints use `instanceof ZodError` for reliable validation error detection, returning 400 status with detailed validation messages.
 - Duplicate Relationship Prevention: Supervision endpoint includes pre-flight duplicate check, returning 409 Conflict for existing relationships instead of 500 database constraint errors.
 - Workspace Creation: Full workspace creation flow with dialog UI, auto-slug generation, and organization setup. ALWAYS updates creator's organizationId and defaultOrganizationId to new workspace (not just for first workspace), unsets isDefault flag on other memberships, and requires re-authentication at /auth/login to access new workspace.
+- **Server Initialization Performance**: RBAC seeding uses bulk upsert operations (chunks of 50) with `onConflictDoUpdate` for permissions and in-memory diffing for role-permission assignments, reducing 600+ serial DB operations to ~10 bulk operations for sub-second initialization.
 
 ## System Architecture
 

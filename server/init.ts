@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { storage } from "./storage";
 import { hashPassword } from "./auth";
 
@@ -436,32 +436,65 @@ export async function initializeSystem(app: Express) {
       { name: "folders.share", resource: "folders", action: "share", description: "Share folders with clients" },
     ];
 
-    const createdPermissions: any[] = [];
-    for (const perm of permissions) {
-      try {
-        const created = await db.insert(schema.permissions).values(perm).returning();
-        createdPermissions.push(created[0]);
-      } catch (error) {
-        // Permission might already exist, fetch it
-        const existing = await db.select().from(schema.permissions).where(eq(schema.permissions.name, perm.name));
-        if (existing.length > 0) {
-          createdPermissions.push(existing[0]);
+    console.log(`📋 Bulk upserting ${permissions.length} permissions...`);
+    // Bulk upsert permissions using onConflictDoUpdate
+    const chunkSize = 50;
+    const allUpserted: any[] = [];
+    
+    for (let i = 0; i < permissions.length; i += chunkSize) {
+      const chunk = permissions.slice(i, i + chunkSize);
+      const upserted = await db
+        .insert(schema.permissions)
+        .values(chunk)
+        .onConflictDoUpdate({
+          target: schema.permissions.name,
+          set: {
+            resource: sql`excluded.resource`,
+            action: sql`excluded.action`,
+            description: sql`excluded.description`,
+          },
+        })
+        .returning();
+      allUpserted.push(...upserted);
+      console.log(`  ✓ Processed ${Math.min(i + chunkSize, permissions.length)}/${permissions.length} permissions`);
+    }
+    
+    const createdPermissions = allUpserted;
+    console.log(`✓ All ${createdPermissions.length} permissions upserted`);
+
+    // Assign permissions to roles using bulk operations
+    console.log(`🔐 Assigning permissions to roles using bulk operations...`);
+    
+    // Fetch all existing role-permission assignments
+    const existingRolePerms = await db.select().from(schema.rolePermissions);
+    const existingSet = new Set(
+      existingRolePerms.map(rp => `${rp.roleId}-${rp.permissionId}`)
+    );
+    
+    // Helper to bulk assign permissions to a role
+    async function bulkAssignPermissions(roleId: number, permissions: any[], roleName: string) {
+      const newAssignments = permissions
+        .filter(p => !existingSet.has(`${roleId}-${p.id}`))
+        .map(p => ({ roleId, permissionId: p.id }));
+      
+      if (newAssignments.length > 0) {
+        console.log(`  📝 Assigning ${newAssignments.length} new permissions to ${roleName}...`);
+        await db.insert(schema.rolePermissions).values(newAssignments).onConflictDoNothing();
+        
+        // CRITICAL: Update existingSet to keep in-memory state accurate for subsequent role assignments
+        // Without this, Admin/Employee/Client diffing would see stale data from before Super Admin inserts
+        for (const assignment of newAssignments) {
+          existingSet.add(`${assignment.roleId}-${assignment.permissionId}`);
         }
+        
+        console.log(`  ✓ ${roleName} permissions assigned`);
+      } else {
+        console.log(`  ✓ ${roleName} already has all required permissions`);
       }
     }
-
-    // Assign permissions to roles
+    
     if (roles.superAdmin) {
-      for (const perm of createdPermissions) {
-        try {
-          await db.insert(schema.rolePermissions).values({
-            roleId: roles.superAdmin.id,
-            permissionId: perm.id,
-          });
-        } catch (error) {
-          // Ignore duplicates
-        }
-      }
+      await bulkAssignPermissions(roles.superAdmin.id, createdPermissions, "Super Admin");
     }
 
     if (roles.admin) {
@@ -469,16 +502,7 @@ export async function initializeSystem(app: Express) {
         // Exclude only organization management permissions
         !p.name.startsWith("organizations.")
       );
-      for (const perm of adminPermissions) {
-        try {
-          await db.insert(schema.rolePermissions).values({
-            roleId: roles.admin.id,
-            permissionId: perm.id,
-          });
-        } catch (error) {
-          // Ignore duplicates
-        }
-      }
+      await bulkAssignPermissions(roles.admin.id, adminPermissions, "Admin");
     }
 
     if (roles.employee) {
@@ -502,16 +526,7 @@ export async function initializeSystem(app: Express) {
         // Notifications (own only)
         (p.resource === "notifications" && (p.action === "view" || p.action === "read" || p.action === "delete"))
       );
-      for (const perm of employeePermissions) {
-        try {
-          await db.insert(schema.rolePermissions).values({
-            roleId: roles.employee.id,
-            permissionId: perm.id,
-          });
-        } catch (error) {
-          // Ignore duplicates
-        }
-      }
+      await bulkAssignPermissions(roles.employee.id, employeePermissions, "Employee");
     }
 
     if (roles.client) {
@@ -531,17 +546,10 @@ export async function initializeSystem(app: Express) {
         // Signatures (sign documents sent to them)
         (p.resource === "signatures" && p.action === "sign")
       );
-      for (const perm of clientPermissions) {
-        try {
-          await db.insert(schema.rolePermissions).values({
-            roleId: roles.client.id,
-            permissionId: perm.id,
-          });
-        } catch (error) {
-          // Ignore duplicates
-        }
-      }
+      await bulkAssignPermissions(roles.client.id, clientPermissions, "Client");
     }
+    
+    console.log(`✅ All role permissions assigned`);
 
     // Seed AI Copilots in marketplace
     const aiCopilots = [
