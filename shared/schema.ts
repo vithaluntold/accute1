@@ -252,8 +252,9 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   description: text("description"),
   displayOrder: integer("display_order").notNull().default(0), // For ordering in UI
   
-  // Feature configuration - JSON array of feature identifiers
-  features: jsonb("features").notNull().default(sql`'[]'::jsonb`), // ['workflows', 'ai_agents', 'signatures', 'analytics']
+  // Feature configuration
+  features: jsonb("features").notNull().default(sql`'[]'::jsonb`), // Marketing copy: ["Forms & Workflows", "Email Integration"]
+  featureIdentifiers: jsonb("feature_identifiers").notNull().default(sql`'[]'::jsonb`), // Machine-readable: ['workflows', 'ai_agents', 'resource_management']
   
   // Base pricing (USD) - before regional multipliers
   basePriceMonthly: numeric("base_price_monthly", { precision: 10, scale: 2 }).notNull().default(sql`0`),

@@ -443,6 +443,27 @@ export async function initializeSystem(app: Express) {
       { name: "folders.edit", resource: "folders", action: "edit", description: "Rename and move folders" },
       { name: "folders.delete", resource: "folders", action: "delete", description: "Delete folders" },
       { name: "folders.share", resource: "folders", action: "share", description: "Share folders with clients" },
+      
+      // P1 PRIORITY: Resource Allocation Management
+      { name: "resource_allocations.view", resource: "resource_allocations", action: "view", description: "View resource allocations" },
+      { name: "resource_allocations.create", resource: "resource_allocations", action: "create", description: "Create resource allocations" },
+      { name: "resource_allocations.update", resource: "resource_allocations", action: "update", description: "Update resource allocations" },
+      { name: "resource_allocations.delete", resource: "resource_allocations", action: "delete", description: "Delete resource allocations" },
+      
+      // P1 PRIORITY: Skills Management
+      { name: "skills.view", resource: "skills", action: "view", description: "View skill taxonomy" },
+      { name: "skills.create", resource: "skills", action: "create", description: "Create new skills" },
+      { name: "skills.update", resource: "skills", action: "update", description: "Update skill definitions" },
+      { name: "skills.delete", resource: "skills", action: "delete", description: "Delete skills" },
+      { name: "skills.categories", resource: "skills", action: "categories", description: "View skill categories" },
+      { name: "skills.stats", resource: "skills", action: "stats", description: "View skill statistics" },
+      
+      // P1 PRIORITY: User Skills (Self-Service)
+      { name: "user_skills.view", resource: "user_skills", action: "view", description: "View own skill profile" },
+      { name: "user_skills.manage", resource: "user_skills", action: "manage", description: "Add/remove own skills" },
+      
+      // P1 PRIORITY: Task Matching
+      { name: "task_matching.suggest", resource: "task_matching", action: "suggest", description: "Get skill-based task suggestions" },
     ];
 
     console.log(`📋 Bulk upserting ${permissions.length} permissions...`);
@@ -533,7 +554,13 @@ export async function initializeSystem(app: Express) {
         // Client view
         (p.resource === "clients" && p.action === "view") ||
         // Notifications (own only)
-        (p.resource === "notifications" && (p.action === "view" || p.action === "read" || p.action === "delete"))
+        (p.resource === "notifications" && (p.action === "view" || p.action === "read" || p.action === "delete")) ||
+        // User Skills (self-service)
+        (p.resource === "user_skills" && (p.action === "view" || p.action === "manage")) ||
+        // Skills (read-only access to skill taxonomy)
+        (p.resource === "skills" && (p.action === "view" || p.action === "categories" || p.action === "stats")) ||
+        // Task Matching (skill-based task suggestions)
+        (p.resource === "task_matching" && p.action === "suggest")
       );
       await bulkAssignPermissions(roles.employee.id, employeePermissions, "Employee");
     }

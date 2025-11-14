@@ -121,6 +121,18 @@ const FEATURE_PERMISSION_MAP: Record<FeatureIdentifier, string[]> = {
     'time-tracking:edit',
     'time-tracking:view',
     'time-tracking:reports'
+  ],
+  
+  // Resource management requires resource allocation and admin-level skills permissions
+  // Note: Basic skill viewing, self-service skill profiles, and task matching are NOT gated (baseline features)
+  resource_management: [
+    'resource_allocations.view',
+    'resource_allocations.create',
+    'resource_allocations.update',
+    'resource_allocations.delete',
+    'skills.create',
+    'skills.update',
+    'skills.delete'
   ]
 };
 

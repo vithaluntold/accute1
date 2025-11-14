@@ -23,7 +23,8 @@ export type FeatureIdentifier =
   | 'document_management'
   | 'client_portal'
   | 'team_collaboration'
-  | 'time_tracking';
+  | 'time_tracking'
+  | 'resource_management';
 
 /**
  * Resource limit identifiers
@@ -153,6 +154,7 @@ export const PLATFORM_ADMIN_ENTITLEMENTS: SubscriptionEntitlements = {
     'custom_workflows',
     'automations',
     'integrations',
+    'resource_management',
     'document_management',
     'client_portal',
     'team_collaboration',
