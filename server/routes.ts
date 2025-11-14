@@ -54,6 +54,10 @@ import {
   insertPlatformSubscriptionSchema,
   insertSupportTicketSchema,
   insertProposalSchema,
+  insertResourceAllocationSchema,
+  insertSkillSchema,
+  insertUserSkillSchema,
+  insertTaskSkillRequirementSchema,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -68,6 +72,8 @@ import { TaskDependenciesService } from "./services/taskDependenciesService";
 import { DocumentVersionsService } from "./services/documentVersionsService";
 import { workflowStagesService } from "./services/workflowStagesService";
 import { samlService } from "./services/SamlService";
+import { ResourceAllocationService } from "./services/ResourceAllocationService";
+import { SkillService } from "./services/SkillService";
 import passport from "passport";
 import { MultiSamlStrategy } from "@node-saml/passport-saml";
 
@@ -19442,6 +19448,642 @@ ${msg.bodyText || msg.bodyHtml || ''}
     } catch (error: any) {
       console.error("[Meetings] Failed to update meeting:", error);
       res.status(500).json({ error: "Failed to update meeting" });
+    }
+  });
+
+  // ==================== RESOURCE ALLOCATION ROUTES ====================
+
+  // Create resource allocation
+  app.post("/api/resource-allocations", requireAuth, requirePermission("projects.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      // Validate input schema - parse first, then override organizationId
+      const parsed = insertResourceAllocationSchema.omit({ organizationId: true }).parse(req.body);
+      const validated = { ...parsed, organizationId };
+
+      // SECURITY: Verify user belongs to organization
+      const user = await db.query.users.findFirst({
+        where: and(
+          eq(schema.users.id, validated.userId),
+          or(
+            eq(schema.users.organizationId, organizationId),
+            eq(schema.users.defaultOrganizationId, organizationId)
+          )
+        ),
+      });
+
+      if (!user) {
+        return res.status(403).json({ error: "User does not belong to organization" });
+      }
+
+      // SECURITY: Verify project belongs to organization
+      const project = await db.query.projects.findFirst({
+        where: and(
+          eq(schema.projects.id, validated.projectId),
+          eq(schema.projects.organizationId, organizationId)
+        ),
+      });
+
+      if (!project) {
+        return res.status(403).json({ error: "Project does not belong to organization" });
+      }
+
+      const allocation = await ResourceAllocationService.createAllocation(validated);
+
+      // Log activity AFTER successful creation
+      await logActivity(currentUserId, organizationId, "create", "resource_allocation", allocation.id, {}, req);
+      res.status(201).json(allocation);
+    } catch (error: any) {
+      if (error.message?.includes("conflict") || error.message?.includes("Conflict")) {
+        return res.status(409).json({ error: error.message });
+      }
+      if (error.message?.includes("exceeds 100%")) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Resource Allocations] Failed to create allocation:", error);
+      res.status(500).json({ error: "Failed to create resource allocation" });
+    }
+  });
+
+  // Update resource allocation
+  app.patch("/api/resource-allocations/:id", requireAuth, requirePermission("projects.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      // Create partial update schema that validates types/ranges
+      const updateSchema = insertResourceAllocationSchema.partial().omit({ 
+        id: true, 
+        organizationId: true,
+        createdAt: true,
+        updatedAt: true,
+      });
+
+      // Validate all incoming fields
+      const validated = updateSchema.parse(req.body);
+
+      // If userId is being updated, verify it belongs to organization
+      if (validated.userId) {
+        const user = await db.query.users.findFirst({
+          where: and(
+            eq(schema.users.id, validated.userId),
+            or(
+              eq(schema.users.organizationId, organizationId),
+              eq(schema.users.defaultOrganizationId, organizationId)
+            )
+          ),
+        });
+
+        if (!user) {
+          return res.status(403).json({ error: "User does not belong to organization" });
+        }
+      }
+
+      // If projectId is being updated, verify it belongs to organization
+      if (validated.projectId) {
+        const project = await db.query.projects.findFirst({
+          where: and(
+            eq(schema.projects.id, validated.projectId),
+            eq(schema.projects.organizationId, organizationId)
+          ),
+        });
+
+        if (!project) {
+          return res.status(403).json({ error: "Project does not belong to organization" });
+        }
+      }
+
+      const allocation = await ResourceAllocationService.updateAllocation(
+        id,
+        organizationId,
+        validated
+      );
+
+      // Log activity AFTER successful update
+      await logActivity(currentUserId, organizationId, "update", "resource_allocation", allocation.id, {}, req);
+      res.json(allocation);
+    } catch (error: any) {
+      if (error.message === "Allocation not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("conflict") || error.message?.includes("Conflict")) {
+        return res.status(409).json({ error: error.message });
+      }
+      if (error.message?.includes("exceeds 100%")) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Resource Allocations] Failed to update allocation:", error);
+      res.status(500).json({ error: "Failed to update resource allocation" });
+    }
+  });
+
+  // Delete resource allocation
+  app.delete("/api/resource-allocations/:id", requireAuth, requirePermission("projects.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const allocation = await ResourceAllocationService.deleteAllocation(id, organizationId);
+
+      // Log activity AFTER successful deletion
+      await logActivity(currentUserId, organizationId, "delete", "resource_allocation", allocation.id, {}, req);
+      res.json(allocation);
+    } catch (error: any) {
+      if (error.message === "Allocation not found") {
+        return res.status(404).json({ error: "Allocation not found" });
+      }
+      console.error("[Resource Allocations] Failed to delete allocation:", error);
+      res.status(500).json({ error: "Failed to delete resource allocation" });
+    }
+  });
+
+  // Get allocations by user
+  app.get("/api/resource-allocations/user/:userId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const allocations = await ResourceAllocationService.getAllocationsByUser(userId, organizationId);
+      res.json(allocations);
+    } catch (error: any) {
+      console.error("[Resource Allocations] Failed to fetch user allocations:", error);
+      res.status(500).json({ error: "Failed to fetch user allocations" });
+    }
+  });
+
+  // Get allocations by project
+  app.get("/api/resource-allocations/project/:projectId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const allocations = await ResourceAllocationService.getAllocationsByProject(projectId, organizationId);
+      res.json(allocations);
+    } catch (error: any) {
+      console.error("[Resource Allocations] Failed to fetch project allocations:", error);
+      res.status(500).json({ error: "Failed to fetch project allocations" });
+    }
+  });
+
+  // Get utilization summary
+  app.get("/api/resource-allocations/utilization-summary", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const summary = await ResourceAllocationService.getUtilizationSummary(organizationId);
+      res.json(summary);
+    } catch (error: any) {
+      console.error("[Resource Allocations] Failed to fetch utilization summary:", error);
+      res.status(500).json({ error: "Failed to fetch utilization summary" });
+    }
+  });
+
+  // ==================== SKILLS MANAGEMENT ROUTES ====================
+
+  // Create skill
+  app.post("/api/skills", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const parsed = insertSkillSchema.omit({ organizationId: true }).parse(req.body);
+      const skill = await SkillService.createSkill({
+        ...parsed,
+        organizationId,
+      });
+
+      await logActivity(currentUserId, organizationId, "create", "skill", skill.id, {}, req);
+      res.status(201).json(skill);
+    } catch (error: any) {
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Skills] Failed to create skill:", error);
+      res.status(500).json({ error: "Failed to create skill" });
+    }
+  });
+
+  // Update skill
+  app.patch("/api/skills/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const updateSchema = insertSkillSchema.partial().omit({ 
+        id: true, 
+        organizationId: true,
+        createdAt: true,
+        updatedAt: true,
+      });
+
+      const validated = updateSchema.parse(req.body);
+      const skill = await SkillService.updateSkill(id, organizationId, validated);
+
+      await logActivity(currentUserId, organizationId, "update", "skill", skill.id, {}, req);
+      res.json(skill);
+    } catch (error: any) {
+      if (error.message === "Skill not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Skills] Failed to update skill:", error);
+      res.status(500).json({ error: "Failed to update skill" });
+    }
+  });
+
+  // Delete skill
+  app.delete("/api/skills/:id", requireAuth, requirePermission("settings.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const skill = await SkillService.deleteSkill(id, organizationId);
+
+      await logActivity(currentUserId, organizationId, "delete", "skill", skill.id, {}, req);
+      res.json(skill);
+    } catch (error: any) {
+      if (error.message === "Skill not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("[Skills] Failed to delete skill:", error);
+      res.status(500).json({ error: "Failed to delete skill" });
+    }
+  });
+
+  // List organization skills
+  app.get("/api/skills", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const skills = await SkillService.getOrganizationSkills(organizationId);
+      res.json(skills);
+    } catch (error: any) {
+      console.error("[Skills] Failed to fetch skills:", error);
+      res.status(500).json({ error: "Failed to fetch skills" });
+    }
+  });
+
+  // Get skill statistics
+  app.get("/api/skills/stats", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const stats = await SkillService.getOrganizationSkillStats(organizationId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("[Skills] Failed to fetch skill stats:", error);
+      res.status(500).json({ error: "Failed to fetch skill statistics" });
+    }
+  });
+
+  // ==================== USER SKILLS ROUTES ====================
+
+  // Add skill to user
+  app.post("/api/users/:userId/skills", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const parsed = insertUserSkillSchema.omit({ userId: true }).parse(req.body);
+      const userSkill = await SkillService.addUserSkill({
+        ...parsed,
+        userId,
+      });
+
+      await logActivity(currentUserId, organizationId, "create", "user_skill", userSkill.id, {}, req);
+      res.status(201).json(userSkill);
+    } catch (error: any) {
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      if (error.message?.includes("not found in organization") || error.message?.includes("not belong")) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[User Skills] Failed to add user skill:", error);
+      res.status(500).json({ error: "Failed to add skill to user" });
+    }
+  });
+
+  // Update user skill
+  app.patch("/api/users/:userId/skills/:userSkillId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId, userSkillId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const updateSchema = insertUserSkillSchema.partial().omit({ 
+        id: true, 
+        userId: true,
+        skillId: true,
+        createdAt: true,
+        updatedAt: true,
+      });
+
+      const validated = updateSchema.parse(req.body);
+      const userSkill = await SkillService.updateUserSkill(userSkillId, userId, organizationId, validated);
+
+      await logActivity(currentUserId, organizationId, "update", "user_skill", userSkill.id, {}, req);
+      res.json(userSkill);
+    } catch (error: any) {
+      if (error.message === "User skill not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[User Skills] Failed to update user skill:", error);
+      res.status(500).json({ error: "Failed to update user skill" });
+    }
+  });
+
+  // Remove skill from user
+  app.delete("/api/users/:userId/skills/:userSkillId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId, userSkillId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const userSkill = await SkillService.removeUserSkill(userSkillId, userId, organizationId);
+
+      await logActivity(currentUserId, organizationId, "delete", "user_skill", userSkill.id, {}, req);
+      res.json(userSkill);
+    } catch (error: any) {
+      if (error.message === "User skill not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[User Skills] Failed to remove user skill:", error);
+      res.status(500).json({ error: "Failed to remove user skill" });
+    }
+  });
+
+  // Get user's skills
+  app.get("/api/users/:userId/skills", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const skills = await SkillService.getUserSkills(userId, organizationId);
+      res.json(skills);
+    } catch (error: any) {
+      if (error.message?.includes("not found in organization")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[User Skills] Failed to fetch user skills:", error);
+      res.status(500).json({ error: "Failed to fetch user skills" });
+    }
+  });
+
+  // Endorse user skill
+  app.post("/api/users/:userId/skills/:userSkillId/endorse", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { userSkillId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const userSkill = await SkillService.endorseUserSkill(userSkillId, organizationId);
+      res.json(userSkill);
+    } catch (error: any) {
+      if (error.message === "User skill not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[User Skills] Failed to endorse user skill:", error);
+      res.status(500).json({ error: "Failed to endorse skill" });
+    }
+  });
+
+  // ==================== TASK SKILL REQUIREMENTS ROUTES ====================
+
+  // Add skill requirement to task
+  app.post("/api/tasks/:taskId/skills", requireAuth, requirePermission("workflows.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { taskId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const parsed = insertTaskSkillRequirementSchema.omit({ taskId: true }).parse(req.body);
+      const requirement = await SkillService.addTaskSkillRequirement({
+        ...parsed,
+        taskId,
+        organizationId,
+      });
+
+      await logActivity(currentUserId, organizationId, "create", "task_skill_requirement", requirement.id, {}, req);
+      res.status(201).json(requirement);
+    } catch (error: any) {
+      if (error.message?.includes("already exists")) {
+        return res.status(409).json({ error: error.message });
+      }
+      if (error.message?.includes("not found") || error.message?.includes("not belong")) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Task Skills] Failed to add task skill requirement:", error);
+      res.status(500).json({ error: "Failed to add skill requirement to task" });
+    }
+  });
+
+  // Update task skill requirement
+  app.patch("/api/tasks/:taskId/skills/:requirementId", requireAuth, requirePermission("workflows.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { requirementId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const updateSchema = insertTaskSkillRequirementSchema.partial().omit({ 
+        id: true, 
+        taskId: true,
+        skillId: true,
+      });
+
+      const validated = updateSchema.parse(req.body);
+      const requirement = await SkillService.updateTaskSkillRequirement(requirementId, organizationId, validated);
+
+      await logActivity(currentUserId, organizationId, "update", "task_skill_requirement", requirement.id, {}, req);
+      res.json(requirement);
+    } catch (error: any) {
+      if (error.message === "Task skill requirement not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      if (error instanceof ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("[Task Skills] Failed to update task skill requirement:", error);
+      res.status(500).json({ error: "Failed to update task skill requirement" });
+    }
+  });
+
+  // Remove skill requirement from task
+  app.delete("/api/tasks/:taskId/skills/:requirementId", requireAuth, requirePermission("workflows.manage"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { requirementId } = req.params;
+      const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
+      
+      if (!organizationId || !currentUserId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const requirement = await SkillService.removeTaskSkillRequirement(requirementId, organizationId);
+
+      await logActivity(currentUserId, organizationId, "delete", "task_skill_requirement", requirement.id, {}, req);
+      res.json(requirement);
+    } catch (error: any) {
+      if (error.message === "Task skill requirement not found") {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[Task Skills] Failed to remove task skill requirement:", error);
+      res.status(500).json({ error: "Failed to remove task skill requirement" });
+    }
+  });
+
+  // Get task skill requirements
+  app.get("/api/tasks/:taskId/skills", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { taskId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const requirements = await SkillService.getTaskSkillRequirements(taskId, organizationId);
+      res.json(requirements);
+    } catch (error: any) {
+      if (error.message?.includes("not found") || error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[Task Skills] Failed to fetch task skill requirements:", error);
+      res.status(500).json({ error: "Failed to fetch task skill requirements" });
+    }
+  });
+
+  // Find matching users for task
+  app.get("/api/tasks/:taskId/matches", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { taskId } = req.params;
+      const organizationId = req.user?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const matches = await SkillService.findMatchingUsers(taskId, organizationId);
+      res.json(matches);
+    } catch (error: any) {
+      if (error.message?.includes("not found") || error.message?.includes("Unauthorized")) {
+        return res.status(403).json({ error: error.message });
+      }
+      console.error("[Task Skills] Failed to find matching users:", error);
+      res.status(500).json({ error: "Failed to find matching users for task" });
     }
   });
 
