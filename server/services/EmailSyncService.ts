@@ -2,6 +2,7 @@ import { db } from '../db';
 import { emailAccounts, emailMessages, EmailAccount } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { emailOAuthService } from './EmailOAuthService';
+import { EmailThreadingService } from './EmailThreadingService';
 import { gmail_v1 } from 'googleapis';
 
 interface EmailFetchResult {
@@ -11,6 +12,12 @@ interface EmailFetchResult {
 }
 
 export class EmailSyncService {
+  private threadingService: EmailThreadingService;
+
+  constructor() {
+    this.threadingService = new EmailThreadingService();
+  }
+
   /**
    * Sync emails for a specific email account
    */
@@ -122,7 +129,7 @@ export class EmailSyncService {
           const existing = await db.query.emailMessages.findFirst({
             where: and(
               eq(emailMessages.emailAccountId, account.id),
-              eq(emailMessages.messageId, msg.id)
+              eq(emailMessages.providerMessageId, msg.id || '')
             )
           });
 
@@ -136,7 +143,7 @@ export class EmailSyncService {
             format: 'full'
           });
 
-          const parsed = this.parseGmailMessage(fullMsg.data, account);
+          const parsed = await this.parseGmailMessage(fullMsg.data, account);
           
           if (parsed) {
             await db.insert(emailMessages).values(parsed);
@@ -157,12 +164,12 @@ export class EmailSyncService {
   }
 
   /**
-   * Parse Gmail message to database format
+   * Parse Gmail message to database format with threading
    */
-  private parseGmailMessage(
+  private async parseGmailMessage(
     msg: gmail_v1.Schema$Message,
     account: EmailAccount
-  ): any | null {
+  ): Promise<any | null> {
     try {
       const headers = msg.payload?.headers || [];
       const getHeader = (name: string) => 
@@ -172,8 +179,38 @@ export class EmailSyncService {
       const to = getHeader('to').split(',').map(e => e.trim()).filter(Boolean);
       const cc = getHeader('cc').split(',').map(e => e.trim()).filter(Boolean);
       const subject = getHeader('subject');
-      const messageId = getHeader('message-id') || msg.id || '';
-      const threadId = msg.threadId || '';
+      
+      // RFC Message-ID (canonical) - cleaned from headers
+      const rfcMessageId = this.cleanMessageId(getHeader('message-id')) || this.generateMessageId();
+      // Provider resource ID (Gmail message ID)
+      const providerMessageId = msg.id || rfcMessageId;
+      const providedThreadId = msg.threadId || '';
+
+      // Build rawHeaders object for threading
+      const rawHeaders: Record<string, string> = {};
+      headers.forEach(h => {
+        if (h.name && h.value) {
+          rawHeaders[h.name.toLowerCase()] = h.value;
+        }
+      });
+
+      // Resolve thread ID using threading service (pass RFC Message-ID for cross-provider matching)
+      const rawThreadId = await this.threadingService.resolveThreadId(
+        rfcMessageId,
+        providedThreadId,
+        subject,
+        rawHeaders,
+        from,
+        to,
+        account.organizationId,
+        account.id
+      );
+
+      // Namespace thread ID to prevent cross-account/provider collisions
+      const threadId = this.namespaceThreadId(rawThreadId, account.provider, account.id);
+
+      // Get normalized subject for threading
+      const normalizedSubject = this.normalizeSubject(subject);
 
       let bodyText = '';
       let bodyHtml = '';
@@ -208,12 +245,14 @@ export class EmailSyncService {
       return {
         emailAccountId: account.id,
         organizationId: account.organizationId,
-        messageId,
+        messageId: rfcMessageId,
+        providerMessageId,
         threadId,
         from,
         to,
         cc: cc.length > 0 ? cc : null,
         subject,
+        normalizedSubject,
         body: bodyText || snippet,
         bodyHtml: bodyHtml || null,
         sentAt: internalDate,
@@ -222,6 +261,7 @@ export class EmailSyncService {
         isStarred: labels.includes('STARRED'),
         hasAttachments,
         labels,
+        rawHeaders,
         attachments: hasAttachments 
           ? (msg.payload?.parts || [])
               .filter(part => part.filename && part.filename.length > 0)
@@ -288,7 +328,7 @@ export class EmailSyncService {
           const existing = await db.query.emailMessages.findFirst({
             where: and(
               eq(emailMessages.emailAccountId, account.id),
-              eq(emailMessages.messageId, msg.id)
+              eq(emailMessages.providerMessageId, msg.id || '')
             )
           });
 
@@ -296,7 +336,7 @@ export class EmailSyncService {
             continue;
           }
 
-          const parsed = this.parseOutlookMessage(msg, account);
+          const parsed = await this.parseOutlookMessage(msg, account);
           
           if (parsed) {
             await db.insert(emailMessages).values(parsed);
@@ -317,16 +357,53 @@ export class EmailSyncService {
   }
 
   /**
-   * Parse Outlook message to database format
+   * Parse Outlook message to database format with threading
    */
-  private parseOutlookMessage(msg: any, account: EmailAccount): any | null {
+  private async parseOutlookMessage(msg: any, account: EmailAccount): Promise<any | null> {
     try {
       const from = msg.from?.emailAddress?.address || '';
       const to = (msg.toRecipients || []).map((r: any) => r.emailAddress?.address).filter(Boolean);
       const cc = (msg.ccRecipients || []).map((r: any) => r.emailAddress?.address).filter(Boolean);
       const subject = msg.subject || '';
-      const messageId = msg.id || '';
-      const conversationId = msg.conversationId || '';
+      const providedConversationId = msg.conversationId || '';
+
+      // Build rawHeaders from Outlook message metadata
+      const rawHeaders: Record<string, string> = {
+        'x-microsoft-conversationid': providedConversationId,
+        'thread-topic': msg.conversationTopic || subject,
+      };
+
+      // Add internet headers if available
+      if (msg.internetMessageHeaders) {
+        msg.internetMessageHeaders.forEach((header: any) => {
+          if (header.name && header.value) {
+            rawHeaders[header.name.toLowerCase()] = header.value;
+          }
+        });
+      }
+
+      // RFC Message-ID (canonical) - extracted from internet headers
+      const rfcMessageId = this.cleanMessageId(rawHeaders['message-id'] || '') || this.generateMessageId();
+      // Provider resource ID (Outlook message ID)
+      const providerMessageId = msg.id || rfcMessageId;
+
+      // Resolve thread ID using threading service (pass RFC Message-ID for cross-provider matching)
+      const rawThreadId = await this.threadingService.resolveThreadId(
+        rfcMessageId,
+        providedConversationId,
+        subject,
+        rawHeaders,
+        from,
+        to,
+        account.organizationId,
+        account.id
+      );
+
+      // Namespace thread ID to prevent cross-account/provider collisions
+      const threadId = this.namespaceThreadId(rawThreadId, account.provider, account.id);
+
+      // Get normalized subject for threading
+      const normalizedSubject = this.normalizeSubject(subject);
 
       const bodyText = msg.body?.contentType === 'text' ? msg.body.content : '';
       const bodyHtml = msg.body?.contentType === 'html' ? msg.body.content : '';
@@ -342,12 +419,14 @@ export class EmailSyncService {
       return {
         emailAccountId: account.id,
         organizationId: account.organizationId,
-        messageId,
-        threadId: conversationId,
+        messageId: rfcMessageId,
+        providerMessageId,
+        threadId,
         from,
         to,
         cc: cc.length > 0 ? cc : null,
         subject,
+        normalizedSubject,
         body: bodyText || snippet,
         bodyHtml: bodyHtml || null,
         sentAt: sentDate,
@@ -356,6 +435,7 @@ export class EmailSyncService {
         isStarred: msg.flag?.flagStatus === 'flagged',
         hasAttachments,
         labels: categories,
+        rawHeaders,
         attachments: [],
         aiProcessed: false
       };
@@ -402,6 +482,51 @@ export class EmailSyncService {
     }
 
     return results;
+  }
+
+  /**
+   * Clean message ID by removing angle brackets
+   */
+  private cleanMessageId(messageId: string): string {
+    if (!messageId) return '';
+    return messageId.replace(/[<>]/g, '').trim();
+  }
+
+  /**
+   * Generate a unique message ID when none is provided
+   */
+  private generateMessageId(): string {
+    return `generated-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  }
+
+  /**
+   * Namespace thread ID to prevent cross-account/provider collisions
+   * Format: provider:accountId:threadId
+   */
+  private namespaceThreadId(threadId: string, provider: string, accountId: string): string {
+    // If already namespaced, return as-is
+    if (threadId.includes(':')) {
+      return threadId;
+    }
+    return `${provider}:${accountId}:${threadId}`;
+  }
+
+  /**
+   * Normalize subject for threading
+   * Removes Re:, Fwd:, etc. prefixes and normalizes whitespace
+   */
+  private normalizeSubject(subject: string): string {
+    if (!subject) return '';
+    
+    return subject
+      // Remove common reply/forward prefixes (English, German, Swedish, etc.)
+      .replace(/^(Re:|Fwd?:|FW:|RE:|FWD?:|Aw:|Sv:|R:|RV:)\s*/gi, '')
+      // Remove bracketed ticket IDs like [TICKET-123] or [#456]
+      .replace(/\[[^\]]*\]/g, '')
+      // Collapse consecutive whitespace
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   }
 }
 

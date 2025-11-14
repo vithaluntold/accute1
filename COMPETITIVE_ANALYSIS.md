@@ -24,7 +24,7 @@ This comprehensive analysis compares **Accute** against three major competitors:
 ```
                     High AI Capability (10/10)
                             │
-                  ACCUTE 🏆│ (9.2/10)
+                  ACCUTE 🏆│ (9.3/10)
               (Market Leader)
                             │
 High Feature    ────────────┼────────────    Low Feature
@@ -36,15 +36,15 @@ Completeness    ClickUp (7.7)│                Completeness
                     Low AI Capability (0-3/10)
 ```
 
-**Accute's Position**: #1 Ranked Platform - High AI capability (10/10), high feature completeness (9.2/10) 🏆
+**Accute's Position**: #1 Ranked Platform - High AI capability (10/10), high feature completeness (9.3/10) 🏆
 - **Strengths**: 10 specialized AI agents, enterprise-grade RBAC (150+ permissions), PKI signatures, production email OAuth, live SLA action center, fail-closed client portal security
-- **Recent Wins**: ✅ Task Dependencies, ✅ Gantt Chart, ✅ Timeline View, ✅ Document Versioning, ✅ Report Builder, ✅ Workload View, ✅ Unified Inbox, ✅ **Enterprise RBAC**, ✅ **Real-Time Notifications**, ✅ **SLA Action Center**, ✅ **Production Email Integration**
-- **Remaining Gaps**: Calendar view, Custom dashboards (lower priority)
-- **Opportunity**: Market leader in AI + enterprise security + email integration - maintain momentum
+- **Recent Wins**: ✅ Task Dependencies, ✅ Gantt Chart, ✅ Timeline View, ✅ Document Versioning, ✅ Report Builder, ✅ Workload View, ✅ Unified Inbox, ✅ **Enterprise RBAC**, ✅ **Real-Time Notifications**, ✅ **SLA Action Center**, ✅ **Production Email Integration**, ✅ **Calendar View**, ✅ **Client Profitability**
+- **Remaining Gaps**: Video conferencing, Document comparison/track changes, Forecasting, Scheduled reports, Skill-based assignment, Client bookings (lower priority)
+- **Opportunity**: Market leader in AI + enterprise security + email integration + analytics - maintain momentum
 
 ### Recent Competitive Achievements (November 2025)
 
-Accute has closed **11 critical competitive gaps**, achieving a **9.2/10 competitive score** - significantly surpassing both TaxDome (7.4/10) and ClickUp (7.7/10):
+Accute has closed **13 critical competitive gaps**, achieving a **9.3/10 competitive score** - significantly surpassing both TaxDome (7.4/10) and ClickUp (7.7/10):
 
 | Feature | Status | Details | Competitive Impact |
 |---------|--------|---------|-------------------|
@@ -59,15 +59,17 @@ Accute has closed **11 critical competitive gaps**, achieving a **9.2/10 competi
 | **Real-Time Notifications** | ✅ **NEW** ✅ | NotificationBell with unread badge, mark-as-read, auto-notifications for @mentions | **HIGH GAP CLOSED** - Now matches TaxDome |
 | **SLA Action Center** | ✅ **NEW** ✅ | Color-coded SLA indicators (green/yellow/orange/red) with unified task/form/signature view | **HIGH GAP CLOSED** - Now EXCEEDS competitors |
 | **Production Email Integration** | ✅ **NEW** ✅ | Gmail/Outlook OAuth with HMAC-signed state, timing-safe comparisons, AES-256-GCM encryption, automatic token refresh | **CRITICAL GAP CLOSED** - Now EXCEEDS TaxDome security |
+| **Calendar View** | ✅ **NEW** ✅ | Multi-source calendar aggregating events, tasks, workflow tasks, project tasks, assignments, and PTO with month/week/day views | **HIGH GAP CLOSED** - Now matches TaxDome/ClickUp |
+| **Client Profitability View** | ✅ **NEW** ✅ | Revenue vs cost analysis per client with margin calculations, hours tracking, and profitability metrics | **MEDIUM GAP CLOSED** - Now EXCEEDS competitors with built-in analytics |
 
 **Impact on Competitive Scoring:**
 - **Security & Compliance**: 9/10 → **9.5/10** (+5.6%) - Enterprise RBAC + OAuth security surpasses all competitors
 - **Client Portal & Communication**: 7/10 → **9/10** (+28.6%) - Production email integration + real-time notifications + SLA dashboard
 - **Document Management**: 9/10 → **9.5/10** (+5.6%) - Drag-drop uploads + PDF/image preview
-- **Visualization & Views**: 5/10 → 8/10 (+60%)
-- **Reporting & Analytics**: 4/10 → 8/10 (+100%)
+- **Visualization & Views**: 5/10 → **9/10** (+80%) - ✅ Calendar view now complete
+- **Reporting & Analytics**: 4/10 → **8.5/10** (+112.5%) - ✅ Client profitability added
 - **Resource Management**: 5/10 → 7/10 (+40%)
-- **Overall Score**: 7.8/10 → **9.2/10** (+17.9%)
+- **Overall Score**: 7.8/10 → **9.3/10** (+19.2%)
 
 **Market Position**: Accute is now the **#1 ranked platform** with the highest competitive score, combining AI leadership (10/10) with enterprise-grade security, visualization, and client portal capabilities.
 
@@ -120,7 +122,7 @@ Accute has closed **11 critical competitive gaps**, achieving a **9.2/10 competi
 | **List View** | ✅ Full featured | ✅ Advanced filtering | ✅ Basic | ✅ Full featured | Tie |
 | **Kanban Board** | ✅ Per pipeline | ✅ Per list | ✅ Per workflow | ✅ **Per project + drag-drop** | Tie |
 | **Gantt Chart** | ✅ Timeline view | ✅ Advanced Gantt | ⚠️ Basic timeline | ✅ **Interactive Gantt + dependencies** | **ClickUp/Accute** |
-| **Calendar View** | ✅ Monthly/weekly | ✅ Multiple calendars | ✅ Basic calendar | ❌ **Missing** | TaxDome/ClickUp |
+| **Calendar View** | ✅ Monthly/weekly | ✅ Multiple calendars | ✅ Basic calendar | ✅ **Multi-source calendar (events+tasks+PTO)** | **Tie** |
 | **Timeline View** | ✅ Project roadmap | ✅ Project timeline | ⚠️ Limited | ✅ **Stage-level roadmap + milestones** | **Tie** |
 | **Workload View** | ⚠️ Limited capacity | ✅ **Full capacity planning** | ❌ None | ✅ **Full capacity planning + viz** | **ClickUp/Accute** |
 | **Table View** | ✅ Spreadsheet-style | ✅ Advanced table | ✅ Data table | ✅ Data tables | Tie |
@@ -129,7 +131,7 @@ Accute has closed **11 critical competitive gaps**, achieving a **9.2/10 competi
 | **Workflow Canvas** | ⚠️ Basic automation view | ⚠️ Automation only | ❌ None | ✅ **Visual automation designer** | **Accute** |
 | **Custom Views** | ⚠️ Limited | ✅ **15+ view types** | ⚠️ 3-4 views | ✅ **6+ view types** | **ClickUp** |
 
-**Summary**: ClickUp leads with 15+ view types. **Accute now competitive** with Gantt, Timeline, and Workload views. Needs Calendar/Mind Map/Map for parity.
+**Summary**: ClickUp leads with 15+ view types. **Accute now highly competitive** with Gantt, Timeline, Workload, and Calendar views complete. Only Mind Map/Map views missing for full parity.
 
 ---
 
@@ -186,13 +188,13 @@ Accute has closed **11 critical competitive gaps**, achieving a **9.2/10 competi
 | **Dashboards** | ✅ Customizable widgets | ✅ **Multiple dashboards** | ✅ Basic dashboard | ⚠️ **Basic only** | ClickUp |
 | **Time Tracking Reports** | ✅ Billable hours | ✅ Time tracking | ✅ Time reports | ✅ **Full time tracking reports** | **Tie** |
 | **Workload Reports** | ⚠️ Limited | ✅ Capacity planning | ❌ None | ✅ **Workload insights API** | ClickUp/Accute |
-| **Client Profitability** | ✅ **Revenue vs time** | ❌ Not applicable | ✅ Profitability | ❌ **Missing** | **TaxDome** |
+| **Client Profitability** | ✅ **Revenue vs time** | ❌ Not applicable | ✅ Profitability | ✅ **Revenue vs cost with margin analysis** | **Tie** |
 | **Forecasting** | ⚠️ Basic trends | ✅ Predictive analytics | ❌ None | ❌ **Missing** | ClickUp |
 | **Scheduled Reports** | ✅ Auto-email reports | ✅ Scheduled exports | ✅ Email reports | ❌ **Missing** | TaxDome/ClickUp |
-| **Data Export** | ✅ CSV, Excel, PDF | ✅ Multiple formats | ✅ CSV, Excel | ✅ API access | Tie |
+| **Data Export** | ✅ CSV, Excel, PDF | ✅ Multiple formats | ✅ CSV, Excel | ✅ **CSV/Excel/PDF** | Tie |
 | **Real-Time Metrics** | ✅ Live dashboards | ✅ Real-time updates | ⚠️ Delayed | ✅ **Real-time via API** | TaxDome/ClickUp/Accute |
 
-**Summary**: TaxDome/ClickUp **dominate** reporting. Accute needs custom report builder and dashboards.
+**Summary**: TaxDome/ClickUp lead in pre-built reports. **Accute now competitive** with client profitability and custom report builder. Needs forecasting and scheduled reports for parity.
 
 ---
 
@@ -323,11 +325,11 @@ Each platform scored 0-10 in each category (10 = market leader, 0 = missing enti
 | **Security & Compliance** | 5% | 8/10 | 8/10 | 7/10 | **9.5/10** 🏆 ↑ |
 | **Mobile Experience** | 3% | 9/10 | **10/10** 🏆 | 6/10 | 3/10 |
 | **Pricing & Value** | 2% | 6/10 | 8/10 | 6/10 | **9/10** 🏆 |
-| **TOTAL WEIGHTED SCORE** | 100% | **7.4/10** | **7.7/10** | **5.9/10** | **9.2/10** 🏆 ↑ |
+| **TOTAL WEIGHTED SCORE** | 100% | **7.4/10** | **7.7/10** | **5.9/10** | **9.3/10** 🏆 ↑ |
 
 ### Rankings
 
-**1. Accute (9.2/10)** 🏆 - AI-native leader with enterprise security, production email integration, and client portal excellence  
+**1. Accute (9.3/10)** 🏆 - AI-native leader with enterprise security, production email integration, calendar views, and client analytics excellence  
 **2. ClickUp (7.7/10)** - Feature-complete general project management  
 **3. TaxDome (7.4/10)** - Accounting-specific with strong client management  
 **4. Trulio (5.9/10)** - Basic accounting automation, fewer advanced features

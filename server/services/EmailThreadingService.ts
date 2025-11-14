@@ -177,7 +177,7 @@ export class EmailThreadingService {
         and(
           eq(emailMessages.organizationId, organizationId),
           sql`${emailMessages.rawHeaders}->>'list-id' = ${listId}`,
-          sql`LOWER(REGEXP_REPLACE(${emailMessages.subject}, '^(Re:|Fwd?:|RE:|FWD?:|Aw:|Sv:|R:|RV:)\\s*', '', 'gi')) = LOWER(${normalizedSubject})`
+          eq(emailMessages.normalizedSubject, normalizedSubject)
         )
       )
       .limit(1);
@@ -222,7 +222,7 @@ export class EmailThreadingService {
         and(
           eq(emailMessages.organizationId, organizationId),
           eq(emailMessages.emailAccountId, emailAccountId),
-          sql`LOWER(REGEXP_REPLACE(${emailMessages.subject}, '^(Re:|Fwd?:|RE:|FWD?:)\\s*', '', 'gi')) = LOWER(${normalizedSubject})`
+          eq(emailMessages.normalizedSubject, normalizedSubject)
         )
       )
       .orderBy(sql`${emailMessages.sentAt} DESC`)

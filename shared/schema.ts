@@ -3516,8 +3516,9 @@ export const emailMessages = pgTable("email_messages", {
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   
   // Email metadata
-  messageId: text("message_id").notNull(), // External message ID from provider
-  threadId: text("thread_id"), // For threading conversations
+  messageId: text("message_id").notNull(), // RFC Message-ID from headers (canonical)
+  providerMessageId: text("provider_message_id").notNull(), // Provider's resource ID (Gmail msg.id, Outlook id)
+  threadId: text("thread_id"), // For threading conversations (namespaced)
   
   // Email details
   from: text("from").notNull(),

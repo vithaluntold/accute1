@@ -18447,6 +18447,84 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ==================== Email Threading Routes ====================
+
+  const { EmailThreadingService } = await import('./services/EmailThreadingService');
+  const emailThreadingService = new EmailThreadingService();
+
+  // List all email threads for organization
+  app.get("/api/email/threads", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const organizationId = req.user?.organizationId;
+
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const threads = await emailThreadingService.getThreadsForOrganization(
+        organizationId,
+        limit,
+        offset
+      );
+
+      res.json(threads);
+    } catch (error: any) {
+      console.error("[Email Threading] Failed to list threads:", error);
+      res.status(500).json({ error: "Failed to fetch email threads" });
+    }
+  });
+
+  // Get thread detail with all messages
+  app.get("/api/email/threads/:threadId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { threadId } = req.params;
+      const organizationId = req.user?.organizationId;
+
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const messages = await emailThreadingService.getThreadMessages(threadId, organizationId);
+
+      if (messages.length === 0) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+
+      const summary = await emailThreadingService.getThreadSummary(threadId, organizationId);
+
+      res.json({
+        threadId,
+        summary,
+        messages
+      });
+    } catch (error: any) {
+      console.error("[Email Threading] Failed to get thread:", error);
+      res.status(500).json({ error: "Failed to fetch thread" });
+    }
+  });
+
+  // Mark thread as read
+  app.patch("/api/email/threads/:threadId/read", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { threadId } = req.params;
+      const organizationId = req.user?.organizationId;
+
+      if (!organizationId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      await emailThreadingService.markThreadAsRead(threadId, organizationId);
+
+      res.json({ success: true, message: "Thread marked as read" });
+    } catch (error: any) {
+      console.error("[Email Threading] Failed to mark thread as read:", error);
+      res.status(500).json({ error: "Failed to mark thread as read" });
+    }
+  });
+
   // Register pricing management routes (product families, SKUs, add-ons, gateways, service plans)
   registerPricingRoutes(app);
 
