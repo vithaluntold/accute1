@@ -19800,7 +19800,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // ==================== USER SKILLS ROUTES ====================
 
   // Add skill to user
-  app.post("/api/users/:userId/skills", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/users/:userId/skills", requireAuth, requirePermission("team.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { userId } = req.params;
       const organizationId = req.user?.organizationId;
@@ -19834,7 +19834,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Update user skill
-  app.patch("/api/users/:userId/skills/:userSkillId", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.patch("/api/users/:userId/skills/:userSkillId", requireAuth, requirePermission("team.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { userId, userSkillId } = req.params;
       const organizationId = req.user?.organizationId;
@@ -19873,7 +19873,7 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Remove skill from user
-  app.delete("/api/users/:userId/skills/:userSkillId", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.delete("/api/users/:userId/skills/:userSkillId", requireAuth, requirePermission("team.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { userId, userSkillId } = req.params;
       const organizationId = req.user?.organizationId;
@@ -19921,16 +19921,20 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Endorse user skill
-  app.post("/api/users/:userId/skills/:userSkillId/endorse", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/users/:userId/skills/:userSkillId/endorse", requireAuth, requirePermission("team.manage"), async (req: AuthRequest, res: Response) => {
     try {
       const { userSkillId } = req.params;
       const organizationId = req.user?.organizationId;
+      const currentUserId = req.user?.id;
       
-      if (!organizationId) {
+      if (!organizationId || !currentUserId) {
         return res.status(403).json({ error: "Organization access required" });
       }
 
       const userSkill = await SkillService.endorseUserSkill(userSkillId, organizationId);
+
+      // Log endorsement activity
+      await logActivity(currentUserId, organizationId, "endorse", "user_skill", userSkill.id, {}, req);
       res.json(userSkill);
     } catch (error: any) {
       if (error.message === "User skill not found") {
