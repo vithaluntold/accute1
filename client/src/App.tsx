@@ -135,6 +135,7 @@ const ExecutiveDashboard = lazy(() => import("@/pages/executive-dashboard"));
 const ReportBuilder = lazy(() => import("@/pages/report-builder"));
 const ProfitabilityView = lazy(() => import("@/pages/profitability-view"));
 const ResourceAllocation = lazy(() => import("@/pages/resource-allocation"));
+const SkillsManagement = lazy(() => import("@/pages/skills-management"));
 const SubscriptionPricing = lazy(() => import("@/pages/subscription-pricing"));
 const EmployeeProfile = lazy(() => import("@/pages/employee-profile"));
 const LiveChat = lazy(() => import("@/pages/live-chat"));
@@ -725,6 +726,13 @@ function Router() {
         <OrganizationRoute>
           <AppLayout>
             <ResourceAllocation />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/skills-management">
+        <OrganizationRoute>
+          <AppLayout>
+            <SkillsManagement />
           </AppLayout>
         </OrganizationRoute>
       </Route>
