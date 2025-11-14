@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getUser } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,17 +9,101 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, Send, AlertCircle, CheckCircle, Clock, User } from "lucide-react";
+import { MessageSquare, Send, AlertCircle, CheckCircle, Clock, User, Reply, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { LiveChatConversation, LiveChatMessage } from "@shared/schema";
 import { canAccessLiveChat } from "@shared/accessControl";
+
+interface MessageWithReplies extends LiveChatMessage {
+  replies: MessageWithReplies[];
+}
+
+// Recursive message thread component
+function MessageThread({ 
+  message, 
+  depth = 0,
+  onReply,
+  user
+}: { 
+  message: MessageWithReplies; 
+  depth?: number;
+  onReply: (msg: LiveChatMessage) => void;
+  user: any;
+}) {
+  // Cap indentation at 3 levels but render all messages
+  const maxIndentDepth = 3;
+  const indentLevel = Math.min(depth, maxIndentDepth);
+  const shouldIndent = indentLevel > 0;
+  const isOwnMessage = message.senderId === user.id;
+  const isAgent = message.senderType === 'agent';
+  
+  return (
+    <div className={shouldIndent ? "ml-8 border-l-2 border-primary/30 pl-4 mt-3" : ""}>
+      {/* Render the message */}
+      <div className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+        <Avatar className={depth > 0 ? "h-7 w-7" : "h-8 w-8"}>
+          <AvatarFallback>
+            {isAgent ? 'A' : 'U'}
+          </AvatarFallback>
+        </Avatar>
+        <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[70%]`}>
+          <div
+            className={`rounded-lg px-4 py-2 ${
+              isOwnMessage
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted'
+            }`}
+          >
+            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-muted-foreground">
+              {new Date(message.createdAt).toLocaleTimeString()}
+            </span>
+            {message.replies?.length > 0 && (
+              <Badge variant="secondary" className="h-4 text-xs" data-testid={`badge-reply-count-${message.id}`}>
+                {message.replies.length} {message.replies.length === 1 ? 'reply' : 'replies'}
+              </Badge>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs mt-1"
+            onClick={() => onReply(message)}
+            data-testid={`button-reply-${message.id}`}
+          >
+            <Reply className="h-3 w-3 mr-1" />
+            Reply
+          </Button>
+        </div>
+      </div>
+      
+      {/* Recursively render ALL replies (indentation capped but all messages shown) */}
+      {message.replies?.length > 0 && (
+        <div className="space-y-2">
+          {message.replies.map((reply) => (
+            <MessageThread 
+              key={reply.id} 
+              message={reply} 
+              depth={depth + 1}
+              onReply={onReply}
+              user={user}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LiveChat() {
   const user = getUser();
   const { toast } = useToast();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageContent, setMessageContent] = useState("");
+  const [replyToMessage, setReplyToMessage] = useState<LiveChatMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
@@ -184,6 +268,35 @@ export default function LiveChat() {
     }
   }, [messagesData]);
 
+  // Build message tree with all levels
+  const buildMessageTree = useMemo(() => {
+    if (!messages) return [];
+    
+    // Create map of all messages by ID for quick lookup
+    const messageMap = new Map(messages.map(m => [m.id, { ...m, replies: [] as MessageWithReplies[] }]));
+    
+    // Separate root messages from replies
+    const rootMessages: MessageWithReplies[] = [];
+    
+    messages.forEach(msg => {
+      if (!msg.inReplyTo) {
+        // This is a root message
+        rootMessages.push(messageMap.get(msg.id)!);
+      } else {
+        // This is a reply - attach to parent
+        const parent = messageMap.get(msg.inReplyTo);
+        if (parent) {
+          parent.replies.push(messageMap.get(msg.id)!);
+        } else {
+          // Parent not found - treat as root (orphaned)
+          rootMessages.push(messageMap.get(msg.id)!);
+        }
+      }
+    });
+    
+    return rootMessages;
+  }, [messages]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -196,9 +309,20 @@ export default function LiveChat() {
     ws.send(JSON.stringify({
       type: 'send_message',
       content: messageContent,
+      inReplyTo: replyToMessage?.id || null,
     }));
 
     setMessageContent("");
+    setReplyToMessage(null);
+  };
+
+  // Handle reply
+  const handleReply = (message: LiveChatMessage) => {
+    setReplyToMessage(message);
+  };
+
+  const handleCancelReply = () => {
+    setReplyToMessage(null);
   };
 
   // Handle typing
@@ -369,39 +493,17 @@ export default function LiveChat() {
                       <p className="text-muted-foreground">No messages yet. Say hello!</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {messages.map((msg) => {
-                        const isOwnMessage = msg.senderId === user.id;
-                        const isAgent = msg.senderType === 'agent';
-
-                        return (
-                          <div
-                            key={msg.id}
-                            className={`flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
-                            data-testid={`message-${msg.id}`}
-                          >
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback>
-                                {isAgent ? 'A' : 'U'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'} max-w-[70%]`}>
-                              <div
-                                className={`rounded-lg px-4 py-2 ${
-                                  isOwnMessage
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
-                                }`}
-                              >
-                                <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                              </div>
-                              <span className="text-xs text-muted-foreground mt-1">
-                                {new Date(msg.createdAt).toLocaleTimeString()}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="space-y-6">
+                      {buildMessageTree.map(rootMessage => (
+                        <div key={rootMessage.id} data-testid={`thread-${rootMessage.id}`}>
+                          <MessageThread 
+                            message={rootMessage} 
+                            depth={0} 
+                            onReply={handleReply}
+                            user={user}
+                          />
+                        </div>
+                      ))}
                       {isTyping && (
                         <div className="flex gap-3">
                           <Avatar className="h-8 w-8">
@@ -424,7 +526,26 @@ export default function LiveChat() {
 
               <Separator />
 
-              <div className="p-4">
+              <div className="p-4 space-y-2">
+                {/* Reply indicator */}
+                {replyToMessage && (
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md" data-testid="reply-indicator">
+                    <Reply className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground flex-1">
+                      Replying to: <span className="font-medium">{replyToMessage.content.substring(0, 50)}{replyToMessage.content.length > 50 ? '...' : ''}</span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={handleCancelReply}
+                      data-testid="button-cancel-reply"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Textarea
                     value={messageContent}
