@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique, pgEnum, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -4749,6 +4749,9 @@ export const resourceAllocations = pgTable("resource_allocations", {
   orgIdx: index("resource_allocations_org_idx").on(table.organizationId),
   // Index for finding allocations by date range
   dateRangeIdx: index("resource_allocations_date_range_idx").on(table.startDate, table.endDate),
+  // CHECK constraints for data integrity
+  percentageCheck: check("resource_allocations_percentage_check", sql`${table.allocationPercentage} >= 0 AND ${table.allocationPercentage} <= 100`),
+  dateOrderCheck: check("resource_allocations_date_check", sql`${table.endDate} > ${table.startDate}`),
 }));
 
 // ==================== CLIENT BOOKINGS ====================
