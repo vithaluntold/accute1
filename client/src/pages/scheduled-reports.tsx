@@ -20,8 +20,8 @@ const reportFormSchema = insertScheduledReportSchema.extend({
   name: z.string().min(1, "Name is required"),
   reportType: z.enum(["time_tracking", "profitability", "workload", "custom"]),
   schedule: z.enum(["daily", "weekly", "monthly", "quarterly"]),
-  recipients: z.array(z.string().email()).min(1, "At least one recipient required"),
-});
+  recipientEmail: z.string().email("Valid email required"),
+}).omit({ recipients: true });
 
 export default function ScheduledReportsPage() {
   const { toast } = useToast();
@@ -35,9 +35,9 @@ export default function ScheduledReportsPage() {
       reportType: "time_tracking",
       schedule: "monthly",
       scheduleTime: "09:00",
-      recipients: [""],
+      recipientEmail: "",
       format: "pdf",
-      reportConfig: {},
+      reportConfig: { includeCharts: true },
       isActive: true,
     },
   });
@@ -77,8 +77,8 @@ export default function ScheduledReportsPage() {
   });
 
   const onSubmit = (data: z.infer<typeof reportFormSchema>) => {
-    const validRecipients = data.recipients.filter((r) => r.trim() !== "");
-    createReportMutation.mutate({ ...data, recipients: validRecipients });
+    const { recipientEmail, ...rest } = data;
+    createReportMutation.mutate({ ...rest, recipients: [recipientEmail] });
   };
 
   const toggleReportStatus = (report: ScheduledReport) => {
@@ -170,12 +170,12 @@ export default function ScheduledReportsPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="recipients.0"
+                  name="recipientEmail"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Recipient Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="email@example.com" {...field} data-testid="input-recipient-0" />
+                        <Input type="email" placeholder="email@example.com" {...field} data-testid="input-recipient" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

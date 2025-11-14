@@ -33,7 +33,7 @@ export default function ForecastingPage() {
       description: "",
       forecastType: "revenue",
       strategy: "statistical",
-      configuration: {},
+      configuration: { period: "monthly", lookback: 12 },
       isActive: true,
     },
   });

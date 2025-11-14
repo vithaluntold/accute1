@@ -16,13 +16,15 @@ import { Video, Plus, Calendar, Users, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-const meetingFormSchema = insertMeetingRecordSchema.extend({
+const meetingFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
   provider: z.enum(["zoom", "google_meet", "microsoft_teams"]),
   date: z.string(),
   time: z.string(),
-  duration: z.number().min(15).default(60),
-}).omit({ startTime: true, endTime: true });
+  duration: z.coerce.number().min(15).default(60),
+  meetingUrl: z.string().optional(),
+});
 
 export default function VideoConferencingPage() {
   const { toast } = useToast();
@@ -63,13 +65,18 @@ export default function VideoConferencingPage() {
 
   const onSubmit = (data: z.infer<typeof meetingFormSchema>) => {
     const startTime = new Date(`${data.date}T${data.time}`);
-    const endTime = new Date(startTime.getTime() + data.duration * 60000);
+    const endTime = new Date(startTime.getTime() + Number(data.duration) * 60000);
 
     createMeetingMutation.mutate({
-      ...data,
+      title: data.title,
+      description: data.description || null,
+      provider: data.provider,
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
-      meetingUrl: `https://zoom.us/j/${Math.random().toString(36).substring(7)}`,
+      duration: Number(data.duration),
+      participants: [],
+      meetingUrl: data.meetingUrl || `https://zoom.us/j/${Math.random().toString(36).substring(7)}`,
+      status: "scheduled",
     });
   };
 
