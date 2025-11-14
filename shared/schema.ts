@@ -4224,3 +4224,472 @@ export const insertTimeOffRequestSchema = createInsertSchema(timeOffRequests).om
 });
 export type InsertTimeOffRequest = z.infer<typeof insertTimeOffRequestSchema>;
 export type TimeOffRequest = typeof timeOffRequests.$inferSelect;
+
+// ==================== FORECASTING SYSTEM ====================
+
+// Forecasting Models - Configurations for different forecast types
+export const forecastingModels = pgTable("forecasting_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  forecastType: text("forecast_type").notNull(), // 'revenue', 'workload', 'capacity', 'client_growth'
+  strategy: text("strategy").notNull().default("statistical"), // 'statistical', 'llm', 'hybrid'
+  configuration: jsonb("configuration").default(sql`'{}'::jsonb`), // Model-specific settings
+  
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgTypeIdx: index("forecasting_models_org_type_idx").on(table.organizationId, table.forecastType),
+}));
+
+// Forecasting Runs - Individual forecast executions
+export const forecastingRuns = pgTable("forecasting_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  modelId: varchar("model_id").notNull().references(() => forecastingModels.id),
+  
+  runBy: varchar("run_by").notNull().references(() => users.id),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  granularity: text("granularity").notNull().default("monthly"), // 'daily', 'weekly', 'monthly', 'quarterly'
+  
+  status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+  errorMessage: text("error_message"),
+  
+  // AI-assisted forecasting metadata
+  llmProvider: text("llm_provider"),
+  llmModel: text("llm_model"),
+  llmTokensUsed: integer("llm_tokens_used"),
+  
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orgModelIdx: index("forecasting_runs_org_model_idx").on(table.organizationId, table.modelId),
+  statusIdx: index("forecasting_runs_status_idx").on(table.status),
+}));
+
+// Forecasting Scenarios - Best/worst/expected variations
+export const forecastingScenarios = pgTable("forecasting_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").notNull().references(() => forecastingRuns.id, { onDelete: "cascade" }),
+  
+  label: text("label").notNull(), // 'best_case', 'worst_case', 'expected'
+  growthRate: text("growth_rate"), // e.g., "15%", "-10%"
+  assumptions: jsonb("assumptions").default(sql`'{}'::jsonb`),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  runIdx: index("forecasting_scenarios_run_idx").on(table.runId),
+}));
+
+// Forecasting Predictions - Time-series forecast outputs
+export const forecastingPredictions = pgTable("forecasting_predictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").notNull().references(() => forecastingRuns.id, { onDelete: "cascade" }),
+  scenarioId: varchar("scenario_id").references(() => forecastingScenarios.id, { onDelete: "cascade" }),
+  
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Predicted metrics (flexible JSON for different forecast types)
+  metrics: jsonb("metrics").notNull().default(sql`'{}'::jsonb`),
+  // Example for revenue: {"predicted_revenue": 125000, "confidence": 0.85}
+  // Example for workload: {"predicted_hours": 1200, "capacity_utilization": 0.75}
+  
+  confidenceScore: text("confidence_score"), // 0.0-1.0
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  runScenarioIdx: index("forecasting_predictions_run_scenario_idx").on(table.runId, table.scenarioId),
+  periodIdx: index("forecasting_predictions_period_idx").on(table.periodStart, table.periodEnd),
+}));
+
+// Zod schemas for forecasting
+export const insertForecastingModelSchema = createInsertSchema(forecastingModels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertForecastingModel = z.infer<typeof insertForecastingModelSchema>;
+export type ForecastingModel = typeof forecastingModels.$inferSelect;
+
+export const insertForecastingRunSchema = createInsertSchema(forecastingRuns).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+export type InsertForecastingRun = z.infer<typeof insertForecastingRunSchema>;
+export type ForecastingRun = typeof forecastingRuns.$inferSelect;
+
+export const insertForecastingScenarioSchema = createInsertSchema(forecastingScenarios).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertForecastingScenario = z.infer<typeof insertForecastingScenarioSchema>;
+export type ForecastingScenario = typeof forecastingScenarios.$inferSelect;
+
+export const insertForecastingPredictionSchema = createInsertSchema(forecastingPredictions).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertForecastingPrediction = z.infer<typeof insertForecastingPredictionSchema>;
+export type ForecastingPrediction = typeof forecastingPredictions.$inferSelect;
+
+// ==================== SCHEDULED REPORTS ====================
+
+// Scheduled Reports - Auto-email reports on schedule
+export const scheduledReports = pgTable("scheduled_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  reportType: text("report_type").notNull(), // 'time_tracking', 'profitability', 'workload', 'custom'
+  reportConfig: jsonb("report_config").notNull().default(sql`'{}'::jsonb`), // Filter/params for report
+  
+  schedule: text("schedule").notNull(), // 'daily', 'weekly', 'monthly', 'quarterly'
+  scheduleDay: integer("schedule_day"), // For weekly (1-7) or monthly (1-31)
+  scheduleTime: text("schedule_time").default("09:00"), // Time to send (HH:MM)
+  
+  recipients: text("recipients").array().notNull(), // Email addresses
+  format: text("format").notNull().default("pdf"), // 'pdf', 'csv', 'excel'
+  
+  isActive: boolean("is_active").default(true),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("scheduled_reports_org_idx").on(table.organizationId),
+  nextRunIdx: index("scheduled_reports_next_run_idx").on(table.nextRunAt),
+}));
+
+// Scheduled Report Logs - Execution history
+export const scheduledReportLogs = pgTable("scheduled_report_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduledReportId: varchar("scheduled_report_id").notNull().references(() => scheduledReports.id, { onDelete: "cascade" }),
+  
+  status: text("status").notNull(), // 'success', 'failed'
+  errorMessage: text("error_message"),
+  emailsSent: integer("emails_sent").default(0),
+  
+  executedAt: timestamp("executed_at").notNull().defaultNow(),
+}, (table) => ({
+  reportIdx: index("scheduled_report_logs_report_idx").on(table.scheduledReportId),
+}));
+
+// ==================== VIDEO CONFERENCING ====================
+
+// OAuth Connections - Generic OAuth connections for external services
+export const oauthConnections = pgTable("oauth_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  provider: text("provider").notNull(), // 'zoom', 'google_meet', 'microsoft_teams'
+  encryptedCredentials: text("encrypted_credentials").notNull(), // Encrypted OAuth tokens
+  
+  status: text("status").notNull().default("active"), // 'active', 'expired', 'revoked'
+  expiresAt: timestamp("expires_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userProviderIdx: index("oauth_connections_user_provider_idx").on(table.userId, table.provider),
+}));
+
+// Meeting Records - Video conference meeting logs
+export const meetingRecords = pgTable("meeting_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  provider: text("provider").notNull(), // 'zoom', 'google_meet', 'microsoft_teams'
+  externalMeetingId: text("external_meeting_id"), // Provider's meeting ID
+  meetingUrl: text("meeting_url").notNull(),
+  
+  title: text("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  duration: integer("duration"), // Minutes
+  
+  hostId: varchar("host_id").notNull().references(() => users.id),
+  participants: text("participants").array(), // User IDs or email addresses
+  
+  // Link to related entities
+  projectId: varchar("project_id").references(() => projects.id),
+  eventId: varchar("event_id").references(() => events.id),
+  clientId: varchar("client_id").references(() => clients.id),
+  
+  status: text("status").notNull().default("scheduled"), // 'scheduled', 'in_progress', 'completed', 'cancelled'
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("meeting_records_org_idx").on(table.organizationId),
+  hostIdx: index("meeting_records_host_idx").on(table.hostId),
+}));
+
+// ==================== SKILL-BASED ASSIGNMENT ====================
+
+// Skills - Skills taxonomy
+export const skills = pgTable("skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // 'technical', 'accounting', 'soft_skills', etc.
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("skills_org_idx").on(table.organizationId),
+  orgNameUnique: index("skills_org_name_unique").on(table.organizationId, table.name),
+}));
+
+// User Skills - Skills assigned to users with proficiency levels
+export const userSkills = pgTable("user_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  skillId: varchar("skill_id").notNull().references(() => skills.id, { onDelete: "cascade" }),
+  
+  proficiencyLevel: text("proficiency_level").notNull().default("intermediate"), // 'beginner', 'intermediate', 'advanced', 'expert'
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userSkillUnique: index("user_skills_unique").on(table.userId, table.skillId),
+}));
+
+// Task Skill Requirements - Skills required for tasks
+export const taskSkillRequirements = pgTable("task_skill_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => workflowTasks.id, { onDelete: "cascade" }),
+  skillId: varchar("skill_id").notNull().references(() => skills.id, { onDelete: "cascade" }),
+  
+  requiredLevel: text("required_level").default("intermediate"), // Minimum proficiency required
+  importance: text("importance").default("required"), // 'required', 'preferred', 'nice_to_have'
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  taskIdx: index("task_skill_requirements_task_idx").on(table.taskId),
+}));
+
+// ==================== CLIENT BOOKINGS ====================
+
+// Booking Rules - Availability rules for client booking
+export const bookingRules = pgTable("booking_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  serviceType: text("service_type"), // e.g., 'consultation', 'tax_prep', 'bookkeeping'
+  duration: integer("duration").notNull().default(60), // Minutes
+  
+  // Availability settings
+  availableDays: text("available_days").array().notNull(), // ['monday', 'tuesday', ...]
+  startTime: text("start_time").notNull(), // "09:00"
+  endTime: text("end_time").notNull(), // "17:00"
+  bufferTime: integer("buffer_time").default(15), // Minutes between bookings
+  
+  // Assigned staff
+  assignedTo: text("assigned_to").array(), // User IDs who can handle these bookings
+  
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("booking_rules_org_idx").on(table.organizationId),
+}));
+
+// Client Bookings - Scheduled client appointments
+export const clientBookings = pgTable("client_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  bookingRuleId: varchar("booking_rule_id").references(() => bookingRules.id),
+  
+  clientId: varchar("client_id").references(() => clients.id),
+  clientName: text("client_name"),
+  clientEmail: text("client_email").notNull(),
+  clientPhone: text("client_phone"),
+  
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  meetingRecordId: varchar("meeting_record_id").references(() => meetingRecords.id), // Link to video conference
+  
+  status: text("status").notNull().default("pending"), // 'pending', 'confirmed', 'completed', 'cancelled', 'no_show'
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("client_bookings_org_idx").on(table.organizationId),
+  clientIdx: index("client_bookings_client_idx").on(table.clientId),
+  timeIdx: index("client_bookings_time_idx").on(table.startTime),
+}));
+
+// ==================== DOCUMENT COMPARISON ====================
+
+// Document Version Diffs - Stores comparison results between document versions
+export const documentVersionDiffs = pgTable("document_version_diffs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  fromVersionId: varchar("from_version_id").notNull().references(() => documentVersions.id),
+  toVersionId: varchar("to_version_id").notNull().references(() => documentVersions.id),
+  
+  diffData: jsonb("diff_data").notNull().default(sql`'{}'::jsonb`), // Stores diff result
+  diffHtml: text("diff_html"), // Rendered HTML diff for display
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  versionIdx: index("document_version_diffs_versions_idx").on(table.fromVersionId, table.toVersionId),
+}));
+
+// ==================== TRACK CHANGES ====================
+
+// Document Collaboration Sessions - Track collaborative editing sessions
+export const documentCollaborationSessions = pgTable("document_collaboration_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  
+  startedBy: varchar("started_by").notNull().references(() => users.id),
+  trackChangesEnabled: boolean("track_changes_enabled").default(true),
+  
+  status: text("status").notNull().default("active"), // 'active', 'closed'
+  
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+}, (table) => ({
+  docIdx: index("document_collaboration_sessions_doc_idx").on(table.documentId),
+}));
+
+// Document Change Events - Individual changes during collaboration
+export const documentChangeEvents = pgTable("document_change_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => documentCollaborationSessions.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  
+  userId: varchar("user_id").notNull().references(() => users.id),
+  changeType: text("change_type").notNull(), // 'insert', 'delete', 'format', 'comment'
+  changeData: jsonb("change_data").notNull().default(sql`'{}'::jsonb`),
+  
+  position: integer("position"), // Position in document
+  length: integer("length"), // Length of change
+  
+  isAccepted: boolean("is_accepted"),
+  isRejected: boolean("is_rejected"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("document_change_events_session_idx").on(table.sessionId),
+  docIdx: index("document_change_events_doc_idx").on(table.documentId),
+}));
+
+// ==================== ZOD SCHEMAS FOR NEW FEATURES ====================
+
+// Scheduled Reports
+export const insertScheduledReportSchema = createInsertSchema(scheduledReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastRunAt: true,
+  nextRunAt: true,
+});
+export type InsertScheduledReport = z.infer<typeof insertScheduledReportSchema>;
+export type ScheduledReport = typeof scheduledReports.$inferSelect;
+
+// Video Conferencing
+export const insertOAuthConnectionSchema = createInsertSchema(oauthConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOAuthConnection = z.infer<typeof insertOAuthConnectionSchema>;
+export type OAuthConnection = typeof oauthConnections.$inferSelect;
+
+export const insertMeetingRecordSchema = createInsertSchema(meetingRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertMeetingRecord = z.infer<typeof insertMeetingRecordSchema>;
+export type MeetingRecord = typeof meetingRecords.$inferSelect;
+
+// Skills
+export const insertSkillSchema = createInsertSchema(skills).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSkill = z.infer<typeof insertSkillSchema>;
+export type Skill = typeof skills.$inferSelect;
+
+export const insertUserSkillSchema = createInsertSchema(userSkills).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUserSkill = z.infer<typeof insertUserSkillSchema>;
+export type UserSkill = typeof userSkills.$inferSelect;
+
+export const insertTaskSkillRequirementSchema = createInsertSchema(taskSkillRequirements).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTaskSkillRequirement = z.infer<typeof insertTaskSkillRequirementSchema>;
+export type TaskSkillRequirement = typeof taskSkillRequirements.$inferSelect;
+
+// Client Bookings
+export const insertBookingRuleSchema = createInsertSchema(bookingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBookingRule = z.infer<typeof insertBookingRuleSchema>;
+export type BookingRule = typeof bookingRules.$inferSelect;
+
+export const insertClientBookingSchema = createInsertSchema(clientBookings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertClientBooking = z.infer<typeof insertClientBookingSchema>;
+export type ClientBooking = typeof clientBookings.$inferSelect;
+
+// Document Comparison
+export const insertDocumentVersionDiffSchema = createInsertSchema(documentVersionDiffs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDocumentVersionDiff = z.infer<typeof insertDocumentVersionDiffSchema>;
+export type DocumentVersionDiff = typeof documentVersionDiffs.$inferSelect;
+
+// Track Changes
+export const insertDocumentCollaborationSessionSchema = createInsertSchema(documentCollaborationSessions).omit({
+  id: true,
+  startedAt: true,
+  closedAt: true,
+});
+export type InsertDocumentCollaborationSession = z.infer<typeof insertDocumentCollaborationSessionSchema>;
+export type DocumentCollaborationSession = typeof documentCollaborationSessions.$inferSelect;
+
+export const insertDocumentChangeEventSchema = createInsertSchema(documentChangeEvents).omit({
+  id: true,
+  createdAt: true,
+  reviewedAt: true,
+});
+export type InsertDocumentChangeEvent = z.infer<typeof insertDocumentChangeEventSchema>;
+export type DocumentChangeEvent = typeof documentChangeEvents.$inferSelect;
