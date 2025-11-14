@@ -4,6 +4,8 @@ import { parse } from 'cookie';
 import { storage } from './storage';
 import { canAccessLiveChat } from '../shared/accessControl';
 import type { LiveChatConversation, LiveChatMessage } from '../shared/schema';
+import { chatThreadingService } from './services/ChatThreadingService';
+import crypto from 'crypto';
 
 interface LiveChatWebSocket extends WebSocket {
   userId?: string;
@@ -27,6 +29,7 @@ interface LiveChatClientMessage {
   content?: string;
   agentStatus?: string;
   metadata?: any;
+  inReplyTo?: string; // Thread support - backward compatible
 }
 
 interface LiveChatBroadcastMessage {
@@ -375,24 +378,38 @@ async function handleSendMessage(
   message: LiveChatClientMessage,
   conversationConnections: Map<string, Set<LiveChatWebSocket>>
 ) {
-  if (!ws.conversationId || !ws.userId || !message.content) {
+  if (!ws.conversationId || !ws.userId || !message.content || !ws.organizationId) {
     ws.send(JSON.stringify({
       type: 'error',
-      error: 'Invalid message data'
+      error: 'Invalid message data or missing organization ID'
     }));
     return;
   }
 
   try {
-    // Save message to database
+    // Generate message ID before resolving threadId
+    const messageId = crypto.randomUUID();
+
+    // Resolve threadId using ChatThreadingService
+    const threadId = await chatThreadingService.resolveLiveChatThreadId(
+      messageId,
+      ws.conversationId,
+      message.inReplyTo || null,
+      ws.organizationId
+    );
+
+    // Save message to database with threading
     const savedMessage = await storage.createLiveChatMessage({
+      id: messageId, // Pass pre-generated ID
       conversationId: ws.conversationId,
       content: message.content,
       senderType: ws.isAgent ? 'agent' : 'user',
       senderId: ws.userId,
       isInternal: false,
       attachments: message.metadata?.attachments || [],
-      isRead: false
+      isRead: false,
+      threadId,
+      inReplyTo: message.inReplyTo || null,
     });
 
     // Update conversation last message time
@@ -401,9 +418,9 @@ async function handleSendMessage(
       messageCount: (await storage.getLiveChatMessages(ws.conversationId)).length
     });
 
-    console.log(`[Live Chat WS] Message sent in conversation ${ws.conversationId}`);
+    console.log(`[Live Chat WS] Message sent in conversation ${ws.conversationId}, thread: ${threadId}`);
 
-    // Broadcast to all participants in the conversation
+    // Broadcast to all participants
     broadcastToConversation(
       ws.conversationId,
       {
@@ -417,7 +434,7 @@ async function handleSendMessage(
     console.error('[Live Chat WS] Send message error:', error);
     ws.send(JSON.stringify({
       type: 'error',
-      error: 'Failed to send message'
+      error: error.message || 'Failed to send message'
     }));
   }
 }

@@ -1667,12 +1667,18 @@ export const teamChatMessages = pgTable("team_chat_messages", {
   senderId: varchar("sender_id").notNull().references(() => users.id),
   message: text("message").notNull(),
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`), // Attachments, mentions, etc.
+  
+  // Threading support
+  threadId: varchar("thread_id"), // Namespace: ${teamId}:${rootMessageId}
+  inReplyTo: varchar("in_reply_to").references((): any => teamChatMessages.id), // Direct parent message
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   teamIdx: index("team_chat_messages_team_idx").on(table.teamId),
   clientIdx: index("team_chat_messages_client_idx").on(table.clientId),
   senderIdx: index("team_chat_messages_sender_idx").on(table.senderId),
   createdIdx: index("team_chat_messages_created_idx").on(table.createdAt),
+  threadIdx: index("team_chat_messages_thread_idx").on(table.teamId, table.threadId),
 }));
 
 // ==================== CLIENT PORTAL TASK SYSTEM ====================
@@ -3575,6 +3581,10 @@ export const liveChatMessages = pgTable("live_chat_messages", {
   isInternal: boolean("is_internal").notNull().default(false), // Internal agent notes
   attachments: jsonb("attachments").default(sql`'[]'::jsonb`),
   
+  // Threading support (scoped within conversation)
+  threadId: varchar("thread_id"), // Thread within this conversation
+  inReplyTo: varchar("in_reply_to").references((): any => liveChatMessages.id), // Direct parent message
+  
   // Read tracking
   isRead: boolean("is_read").notNull().default(false),
   readAt: timestamp("read_at"),
@@ -3584,6 +3594,7 @@ export const liveChatMessages = pgTable("live_chat_messages", {
   conversationIdx: index("live_chat_messages_conversation_idx").on(table.conversationId),
   senderIdx: index("live_chat_messages_sender_idx").on(table.senderId),
   createdIdx: index("live_chat_messages_created_idx").on(table.createdAt),
+  threadIdx: index("live_chat_messages_thread_idx").on(table.conversationId, table.threadId),
 }));
 
 // Agent Availability - Track support agent online status for live chat

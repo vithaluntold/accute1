@@ -2,6 +2,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { parse } from 'cookie';
 import { storage } from './storage';
+import { chatThreadingService } from './services/ChatThreadingService';
+import crypto from 'crypto';
 
 interface TeamChatWebSocket extends WebSocket {
   userId?: string;
@@ -21,6 +23,7 @@ interface TeamChatMessage {
   teamId?: string;
   message?: string;
   metadata?: any;
+  inReplyTo?: string; // Thread support - backward compatible
 }
 
 interface BroadcastMessage {
@@ -295,26 +298,48 @@ async function handleSendMessage(
   message: TeamChatMessage,
   teamConnections: Map<string, Set<TeamChatWebSocket>>
 ) {
-  const { message: content, metadata } = message;
-  if (!content || !ws.teamId || !ws.userId) {
-    throw new Error('Message content, team ID, and user ID required');
+  const { message: content, metadata, inReplyTo } = message;
+  if (!content || !ws.teamId || !ws.userId || !ws.organizationId) {
+    throw new Error('Message content, team ID, user ID, and organization ID required');
   }
 
-  // Save message to database
-  const chatMessage = await storage.createTeamChatMessage({
-    teamId: ws.teamId,
-    senderId: ws.userId,
-    message: content,
-    metadata: metadata || {},
-  });
+  try {
+    // Generate message ID before resolving threadId
+    const messageId = crypto.randomUUID();
 
-  // Broadcast to all team members
-  broadcastToTeam(ws.teamId, teamConnections, {
-    type: 'new_message',
-    data: chatMessage
-  });
+    // Resolve threadId using ChatThreadingService
+    const threadId = await chatThreadingService.resolveTeamChatThreadId(
+      messageId,
+      ws.teamId,
+      inReplyTo || null,
+      ws.organizationId
+    );
 
-  console.log(`[Team Chat WS] Message sent in team ${ws.teamId} by user ${ws.userId}`);
+    // Save message to database with threading
+    const chatMessage = await storage.createTeamChatMessage({
+      id: messageId, // Pass pre-generated ID
+      teamId: ws.teamId,
+      senderId: ws.userId,
+      message: content,
+      metadata: metadata || {},
+      threadId,
+      inReplyTo: inReplyTo || null,
+    });
+
+    // Broadcast to all team members
+    broadcastToTeam(ws.teamId, teamConnections, {
+      type: 'new_message',
+      data: chatMessage
+    });
+
+    console.log(`[Team Chat WS] Message sent in team ${ws.teamId} by user ${ws.userId}, thread: ${threadId}`);
+  } catch (error: any) {
+    console.error('[Team Chat WS] Send message error:', error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      error: error.message || 'Failed to send message'
+    }));
+  }
 }
 
 /**
