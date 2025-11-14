@@ -4689,6 +4689,10 @@ export const userSkills = pgTable("user_skills", {
   skillId: varchar("skill_id").notNull().references(() => skills.id, { onDelete: "cascade" }),
   
   proficiencyLevel: text("proficiency_level").notNull().default("intermediate"), // 'beginner', 'intermediate', 'advanced', 'expert'
+  yearsExperience: integer("years_experience").default(0), // Years of experience with this skill
+  certifications: text("certifications").array().default(sql`ARRAY[]::text[]`), // e.g., ['CPA', 'CMA', 'CIA']
+  lastUsedDate: timestamp("last_used_date"), // When this skill was last used professionally
+  endorsements: integer("endorsements").default(0), // Count of colleague endorsements
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -4708,6 +4712,43 @@ export const taskSkillRequirements = pgTable("task_skill_requirements", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   taskIdx: index("task_skill_requirements_task_idx").on(table.taskId),
+}));
+
+// ==================== RESOURCE ALLOCATION ====================
+
+// Resource Allocations - % Time allocation per user per project/assignment
+export const resourceAllocations = pgTable("resource_allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // What are they allocated to?
+  assignmentId: varchar("assignment_id").references(() => workflowAssignments.id, { onDelete: "cascade" }), // Specific assignment
+  projectId: varchar("project_id").references(() => projects.id, { onDelete: "cascade" }), // Or project-level allocation
+  
+  // Time period
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  
+  // Allocation percentage (0-100)
+  allocationPercentage: integer("allocation_percentage").notNull(), // e.g., 50 = 50% of time
+  
+  // Hours estimates (optional, calculated from percentage)
+  estimatedHoursPerWeek: numeric("estimated_hours_per_week", { precision: 10, scale: 2 }),
+  
+  // Notes and metadata
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("resource_allocations_user_idx").on(table.userId),
+  assignmentIdx: index("resource_allocations_assignment_idx").on(table.assignmentId),
+  projectIdx: index("resource_allocations_project_idx").on(table.projectId),
+  orgIdx: index("resource_allocations_org_idx").on(table.organizationId),
+  // Index for finding allocations by date range
+  dateRangeIdx: index("resource_allocations_date_range_idx").on(table.startDate, table.endDate),
 }));
 
 // ==================== CLIENT BOOKINGS ====================
@@ -4850,6 +4891,17 @@ export const insertTaskSkillRequirementSchema = createInsertSchema(taskSkillRequ
 });
 export type InsertTaskSkillRequirement = z.infer<typeof insertTaskSkillRequirementSchema>;
 export type TaskSkillRequirement = typeof taskSkillRequirements.$inferSelect;
+
+// Resource Allocations
+export const insertResourceAllocationSchema = createInsertSchema(resourceAllocations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  allocationPercentage: z.number().min(0).max(100), // Validate 0-100%
+});
+export type InsertResourceAllocation = z.infer<typeof insertResourceAllocationSchema>;
+export type ResourceAllocation = typeof resourceAllocations.$inferSelect;
 
 // Client Bookings
 export const insertBookingRuleSchema = createInsertSchema(bookingRules).omit({
