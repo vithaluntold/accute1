@@ -134,6 +134,15 @@ async function createPersistentSeedAccountsInline() {
     console.log("✓ Client User created: David Chen");
   }
 
+  // Ensure Sterling organization has a default LLM configuration
+  const { getOnboardingService } = await import("./organization-onboarding-service");
+  try {
+    const onboardingService = getOnboardingService();
+    await onboardingService.ensureDefaultLlmConfig(organization.id, admin.id);
+  } catch (error) {
+    console.log("Note: LLM config will be created after onboarding service initializes");
+  }
+
   console.log("✅ Persistent seed accounts ready for roleplay");
 }
 
@@ -772,6 +781,10 @@ export async function initializeSystem(app: Express) {
     // Initialize LLM Configuration Service (before agents)
     const { initializeLLMConfigService } = await import("./llm-config-service");
     initializeLLMConfigService(storage);
+    
+    // Initialize Organization Onboarding Service (for auto-provisioning LLM configs)
+    const { initializeOnboardingService } = await import("./organization-onboarding-service");
+    initializeOnboardingService(storage);
 
     // Initialize Agent Registry
     console.log("🤖 Initializing AI Agent Foundry...");
