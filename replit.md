@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ## Overview
-Accute is an AI-native accounting workflow automation platform designed for modern accounting firms. Its primary purpose is to leverage specialized AI agents to automate accounting tasks, thereby boosting efficiency, ensuring compliance, and enhancing accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. Accute aims to revolutionize accounting workflows through AI-driven automation, offering a significant market advantage.
+Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms through AI. It leverages specialized AI agents to automate tasks, enhancing efficiency, ensuring compliance, and improving accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
@@ -21,10 +21,10 @@ Accute is an AI-native accounting workflow automation platform designed for mode
 ## System Architecture
 
 ### UI/UX Decisions
-The UI/UX draws inspiration from Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is implemented as a responsive Progressive Web App (PWA).
+The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is implemented as a responsive Progressive Web App (PWA).
 
 ### Technical Implementations
-The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript, with PostgreSQL (Neon) for data storage managed by Drizzle ORM. Authentication is handled via JWT and bcrypt, supplemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript, with PostgreSQL (Neon) for data storage managed by Drizzle ORM. Authentication relies on JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
 ### Feature Specifications
 - **Multi-tenant Architecture**: Isolated data and distinct roles.
@@ -77,18 +77,13 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 - **Profile Picture Upload**: Full user avatar upload system with image validation, size limits, and old avatar deletion.
 - **Two-Level LLM Configuration System**: Supports user-level (portable) and workspace-level (isolated) LLM configurations with fallback logic.
 - **Client Payment Collection System**: Full payment request and collection workflow with invoice generation, shareable payment links, Razorpay integration, and email notifications.
-- **Email Integration System**: Production-ready OAuth-based email integration with Gmail and Outlook support. Features include:
-  - **OAuth 2.0 Integration**: Secure Gmail and Outlook OAuth flows with HMAC-signed state verification, timing-safe comparisons, and dedicated HMAC key derivation to prevent CSRF attacks
-  - **Token Management**: EmailOAuthService handles AES-256-GCM encrypted credential storage, automatic token refresh with immediate database persistence to prevent token rot, and provider-specific client factories
-  - **Email Sync**: EmailSyncService fetches emails via Gmail API and Microsoft Graph, with incremental sync, message parsing, threading support, and duplicate detection
-  - **API Routes**: Complete REST API for email account management (CRUD), manual sync triggering, message operations (read/star/archive), and full-text search across messages
-  - **Security**: HMAC-SHA256 signed OAuth state with 15-minute TTL, crypto.timingSafeEqual for signature verification, segregated HMAC and encryption keys, and encrypted OAuth credentials at rest
-  - **Multi-Account Support**: Users can connect multiple Gmail and Outlook accounts per organization with automatic account updates during re-authentication
-  - **Route Consolidation**: Legacy OAuth routes removed to eliminate route shadowing vulnerability; EmailOAuthService is single source of truth for all OAuth flows
-  - **Backward Compatibility**: EmailOAuthService supports both legacy JSON credential format ({iv, authTag, encrypted}) and new colon-delimited format (iv:encrypted:authTag) with automatic format detection and normalization
+- **Email Integration System**: OAuth-based email integration with Gmail and Outlook, featuring secure token management, email sync, and API routes for account and message operations.
+- **SSO/SAML Enterprise Authentication**: SAML 2.0 protocol support for IdP/SP-initiated flows, multi-provider compatibility, secure configuration, auto-provisioning, and per-organization settings.
+- **Proposals & Quotes Management**: Full proposal lifecycle management with template support, line items, status tracking, and permission-based access.
+- **Chat Threading Extension**: Production-ready threading for Team Chat and Live Chat with unlimited nesting, recursive UI, and context isolation.
 
 ### System Design Choices
-The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy support. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, providing a single source of truth with caching and cache invalidation. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats, with dedicated upload endpoints for each agent. WebSocket management is lazy-loaded on-demand when chat sessions start.
+The project is structured into `client/`, `server/`, and `shared/` directories. Security is paramount, with robust authentication, encryption, and multi-tenancy. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats. WebSocket management is lazy-loaded on-demand for chat sessions.
 
 ## External Dependencies
 - **PostgreSQL (via Neon)**: Primary database.
