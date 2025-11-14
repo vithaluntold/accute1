@@ -250,7 +250,38 @@ export function registerPerformanceMetricsRoutes(app: Express) {
           return res.status(403).json({ error: "Organization access required" });
         }
 
-        const scores = await metricsService.getMetricScores(metricId, organizationId);
+        // Parse and validate optional date filters from query params
+        let periodStart: Date | undefined;
+        let periodEnd: Date | undefined;
+
+        if (req.query.periodStart) {
+          const parsedStart = z.coerce.date().safeParse(req.query.periodStart);
+          if (!parsedStart.success || isNaN(parsedStart.data.getTime())) {
+            return res.status(400).json({ 
+              error: "Invalid periodStart date. Expected ISO 8601 format (e.g., 2024-01-01)",
+              details: parsedStart.success ? ["Invalid date value"] : parsedStart.error.errors 
+            });
+          }
+          periodStart = parsedStart.data;
+        }
+
+        if (req.query.periodEnd) {
+          const parsedEnd = z.coerce.date().safeParse(req.query.periodEnd);
+          if (!parsedEnd.success || isNaN(parsedEnd.data.getTime())) {
+            return res.status(400).json({ 
+              error: "Invalid periodEnd date. Expected ISO 8601 format (e.g., 2024-01-01)",
+              details: parsedEnd.success ? ["Invalid date value"] : parsedEnd.error.errors 
+            });
+          }
+          periodEnd = parsedEnd.data;
+        }
+
+        const scores = await metricsService.getMetricScores(
+          metricId, 
+          organizationId,
+          periodStart,
+          periodEnd
+        );
         res.json({ scores });
       } catch (error: any) {
         if (error.message === "Metric not found") {
@@ -283,7 +314,7 @@ export function registerPerformanceMetricsRoutes(app: Express) {
 
         const validated = insertPerformanceScoreSchema.parse({
           ...req.body,
-          metricId,
+          metricDefinitionId: metricId,
           organizationId,
         });
 

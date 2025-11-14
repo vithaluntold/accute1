@@ -689,6 +689,7 @@ Return a JSON array of exactly 10 metric suggestions with this structure:
    */
   async updateMetric(
     metricId: string,
+    organizationId: string,
     updates: Partial<InsertPerformanceMetricDefinition>
   ): Promise<PerformanceMetricDefinition> {
     const [updated] = await db
@@ -697,7 +698,12 @@ Return a JSON array of exactly 10 metric suggestions with this structure:
         ...updates,
         updatedAt: new Date(),
       })
-      .where(eq(performanceMetricDefinitions.id, metricId))
+      .where(
+        and(
+          eq(performanceMetricDefinitions.id, metricId),
+          eq(performanceMetricDefinitions.organizationId, organizationId)
+        )
+      )
       .returning();
 
     if (!updated) {
@@ -710,11 +716,86 @@ Return a JSON array of exactly 10 metric suggestions with this structure:
   /**
    * Soft delete a metric
    */
-  async deleteMetric(metricId: string): Promise<void> {
-    await db
+  async deleteMetric(
+    metricId: string,
+    organizationId: string
+  ): Promise<PerformanceMetricDefinition> {
+    const [deleted] = await db
       .update(performanceMetricDefinitions)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(performanceMetricDefinitions.id, metricId));
+      .where(
+        and(
+          eq(performanceMetricDefinitions.id, metricId),
+          eq(performanceMetricDefinitions.organizationId, organizationId)
+        )
+      )
+      .returning();
+
+    if (!deleted) {
+      throw new Error("Metric not found");
+    }
+
+    return deleted;
+  }
+
+  /**
+   * Record a performance score
+   */
+  async recordScore(score: InsertPerformanceScore): Promise<PerformanceScore> {
+    // Validate metric exists and belongs to organization
+    const [metric] = await db
+      .select()
+      .from(performanceMetricDefinitions)
+      .where(
+        and(
+          eq(performanceMetricDefinitions.id, score.metricDefinitionId),
+          eq(performanceMetricDefinitions.organizationId, score.organizationId),
+          eq(performanceMetricDefinitions.isActive, true)
+        )
+      )
+      .limit(1);
+
+    if (!metric) {
+      throw new Error("Metric not found");
+    }
+
+    const [created] = await db
+      .insert(performanceScores)
+      .values({
+        ...score,
+        calculatedAt: new Date(),
+      })
+      .returning();
+
+    return created;
+  }
+
+  /**
+   * Get performance scores for a specific metric
+   */
+  async getMetricScores(
+    metricId: string,
+    organizationId: string,
+    periodStart?: Date,
+    periodEnd?: Date
+  ): Promise<PerformanceScore[]> {
+    const conditions = [
+      eq(performanceScores.metricDefinitionId, metricId),
+      eq(performanceScores.organizationId, organizationId),
+    ];
+
+    if (periodStart) {
+      conditions.push(gte(performanceScores.periodStart, periodStart));
+    }
+    if (periodEnd) {
+      conditions.push(lte(performanceScores.periodEnd, periodEnd));
+    }
+
+    return db
+      .select()
+      .from(performanceScores)
+      .where(and(...conditions))
+      .orderBy(desc(performanceScores.calculatedAt));
   }
 
   /**
