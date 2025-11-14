@@ -23,7 +23,12 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export const pool = new Proxy({} as Pool, {
   get(target, prop) {
     if (!_pool) {
-      _pool = new Pool({ connectionString: getDatabaseUrl() });
+      _pool = new Pool({ 
+        connectionString: getDatabaseUrl(),
+        max: 10, // Maximum 10 connections in pool
+        idleTimeoutMillis: 30000, // Close idle connections after 30s
+        connectionTimeoutMillis: 10000, // Fail fast if connection takes >10s
+      });
     }
     return (_pool as any)[prop];
   }
@@ -33,7 +38,12 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(target, prop) {
     if (!_db) {
       if (!_pool) {
-        _pool = new Pool({ connectionString: getDatabaseUrl() });
+        _pool = new Pool({ 
+          connectionString: getDatabaseUrl(),
+          max: 10, // Maximum 10 connections in pool
+          idleTimeoutMillis: 30000, // Close idle connections after 30s
+          connectionTimeoutMillis: 10000, // Fail fast if connection takes >10s
+        });
       }
       _db = drizzle({ client: _pool, schema });
     }
