@@ -4965,3 +4965,404 @@ export const insertSsoSessionSchema = createInsertSchema(ssoSessions).omit({
 });
 export type InsertSsoSession = z.infer<typeof insertSsoSessionSchema>;
 export type SsoSession = typeof ssoSessions.$inferSelect;
+
+// ============================================================================
+// AI PERSONALITY PROFILING & PERFORMANCE MONITORING SYSTEM
+// ============================================================================
+// Revolutionary multi-framework personality assessment with ML fusion
+// Designed to be extremely difficult to replicate
+
+// Enums for personality frameworks
+export const personalityFrameworkEnum = pgEnum("personality_framework", [
+  "big_five",      // Big Five (OCEAN)
+  "disc",          // DISC Model
+  "mbti",          // Myers-Briggs Type Indicator
+  "eq",            // Emotional Intelligence
+  "cultural"       // Hofstede Cultural Dimensions
+]);
+
+export const mlModelTypeEnum = pgEnum("ml_model_type", [
+  "keyword_analysis",     // Fast keyword/pattern matching
+  "sentiment_analysis",   // Emotion/tone detection
+  "behavioral_patterns",  // Communication style analysis
+  "llm_validation",       // LLM-based deep analysis (token-conscious)
+  "cultural_inference",   // Location + behavior → cultural traits
+  "performance_predictor" // Task success prediction
+]);
+
+export const traitTypeEnum = pgEnum("trait_type", [
+  // Big Five (OCEAN)
+  "openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism",
+  // DISC
+  "dominance", "influence", "steadiness", "compliance",
+  // MBTI dimensions
+  "introversion_extraversion", "sensing_intuition", "thinking_feeling", "judging_perceiving",
+  // EQ components
+  "self_awareness", "self_regulation", "motivation", "empathy", "social_skills",
+  // Cultural dimensions (Hofstede)
+  "power_distance", "individualism_collectivism", "masculinity_femininity", 
+  "uncertainty_avoidance", "long_term_orientation", "indulgence_restraint"
+]);
+
+export const metricAggregationTypeEnum = pgEnum("metric_aggregation_type", [
+  "sum", "average", "min", "max", "count", "rate", "percentage"
+]);
+
+// ML analysis runs (audit trail for fusion jobs) - DEFINED FIRST for FK references
+export const mlAnalysisRuns = pgTable("ml_analysis_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Run metadata
+  runType: varchar("run_type", { length: 50 }).notNull(), // 'personality_update', 'performance_calculation', 'cultural_inference'
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+  
+  // Batch details
+  usersProcessed: integer("users_processed").notNull().default(0),
+  conversationsAnalyzed: integer("conversations_analyzed").notNull().default(0),
+  
+  // Model fusion details
+  modelsUsed: jsonb("models_used"), // Array of model types used
+  fusionStrategy: text("fusion_strategy"), // How models were combined
+  
+  // Resource usage
+  tokensConsumed: integer("tokens_consumed").notNull().default(0),
+  processingTimeSeconds: integer("processing_time_seconds"),
+  
+  // Error handling
+  errorMessage: text("error_message"),
+  
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  orgIdx: index("ml_analysis_runs_org_idx").on(table.organizationId),
+  statusIdx: index("ml_analysis_runs_status_idx").on(table.status),
+  startedIdx: index("ml_analysis_runs_started_idx").on(table.startedAt),
+}));
+
+// Main personality profiles table - one per user per organization
+export const personalityProfiles = pgTable("personality_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Overall confidence score (0-100) based on ML model consensus
+  overallConfidence: integer("overall_confidence").notNull().default(0).$type<number>(),
+  
+  // Number of analyzed conversations
+  conversationsAnalyzed: integer("conversations_analyzed").notNull().default(0),
+  
+  // MBTI type (16 types) if applicable
+  mbtiType: varchar("mbti_type", { length: 4 }), // e.g., "INTJ", "ENFP"
+  mbtiConfidence: integer("mbti_confidence").$type<number>(), // 0-100
+  
+  // DISC primary type
+  discPrimary: varchar("disc_primary", { length: 1 }), // D, I, S, or C
+  discConfidence: integer("disc_confidence").$type<number>(),
+  
+  // Cultural profile summary
+  culturalContext: jsonb("cultural_context"), // { region, inferred_dimensions, confidence }
+  
+  // ML fusion metadata
+  lastAnalysisRunId: varchar("last_analysis_run_id").references(() => mlAnalysisRuns.id),
+  modelsUsedCount: integer("models_used_count").notNull().default(0),
+  
+  // Privacy & consent
+  analysisConsented: boolean("analysis_consented").notNull().default(false),
+  consentedAt: timestamp("consented_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("personality_profiles_user_org_idx").on(table.userId, table.organizationId),
+  orgIdx: index("personality_profiles_org_idx").on(table.organizationId),
+  // One profile per user per organization
+  userOrgUnique: unique("personality_profiles_user_org_unique").on(table.userId, table.organizationId),
+}));
+
+// Individual personality traits with confidence scores
+export const personalityTraits = pgTable("personality_traits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  profileId: varchar("profile_id").notNull().references(() => personalityProfiles.id, { onDelete: 'cascade' }),
+  
+  framework: personalityFrameworkEnum("framework").notNull(),
+  traitType: traitTypeEnum("trait_type").notNull(),
+  
+  // Score normalized to 0-100 scale
+  score: integer("score").notNull(),
+  confidence: integer("confidence").notNull(), // 0-100
+  
+  // Metadata about how this trait was derived
+  derivationMethod: jsonb("derivation_method"), // { models_used, weight_distribution }
+  
+  // Support for time-series tracking
+  observedAt: timestamp("observed_at").notNull().defaultNow(),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  profileIdx: index("personality_traits_profile_idx").on(table.profileId),
+  frameworkIdx: index("personality_traits_framework_idx").on(table.framework),
+  profileFrameworkTraitIdx: index("personality_traits_pft_idx").on(table.profileId, table.framework, table.traitType),
+}));
+
+// Aggregated conversation metrics (NO raw message content)
+// Privacy-first: stores only statistical patterns
+export const conversationMetrics = pgTable("conversation_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Time window for this aggregation
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Channel type
+  channelType: varchar("channel_type", { length: 50 }).notNull(), // 'team_chat', 'live_chat', 'email'
+  
+  // Aggregated metrics
+  messageCount: integer("message_count").notNull().default(0),
+  avgMessageLength: numeric("avg_message_length", { precision: 10, scale: 2 }),
+  avgResponseTimeSeconds: numeric("avg_response_time_seconds", { precision: 10, scale: 2 }),
+  
+  // Sentiment distribution (percentage)
+  sentimentPositive: numeric("sentiment_positive", { precision: 5, scale: 2 }), // 0-100
+  sentimentNeutral: numeric("sentiment_neutral", { precision: 5, scale: 2 }),
+  sentimentNegative: numeric("sentiment_negative", { precision: 5, scale: 2 }),
+  
+  // Communication patterns
+  questionAskedCount: integer("question_asked_count").notNull().default(0),
+  exclamationCount: integer("exclamation_count").notNull().default(0),
+  emojiUsageCount: integer("emoji_usage_count").notNull().default(0),
+  
+  // Interaction patterns
+  conversationsInitiated: integer("conversations_initiated").notNull().default(0),
+  conversationsParticipated: integer("conversations_participated").notNull().default(0),
+  
+  // Advanced linguistic markers (extensible)
+  linguisticMarkers: jsonb("linguistic_markers"), // { formality_score, vocabulary_diversity, etc. }
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userPeriodIdx: index("conversation_metrics_user_period_idx").on(table.userId, table.periodStart),
+  orgPeriodIdx: index("conversation_metrics_org_period_idx").on(table.organizationId, table.periodStart),
+}));
+
+// Performance metric definitions (admin-configurable)
+export const performanceMetricDefinitions = pgTable("performance_metric_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Metric calculation
+  metricType: varchar("metric_type", { length: 50 }).notNull(), // 'task_completion_rate', 'response_time', 'client_satisfaction', etc.
+  aggregationType: metricAggregationTypeEnum("aggregation_type").notNull(),
+  
+  // Formula or calculation logic
+  calculationFormula: jsonb("calculation_formula"), // For complex metrics
+  
+  // AI-suggested metadata
+  aiSuggested: boolean("ai_suggested").notNull().default(false),
+  suggestionReason: text("suggestion_reason"), // Why AI recommended this metric
+  suggestionConfidence: integer("suggestion_confidence"), // 0-100
+  
+  // Weight in overall performance score
+  weight: numeric("weight", { precision: 5, scale: 2 }).notNull().default(sql`1.0`),
+  
+  // Target/threshold values
+  targetValue: numeric("target_value", { precision: 10, scale: 2 }),
+  minAcceptable: numeric("min_acceptable", { precision: 10, scale: 2 }),
+  maxAcceptable: numeric("max_acceptable", { precision: 10, scale: 2 }),
+  
+  // Who can view this metric
+  visibilityScope: varchar("visibility_scope", { length: 50 }).notNull().default("admins_only"), // 'admins_only', 'managers', 'self', 'team', 'all'
+  
+  isActive: boolean("is_active").notNull().default(true),
+  
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("performance_metric_definitions_org_idx").on(table.organizationId),
+  activeIdx: index("performance_metric_definitions_active_idx").on(table.isActive),
+}));
+
+// Performance scores (time-series)
+export const performanceScores = pgTable("performance_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  metricDefinitionId: varchar("metric_definition_id").notNull().references(() => performanceMetricDefinitions.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Time period for this score
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Actual score value
+  score: numeric("score", { precision: 10, scale: 2 }).notNull(),
+  
+  // Comparison to target
+  targetMet: boolean("target_met"),
+  percentageOfTarget: numeric("percentage_of_target", { precision: 5, scale: 2 }),
+  
+  // Supporting data
+  dataPoints: integer("data_points").notNull().default(1), // Number of observations
+  rawData: jsonb("raw_data"), // Detailed breakdown if needed
+  
+  // AI insights
+  aiInsight: text("ai_insight"), // LLM-generated interpretation
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userMetricPeriodIdx: index("performance_scores_ump_idx").on(table.userId, table.metricDefinitionId, table.periodStart),
+  userPeriodIdx: index("performance_scores_user_period_idx").on(table.userId, table.periodStart),
+  orgPeriodIdx: index("performance_scores_org_period_idx").on(table.organizationId, table.periodStart),
+}));
+
+// Cultural profiles based on location and behavior
+export const culturalProfiles = pgTable("cultural_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Location-based baseline (Hofstede country averages)
+  countryCode: varchar("country_code", { length: 2 }), // ISO 3166-1 alpha-2
+  locationBasedProfile: jsonb("location_based_profile"), // Hofstede dimensions for country
+  
+  // Behavior-adjusted scores (learned from conversations)
+  powerDistance: integer("power_distance"), // 0-100
+  individualismCollectivism: integer("individualism_collectivism"), // 0=Collectivist, 100=Individualist
+  masculinityFemininity: integer("masculinity_femininity"), // 0=Feminine, 100=Masculine
+  uncertaintyAvoidance: integer("uncertainty_avoidance"), // 0-100
+  longTermOrientation: integer("long_term_orientation"), // 0-100
+  indulgenceRestraint: integer("indulgence_restraint"), // 0=Restraint, 100=Indulgence
+  
+  // Confidence in behavioral adjustments
+  behavioralConfidence: integer("behavioral_confidence").notNull().default(0), // 0-100
+  
+  // Data provenance
+  conversationsAnalyzed: integer("conversations_analyzed").notNull().default(0),
+  lastAnalysisAt: timestamp("last_analysis_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("cultural_profiles_user_org_idx").on(table.userId, table.organizationId),
+  userOrgUnique: unique("cultural_profiles_user_org_unique").on(table.userId, table.organizationId),
+}));
+
+// Individual ML model outputs (for audit and fusion)
+export const mlModelOutputs = pgTable("ml_model_outputs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  analysisRunId: varchar("analysis_run_id").notNull().references(() => mlAnalysisRuns.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  modelType: mlModelTypeEnum("model_type").notNull(),
+  
+  // Model output (structured JSON)
+  output: jsonb("output").notNull(), // Model-specific schema
+  
+  // Quality metrics
+  confidence: integer("confidence").notNull(), // 0-100
+  checksum: varchar("checksum", { length: 64 }), // SHA-256 of output for integrity
+  
+  // Weighting in fusion
+  fusionWeight: numeric("fusion_weight", { precision: 5, scale: 4 }).notNull().default(sql`1.0`),
+  
+  // Resource tracking
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  processingTimeMs: integer("processing_time_ms"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  runIdx: index("ml_model_outputs_run_idx").on(table.analysisRunId),
+  userModelIdx: index("ml_model_outputs_user_model_idx").on(table.userId, table.modelType),
+}));
+
+// ============================================================================
+// INSERT SCHEMAS & TYPES - AI PERSONALITY PROFILING & PERFORMANCE MONITORING
+// ============================================================================
+
+// Personality Profiles
+export const insertPersonalityProfileSchema = createInsertSchema(personalityProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPersonalityProfile = z.infer<typeof insertPersonalityProfileSchema>;
+export type PersonalityProfile = typeof personalityProfiles.$inferSelect;
+
+// Personality Traits
+export const insertPersonalityTraitSchema = createInsertSchema(personalityTraits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  score: z.number().min(0).max(100),
+  confidence: z.number().min(0).max(100),
+});
+export type InsertPersonalityTrait = z.infer<typeof insertPersonalityTraitSchema>;
+export type PersonalityTrait = typeof personalityTraits.$inferSelect;
+
+// Conversation Metrics
+export const insertConversationMetricsSchema = createInsertSchema(conversationMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertConversationMetrics = z.infer<typeof insertConversationMetricsSchema>;
+export type ConversationMetrics = typeof conversationMetrics.$inferSelect;
+
+// Performance Metric Definitions
+export const insertPerformanceMetricDefinitionSchema = createInsertSchema(performanceMetricDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPerformanceMetricDefinition = z.infer<typeof insertPerformanceMetricDefinitionSchema>;
+export type PerformanceMetricDefinition = typeof performanceMetricDefinitions.$inferSelect;
+
+// Performance Scores
+export const insertPerformanceScoreSchema = createInsertSchema(performanceScores).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPerformanceScore = z.infer<typeof insertPerformanceScoreSchema>;
+export type PerformanceScore = typeof performanceScores.$inferSelect;
+
+// Cultural Profiles
+export const insertCulturalProfileSchema = createInsertSchema(culturalProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  // All Hofstede dimensions are 0-100
+  powerDistance: z.number().min(0).max(100).optional(),
+  individualismCollectivism: z.number().min(0).max(100).optional(),
+  masculinityFemininity: z.number().min(0).max(100).optional(),
+  uncertaintyAvoidance: z.number().min(0).max(100).optional(),
+  longTermOrientation: z.number().min(0).max(100).optional(),
+  indulgenceRestraint: z.number().min(0).max(100).optional(),
+});
+export type InsertCulturalProfile = z.infer<typeof insertCulturalProfileSchema>;
+export type CulturalProfile = typeof culturalProfiles.$inferSelect;
+
+// ML Analysis Runs
+export const insertMlAnalysisRunSchema = createInsertSchema(mlAnalysisRuns).omit({
+  id: true,
+  startedAt: true,
+  completedAt: true,
+});
+export type InsertMlAnalysisRun = z.infer<typeof insertMlAnalysisRunSchema>;
+export type MlAnalysisRun = typeof mlAnalysisRuns.$inferSelect;
+
+// ML Model Outputs
+export const insertMlModelOutputSchema = createInsertSchema(mlModelOutputs).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  confidence: z.number().min(0).max(100),
+});
+export type InsertMlModelOutput = z.infer<typeof insertMlModelOutputSchema>;
+export type MlModelOutput = typeof mlModelOutputs.$inferSelect;
