@@ -58,7 +58,7 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Gantt Chart View**: Interactive Gantt chart visualization for workflow task management with dependency highlighting and critical path detection.
 - **Timeline View**: Stage-level roadmap visualization with milestone tracking and progress monitoring.
 - **Enhanced Report Builder**: Production-ready analytics system with pre-built templates and custom query builder.
-- **Workload View**: Comprehensive capacity planning dashboard with team totals summary, workload distribution chart, and detailed team member cards.
+- **Workload View**: Comprehensive capacity planning dashboard with team totals summary, workload distribution chart, detailed team member cards, and resource allocation percentages with over-allocation warnings.
 - **Unified Inbox**: Consolidated communication hub aggregating Email, Team Chat, and Live Chat into a single interface.
 - **Calendar & Event Management**: Multi-source calendar view aggregating events from dedicated events table, workflow tasks, project tasks, and assignments, including event creation, attendee management, and time-off requests.
 - **Cadence Workflow Builder**: Supports full hierarchy extraction (Stages → Steps → Tasks → Subtasks → Checklists) from uploaded documents and conversational building.

@@ -12238,20 +12238,38 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(403).json({ error: "Organization access required" });
       }
 
-      const [users, assignments, tasks, timeEntries] = await Promise.all([
+      const now = new Date();
+      // Start of today (midnight) for proper date comparison
+      // endDate is stored as DATE type (midnight), so we compare with start of current day
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      const [users, assignments, tasks, timeEntries, resourceAllocations] = await Promise.all([
         storage.getUsersByOrganization(req.user!.organizationId),
         storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId),
         db.select().from(schema.assignmentTasks).where(eq(schema.assignmentTasks.organizationId, req.user!.organizationId)),
-        db.select().from(schema.timeEntries).where(eq(schema.timeEntries.organizationId, req.user!.organizationId))
+        db.select().from(schema.timeEntries).where(eq(schema.timeEntries.organizationId, req.user!.organizationId)),
+        // Get current resource allocations
+        // CRITICAL: endDate is DATE type (midnight), compare with start of day to include full day
+        db.select().from(schema.resourceAllocations).where(
+          and(
+            eq(schema.resourceAllocations.organizationId, req.user!.organizationId),
+            lte(schema.resourceAllocations.startDate, now),        // Started on or before today
+            gte(schema.resourceAllocations.endDate, startOfToday)  // Ends on or after today (inclusive)
+          )
+        )
       ]);
 
-      const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
       const workloadData = users.map(user => {
         const userAssignments = assignments.filter(a => a.assignedTo === user.id);
         const userTasks = tasks.filter((t: any) => t.assignedTo === user.id);
         const userTimeEntries = timeEntries.filter(t => t.userId === user.id);
+        
+        // Calculate current resource allocation percentage
+        const userAllocations = resourceAllocations.filter((a: any) => a.userId === user.id);
+        const totalAllocationPercentage = userAllocations.reduce((sum, a: any) => sum + a.allocationPercentage, 0);
+        const isOverAllocated = totalAllocationPercentage > 100;
 
         const activeAssignments = userAssignments.filter(a => a.status === 'active' || a.status === 'not-started');
         const completedAssignments = userAssignments.filter(a => a.status === 'completed');
@@ -12290,6 +12308,11 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
             billable: parseFloat(billableHours.toFixed(2)),
             nonBillable: parseFloat((totalHours - billableHours).toFixed(2)),
             billablePercentage: totalHours > 0 ? parseFloat((billableHours / totalHours * 100).toFixed(1)) : 0,
+          },
+          allocation: {
+            totalPercentage: totalAllocationPercentage,
+            isOverAllocated,
+            allocationsCount: userAllocations.length,
           },
           metrics: {
             avgTasksPerAssignment: parseFloat(avgTasksPerAssignment.toFixed(1)),

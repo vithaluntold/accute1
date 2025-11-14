@@ -138,6 +138,7 @@ export class OrganizationOnboardingService {
     }
     
     // Create default workspace-level LLM configuration
+    // CRITICAL: Only mark as active if fully configured, otherwise it's unusable
     const config = await this.storage.createLlmConfiguration({
       name: `Default ${provider === 'azure' ? 'Azure OpenAI' : provider === 'openai' ? 'OpenAI' : 'Anthropic'}`,
       provider,
@@ -146,7 +147,7 @@ export class OrganizationOnboardingService {
       apiKeyEncrypted: encryptedKey,
       azureEndpoint: azureEndpointValue,
       isDefault: true,
-      isActive: true,
+      isActive: configured, // Only active if fully configured with valid credentials
       scope: 'workspace',
       organizationId,
       userId: null,

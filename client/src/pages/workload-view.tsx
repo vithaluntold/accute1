@@ -25,6 +25,11 @@ interface TeamMember {
     total: number;
     billable: number;
   };
+  allocation: {
+    totalPercentage: number;
+    isOverAllocated: boolean;
+    allocationsCount: number;
+  };
   metrics: {
     avgHoursPerTask: number;
     avgTasksPerAssignment: number;
@@ -266,6 +271,40 @@ export default function WorkloadView() {
                       </span>
                     </div>
                     <Progress value={capacityPercentage} className="h-2" />
+                  </div>
+
+                  {/* Resource Allocation */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        Resource Allocation
+                        {member.allocation.isOverAllocated && (
+                          <AlertTriangle className="h-3 w-3 text-destructive" />
+                        )}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className={`font-medium ${member.allocation.isOverAllocated ? 'text-destructive' : ''}`}
+                          data-testid={`text-allocation-${member.userId}`}
+                        >
+                          {member.allocation.totalPercentage}%
+                        </span>
+                        {member.allocation.isOverAllocated && (
+                          <Badge variant="destructive" className="text-xs" data-testid={`badge-overallocated-${member.userId}`}>
+                            Over-allocated
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Progress 
+                      value={Math.min(member.allocation.totalPercentage, 100)} 
+                      className={`h-2 ${member.allocation.isOverAllocated ? '[&>div]:bg-destructive' : ''}`}
+                    />
+                    {member.allocation.isOverAllocated && (
+                      <p className="text-xs text-destructive" data-testid={`text-overallocation-warning-${member.userId}`}>
+                        Warning: Allocated to {member.allocation.allocationsCount} project{member.allocation.allocationsCount !== 1 ? 's' : ''} exceeding 100% capacity
+                      </p>
+                    )}
                   </div>
                 </CardHeader>
 
