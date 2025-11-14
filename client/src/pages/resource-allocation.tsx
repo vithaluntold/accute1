@@ -27,8 +27,8 @@ interface ResourceAllocation {
   userId: string;
   projectId: string;
   allocationPercentage: number;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -150,15 +150,28 @@ export default function ResourceAllocation() {
     },
   });
 
+  // Helper to normalize dates to YYYY-MM-DD format
+  const normalizeDateToYYYYMMDD = (dateValue: string | null): string => {
+    if (!dateValue) return "";
+    // Extract first 10 characters (YYYY-MM-DD) from ISO string or date string
+    const normalized = dateValue.substring(0, 10);
+    // Validate format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      console.warn("Invalid date format:", dateValue);
+      return "";
+    }
+    return normalized;
+  };
+
   const handleOpenDialog = (allocation?: ResourceAllocation) => {
     if (allocation) {
       setEditingAllocation(allocation);
       setSelectedUserId(allocation.userId);
       setSelectedProjectId(allocation.projectId);
       setPercentAllocation(allocation.allocationPercentage.toString());
-      // Dates are already ISO strings from the backend, just extract the date part
-      setStartDate(allocation.startDate ? (typeof allocation.startDate === 'string' ? allocation.startDate.split("T")[0] : new Date(allocation.startDate).toISOString().split("T")[0]) : "");
-      setEndDate(allocation.endDate ? (typeof allocation.endDate === 'string' ? allocation.endDate.split("T")[0] : new Date(allocation.endDate).toISOString().split("T")[0]) : "");
+      // Normalize dates to YYYY-MM-DD format
+      setStartDate(normalizeDateToYYYYMMDD(allocation.startDate));
+      setEndDate(normalizeDateToYYYYMMDD(allocation.endDate));
     } else {
       setEditingAllocation(null);
       setSelectedUserId("");
@@ -202,9 +215,9 @@ export default function ResourceAllocation() {
       return;
     }
 
-    // Convert date strings to ISO format for backend
-    const startDateISO = new Date(startDate).toISOString();
-    const endDateISO = new Date(endDate).toISOString();
+    // Convert date strings to ISO format at midnight UTC (prevents timezone shifts)
+    const startDateISO = `${startDate}T00:00:00.000Z`;
+    const endDateISO = `${endDate}T23:59:59.999Z`;
 
     if (editingAllocation) {
       updateMutation.mutate({ 
@@ -363,8 +376,8 @@ export default function ResourceAllocation() {
                               <div className="font-medium text-sm">{allocation.projectName}</div>
                               {(allocation.startDate || allocation.endDate) && (
                                 <div className="text-xs text-muted-foreground">
-                                  {allocation.startDate && new Date(allocation.startDate).toLocaleDateString()} -{" "}
-                                  {allocation.endDate ? new Date(allocation.endDate).toLocaleDateString() : "Ongoing"}
+                                  {allocation.startDate && allocation.startDate.substring(0, 10)} -{" "}
+                                  {allocation.endDate ? allocation.endDate.substring(0, 10) : "Ongoing"}
                                 </div>
                               )}
                             </div>
@@ -376,16 +389,16 @@ export default function ResourceAllocation() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => {
-                                  // Use real allocation from summary with ID
+                                  // Create minimal allocation object for editing
                                   const allocationToEdit: ResourceAllocation = {
                                     id: allocation.id,
                                     userId: userSummary.userId,
                                     projectId: allocation.projectId,
                                     allocationPercentage: allocation.percentAllocation,
-                                    startDate: allocation.startDate ? new Date(allocation.startDate) : null,
-                                    endDate: allocation.endDate ? new Date(allocation.endDate) : null,
-                                    createdAt: new Date(),
-                                    updatedAt: new Date(),
+                                    startDate: allocation.startDate,
+                                    endDate: allocation.endDate,
+                                    createdAt: new Date(), // Not used in edit dialog
+                                    updatedAt: new Date(), // Not used in edit dialog
                                   };
                                   handleOpenDialog(allocationToEdit);
                                 }}
