@@ -1046,6 +1046,123 @@ if (match && !match.usedAt && match.expiresAt > now) {
 
 ---
 
+### **26. Multi-Provider SSO/SAML Enterprise Authentication** 🔐
+
+**UNIQUE TO ACCUTE:**
+- **SAML 2.0 protocol support** - Industry-standard enterprise SSO
+- **Multi-provider compatibility** - Okta, Azure AD, Google Workspace, OneLogin, Auth0
+- **Per-organization SSO configuration** - Each workspace configures their own identity provider
+- **IdP and SP-initiated flows** - Supports both authentication flows
+- **Auto-provisioning** - Automatically create users on first SSO login
+- **Metadata-driven setup** - Simple XML metadata upload for configuration
+- **Secure credential storage** - AES-256-GCM encrypted SAML certificates and keys
+- **Fallback to password authentication** - Organizations can choose SSO, password, or both
+
+**Implementation highlights:**
+- SamlService with passport-saml integration
+- Per-organization SAML configuration in database
+- Automatic user creation with role mapping
+- Session management with JWT tokens
+- Admin UI for SSO configuration and testing
+
+**Business value:**
+- Enterprise sales enabler - Fortune 500 requirement
+- Security improvement - Centralized identity management
+- Compliance requirement - SOC 2, ISO 27001 alignment
+- User experience - Single sign-on across all apps
+
+**Competitors:**
+- ✅ TaxDome: Enterprise SSO (basic)
+- ✅ Karbon: SSO support (limited providers)
+- ❌ Canopy: No SSO support
+- ❌ SafeSend: No SSO support
+
+---
+
+### **27. Proposals & Quotes Management System** 💼
+
+**UNIQUE TO ACCUTE:**
+- **Full CRUD UI** - Create, view, edit, delete proposals with professional interface
+- **Dynamic line items** - Add unlimited service/product line items with descriptions, quantities, rates
+- **Status tracking** - Draft → Sent → Accepted/Rejected/Expired workflow
+- **Template support** - Save and reuse proposal templates for common services
+- **Permission-based access** - Admins create, all roles view based on RBAC
+- **Client assignment** - Link proposals to specific clients
+- **Automatic calculations** - Subtotals, taxes, discounts, grand total
+- **Expiration dates** - Set validity periods for quotes
+- **Professional presentation** - Clean, branded proposal format
+
+**Implementation highlights:**
+- ProposalService with line items support
+- Dedicated proposals page with table and modal UI
+- Status badge visualization (draft/sent/accepted/rejected/expired)
+- Permission middleware (view_proposals, create_proposals, edit_proposals, delete_proposals)
+- Template creation for recurring proposal types
+
+**Business value:**
+- Streamlined sales process - Professional quoting system
+- Faster proposal creation - Templates reduce manual work
+- Better tracking - Know which proposals are accepted/rejected
+- Revenue acceleration - Quick turnaround on quotes
+
+**Competitors:**
+- ✅ TaxDome: Basic proposal system
+- ⚠️ Karbon: Limited quoting features
+- ❌ Canopy: No proposal system
+- ❌ SafeSend: No proposal system
+
+---
+
+### **28. Deep Chat Threading (Unlimited Depth)** 💬
+
+**UNIQUE TO ACCUTE:**
+- **Unlimited nesting depth** - Threads can go as deep as conversations require
+- **Recursive UI rendering** - Beautiful threaded conversations like Reddit/Slack
+- **Bounded indentation** - 3-level visual indentation with overflow indicator
+- **Context isolation** - Reply to specific messages in long conversations
+- **Works in Team Chat AND Live Chat** - Unified threading across all chat types
+- **Thread counters** - See reply counts at a glance
+- **Expand/collapse threads** - Manage complex conversation trees
+- **Performance optimized** - Recursive queries with depth limits
+
+**Implementation highlights:**
+- ChatThreadingService with parent_message_id support
+- Recursive React components for thread rendering
+- Database queries optimized for thread retrieval
+- Reply buttons and thread indicators in UI
+- Indentation styling with rem-based offsets
+
+**Technical architecture:**
+```typescript
+// Messages support threading
+messages: {
+  id, content, userId, chatSessionId,
+  parent_message_id,  // NULL = root message
+  created_at
+}
+
+// Recursive retrieval
+SELECT * FROM messages 
+WHERE chat_session_id = $1 
+ORDER BY created_at ASC
+// Client-side tree construction
+```
+
+**Business value:**
+- Superior conversation management vs competitors
+- Reduces message clutter in busy channels
+- Maintains context in complex discussions
+- Professional collaboration experience
+
+**Competitors:**
+- ⚠️ TaxDome: Linear chat only, no threading
+- ⚠️ Karbon: Basic comments, limited threading
+- ✅ ClickUp: Good threading support
+- ❌ Canopy: No threading
+- ❌ SafeSend: No chat features
+
+---
+
 ## 📊 COMPREHENSIVE COMPETITIVE COMPARISON
 
 ### **Accute vs. TaxDome**

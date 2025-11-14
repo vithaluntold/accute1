@@ -78,9 +78,9 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 - **Two-Level LLM Configuration System**: Supports user-level (portable) and workspace-level (isolated) LLM configurations with fallback logic.
 - **Client Payment Collection System**: Full payment request and collection workflow with invoice generation, shareable payment links, Razorpay integration, and email notifications.
 - **Email Integration System**: OAuth-based email integration with Gmail and Outlook, featuring secure token management, email sync, and API routes for account and message operations.
-- **SSO/SAML Enterprise Authentication**: SAML 2.0 protocol support for IdP/SP-initiated flows, multi-provider compatibility, secure configuration, auto-provisioning, and per-organization settings.
-- **Proposals & Quotes Management**: Full proposal lifecycle management with template support, line items, status tracking, and permission-based access.
-- **Chat Threading Extension**: Production-ready threading for Team Chat and Live Chat with unlimited nesting, recursive UI, and context isolation.
+- **SSO/SAML Enterprise Authentication**: SAML 2.0 protocol support for IdP/SP-initiated flows, multi-provider compatibility (Okta, Azure AD, Google Workspace, OneLogin, Auth0), secure configuration with AES-256-GCM encrypted credentials, auto-provisioning, and per-organization settings.
+- **Proposals & Quotes Management**: Full proposal lifecycle management with dynamic line items, template support, status tracking (draft/sent/accepted/rejected/expired), automatic calculations, permission-based access, and professional branded presentation.
+- **Chat Threading Extension**: Production-ready threading for Team Chat and Live Chat with unlimited nesting depth, recursive UI rendering, bounded indentation (3 levels), thread counters, context isolation, and performance-optimized queries.
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is paramount, with robust authentication, encryption, and multi-tenancy. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats. WebSocket management is lazy-loaded on-demand for chat sessions.

@@ -10,6 +10,7 @@ This document outlines the feature gaps between Accute and TaxDome, along with a
 
 ### Core Platform
 - ✅ **Multi-role Authentication** - Super Admin, Admin, Employee, Client with JWT & bcrypt
+- ✅ **SSO/SAML Enterprise Authentication** - Multi-provider SAML 2.0 (Okta, Azure AD, Google Workspace, OneLogin, Auth0) with per-org configuration and auto-provisioning
 - ✅ **Role-Based Permissions** - Granular permission system with middleware enforcement
 - ✅ **Organization Management** - Multi-tenant architecture with data isolation
 - ✅ **User Management** - CRUD operations, role assignment, organization scoping
@@ -40,6 +41,8 @@ This document outlines the feature gaps between Accute and TaxDome, along with a
 - ✅ **Document Viewing** - Clients can view their documents
 - ✅ **Secure Access** - JWT authentication for client portal
 - ✅ **Notifications** - System for user notifications
+- ✅ **Proposals & Quotes Management** - Full CRUD UI with line items, status tracking (draft/sent/accepted/rejected/expired), template support, permission-based access
+- ✅ **Chat Threading Extension** - Unlimited-depth threading for Team Chat and Live Chat with recursive UI, bounded indentation, and context isolation
 
 ### UI/UX
 - ✅ **Landing Page** - Marketing page with features, comparison, security
