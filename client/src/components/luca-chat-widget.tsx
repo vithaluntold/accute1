@@ -384,11 +384,9 @@ export function LucaChatWidget() {
               )
             );
             
-            // Assistant messages are now saved by the backend WebSocket handler
-            // Reload the current session to sync with database-persisted messages
+            // ✅ FIX: Don't reload all messages - they're already in state and saved by backend
+            // Just generate title and invalidate session list for timestamps
             if (currentSessionId) {
-              loadSessionMessages(currentSessionId);
-              
               // Generate title for new chats after first message exchange
               // Wait for messages to be saved, then check and generate title
               setTimeout(async () => {
@@ -418,7 +416,7 @@ export function LucaChatWidget() {
                 }
               }, 1500);
               
-              // Also invalidate sessions list to update timestamps
+              // Invalidate sessions list to update timestamps
               queryClient.invalidateQueries({ 
                 queryKey: ["/api/luca-chat-sessions"] 
               });
