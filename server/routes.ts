@@ -376,29 +376,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if already verified
       if (user.emailVerified) {
         return res.json({ 
-          message: "Email already verified. You can now log in.",
-          alreadyVerified: true 
+          message: "Email already verified. Please set your password to complete registration.",
+          alreadyVerified: true,
+          token: token // Return token for password setup
         });
       }
 
-      // Update user: set emailVerified = true, clear token
+      // Update user: set emailVerified = true, KEEP token for password setup
       await storage.updateUser(user.id, {
         emailVerified: true,
         emailVerifiedAt: new Date(),
-        emailVerificationToken: null,
-        emailVerificationTokenExpiry: null,
       });
 
       // Log activity
       await logActivity(user.id, user.organizationId || undefined, "email_verified", "user", user.id, {}, req);
 
       res.json({ 
-        message: "Email verified successfully! You can now log in.",
-        verified: true 
+        message: "Email verified successfully! Please set your password to complete registration.",
+        verified: true,
+        token: token // Return token for password setup
       });
     } catch (error: any) {
       console.error("Email verification error:", error);
       res.status(500).json({ error: "Email verification failed" });
+    }
+  });
+
+  // Set Password (Step 2 of secure registration flow - set password after email verification)
+  app.post("/api/auth/set-password", rateLimit(10, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token and password are required" });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters long" });
+      }
+
+      // Find user by verification token
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.emailVerificationToken === token);
+
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired token" });
+      }
+
+      // Check if token has expired
+      if (user.emailVerificationTokenExpiry && new Date() > user.emailVerificationTokenExpiry) {
+        return res.status(400).json({ error: "Token has expired. Please register again." });
+      }
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        return res.status(400).json({ error: "Please verify your email first" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await hashPassword(password);
+
+      // Update user with new password and clear verification token
+      await storage.updateUser(user.id, {
+        password: hashedPassword,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null,
+      });
+
+      await logActivity(user.id, user.organizationId || undefined, "set_password", "user", user.id, {}, req);
+
+      res.json({
+        message: "Password set successfully! You can now log in.",
+        success: true,
+      });
+    } catch (error: any) {
+      console.error("Set password error:", error);
+      res.status(500).json({ error: "Failed to set password" });
     }
   });
 
