@@ -439,7 +439,9 @@ function Router() {
       <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
+      <Route path="/auth/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/auth/register" component={Register} />
       {/* DISABLED: Subscription pricing removed */}
       {/* <Route path="/subscription-pricing" component={SubscriptionPricing} /> */}
       
