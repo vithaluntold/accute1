@@ -45,6 +45,8 @@ import { Loader2 } from "lucide-react";
 const Landing = lazy(() => import("@/pages/landing"));
 const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
@@ -442,6 +444,10 @@ function Router() {
       <Route path="/auth/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/auth/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/auth/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/auth/reset-password" component={ResetPassword} />
       {/* DISABLED: Subscription pricing removed */}
       {/* <Route path="/subscription-pricing" component={SubscriptionPricing} /> */}
       

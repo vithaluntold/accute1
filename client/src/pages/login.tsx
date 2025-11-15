@@ -153,7 +153,18 @@ export default function Login() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setLocation("/auth/forgot-password")}
+                        data-testid="link-forgot-password"
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                     <FormControl>
                       <Input
                         {...field}

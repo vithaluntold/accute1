@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== Auth Routes ====================
   
   // Register
-  app.post("/api/auth/register", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  app.post("/api/auth/register", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { email, username, password, firstName, lastName, organizationName } = req.body;
 
@@ -402,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Resend Verification Email
-  app.post("/api/auth/resend-verification", rateLimit(3, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  app.post("/api/auth/resend-verification", rateLimit(10, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { email } = req.body;
 
@@ -439,6 +439,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Resend verification error:", error);
       res.status(500).json({ error: "Failed to resend verification email" });
+    }
+  });
+
+  // Forgot Password
+  app.post("/api/auth/forgot-password", rateLimit(10, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success message to prevent email enumeration
+      if (!user) {
+        return res.json({ 
+          message: "If an account exists with that email, a password reset link has been sent.",
+          success: true 
+        });
+      }
+
+      // Generate password reset token
+      const resetToken = crypto.randomUUID();
+      const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await storage.updateUser(user.id, {
+        passwordResetToken: resetToken,
+        passwordResetTokenExpiry: tokenExpiry,
+      });
+
+      // Send password reset email
+      try {
+        const resetUrl = `${process.env.APP_URL || req.get('origin')}/auth/reset-password?token=${resetToken}`;
+        
+        if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+          const formData = new FormData();
+          formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
+          formData.append('to', email);
+          formData.append('subject', 'Reset Your Password');
+          formData.append('html', `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Reset Your Password</h1>
+                <p>Hi ${user.firstName || 'there'},</p>
+                <p>We received a request to reset the password for your Accute account.</p>
+                <p>
+                  <a href="${resetUrl}" class="button">Reset Password</a>
+                </p>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+                <p>This link will expire in 1 hour.</p>
+                <p><strong>If you didn't request this password reset, you can safely ignore this email.</strong> Your password will remain unchanged.</p>
+                <div class="footer">
+                  <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `);
+          
+          const response = await fetch(
+            `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+              },
+              body: formData,
+            }
+          );
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
+          }
+          
+          console.log(`✓ Password reset email sent to ${email}`);
+        } else {
+          console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Password reset link:', resetUrl);
+        }
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Continue even if email fails
+      }
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "password_reset_requested", "user", user.id, {}, req);
+
+      res.json({ 
+        message: "If an account exists with that email, a password reset link has been sent.",
+        success: true 
+      });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  // Reset Password
+  app.post("/api/auth/reset-password", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ error: "Token and new password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      // Find user by reset token
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.passwordResetToken === token);
+
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Check if token has expired
+      if (user.passwordResetTokenExpiry && new Date() > user.passwordResetTokenExpiry) {
+        return res.status(400).json({ error: "Reset token has expired. Please request a new password reset." });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(password);
+
+      // Update user: set new password, clear reset token
+      await storage.updateUser(user.id, {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetTokenExpiry: null,
+      });
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "password_reset_completed", "user", user.id, {}, req);
+
+      res.json({ 
+        message: "Password reset successful! You can now log in with your new password.",
+        success: true 
+      });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 
@@ -1143,7 +1298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Register as super admin with key
-  app.post("/api/super-admin/register", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  app.post("/api/super-admin/register", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { email, username, password, firstName, lastName, superAdminKey } = req.body;
 
@@ -1212,7 +1367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Admin Self-Registration ====================
 
-  app.post("/api/auth/register-admin", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  app.post("/api/auth/register-admin", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { email, username, password, firstName, lastName, organizationName } = req.body;
 
@@ -1414,7 +1569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/register-invite", rateLimit(5, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  app.post("/api/auth/register-invite", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
       const { email, username, password, firstName, lastName, invitationToken } = req.body;
 
