@@ -263,11 +263,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register
   app.post("/api/auth/register", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
-      const { email, username, password, firstName, lastName, organizationName } = req.body;
+      const { email, username, firstName, lastName, organizationName } = req.body;
 
-      // Validate input
-      if (!email || !username || !password) {
-        return res.status(400).json({ error: "Email, username and password are required" });
+      // Validate input - password is NOT required, will be set after email verification
+      if (!email || !username) {
+        return res.status(400).json({ error: "Email and username are required" });
       }
 
       // Check if user exists
@@ -308,8 +308,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Hash password
-      const hashedPassword = await hashPassword(password);
+      // Generate temporary password (will be replaced when user sets their password after verification)
+      const temporaryPassword = crypto.randomBytes(32).toString('hex');
+      const hashedTempPassword = await hashPassword(temporaryPassword);
 
       // Generate email verification token
       const verificationToken = crypto.randomUUID();
@@ -319,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userData = insertUserSchema.parse({
         email,
         username,
-        password: hashedPassword,
+        password: hashedTempPassword, // Temporary password, user will set real one after verification
         firstName: firstName || null,
         lastName: lastName || null,
         roleId: clientRole.id,
@@ -1300,10 +1301,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register as super admin with key
   app.post("/api/super-admin/register", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
-      const { email, username, password, firstName, lastName, superAdminKey } = req.body;
+      const { email, username, firstName, lastName, superAdminKey } = req.body;
 
-      if (!email || !username || !password || !superAdminKey) {
-        return res.status(400).json({ error: "All fields including super admin key are required" });
+      if (!email || !username || !superAdminKey) {
+        return res.status(400).json({ error: "Email, username, and super admin key are required" });
       }
 
       const validation = await validateSuperAdminKey(superAdminKey);
@@ -1326,7 +1327,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Super Admin role not found. Contact system administrator." });
       }
 
-      const hashedPassword = await hashPassword(password);
+      // Generate temporary password (will be replaced when user sets their password after verification)
+      const temporaryPassword = crypto.randomBytes(32).toString('hex');
+      const hashedTempPassword = await hashPassword(temporaryPassword);
       
       // Generate email verification token
       const verificationToken = crypto.randomUUID();
@@ -1335,7 +1338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userData = insertUserSchema.parse({
         email,
         username,
-        password: hashedPassword,
+        password: hashedTempPassword, // Temporary password, user will set real one after verification
         firstName: firstName || null,
         lastName: lastName || null,
         roleId: superAdminRole.id,
@@ -1369,10 +1372,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/register-admin", rateLimit(20, 15 * 60 * 1000), async (req: Request, res: Response) => {
     try {
-      const { email, username, password, firstName, lastName, organizationName } = req.body;
+      const { email, username, firstName, lastName, organizationName } = req.body;
 
-      if (!email || !username || !password || !organizationName) {
-        return res.status(400).json({ error: "All fields including organization name are required" });
+      if (!email || !username || !organizationName) {
+        return res.status(400).json({ error: "Email, username, and organization name are required" });
       }
 
       const existingUser = await storage.getUserByEmail(email);
@@ -1402,7 +1405,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Admin role not found. Contact system administrator." });
       }
 
-      const hashedPassword = await hashPassword(password);
+      // Generate temporary password (will be replaced when user sets their password after verification)
+      const temporaryPassword = crypto.randomBytes(32).toString('hex');
+      const hashedTempPassword = await hashPassword(temporaryPassword);
       
       // Generate email verification token
       const verificationToken = crypto.randomUUID();
@@ -1411,7 +1416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userData = insertUserSchema.parse({
         email,
         username,
-        password: hashedPassword,
+        password: hashedTempPassword, // Temporary password, user will set real one after verification
         firstName: firstName || null,
         lastName: lastName || null,
         roleId: adminRole.id,
