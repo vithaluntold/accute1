@@ -110,6 +110,7 @@ const MarketplaceCreatePage = lazy(() => import("@/pages/admin/marketplace-creat
 const MarketplacePublishedPage = lazy(() => import("@/pages/admin/marketplace-published"));
 const AdminDashboard = lazy(() => import("@/pages/admin/admin-dashboard"));
 const AgentFoundryPage = lazy(() => import("@/pages/admin/agent-foundry"));
+const AdminPersonalityProfilingPage = lazy(() => import("@/pages/admin/personality-profiling"));
 const ClientPortalDashboard = lazy(() => import("@/pages/client-portal/dashboard"));
 const ClientMyDocuments = lazy(() => import("@/pages/client-portal/my-documents"));
 const ClientMyTasks = lazy(() => import("@/pages/client-portal/my-tasks"));
@@ -645,6 +646,15 @@ function Router() {
           <RoleGuard allowedRoles={["Super Admin"]}>
             <AppLayout>
               <AgentFoundryPage />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/personality-profiling">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Super Admin", "Admin"]}>
+            <AppLayout>
+              <AdminPersonalityProfilingPage />
             </AppLayout>
           </RoleGuard>
         </ProtectedRoute>
