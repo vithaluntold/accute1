@@ -261,13 +261,50 @@ async function handleJoinTeam(
 ) {
   const { teamId } = message;
   if (!teamId || !ws.userId) {
-    throw new Error('Team ID and user ID required');
+    throw new Error('Team ID (or Channel ID) and user ID required');
   }
 
-  // Verify user is a member of the team
-  const team = await storage.getTeam(teamId);
+  // Try as team first, then fallback to channel (for chat channels)
+  let team = await storage.getTeam(teamId);
+  
   if (!team) {
-    throw new Error('Team not found');
+    // Check if it's a chat channel instead
+    const channel = await storage.getChatChannel(teamId);
+    if (channel && channel.organizationId === ws.organizationId) {
+      // Verify user is a member of the channel
+      const members = await storage.getChatChannelMembers(teamId);
+      const isMember = members.some(m => m.userId === ws.userId);
+      
+      if (!isMember) {
+        throw new Error('Access denied: not a channel member');
+      }
+      
+      // Treat channel as team for WebSocket purposes
+      ws.teamId = teamId;
+      
+      // Add to connections
+      if (!teamConnections.has(teamId)) {
+        teamConnections.set(teamId, new Set());
+      }
+      teamConnections.get(teamId)!.add(ws);
+      
+      console.log(`[Team Chat WS] User ${ws.userId} joined channel ${teamId}`);
+      
+      // Broadcast user joined
+      broadcastToTeam(
+        teamId,
+        {
+          type: 'user_joined',
+          data: { userId: ws.userId }
+        },
+        teamConnections,
+        ws
+      );
+      
+      return;
+    }
+    
+    throw new Error('Team or Channel not found');
   }
 
   if (team.organizationId !== ws.organizationId) {

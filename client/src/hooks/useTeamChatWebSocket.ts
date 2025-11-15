@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useWebRTC, CallType } from './useWebRTC';
 
 interface TeamChatWebSocketOptions {
-  teamId: string;
+  channelId: string;
   userId: string;
   onMessage?: (message: any) => void;
-  onIncomingCall?: (data: { callId: string; callerId: string; callerName: string; callType: CallType; teamId: string }) => void;
+  onIncomingCall?: (data: { callId: string; callerId: string; callerName: string; callType: CallType; channelId: string }) => void;
   onCallAccepted?: (data: { callId: string }) => void;
   onCallRejected?: (data: { callId: string }) => void;
   onCallEnded?: (data: { callId: string }) => void;
@@ -17,6 +17,8 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [currentCallId, setCurrentCallId] = useState<string | null>(null);
   const currentCallIdRef = useRef<string | null>(null);
+  const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
+  const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
@@ -51,7 +53,7 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
           type: 'ice_candidate',
           callId,
           candidate: candidate.toJSON(),
-          teamId: options.teamId,
+          teamId: options.channelId,
         }));
       }
     },
@@ -72,10 +74,10 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
 
-      // Join team
+      // Join channel (using teamId field for compatibility)
       ws.send(JSON.stringify({
         type: 'join_team',
-        teamId: options.teamId,
+        teamId: options.channelId, // Use channelId as teamId
         userId: options.userId,
       }));
     };
@@ -92,16 +94,29 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
 
           // WebRTC signaling messages
           case 'call_started':
-            // Caller receives confirmation
+            // Caller receives confirmation with callId
             webRTC.setCallId(message.data.callId);
             webRTC.setRemoteUserId(message.data.receiverId);
             webRTC.setRemoteUserName(message.data.receiverName);
             webRTC.setCallState('ringing');
             setCurrentCallId(message.data.callId);
+            
+            // Now send the SDP offer that was created earlier
+            if (pendingOfferRef.current) {
+              sendMessage('sdp_offer', {
+                callId: message.data.callId,
+                sdp: pendingOfferRef.current,
+                teamId: options.channelId,
+              });
+              pendingOfferRef.current = null;
+            }
             break;
 
           case 'incoming_call':
-            // Receiver gets incoming call
+            // Receiver gets incoming call  
+            webRTC.setCallId(message.data.callId);
+            webRTC.setRemoteUserId(message.data.callerId);
+            webRTC.setRemoteUserName(message.data.callerName);
             options.onIncomingCall?.(message.data);
             break;
 
@@ -123,8 +138,8 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
             break;
 
           case 'sdp_offer':
-            // Receiver gets SDP offer
-            await webRTC.handleOffer(message.data.sdp);
+            // Receiver gets SDP offer - buffer it until accept
+            incomingOfferRef.current = message.data.sdp;
             break;
 
           case 'sdp_answer':
@@ -170,7 +185,7 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
     };
 
     wsRef.current = ws;
-  }, [options.teamId, options.userId]);
+  }, [options.channelId, options.userId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -200,70 +215,76 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
       // Create WebRTC offer
       const config = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
       const offer = await webRTC.createOffer(config, callType);
+      
+      // Buffer the offer - will be sent after call_started with callId
+      pendingOfferRef.current = offer;
 
-      // Send start_call message
+      // Send start_call message (no callId yet - server will generate it)
       sendMessage('start_call', {
         receiverId,
         callType,
-        teamId: options.teamId,
-      });
-
-      // Send SDP offer
-      sendMessage('sdp_offer', {
-        callId: currentCallId,
-        sdp: offer,
-        teamId: options.teamId,
+        teamId: options.channelId,
       });
     } catch (error) {
       console.error('[TeamChat WS] Failed to start call:', error);
       options.onError?.('Failed to start call');
+      pendingOfferRef.current = null;
     }
-  }, [webRTC, sendMessage, currentCallId, options.teamId, options.onError]);
+  }, [webRTC, sendMessage, options.channelId, options.onError]);
 
-  const acceptCall = useCallback(async (callId: string, callType: CallType, offer: any) => {
+  const acceptCall = useCallback(async (callId: string, callType: CallType) => {
     try {
+      // Get the buffered SDP offer
+      const offer = incomingOfferRef.current;
+      if (!offer) {
+        throw new Error('No SDP offer available');
+      }
+
       webRTC.setCallId(callId);
       setCurrentCallId(callId);
 
       // Create WebRTC answer
       const config = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
       const answer = await webRTC.createAnswer(config, callType, offer);
+      
+      // Clear the buffered offer
+      incomingOfferRef.current = null;
 
       // Send accept_call message
       sendMessage('accept_call', {
         callId,
-        teamId: options.teamId,
+        teamId: options.channelId,
       });
 
       // Send SDP answer
       sendMessage('sdp_answer', {
         callId,
         sdp: answer,
-        teamId: options.teamId,
+        teamId: options.channelId,
       });
     } catch (error) {
       console.error('[TeamChat WS] Failed to accept call:', error);
       options.onError?.('Failed to accept call');
     }
-  }, [webRTC, sendMessage, options.teamId, options.onError]);
+  }, [webRTC, sendMessage, options.channelId, options.onError]);
 
   const rejectCall = useCallback((callId: string) => {
     sendMessage('reject_call', {
       callId,
-      teamId: options.teamId,
+      teamId: options.channelId,
     });
-  }, [sendMessage, options.teamId]);
+  }, [sendMessage, options.channelId]);
 
   const endCall = useCallback(() => {
     if (currentCallId) {
       sendMessage('end_call', {
         callId: currentCallId,
-        teamId: options.teamId,
+        teamId: options.channelId,
       });
       webRTC.cleanup();
       setCurrentCallId(null);
     }
-  }, [currentCallId, sendMessage, webRTC, options.teamId]);
+  }, [currentCallId, sendMessage, webRTC, options.channelId]);
 
   // Connect on mount
   useEffect(() => {

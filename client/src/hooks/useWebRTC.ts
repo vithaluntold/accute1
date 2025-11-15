@@ -97,7 +97,7 @@ export function useWebRTC(options: UseWebRTCOptions = {}) {
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [callId]);
+  }, [options]);
 
   /**
    * Create SDP offer (caller initiates)
