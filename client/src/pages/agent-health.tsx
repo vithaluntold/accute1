@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Activity, 
   AlertCircle, 
@@ -11,7 +12,8 @@ import {
   Server, 
   Bot,
   Clock,
-  Zap
+  Zap,
+  XCircle
 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
@@ -48,12 +50,14 @@ interface HealthResponse {
 }
 
 export default function AgentHealth() {
-  const { data, isLoading, refetch, isFetching } = useQuery<HealthResponse>({
-    queryKey: ['/api/agents/health']
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<HealthResponse>({
+    queryKey: ['/api/agents/health'],
+    retry: 1
   });
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/agents/health'] });
+    // Use refetch() to immediately re-execute the query, especially important in error states
+    refetch();
   };
 
   if (isLoading) {
@@ -69,6 +73,59 @@ export default function AgentHealth() {
           ))}
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to load agent health data';
+    
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
+              Agent Health Control Panel
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Monitor the health and status of all AI agents and LLM providers
+            </p>
+          </div>
+          <Button 
+            onClick={handleRefresh} 
+            disabled={isFetching}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Retrying...' : 'Retry'}
+          </Button>
+        </div>
+
+        <Alert variant="destructive" data-testid="alert-error">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Failed to Load Health Status</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>{errorMessage}</p>
+            <div className="mt-4 space-y-2 text-sm">
+              <p className="font-semibold">Troubleshooting steps:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Check that you have active LLM configurations in Settings</li>
+                <li>Verify your network connection and try refreshing</li>
+                <li>Ensure you have the "settings.manage" permission</li>
+                <li>Check the browser console for additional error details</li>
+              </ul>
+            </div>
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Unable to Display Health Information</CardTitle>
+            <CardDescription>
+              The health check service is currently unavailable. Please try refreshing or contact support if the issue persists.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
