@@ -47,6 +47,8 @@ const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
 const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const VerifyEmail = lazy(() => import("@/pages/verify-email"));
+const SetPassword = lazy(() => import("@/pages/set-password"));
 const PublicFormPage = lazy(() => import("@/pages/public-form"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
@@ -448,6 +450,10 @@ function Router() {
       <Route path="/auth/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/auth/reset-password" component={ResetPassword} />
+      <Route path="/verify-email" component={VerifyEmail} />
+      <Route path="/auth/verify-email" component={VerifyEmail} />
+      <Route path="/set-password" component={SetPassword} />
+      <Route path="/auth/set-password" component={SetPassword} />
       {/* DISABLED: Subscription pricing removed */}
       {/* <Route path="/subscription-pricing" component={SubscriptionPricing} /> */}
       
