@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import { OmniSpectraAgent } from "./index";
 import multer from "multer";
@@ -15,47 +16,39 @@ export const registerRoutes = (app: any) => {
   // Register session management routes
   registerAgentSessionRoutes(app, "omnispectra");
 
-  app.post("/api/agents/omnispectra/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, context } = req.body;
-      
-      // Get default LLM configuration for the organization
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/omnispectra/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, context } = req.body;
 
-      // Gather organization data for assignment tracking
-      const [assignments, workflows, users, clients] = await Promise.all([
-        storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId!),
-        storage.getWorkflowsByOrganization(req.user!.organizationId!),
-        storage.getUsersByOrganization(req.user!.organizationId!),
-        storage.getClientsByOrganization(req.user!.organizationId!)
-      ]);
+        // Gather organization data for assignment tracking
+        const [assignments, workflows, users, clients] = await Promise.all([
+          storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId!),
+          storage.getWorkflowsByOrganization(req.user!.organizationId!),
+          storage.getUsersByOrganization(req.user!.organizationId!),
+          storage.getClientsByOrganization(req.user!.organizationId!)
+        ]);
 
-      // Build organization data context
-      const organizationData = {
-        assignments: assignments.map(a => ({
-          id: a.id,
-          workflowId: a.workflowId,
-          clientId: a.clientId,
-          assignedToId: a.assignedToId,
-          status: a.status,
-          currentStage: a.currentStage,
-          dueDate: a.dueDate,
-          completedAt: a.completedAt,
-          createdAt: a.createdAt
-        })),
-        workflows: workflows.map(w => ({ id: w.id, name: w.name, status: w.status })),
-        users: users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, role: u.role })),
-        clients: clients.map(c => ({ id: c.id, name: c.name, status: c.status, type: c.type })),
-      };
+        // Build organization data context
+        const organizationData = {
+          assignments: assignments.map(a => ({
+            id: a.id,
+            workflowId: a.workflowId,
+            clientId: a.clientId,
+            assignedToId: a.assignedToId,
+            status: a.status,
+            currentStage: a.currentStage,
+            dueDate: a.dueDate,
+            completedAt: a.completedAt,
+            createdAt: a.createdAt
+          })),
+          workflows: workflows.map(w => ({ id: w.id, name: w.name, status: w.status })),
+          users: users.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, role: u.role })),
+          clients: clients.map(c => ({ id: c.id, name: c.name, status: c.status, type: c.type })),
+        };
 
-      // Use OmniSpectraAgent class with organization data
-      const agent = new OmniSpectraAgent(llmConfig);
+        // Use OmniSpectraAgent class with LLM config from middleware
+        const agent = new OmniSpectraAgent(llmConfig);
       const result = await agent.execute({ 
         message, 
         history, 
@@ -67,14 +60,15 @@ export const registerRoutes = (app: any) => {
         suggestions: result.suggestions,
         timestamp: new Date().toISOString(),
       });
-    } catch (error) {
-      console.error("OmniSpectra error:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+      } catch (error) {
+        console.error("OmniSpectra error:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // File upload and parsing endpoint
   const upload = multer({ 
@@ -109,7 +103,10 @@ export const registerRoutes = (app: any) => {
         }
 
         // Get LLM config (optional - only needed for scanned PDF OCR)
-        const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+        const llmConfig = await getLLMConfig({
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id
+        }).catch(() => null);
         
         const parsed = await FileParserService.parseFile(
           req.file.buffer,

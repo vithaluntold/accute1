@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import { LynkAgent } from "./index";
 import multer from "multer";
@@ -16,29 +17,13 @@ export const registerRoutes = (app: any) => {
   registerAgentSessionRoutes(app, "lynk");
 
   // Chat endpoint for conversational message processing
-  app.post("/api/agents/lynk/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, messageContent, llmConfigId } = req.body;
-      
-      // Get LLM configuration (user-selected or default)
-      let llmConfig;
-      if (llmConfigId) {
-        llmConfig = await storage.getLlmConfiguration(llmConfigId);
-        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
-          return res.status(404).json({ error: "LLM configuration not found" });
-        }
-      } else {
-        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      }
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/lynk/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, messageContent } = req.body;
 
-      // Use LynkAgent class
-      const agent = new LynkAgent(llmConfig);
+        // Use LynkAgent class with LLM config from middleware
+        const agent = new LynkAgent(llmConfig);
       const result = await agent.execute({ message, history, messageContent });
 
       res.json({ 
@@ -46,14 +31,15 @@ export const registerRoutes = (app: any) => {
         taskExtraction: result.taskExtraction
       });
       
-    } catch (error) {
-      console.error("Error in Lynk chat:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+      } catch (error) {
+        console.error("Error in Lynk chat:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // Create task from extracted data
   app.post("/api/agents/lynk/create-task", requireAuth, async (req: AuthRequest, res: Response) => {

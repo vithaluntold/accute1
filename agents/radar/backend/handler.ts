@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import { RadarAgent } from "./index";
 import multer from "multer";
@@ -16,31 +17,23 @@ export const registerRoutes = (app: any) => {
   registerAgentSessionRoutes(app, "radar");
 
   // Chat endpoint for activity log analysis and queries
-  app.post("/api/agents/radar/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, assignmentId, projectId } = req.body;
-      
-      // Get default LLM configuration for the organization
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/radar/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, assignmentId, projectId } = req.body;
 
-      // Fetch relevant activity logs for context
-      const activities = await storage.getActivityLogsByOrganization(
-        req.user!.organizationId!,
-        {
-          limit: 100,
-          resource: assignmentId ? "assignment" : projectId ? "project" : undefined,
-          resourceId: assignmentId || projectId
-        }
-      );
+        // Fetch relevant activity logs for context
+        const activities = await storage.getActivityLogsByOrganization(
+          req.user!.organizationId!,
+          {
+            limit: 100,
+            resource: assignmentId ? "assignment" : projectId ? "project" : undefined,
+            resourceId: assignmentId || projectId
+          }
+        );
 
-      // Use RadarAgent class
-      const agent = new RadarAgent(llmConfig);
+        // Use RadarAgent class with LLM config from middleware
+        const agent = new RadarAgent(llmConfig);
       const result = await agent.execute({ message, history, activities, assignmentId, projectId });
 
       res.json({ 
@@ -49,14 +42,15 @@ export const registerRoutes = (app: any) => {
         timestamp: new Date().toISOString()
       });
       
-    } catch (error) {
-      console.error("Radar error:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+      } catch (error) {
+        console.error("Radar error:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // Get activity logs for a specific resource
   app.get("/api/agents/radar/activities/:resourceType/:resourceId", requireAuth, async (req: AuthRequest, res: Response) => {

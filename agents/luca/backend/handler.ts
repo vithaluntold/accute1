@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { LucaAgent } from "./index";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import multer from "multer";
 import { FileParserService } from "../../../server/file-parser-service";
 
@@ -28,53 +29,38 @@ export const registerRoutes = (app: any) => {
   });
   
   // Optional: Direct execution endpoint (for testing without WebSocket)
-  app.post("/api/agents/luca/query", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { query, llmConfigId } = req.body;
-      
-      if (!query) {
-        return res.status(400).json({ error: "Query is required" });
-      }
-      
-      // Get LLM configuration
-      let llmConfig;
-      if (llmConfigId) {
-        llmConfig = await storage.getLlmConfiguration(llmConfigId);
-        if (!llmConfig || llmConfig.organizationId !== req.user!.organizationId) {
-          return res.status(404).json({ error: "LLM configuration not found" });
+  app.post("/api/agents/luca/query", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { query } = req.body;
+        
+        if (!query) {
+          return res.status(400).json({ error: "Query is required" });
         }
-      } else {
-        llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      }
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings." 
+
+        // Initialize Luca agent with LLM config from middleware
+        const agent = new LucaAgent(llmConfig);
+        
+        // Execute query
+        const response = await agent.execute({
+          query,
+          context: {
+            organizationId: req.user!.organizationId!,
+            userId: req.user!.id
+          }
+        });
+        
+        res.json({ response });
+        
+      } catch (error) {
+        console.error("Error in Luca query:", error);
+        res.status(500).json({ 
+          error: "Failed to process query",
+          details: error instanceof Error ? error.message : "Unknown error"
         });
       }
-
-      // Initialize Luca agent
-      const agent = new LucaAgent(llmConfig);
-      
-      // Execute query
-      const response = await agent.execute({
-        query,
-        context: {
-          organizationId: req.user!.organizationId!,
-          userId: req.user!.id
-        }
-      });
-      
-      res.json({ response });
-      
-    } catch (error) {
-      console.error("Error in Luca query:", error);
-      res.status(500).json({ 
-        error: "Failed to process query",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+    })
+  );
 
   // File upload and parsing endpoint
   const upload = multer({ 
@@ -109,7 +95,10 @@ export const registerRoutes = (app: any) => {
         }
 
         // Get LLM config (optional - only needed for scanned PDF OCR)
-        const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+        const llmConfig = await getLLMConfig({
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id
+        }).catch(() => null);
         
         const parsed = await FileParserService.parseFile(
           req.file.buffer,

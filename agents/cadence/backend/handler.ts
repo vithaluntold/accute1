@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { LLMService } from "../../../server/llm-service";
 import { FileParserService } from "../../../server/file-parser-service";
 import multer from "multer";
@@ -35,21 +36,13 @@ export const registerRoutes = (app: any) => {
   // Register session management routes
   registerAgentSessionRoutes(app, "cadence");
   // Chat endpoint for conversational workflow building
-  app.post("/api/agents/cadence/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, currentWorkflow } = req.body;
-      
-      // Get default LLM configuration for the organization
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      
-      if (!llmConfig) {
-        return res.json({
-          response: "Hi! I'm Cadence. To start building workflows, I need an API key to be configured in your LLM settings. Once that's set up, I can help you create custom workflows conversationally!",
-        });
-      }
+  app.post("/api/agents/cadence/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, currentWorkflow } = req.body;
 
-      // Initialize LLM service
-      const llmService = new LLMService(llmConfig);
+        // Initialize LLM service with LLM config from middleware
+        const llmService = new LLMService(llmConfig);
 
       // Build conversation context from history
       let conversationContext = '';
@@ -196,14 +189,15 @@ Current workflow state: ${currentWorkflow ? JSON.stringify(currentWorkflow) : "N
         workflowUpdate: workflowUpdate,
         timestamp: new Date().toISOString(),
       });
-    } catch (error: any) {
-      console.error("Cadence agent error:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error.message 
-      });
-    }
-  });
+      } catch (error: any) {
+        console.error("Cadence agent error:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error.message 
+        });
+      }
+    })
+  );
 
   // Endpoint to save the completed workflow
   app.post("/api/agents/cadence/save-workflow", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -341,13 +335,11 @@ Current workflow state: ${currentWorkflow ? JSON.stringify(currentWorkflow) : "N
           return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
         }
 
-      // Get LLM configuration
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+      // Get LLM configuration using middleware helper
+      const llmConfig = await getLLMConfig({
+        organizationId: req.user!.organizationId!,
+        userId: req.user!.id
+      });
 
       // Parse document using centralized FileParserService
       // This supports scanned PDFs via multimodal AI (OCR), unlike manual parsing

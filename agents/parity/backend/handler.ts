@@ -2,6 +2,7 @@ import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { ParityAgent } from "./index";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import multer from "multer";
 import { FileParserService } from "../../../server/file-parser-service";
@@ -22,23 +23,15 @@ export const registerRoutes = (app: any) => {
   // Register session management routes
   registerAgentSessionRoutes(app, "parity");
   // Chat endpoint for conversational document generation
-  app.post("/api/agents/parity/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, currentDocument } = req.body;
-      
-      // Get default LLM configuration for the organization
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      
-      console.log("LLM Config found:", llmConfig ? `Provider: ${llmConfig.provider}, Model: ${llmConfig.model}` : "None");
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/parity/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, currentDocument } = req.body;
+        
+        console.log("LLM Config found:", llmConfig ? `Provider: ${llmConfig.provider}, Model: ${llmConfig.model}` : "None");
 
-      // Initialize Parity agent
-      const agent = new ParityAgent(llmConfig);
+        // Initialize Parity agent with LLM config from middleware
+        const agent = new ParityAgent(llmConfig);
       console.log("Parity agent initialized, executing prompt...");
       
       // Build conversation context
@@ -91,13 +84,14 @@ export const registerRoutes = (app: any) => {
       });
       
     } catch (error) {
-      console.error("Error in Parity chat:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+        console.error("Error in Parity chat:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // Save generated document to documents library
   app.post("/api/agents/parity/save-document", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -194,7 +188,10 @@ export const registerRoutes = (app: any) => {
           return res.status(400).json({ error: "No file uploaded" });
         }
 
-        const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
+        const llmConfig = await getLLMConfig({
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id
+        }).catch(() => null);
         
         const parsed = await FileParserService.parseFile(
           req.file.buffer,

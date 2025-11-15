@@ -1,10 +1,10 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { insertEmailTemplateSchema } from "../../../shared/schema";
 import { registerAgentSessionRoutes } from "../../../server/agent-sessions";
 import { ScribeAgent } from "./index";
-import { getLLMConfigService } from "../../../server/llm-config-service";
 import multer from "multer";
 import { FileParserService } from "../../../server/file-parser-service";
 
@@ -18,22 +18,13 @@ export const registerRoutes = (app: any) => {
   registerAgentSessionRoutes(app, "scribe");
 
   // Chat endpoint for conversational email template building
-  app.post("/api/agents/scribe/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, currentTemplate, llmConfigId } = req.body;
-      
-      // Get LLM configuration using centralized service
-      const llmConfigService = getLLMConfigService();
-      const llmConfig = await llmConfigService.getConfig(req.user!.organizationId!, llmConfigId);
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/scribe/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, currentTemplate } = req.body;
 
-      // Use ScribeAgent class
-      const agent = new ScribeAgent(llmConfig);
+        // Use ScribeAgent class with LLM config from middleware
+        const agent = new ScribeAgent(llmConfig);
       const result = await agent.execute({ message, history, currentTemplate });
 
       res.json({ 
@@ -41,14 +32,15 @@ export const registerRoutes = (app: any) => {
         templateUpdate: result.templateUpdate
       });
       
-    } catch (error) {
-      console.error("Error in Scribe chat:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+      } catch (error) {
+        console.error("Error in Scribe chat:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // Save email template
   app.post("/api/agents/scribe/save-template", requireAuth, async (req: AuthRequest, res: Response) => {

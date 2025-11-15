@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { requireAuth, type AuthRequest } from "../../../server/auth";
 import { storage } from "../../../server/storage";
+import { withLLMConfig, getLLMConfig } from "../../../server/middleware/agent-llm-middleware";
 import { LLMService } from "../../../server/llm-service";
 import { FileParserService } from "../../../server/file-parser-service";
 import multer from "multer";
@@ -38,21 +39,13 @@ export const registerRoutes = (app: any) => {
   // Register session management routes
   registerAgentSessionRoutes(app, "forma");
   // Chat endpoint for conversational form building
-  app.post("/api/agents/forma/chat", requireAuth, async (req: AuthRequest, res: Response) => {
-    try {
-      const { message, history, currentForm } = req.body;
-      
-      // Get default LLM configuration for the organization
-      const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-      
-      if (!llmConfig) {
-        return res.status(400).json({ 
-          error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-        });
-      }
+  app.post("/api/agents/forma/chat", requireAuth, 
+    withLLMConfig(async (req, res, llmConfig) => {
+      try {
+        const { message, history, currentForm } = req.body;
 
-      // Initialize LLM service
-      const llmService = new LLMService(llmConfig);
+        // Initialize LLM service with LLM config from middleware
+        const llmService = new LLMService(llmConfig);
 
       const systemPrompt = `You are Forma, an AI form builder assistant. You help users create comprehensive, production-ready forms through conversation.
 
@@ -221,14 +214,15 @@ Great! I've added an email field for you. What other information do you need to 
         formUpdate: formUpdate || currentForm
       });
       
-    } catch (error) {
-      console.error("Error in Forma chat:", error);
-      res.status(500).json({ 
-        error: "Failed to process message",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+      } catch (error) {
+        console.error("Error in Forma chat:", error);
+        res.status(500).json({ 
+          error: "Failed to process message",
+          details: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    })
+  );
 
   // Save form as template
   app.post("/api/agents/forma/save-form", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -332,12 +326,10 @@ Great! I've added an email field for you. What other information do you need to 
         }
 
         // Get LLM configuration (required for form generation via AI)
-        const llmConfig = await storage.getDefaultLlmConfiguration(req.user!.organizationId!);
-        if (!llmConfig) {
-          return res.status(400).json({ 
-            error: "No LLM configuration found. Please configure your AI provider in Settings > LLM Configuration." 
-          });
-        }
+        const llmConfig = await getLLMConfig({
+          organizationId: req.user!.organizationId!,
+          userId: req.user!.id
+        });
 
         // Parse document using centralized FileParserService
         const parsed = await FileParserService.parseFile(
