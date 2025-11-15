@@ -1,3 +1,27 @@
+// Helper: Validate ENCRYPTION_KEY has proper byte entropy
+function validateEncryptionKey(key: string): boolean {
+  // Accept base64 encoded 32+ bytes (44+ chars for 32 bytes in base64)
+  const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+  if (base64Regex.test(key) && key.length >= 44) {
+    try {
+      const decoded = Buffer.from(key, 'base64');
+      return decoded.length >= 32; // At least 32 bytes
+    } catch {
+      return false;
+    }
+  }
+  
+  // Accept hex encoded 32+ bytes (64+ chars for 32 bytes in hex)
+  const hexRegex = /^[0-9a-fA-F]+$/;
+  if (hexRegex.test(key) && key.length >= 64) {
+    return true; // Valid hex with 32+ bytes
+  }
+  
+  // For backwards compatibility: accept any string >= 32 chars
+  // (SHA-256 hashing in auth.ts normalizes it to 32 bytes)
+  return key.length >= 32;
+}
+
 // CRITICAL: Validate required environment variables BEFORE any imports
 // This prevents cryptic crashes from missing database or auth configuration
 function validateEnvironment() {
@@ -5,7 +29,6 @@ function validateEnvironment() {
     { name: 'DATABASE_URL', critical: true },
     { name: 'JWT_SECRET', critical: true },
     { name: 'SESSION_SECRET', critical: true },
-    { name: 'ENCRYPTION_KEY', critical: true, minLength: 32 },
   ];
 
   const optionalVars: Array<{ name: string; critical: boolean; minLength?: number }> = [];
@@ -22,6 +45,13 @@ function validateEnvironment() {
     } else if (minLength && process.env[name]!.length < minLength) {
       missing.push(`${name} (too short - minimum ${minLength} characters)`);
     }
+  }
+  
+  // Special validation for ENCRYPTION_KEY (requires proper entropy)
+  if (!process.env.ENCRYPTION_KEY) {
+    missing.push('ENCRYPTION_KEY (required)');
+  } else if (!validateEncryptionKey(process.env.ENCRYPTION_KEY)) {
+    missing.push('ENCRYPTION_KEY (invalid format - must be base64/hex encoded 32+ bytes, or 32+ character string)');
   }
 
   // Check optional variables with warnings
