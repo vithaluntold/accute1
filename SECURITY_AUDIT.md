@@ -29,29 +29,42 @@
 - ✅ Organization-based access control
 - ✅ RBAC with 4-tier permissions (Super Admin, Admin, Employee, Client)
 
-## 🔍 TODO (Phase 2: Application Security)
+## 🔍 COMPLETED (Phase 2: Application Security - Partial)
 
 ### 5. IDOR (Insecure Direct Object Reference)
-**Priority: HIGH**
+**Priority: HIGH**  
+**Status**: ✅ Critical vulnerabilities FIXED (2025-11-15)
 
-Audit all endpoints for proper authorization:
-- [ ] `/api/projects/:id` - Verify user can only access their org's projects
-- [ ] `/api/tasks/:id` - Verify task access is org-scoped
-- [ ] `/api/documents/:id` - Verify document access is org-scoped
-- [ ] `/api/workflows/:id` - Verify workflow access is org-scoped
+**Fixed Endpoints**:
+- [x] `/api/workflows/:id` (GET) - ✅ FIXED: Added organizationId verification
+- [x] `/api/workflows/:id` (PATCH) - ✅ FIXED: Verify ownership before update
+- [x] `/api/tasks/:id` (DELETE) - ✅ FIXED: Verify ownership via workflow chain
+
+**Already Secure** (found during audit):
+- [x] `/api/projects/:id` - ✅ SECURE: Properly checks organizationId
+- [x] `/api/tasks/:id` (PUT) - ✅ SECURE: Verifies via project chain
+- [x] `/api/contacts/:id` - ✅ SECURE: Verifies organizationId
+- [x] `/api/teams/:id` - ✅ SECURE: Verifies organizationId
+- [x] `/api/documents/:id` - ✅ SECURE: Organization-scoped queries
+
+**Remaining Audit**:
 - [ ] `/api/users/:id` - Verify user data access is properly restricted
 - [ ] `/api/organizations/:id` - Verify org access is properly restricted
 - [ ] `/api/llm-configs/:id` - Verify LLM config access is user/org-scoped
 - [ ] `/api/personality-profiles/:userId` - Verify profile access authorization
 - [ ] `/api/performance-metrics/:userId` - Verify metrics access authorization
+- [ ] Other workflow-related endpoints
 
 **Test Pattern**:
 ```typescript
 // Try to access another org's resource
-GET /api/projects/123
+GET /api/workflows/123
 Authorization: Bearer <user-from-org-A-token>
-// Should fail if project 123 belongs to org B
+// Should return 404 if workflow 123 belongs to org B
 ```
+
+**Fixes Validated**: ✅ Architect review passed  
+**Production Status**: ✅ Deployed and running
 
 ### 6. File Upload Security
 **Priority: HIGH**

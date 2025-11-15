@@ -2424,6 +2424,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!workflow) {
         return res.status(404).json({ error: "Workflow not found" });
       }
+      
+      // ✅ SECURITY: Verify workflow belongs to user's organization (unless super admin)
+      if (req.user!.organizationId && workflow.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      
       res.json(workflow);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch workflow" });
@@ -2448,10 +2454,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/workflows/:id", requireAuth, requirePermission("workflows.edit"), async (req: AuthRequest, res: Response) => {
     try {
-      const workflow = await storage.updateWorkflow(req.params.id, req.body);
-      if (!workflow) {
+      // ✅ SECURITY: Fetch workflow FIRST to verify ownership before update
+      const existing = await storage.getWorkflow(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "Workflow not found" });
       }
+      
+      // ✅ SECURITY: Verify workflow belongs to user's organization (unless super admin)
+      if (req.user!.organizationId && existing.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Workflow not found" });
+      }
+      
+      const workflow = await storage.updateWorkflow(req.params.id, req.body);
       await logActivity(req.userId, req.user!.organizationId || undefined, "update", "workflow", workflow.id, {}, req);
       res.json(workflow);
     } catch (error: any) {
@@ -11372,6 +11386,21 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       if (!task) {
         return res.status(404).json({ error: "Task not found" });
       }
+      
+      // ✅ SECURITY: Verify task belongs to user's organization via workflow chain
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || (req.user!.organizationId && workflow.organizationId !== req.user!.organizationId)) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
       await storage.deleteWorkflowTask(req.params.id);
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "workflow_task", req.params.id, {}, req);
       res.status(204).send();
