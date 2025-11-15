@@ -144,6 +144,7 @@ const LiveChat = lazy(() => import("@/pages/live-chat"));
 const AgentIntegrationGuide = lazy(() => import("@/pages/agent-integration-guide"));
 const Help = lazy(() => import("@/pages/help"));
 const AgentHealth = lazy(() => import("@/pages/agent-health"));
+const CreateWorkspace = lazy(() => import("@/pages/create-workspace"));
 
 // Competitive Gap Features
 const Forecasting = lazy(() => import("@/pages/forecasting"));
@@ -484,6 +485,13 @@ function Router() {
               </AppLayout>
             </RoleGuard>
           </OrganizationRoute>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/organizations/create">
+        <ProtectedRoute>
+          <AppLayout>
+            <CreateWorkspace />
+          </AppLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/profile">
