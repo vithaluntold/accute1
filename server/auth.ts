@@ -7,7 +7,10 @@ import type { User } from "@shared/schema";
 import { calculateKycCompletion } from "@shared/kycUtils";
 
 const SALT_ROUNDS = 12;
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
+
+// SECURITY: JWT_SECRET is validated in server/index.ts validateEnvironment()
+// No fallback - server will fail fast at startup if missing (prevents session invalidation on restart)
+const JWT_SECRET = process.env.JWT_SECRET!;
 const SESSION_EXPIRY_HOURS = 24 * 7; // 7 days
 
 export interface AuthRequest extends Request {
@@ -43,9 +46,9 @@ export function verifyToken(token: string): { userId: string } | null {
 }
 
 // AES-256 encryption for sensitive data
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY 
-  ? crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY).digest()
-  : crypto.randomBytes(32);
+// SECURITY: ENCRYPTION_KEY is validated in server/index.ts validateEnvironment()
+// No fallback - server will fail fast at startup if missing (prevents silent data loss on restart)
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY!).digest();
 const IV_LENGTH = 16;
 
 export function encrypt(text: string): string {

@@ -68,6 +68,7 @@ export default function Landing() {
   const comparisonFeatures = [
     { feature: "AI Agent Marketplace", accute: true, taxdome: false },
     { feature: "Multi-Provider AI (OpenAI, Azure, Anthropic)", accute: true, taxdome: false },
+    { feature: "AI Personality Profiling & Performance Monitoring", accute: true, taxdome: false },
     { feature: "Workflow Automation", accute: true, taxdome: true },
     { feature: "Client Portal", accute: true, taxdome: true },
     { feature: "Document Management", accute: true, taxdome: true },

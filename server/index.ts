@@ -83,7 +83,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { registerRoutes, setInitializationStatus } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, log } from "./vite";
 import { initializeSystem } from "./init";
 // DISABLED: WebSockets now lazy-load with chat sessions, not at server startup
 // import { setupWebSocket } from "./websocket";
@@ -255,8 +255,78 @@ app.use((req, res, next) => {
       });
     });
     
-    // NOW do heavy initialization in the background (after server is listening)
-    // This allows health checks to pass while initialization happens
+    // CRITICAL FIX: Setup Vite/static serving IMMEDIATELY after server starts listening
+    // This prevents "Cannot GET /" errors during initialization window
+    const distPath = path.resolve(moduleDir, "public");
+    const isDevelopment = app.get("env") === "development";
+    
+    // ALWAYS use Vite in development, even if dist exists
+    if (isDevelopment) {
+      try {
+        console.log('🔧 Setting up Vite dev server...');
+        await setupVite(app, server);
+        console.log('✅ Vite dev server initialized - routes ready');
+      } catch (viteError) {
+        console.error('❌ Vite setup failed:', viteError);
+        console.error('Error stack:', viteError instanceof Error ? viteError.stack : 'N/A');
+        console.warn('⚠️  Continuing without Vite dev server');
+      }
+    } else {
+      // PRODUCTION: Serve static files from dist/public
+      try {
+        if (!fs.existsSync(distPath)) {
+          throw new Error(
+            `Could not find the build directory: ${distPath}, make sure to build the client first`,
+          );
+        }
+
+        app.use(express.static(distPath));
+        
+        // SPA fallback: serve index.html for all non-API routes
+        app.use("*", (_req, res) => {
+          res.sendFile(path.resolve(distPath, "index.html"));
+        });
+        
+        console.log('✅ Static file serving initialized (production mode) - routes ready');
+        console.log(`   Serving from: ${distPath}`);
+      } catch (staticError) {
+        console.error('❌ Static file setup failed:', staticError);
+        console.warn('⚠️  Continuing without static file serving');
+      }
+    }
+    
+    // Serve uploaded files from /uploads directory
+    const uploadsPath = path.resolve(process.cwd(), "uploads");
+    app.use("/uploads", express.static(uploadsPath, {
+      fallthrough: false,
+      setHeaders: (res) => {
+        // Allow browser to determine content type from file extension
+      }
+    }));
+    console.log('✅ Upload serving initialized');
+    console.log(`   Serving from: ${uploadsPath}`);
+    
+    // Error handler MUST be registered AFTER static file serving
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      
+      console.error('Request error:', {
+        status,
+        message,
+        path: _req.path,
+        method: _req.method,
+        stack: err.stack
+      });
+
+      res.status(status).json({ message });
+    });
+    
+    // WebSockets disabled at startup - lazy-load on-demand
+    console.log('ℹ️  WebSockets will initialize on-demand when needed');
+    
+    // NOW do heavy initialization in the background (after server is listening AND routes are ready)
+    // This allows health checks AND user requests to work while initialization happens
     console.log('🔧 Starting background initialization...');
     
     // Background initialization - don't await, let it run asynchronously
@@ -273,75 +343,6 @@ app.use((req, res, next) => {
         setInitializationStatus(false, errorMsg);
         console.warn('⚠️  Server running with limited functionality');
       }
-      
-      // Serve uploaded files from /uploads directory
-      const uploadsPath = path.resolve(process.cwd(), "uploads");
-      app.use("/uploads", express.static(uploadsPath, {
-        fallthrough: false,
-        setHeaders: (res) => {
-          // Allow browser to determine content type from file extension
-        }
-      }));
-      console.log('✅ Upload serving initialized');
-      console.log(`   Serving from: ${uploadsPath}`);
-      
-      // Setup static file serving AFTER initialization
-      const distPath = path.resolve(moduleDir, "public");
-      const isDevelopment = app.get("env") === "development";
-      
-      // ALWAYS use Vite in development, even if dist exists
-      if (isDevelopment) {
-        try {
-          console.log('🔧 Setting up Vite dev server...');
-          await setupVite(app, server);
-          console.log('✅ Vite dev server initialized');
-        } catch (viteError) {
-          console.error('❌ Vite setup failed:', viteError);
-          console.error('Error stack:', viteError instanceof Error ? viteError.stack : 'N/A');
-          console.warn('⚠️  Continuing without Vite dev server');
-        }
-      } else {
-        // PRODUCTION: Serve static files from dist/public
-        try {
-          if (!fs.existsSync(distPath)) {
-            throw new Error(
-              `Could not find the build directory: ${distPath}, make sure to build the client first`,
-            );
-          }
-
-          app.use(express.static(distPath));
-          
-          // SPA fallback: serve index.html for all non-API routes
-          app.use("*", (_req, res) => {
-            res.sendFile(path.resolve(distPath, "index.html"));
-          });
-          
-          console.log('✅ Static file serving initialized (production mode)');
-          console.log(`   Serving from: ${distPath}`);
-        } catch (staticError) {
-          console.error('❌ Static file setup failed:', staticError);
-          console.warn('⚠️  Continuing without static file serving');
-        }
-      }
-      
-      // WebSockets disabled at startup - lazy-load on-demand
-      console.log('ℹ️  WebSockets will initialize on-demand when needed');
-
-      // Error handler MUST be registered AFTER static file serving
-      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-        const status = err.status || err.statusCode || 500;
-        const message = err.message || "Internal Server Error";
-        
-        console.error('Request error:', {
-          status,
-          message,
-          path: _req.path,
-          method: _req.method,
-          stack: err.stack
-        });
-
-        res.status(status).json({ message });
-      });
       
       console.log('🎉 Background initialization complete!');
     })();
