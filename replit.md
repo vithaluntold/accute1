@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ## Overview
-Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms using specialized AI agents. It aims to automate tasks, enhance efficiency, ensure compliance, and improve overall accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform seeks to transform the accounting industry through intelligent automation, offering significant market potential.
+Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms. Its core purpose is to automate tasks, enhance efficiency, ensure compliance, and improve overall accounting practices through intelligent automation. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to transform the accounting industry by providing an AI-native solution for accounting automation.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
