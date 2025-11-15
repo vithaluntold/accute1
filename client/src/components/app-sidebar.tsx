@@ -1,7 +1,7 @@
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog, Video
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog, Video, Activity
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -109,6 +109,7 @@ const organizationMenuCategories = [
     title: "AI & Automation",
     items: [
       { title: "AI Agents", url: "/ai-agents", icon: Bot, permission: "ai_agents.view" },
+      { title: "Agent Health", url: "/agent-health", icon: Activity, permission: "settings.manage" },
       { title: "Agent Integration Guide", url: "/agent-integration-guide", icon: FileText, permission: null },
       { title: "AI Roundtable", url: "/roundtable", icon: Users, permission: "roundtable.access" },
       { title: "Marketplace", url: "/marketplace", icon: Store, permission: null },
