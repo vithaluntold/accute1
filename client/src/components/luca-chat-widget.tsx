@@ -172,14 +172,26 @@ export function LucaChatWidget() {
     enabled: isOpen || isFullScreen,
   });
 
-  // Auto-select default LLM config (prefer default, fallback to first active config)
+  // Auto-select default LLM config (priority: workspace default > user default > first workspace > first config)
   useEffect(() => {
-    if (llmConfigs.length === 0 || selectedLlmConfig) return;
+    // Don't auto-select if configs haven't loaded or if user has already selected one
+    if (llmConfigs.length === 0) return;
+    if (selectedLlmConfig && selectedLlmConfig !== "") return;
     
-    // Try to find default config
-    let configToSelect = llmConfigs.find((c) => c.isDefault);
+    // Priority 1: Workspace default config
+    let configToSelect = llmConfigs.find((c) => c.scope === 'workspace' && c.isDefault);
     
-    // Fallback to first active config if no default
+    // Priority 2: User default config
+    if (!configToSelect) {
+      configToSelect = llmConfigs.find((c) => c.scope === 'user' && c.isDefault);
+    }
+    
+    // Priority 3: First workspace config (even if not default)
+    if (!configToSelect) {
+      configToSelect = llmConfigs.find((c) => c.scope === 'workspace');
+    }
+    
+    // Priority 4: Fallback to first available config
     if (!configToSelect) {
       configToSelect = llmConfigs[0];
     }

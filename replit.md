@@ -27,6 +27,8 @@ Accute is an AI-native accounting workflow automation platform designed to revol
 - **Security & Startup Architecture**: Vite middleware initializes immediately after server.listen() to prevent routing gaps. Environment variable validation in `server/index.ts` with fail-fast for missing secrets (`ENCRYPTION_KEY` validation supports base64, hex, or legacy strings). No `dotenv` dependency. `JWT_SECRET` and `ENCRYPTION_KEY` have no `crypto.randomBytes()` fallbacks. Startup log order guarantees routing health before heavy initialization.
 - **IDOR Protection**: Fixed critical Insecure Direct Object Reference vulnerabilities in workflow endpoints by verifying `organizationId` and ownership before returning, updating, or deleting resources. All fixes return 404 to prevent information disclosure. Super admins can access all resources.
 - **Personalized Welcome Messages**: Login system tracks `lastLoginAt` to distinguish first-time vs. returning users. First-time users see "Welcome!" while returning users see "Welcome back!" for a more personalized experience. Both regular and MFA login flows support this feature.
+- **Country Code Phone Field**: Users table includes mandatory `countryCode` field (default "+1") with dropdown UI containing 30 common country codes. Employee profile form validates and combines countryCode + phone before OTP verification. Backend API whitelists countryCode for profile updates.
+- **LLM Auto-Selection Fix**: Luca chat widget properly auto-selects LLM configuration on load. Fixed bug where empty string initial state prevented auto-selection useEffect from running. Now correctly prioritizes workspace default configs over user configs, with fallback to first available config.
 
 ## System Architecture
 
