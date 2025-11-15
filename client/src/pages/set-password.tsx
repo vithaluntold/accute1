@@ -65,10 +65,16 @@ export default function SetPassword() {
       setTimeout(() => setLocation("/auth/login"), 2000);
     },
     onError: (error: any) => {
+      const isTokenError = error.message?.toLowerCase().includes("token") || 
+                          error.message?.toLowerCase().includes("expired");
+      
       toast({
         title: "Failed to set password",
-        description: error.message || "Please try again or request a new verification email.",
+        description: isTokenError 
+          ? "Your verification link has expired. Please register again to receive a new verification email."
+          : error.message || "Please try again.",
         variant: "destructive",
+        duration: 8000,
       });
     },
   });

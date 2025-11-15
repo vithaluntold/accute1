@@ -24,8 +24,6 @@ export default function VerifyEmail() {
           return;
         }
 
-        setToken(verificationToken);
-
         const response = await fetch(`/api/auth/verify-email?token=${verificationToken}`);
         const data = await response.json();
 
@@ -38,9 +36,13 @@ export default function VerifyEmail() {
         setStatus("success");
         setMessage(data.message || "Email verified successfully!");
 
-        // Redirect to set-password page after 2 seconds with the token
+        // Use the token returned from the backend (not the query parameter)
+        const passwordSetupToken = data.token || verificationToken;
+        setToken(passwordSetupToken);
+
+        // Redirect to set-password page after 2 seconds with the correct token
         setTimeout(() => {
-          setLocation(`/auth/set-password?token=${verificationToken}`);
+          setLocation(`/auth/set-password?token=${passwordSetupToken}`);
         }, 2000);
       } catch (error: any) {
         setStatus("error");

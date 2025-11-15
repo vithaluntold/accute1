@@ -267,18 +267,26 @@ export default function Register() {
           )}
 
           {registrationType === "admin" && (
-            <Tabs value="admin" className="mb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="admin" disabled>
-                  <Building2 className="h-4 w-4 mr-2" />
-                  Create Organization
-                </TabsTrigger>
-                <TabsTrigger value="superadmin" onClick={() => setRegistrationType("superadmin")} data-testid="tab-superadmin">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Super Admin
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <>
+              <Tabs value="admin" className="mb-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="admin" disabled>
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Create Organization
+                  </TabsTrigger>
+                  <TabsTrigger value="superadmin" onClick={() => setRegistrationType("superadmin")} data-testid="tab-superadmin">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Super Admin
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Alert className="mb-4">
+                <Building2 className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Registration Process:</strong> After submitting, check your email for a verification link. Click the link to verify your email, then set your password to complete registration.
+                </AlertDescription>
+              </Alert>
+            </>
           )}
 
           {registrationType === "superadmin" && (
@@ -298,7 +306,7 @@ export default function Register() {
               <Alert className="mb-4">
                 <Shield className="h-4 w-4" />
                 <AlertDescription>
-                  Super admin registration requires a valid key
+                  <strong>Registration Process:</strong> Super admin registration requires a valid key. After submitting, you'll receive a verification email. Click the link to verify your email, then set your password to complete registration.
                 </AlertDescription>
               </Alert>
             </>
