@@ -42,9 +42,44 @@ import {
 } from "@/components/ui/dialog";
 import { SkillsExpertiseTab } from "@/components/profile/skills-expertise-tab";
 
+// Common country codes for phone numbers
+const COUNTRY_CODES = [
+  { code: "+1", country: "US/Canada" },
+  { code: "+44", country: "United Kingdom" },
+  { code: "+91", country: "India" },
+  { code: "+61", country: "Australia" },
+  { code: "+86", country: "China" },
+  { code: "+81", country: "Japan" },
+  { code: "+49", country: "Germany" },
+  { code: "+33", country: "France" },
+  { code: "+39", country: "Italy" },
+  { code: "+34", country: "Spain" },
+  { code: "+7", country: "Russia" },
+  { code: "+55", country: "Brazil" },
+  { code: "+52", country: "Mexico" },
+  { code: "+27", country: "South Africa" },
+  { code: "+234", country: "Nigeria" },
+  { code: "+971", country: "UAE" },
+  { code: "+65", country: "Singapore" },
+  { code: "+60", country: "Malaysia" },
+  { code: "+62", country: "Indonesia" },
+  { code: "+63", country: "Philippines" },
+  { code: "+82", country: "South Korea" },
+  { code: "+66", country: "Thailand" },
+  { code: "+84", country: "Vietnam" },
+  { code: "+92", country: "Pakistan" },
+  { code: "+880", country: "Bangladesh" },
+  { code: "+20", country: "Egypt" },
+  { code: "+966", country: "Saudi Arabia" },
+  { code: "+90", country: "Turkey" },
+  { code: "+48", country: "Poland" },
+  { code: "+31", country: "Netherlands" },
+];
+
 const kycFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
+  countryCode: z.string().min(1, "Country code is required"),
   phone: z.string().min(10, "Valid phone number is required"),
   dateOfBirth: z.string().optional(),
   nationalId: z.string().optional(),
@@ -78,6 +113,7 @@ export default function EmployeeProfile() {
     defaultValues: {
       firstName: "",
       lastName: "",
+      countryCode: "+1",
       phone: "",
       dateOfBirth: "",
       nationalId: "",
@@ -99,6 +135,7 @@ export default function EmployeeProfile() {
       form.reset({
         firstName: currentUser.firstName || "",
         lastName: currentUser.lastName || "",
+        countryCode: currentUser.countryCode || "+1",
         phone: currentUser.phone || "",
         dateOfBirth: currentUser.dateOfBirth ? new Date(currentUser.dateOfBirth).toISOString().split('T')[0] : "",
         nationalId: currentUser.nationalId || "",
@@ -326,6 +363,7 @@ export default function EmployeeProfile() {
 
   const handleSendOtp = () => {
     const phone = form.getValues("phone");
+    const countryCode = form.getValues("countryCode");
     if (!phone || phone.length < 10) {
       toast({
         title: "Invalid phone number",
@@ -334,11 +372,21 @@ export default function EmployeeProfile() {
       });
       return;
     }
-    sendOtpMutation.mutate(phone);
+    if (!countryCode) {
+      toast({
+        title: "Country code required",
+        description: "Please select a country code",
+        variant: "destructive",
+      });
+      return;
+    }
+    const fullPhone = `${countryCode}${phone}`;
+    sendOtpMutation.mutate(fullPhone);
   };
 
   const handleVerifyOtp = () => {
     const phone = form.getValues("phone");
+    const countryCode = form.getValues("countryCode");
     if (!otp || otp.length !== 6) {
       toast({
         title: "Invalid OTP",
@@ -347,7 +395,16 @@ export default function EmployeeProfile() {
       });
       return;
     }
-    verifyOtpMutation.mutate({ phone, otp });
+    if (!countryCode) {
+      toast({
+        title: "Country code required",
+        description: "Please select a country code",
+        variant: "destructive",
+      });
+      return;
+    }
+    const fullPhone = `${countryCode}${phone}`;
+    verifyOtpMutation.mutate({ phone: fullPhone, otp });
   };
 
   const getKycStatusBadge = () => {
@@ -538,35 +595,66 @@ export default function EmployeeProfile() {
                 </div>
 
                 {/* Phone with Verification */}
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input {...field} placeholder="+1234567890" data-testid="input-phone" />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant={currentUser?.phoneVerified ? "outline" : "default"}
-                          onClick={() => setShowPhoneVerification(true)}
-                          data-testid="button-verify-phone"
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="countryCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country Code <span className="text-destructive">*</span></FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          data-testid="select-country-code"
                         >
-                          <Phone className="h-4 w-4 mr-2" />
-                          {currentUser?.phoneVerified ? "Verified" : "Verify"}
-                        </Button>
-                      </div>
-                      {currentUser?.phoneVerified && (
-                        <FormDescription className="text-green-600">
-                          ✓ Verified on {new Date(currentUser.phoneVerifiedAt).toLocaleDateString()}
-                        </FormDescription>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select country code" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {COUNTRY_CODES.map(({ code, country }) => (
+                              <SelectItem key={code} value={code}>
+                                {code} ({country})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input {...field} placeholder="1234567890" data-testid="input-phone" />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant={currentUser?.phoneVerified ? "outline" : "default"}
+                            onClick={() => setShowPhoneVerification(true)}
+                            data-testid="button-verify-phone"
+                          >
+                            <Phone className="h-4 w-4 mr-2" />
+                            {currentUser?.phoneVerified ? "Verified" : "Verify"}
+                          </Button>
+                        </div>
+                        {currentUser?.phoneVerified && (
+                          <FormDescription className="text-green-600">
+                            ✓ Verified on {new Date(currentUser.phoneVerifiedAt).toLocaleDateString()}
+                          </FormDescription>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <Separator />
 

@@ -2193,6 +2193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'firstName',
         'lastName',
         'phone',
+        'countryCode',
         'dateOfBirth',
         'nationalId',
         'nationalIdType',
