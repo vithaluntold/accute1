@@ -239,7 +239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await hashPassword(password);
 
-      // Validate and create user
+      // Generate email verification token
+      const verificationToken = crypto.randomUUID();
+      const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Validate and create user with email verification fields
       const userData = insertUserSchema.parse({
         email,
         username,
@@ -249,40 +253,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: clientRole.id,
         organizationId: organization?.id || null,
         isActive: true,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: tokenExpiry,
       });
 
       const user = await storage.createUser(userData);
 
-      // Create session
-      const token = generateToken(user.id);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-      await storage.createSession(user.id, token, expiresAt);
-
-      // Get role and permissions
-      const role = await storage.getRole(user.roleId);
-      const permissions = await storage.getPermissionsByRole(user.roleId);
+      // Send verification email
+      try {
+        const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
+        
+        if (process.env.RESEND_API_KEY) {
+          const { Resend } = await import('resend');
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          
+          await resend.emails.send({
+            from: 'Accute <noreply@accute.app>',
+            to: email,
+            subject: 'Verify your email address',
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Welcome to Accute!</h1>
+                  <p>Hi ${firstName || 'there'},</p>
+                  <p>Thank you for signing up. Please verify your email address to activate your account.</p>
+                  <p>
+                    <a href="${verificationUrl}" class="button">Verify Email Address</a>
+                  </p>
+                  <p>Or copy and paste this link into your browser:</p>
+                  <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+                  <p>This link will expire in 24 hours.</p>
+                  <div class="footer">
+                    <p>If you didn't create an account, you can safely ignore this email.</p>
+                    <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `,
+          });
+        } else {
+          console.warn('⚠️ RESEND_API_KEY not configured. Email verification link:', verificationUrl);
+        }
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        // Continue registration even if email fails
+      }
 
       // Log activity
-      await logActivity(user.id, organization?.id, "register", "user", user.id, {}, req);
+      await logActivity(user.id, organization?.id, "register", "user", user.id, { emailVerificationSent: true }, req);
 
+      // Return success message WITHOUT creating session (no auto-login)
       res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          roleId: user.roleId,
-          roleName: role?.name, // Add role name to user object
-          organizationId: user.organizationId,
-          permissions: permissions.map(p => p.name),
-        },
-        role,
-        token,
+        message: "Registration successful! Please check your email to verify your account.",
+        email: user.email,
+        verificationRequired: true,
       });
     } catch (error: any) {
       console.error("Registration error:", error);
       res.status(500).json({ error: "Registration failed" });
+    }
+  });
+
+  // Verify Email
+  app.get("/api/auth/verify-email", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ error: "Verification token is required" });
+      }
+
+      // Find user by verification token
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.emailVerificationToken === token);
+
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired verification token" });
+      }
+
+      // Check if token has expired
+      if (user.emailVerificationTokenExpiry && new Date() > user.emailVerificationTokenExpiry) {
+        return res.status(400).json({ error: "Verification token has expired. Please request a new one." });
+      }
+
+      // Check if already verified
+      if (user.emailVerified) {
+        return res.json({ 
+          message: "Email already verified. You can now log in.",
+          alreadyVerified: true 
+        });
+      }
+
+      // Update user: set emailVerified = true, clear token
+      await storage.updateUser(user.id, {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null,
+      });
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "email_verified", "user", user.id, {}, req);
+
+      res.json({ 
+        message: "Email verified successfully! You can now log in.",
+        verified: true 
+      });
+    } catch (error: any) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ error: "Email verification failed" });
+    }
+  });
+
+  // Resend Verification Email
+  app.post("/api/auth/resend-verification", rateLimit(3, 15 * 60 * 1000), async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists for security
+        return res.json({ message: "If the email exists, a verification link has been sent." });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ error: "Email is already verified" });
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomUUID();
+      const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      await storage.updateUser(user.id, {
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: tokenExpiry,
+      });
+
+      // Send verification email
+      try {
+        const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
+        
+        if (process.env.RESEND_API_KEY) {
+          const { Resend } = await import('resend');
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          
+          await resend.emails.send({
+            from: 'Accute <noreply@accute.app>',
+            to: email,
+            subject: 'Verify your email address',
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h1>Verify Your Email</h1>
+                  <p>Hi ${user.firstName || 'there'},</p>
+                  <p>Please verify your email address to activate your Accute account.</p>
+                  <p>
+                    <a href="${verificationUrl}" class="button">Verify Email Address</a>
+                  </p>
+                  <p>Or copy and paste this link into your browser:</p>
+                  <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+                  <p>This link will expire in 24 hours.</p>
+                  <div class="footer">
+                    <p>If you didn't create an account, you can safely ignore this email.</p>
+                    <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `,
+          });
+        } else {
+          console.warn('⚠️ RESEND_API_KEY not configured. Email verification link:', verificationUrl);
+        }
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+      }
+
+      // Log activity
+      await logActivity(user.id, user.organizationId || undefined, "resend_verification", "user", user.id, {}, req);
+
+      res.json({ message: "If the email exists, a verification link has been sent." });
+    } catch (error: any) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ error: "Failed to resend verification email" });
     }
   });
 
@@ -309,6 +488,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!user.isActive) {
         return res.status(403).json({ error: "Account is inactive" });
+      }
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        return res.status(403).json({ 
+          error: "Please verify your email address before logging in. Check your inbox for the verification link.",
+          emailVerificationRequired: true,
+          email: user.email
+        });
       }
 
       // Check if MFA is enabled for this user

@@ -12,6 +12,10 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  emailVerificationToken: text("email_verification_token"),
+  emailVerificationTokenExpiry: timestamp("email_verification_token_expiry"),
   phoneVerified: boolean("phone_verified").notNull().default(false),
   phoneVerifiedAt: timestamp("phone_verified_at"),
   avatarUrl: text("avatar_url"), // Profile picture URL
