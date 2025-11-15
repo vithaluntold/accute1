@@ -70,11 +70,16 @@ export function registerPersonalityProfilingRoutes(app: Express) {
         const { userIds } = parseResult.data;
         const organizationId = req.user!.organizationId!;
 
-        // Verify all users belong to the organization
+        // CRITICAL: Verify all users belong to the SAME organization as the requester
         const orgUsers = await db
           .select({ id: users.id })
           .from(users)
-          .where(inArray(users.id, userIds));
+          .where(
+            and(
+              inArray(users.id, userIds),
+              eq(users.organizationId, organizationId)
+            )
+          );
 
         if (orgUsers.length !== userIds.length) {
           return res.status(400).json({
@@ -393,6 +398,139 @@ export function registerPersonalityProfilingRoutes(app: Express) {
           message: "Failed to fetch queue statistics",
           error: error.message,
         });
+      }
+    }
+  );
+
+  /**
+   * GET /api/personality-profiling/performance-correlations
+   * Get correlations between personality traits and performance metrics
+   * Admin only - shows organization-wide insights
+   */
+  app.get(
+    "/api/personality-profiling/performance-correlations",
+    requireAuth,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        // Role check: Only admins can view correlations
+        if (req.user!.role !== "super_admin" && req.user!.role !== "admin") {
+          return res.status(403).json({
+            message: "Only admins can view performance correlations",
+          });
+        }
+
+        // CRITICAL: Validate organization membership
+        const organizationId = req.user!.organizationId;
+        if (!organizationId) {
+          return res.status(403).json({
+            error: "Organization access required to view correlations",
+          });
+        }
+
+        // Fetch all personality profiles for users in organization
+        const profiles = await db
+          .select()
+          .from(personalityProfiles)
+          .where(eq(personalityProfiles.organizationId, organizationId));
+
+        if (profiles.length < 5) {
+          return res.status(200).json({
+            message: "Insufficient data for correlation analysis",
+            minRequired: 5,
+            currentCount: profiles.length,
+            correlations: [],
+          });
+        }
+
+        // Fetch performance scores for these users
+        const userIds = profiles.map((p) => p.userId);
+        const performanceScores = await db
+          .select()
+          .from(schema.performanceScores)
+          .where(
+            and(
+              eq(schema.performanceScores.organizationId, organizationId),
+              inArray(schema.performanceScores.userId, userIds)
+            )
+          );
+
+        // Calculate correlations
+        const correlations: any[] = [];
+        
+        // Helper: Pearson correlation coefficient
+        const calculateCorrelation = (x: number[], y: number[]): number => {
+          if (x.length !== y.length || x.length === 0) return 0;
+          
+          const n = x.length;
+          const sumX = x.reduce((a, b) => a + b, 0);
+          const sumY = y.reduce((a, b) => a + b, 0);
+          const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+          const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+          const sumY2 = y.reduce((sum, yi) => sum + yi * yi, 0);
+          
+          const numerator = n * sumXY - sumX * sumY;
+          const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+          
+          return denominator === 0 ? 0 : numerator / denominator;
+        };
+
+        // Group performance scores by metric
+        const scoresByMetric = performanceScores.reduce((acc, score) => {
+          if (!acc[score.metricDefinitionId]) {
+            acc[score.metricDefinitionId] = [];
+          }
+          acc[score.metricDefinitionId].push(score);
+          return acc;
+        }, {} as Record<string, any[]>);
+
+        // Analyze Big Five traits vs performance metrics
+        if (profiles.some((p) => p.bigFiveTraits)) {
+          const traits = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"];
+          
+          for (const trait of traits) {
+            for (const [metricId, scores] of Object.entries(scoresByMetric)) {
+              const pairs: Array<{ trait: number; performance: number }> = [];
+              
+              for (const score of scores) {
+                const profile = profiles.find((p) => p.userId === score.userId);
+                if (profile?.bigFiveTraits && (profile.bigFiveTraits as any)[trait] != null) {
+                  pairs.push({
+                    trait: (profile.bigFiveTraits as any)[trait],
+                    performance: Number(score.scoreValue),
+                  });
+                }
+              }
+              
+              if (pairs.length >= 3) {
+                const traitValues = pairs.map((p) => p.trait);
+                const perfValues = pairs.map((p) => p.performance);
+                const correlation = calculateCorrelation(traitValues, perfValues);
+                
+                if (Math.abs(correlation) > 0.1) {
+                  correlations.push({
+                    framework: "Big Five",
+                    trait,
+                    metricId,
+                    correlation: Math.round(correlation * 1000) / 1000,
+                    sampleSize: pairs.length,
+                    strength: Math.abs(correlation) > 0.5 ? "strong" : Math.abs(correlation) > 0.3 ? "moderate" : "weak",
+                    direction: correlation > 0 ? "positive" : "negative",
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        res.json({
+          organizationId,
+          profilesAnalyzed: profiles.length,
+          correlations: correlations.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)),
+          generatedAt: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error("[Personality Profiling] Failed to calculate correlations:", error);
+        res.status(500).json({ error: "Failed to calculate performance correlations" });
       }
     }
   );

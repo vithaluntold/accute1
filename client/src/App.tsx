@@ -139,6 +139,7 @@ const ResourceAllocation = lazy(() => import("@/pages/resource-allocation"));
 const SkillsManagement = lazy(() => import("@/pages/skills-management"));
 const SubscriptionPricing = lazy(() => import("@/pages/subscription-pricing"));
 const EmployeeProfile = lazy(() => import("@/pages/employee-profile"));
+const PersonalityProfile = lazy(() => import("@/pages/personality-profile"));
 const LiveChat = lazy(() => import("@/pages/live-chat"));
 const AgentIntegrationGuide = lazy(() => import("@/pages/agent-integration-guide"));
 const Help = lazy(() => import("@/pages/help"));
@@ -463,6 +464,15 @@ function Router() {
             <Settings />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/personality-profile">
+        <ProtectedRoute>
+          <OrganizationRoute>
+            <AppLayout>
+              <PersonalityProfile />
+            </AppLayout>
+          </OrganizationRoute>
+        </ProtectedRoute>
       </Route>
       <Route path="/organization-settings">
         <ProtectedRoute>

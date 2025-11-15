@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Brain, Play, RefreshCw, Users, TrendingUp, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -88,6 +89,16 @@ type User = {
   lastName: string | null;
 };
 
+type PerformanceCorrelation = {
+  framework: string;
+  trait: string;
+  metricId: string;
+  correlation: number;
+  sampleSize: number;
+  strength: "strong" | "moderate" | "weak";
+  direction: "positive" | "negative";
+};
+
 export default function AdminPersonalityProfiling() {
   const { toast } = useToast();
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -103,6 +114,17 @@ export default function AdminPersonalityProfiling() {
   const { data: queueStats, isLoading: loadingStats } = useQuery<QueueStats>({
     queryKey: ["/api/personality-profiling/queue/stats"],
     refetchInterval: 5000, // Refresh every 5 seconds
+  });
+
+  // Fetch performance correlations
+  const { data: correlations, error: correlationsError } = useQuery<{
+    organizationId: string;
+    profilesAnalyzed: number;
+    correlations: PerformanceCorrelation[];
+    generatedAt: string;
+  }>({
+    queryKey: ["/api/personality-profiling/performance-correlations"],
+    retry: 1, // Don't retry if access is denied
   });
 
   // Fetch recent analysis runs
@@ -352,12 +374,63 @@ export default function AdminPersonalityProfiling() {
         </Card>
       </div>
 
+      {/* Performance Correlations Insight */}
+      {correlationsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="w-4 h-4" />
+          <AlertDescription>
+            Failed to load performance correlations. Please ensure you have proper organization access.
+          </AlertDescription>
+        </Alert>
+      )}
+      {correlations && correlations.correlations && correlations.correlations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Performance Insights
+            </CardTitle>
+            <CardDescription>
+              Statistical correlations between personality traits and performance metrics ({correlations.profilesAnalyzed} users analyzed)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {correlations.correlations.slice(0, 5).map((corr, idx) => (
+                <div key={idx} className="p-3 rounded-md bg-muted/50 hover-elevate" data-testid={`insight-${idx}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium capitalize">
+                      {corr.trait.replace('_', ' ')}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={corr.strength === "strong" ? "default" : "outline"}>
+                        {corr.strength}
+                      </Badge>
+                      <Badge variant={corr.direction === "positive" ? "default" : "destructive"}>
+                        {corr.direction === "positive" ? "+" : "-"}{Math.abs(corr.correlation).toFixed(2)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {corr.direction === "positive" ? "Higher" : "Lower"} {corr.trait} correlates with {corr.direction === "positive" ? "better" : "lower"} performance
+                    ({corr.sampleSize} users)
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tabs for Runs and Jobs */}
       <Tabs defaultValue="runs" className="space-y-4">
         <TabsList>
           <TabsTrigger value="runs" data-testid="tab-runs">Analysis Runs</TabsTrigger>
           <TabsTrigger value="jobs" disabled={!selectedRunId} data-testid="tab-jobs">
             Job Details {selectedRunId && `(${runJobs.length})`}
+          </TabsTrigger>
+          <TabsTrigger value="insights" data-testid="tab-insights">
+            Team Insights
           </TabsTrigger>
         </TabsList>
 
@@ -541,6 +614,87 @@ export default function AdminPersonalityProfiling() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="insights" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Team Composition Insights
+              </CardTitle>
+              <CardDescription>
+                AI-powered recommendations based on personality trait distribution
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {correlations && correlations.correlations.length > 0 ? (
+                <>
+                  <Alert>
+                    <Brain className="w-4 h-4" />
+                    <AlertDescription>
+                      <strong>Recommendation Engine:</strong> Based on {correlations.profilesAnalyzed} analyzed profiles,
+                      we've identified the following patterns and recommendations for optimal team performance.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-3">
+                    <h4 className="font-semibold">Top Trait-Performance Correlations</h4>
+                    {correlations.correlations.slice(0, 3).map((corr, idx) => (
+                      <Card key={idx} className="bg-muted/30">
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <div className="font-medium capitalize">{corr.trait.replace('_', ' ')}</div>
+                              <Badge variant="outline" className="mt-1">
+                                {corr.framework}
+                              </Badge>
+                            </div>
+                            <Badge variant={corr.strength === "strong" ? "default" : "outline"}>
+                              {Math.abs(corr.correlation * 100).toFixed(0)}% correlation
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            💡 <strong>Recommendation:</strong> When assigning high-stakes tasks, prioritize team members with {corr.direction === "positive" ? "higher" : "lower"} {corr.trait}.
+                            This trait shows a {corr.strength} {corr.direction} correlation with performance.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <h4 className="font-semibold mb-3">Team Diversity Score</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">Personality trait diversity</span>
+                        <span className="font-semibold">
+                          {correlations.profilesAnalyzed > 10 ? "High" : correlations.profilesAnalyzed > 5 ? "Moderate" : "Low"}
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min((correlations.profilesAnalyzed / 20) * 100, 100)}
+                        className="h-2"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {correlations.profilesAnalyzed < 10
+                          ? "Analyze more team members to get better diversity insights."
+                          : "Your team shows good personality diversity, which can lead to creative problem-solving."}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground" data-testid="text-no-insights">
+                  <Brain className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No insights available yet</p>
+                  <p className="text-sm mt-1">
+                    Trigger a batch analysis to generate personality profiles and unlock team insights.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
