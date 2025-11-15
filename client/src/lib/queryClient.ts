@@ -4,7 +4,22 @@ import { getToken } from "./auth";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    
+    // Try to parse as JSON to extract error details
+    try {
+      const errorData = JSON.parse(text);
+      
+      // Create error with proper structure
+      const error = new Error(errorData.error || errorData.message || res.statusText);
+      
+      // Attach additional properties from the error response
+      Object.assign(error, errorData);
+      
+      throw error;
+    } catch (parseError) {
+      // If not JSON, throw as plain error
+      throw new Error(`${res.status}: ${text}`);
+    }
   }
 }
 
