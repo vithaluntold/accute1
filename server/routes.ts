@@ -181,9 +181,14 @@ async function sendVerificationEmail(
           <div class="container">
             <h1>Welcome to Accute!</h1>
             <p>Hi ${firstName || 'there'},</p>
-            <p>Thank you for signing up. Please verify your email address to activate your account.</p>
+            <p>Thank you for signing up. To complete your registration, please follow these steps:</p>
+            <ol>
+              <li>Click the link below to verify your email address</li>
+              <li>Set your password to secure your account</li>
+              <li>Log in and start using Accute</li>
+            </ol>
             <p>
-              <a href="${verificationUrl}" class="button">Verify Email Address</a>
+              <a href="${verificationUrl}" class="button">Verify Email & Set Password</a>
             </p>
             <p>Or copy and paste this link into your browser:</p>
             <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
