@@ -47,7 +47,7 @@ export type LLMConfigHandler = (
  * @returns Express middleware function
  */
 export function withLLMConfig(handler: LLMConfigHandler) {
-  return async (req: AuthRequest, res: Response) => {
+  return async (req: AuthRequest, res: Response, next: any) => {
     try {
       // Extract optional llmConfigId from request body
       const { llmConfigId } = req.body || {};
@@ -70,7 +70,13 @@ export function withLLMConfig(handler: LLMConfigHandler) {
       // Pass config to handler
       await handler(req, res, llmConfig);
     } catch (error: any) {
-      // Handle LLM configuration errors with user-friendly messages
+      // If headers already sent (partial response), just log and bail
+      if (res.headersSent) {
+        console.error('[withLLMConfig] Error after headers sent:', error);
+        return;
+      }
+      
+      // Handle known LLM configuration errors with user-friendly messages
       if (error.message?.includes('No active LLM configuration')) {
         return res.status(400).json({ 
           error: "No LLM configuration found. Please configure an AI provider in Workspace Settings or your User Settings." 
@@ -95,9 +101,37 @@ export function withLLMConfig(handler: LLMConfigHandler) {
         });
       }
       
-      // Re-throw other errors to be handled by global error handler
-      console.error('[withLLMConfig] Unexpected error:', error);
-      throw error;
+      // CRITICAL FIX: Handle decryption and API errors with detailed logging
+      // Log structured error information for debugging
+      console.error('[withLLMConfig] Unexpected error:', {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+        provider: error?.provider,
+        model: error?.model
+      });
+      console.error('[withLLMConfig] Error stack:', error?.stack);
+      
+      // For API/decryption errors, return user-friendly JSON
+      // Check for common error patterns
+      if (error?.message?.includes('decrypt') || error?.message?.includes('ENCRYPTION_KEY')) {
+        return res.status(500).json({
+          error: "Failed to decrypt LLM credentials. Please contact your administrator.",
+          details: "Encryption key configuration issue"
+        });
+      }
+      
+      if (error?.message?.includes('API key') || error?.status === 401 || error?.status === 403) {
+        return res.status(500).json({
+          error: "Invalid API key configuration. Please update your LLM settings.",
+          details: error?.message,
+          hint: "Check your API key in Workspace Settings"
+        });
+      }
+      
+      // For other errors, delegate to Express global error handler via next()
+      // This ensures consistent error handling and logging across the app
+      next(error);
     }
   };
 }
