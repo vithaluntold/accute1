@@ -20,9 +20,7 @@ export function NotificationBell() {
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: () => apiRequest("/api/notifications/mark-all-read", {
-      method: "POST",
-    }),
+    mutationFn: () => apiRequest("POST", "/api/notifications/mark-all-read"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });

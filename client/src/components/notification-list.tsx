@@ -60,9 +60,7 @@ export function NotificationList({ onClose }: NotificationListProps) {
 
   const markReadMutation = useMutation({
     mutationFn: (notificationId: string) =>
-      apiRequest(`/api/notifications/${notificationId}/read`, {
-        method: "PATCH",
-      }),
+      apiRequest("PATCH", `/api/notifications/${notificationId}/read`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });

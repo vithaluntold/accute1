@@ -55,13 +55,10 @@ export function ContextualNudge({
   // Track nudge impression
   const trackNudgeMutation = useMutation({
     mutationFn: async (action: 'shown' | 'dismissed' | 'action_taken') => {
-      return await apiRequest('/api/onboarding/nudges/track', {
-        method: 'POST',
-        body: JSON.stringify({
-          nudgeId,
-          action,
-          trigger,
-        }),
+      return await apiRequest('POST', '/api/onboarding/nudges/track', {
+        nudgeId,
+        action,
+        trigger,
       });
     },
   });

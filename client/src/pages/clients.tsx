@@ -120,7 +120,8 @@ export default function Clients() {
         // Strip auxiliary form-only fields and create clean client data
         const { primaryContactFirstName, primaryContactLastName, primaryContactEmail, primaryContactPhone, isCreating, ...cleanClientData } = data;
         
-        createdClient = await apiRequest("/api/clients", "POST", cleanClientData);
+        const response = await apiRequest("POST", "/api/clients", cleanClientData);
+        createdClient = await response.json();
         
         // Only create primary contact if we're creating a new client
         if (data.isCreating && data.primaryContactFirstName) {
@@ -135,11 +136,11 @@ export default function Clients() {
           };
           
           try {
-            await apiRequest("/api/contacts", "POST", contactData);
+            await apiRequest("POST", "/api/contacts", contactData);
           } catch (contactError: any) {
             // If contact creation fails, delete the created client to maintain consistency
             try {
-              await apiRequest(`/api/clients/${createdClient.id}`, "DELETE");
+              await apiRequest("DELETE", `/api/clients/${createdClient.id}`);
             } catch (rollbackError) {
               console.error("Failed to rollback client creation:", rollbackError);
             }
@@ -173,7 +174,7 @@ export default function Clients() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertClient> }) => {
-      return apiRequest(`/api/clients/${id}`, "PATCH", data);
+      return apiRequest("PATCH", `/api/clients/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", orgId] });
@@ -196,7 +197,7 @@ export default function Clients() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/clients/${id}`, "DELETE");
+      return apiRequest("DELETE", `/api/clients/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/clients", orgId] });

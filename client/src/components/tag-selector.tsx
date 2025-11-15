@@ -45,7 +45,7 @@ export function TagSelector({ resourceType, resourceId, className }: TagSelector
 
   const addTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
-      return apiRequest("/api/taggables", "POST", {
+      return apiRequest("POST", "/api/taggables", {
         tagId,
         taggableType: resourceType,
         taggableId: resourceId,
@@ -71,7 +71,7 @@ export function TagSelector({ resourceType, resourceId, className }: TagSelector
 
   const removeTagMutation = useMutation({
     mutationFn: async (tagId: string) => {
-      return apiRequest("/api/taggables", "DELETE", {
+      return apiRequest("DELETE", "/api/taggables", {
         tagId,
         taggableType: resourceType,
         taggableId: resourceId,
@@ -96,7 +96,7 @@ export function TagSelector({ resourceType, resourceId, className }: TagSelector
 
   const createTagMutation = useMutation({
     mutationFn: async (data: { name: string; color: string }) => {
-      return apiRequest("/api/tags", "POST", data);
+      return apiRequest("POST", "/api/tags", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tags"] });
