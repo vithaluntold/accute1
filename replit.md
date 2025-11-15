@@ -61,7 +61,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **OpenAI API**: AI model integration.
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
-- **Resend**: Transactional email service.
+- **Mailgun**: Transactional email service for verification emails.
 - **MSG91**: SMS service for OTP verification.
 - **Razorpay**: Payment gateway.
 - **Stripe**: Payment gateway.

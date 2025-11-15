@@ -264,47 +264,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
         
-        if (process.env.RESEND_API_KEY) {
-          const { Resend } = await import('resend');
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          
-          await resend.emails.send({
-            from: 'Accute <noreply@accute.app>',
-            to: email,
-            subject: 'Verify your email address',
-            html: `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <style>
-                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                  .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <h1>Welcome to Accute!</h1>
-                  <p>Hi ${firstName || 'there'},</p>
-                  <p>Thank you for signing up. Please verify your email address to activate your account.</p>
-                  <p>
-                    <a href="${verificationUrl}" class="button">Verify Email Address</a>
-                  </p>
-                  <p>Or copy and paste this link into your browser:</p>
-                  <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-                  <p>This link will expire in 24 hours.</p>
-                  <div class="footer">
-                    <p>If you didn't create an account, you can safely ignore this email.</p>
-                    <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
-                  </div>
+        if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+          const formData = new FormData();
+          formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
+          formData.append('to', email);
+          formData.append('subject', 'Verify your email address');
+          formData.append('html', `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Welcome to Accute!</h1>
+                <p>Hi ${firstName || 'there'},</p>
+                <p>Thank you for signing up. Please verify your email address to activate your account.</p>
+                <p>
+                  <a href="${verificationUrl}" class="button">Verify Email Address</a>
+                </p>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+                <p>This link will expire in 24 hours.</p>
+                <div class="footer">
+                  <p>If you didn't create an account, you can safely ignore this email.</p>
+                  <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
                 </div>
-              </body>
-              </html>
-            `,
-          });
+              </div>
+            </body>
+            </html>
+          `);
+          
+          const response = await fetch(
+            `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+              },
+              body: formData,
+            }
+          );
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
+          }
         } else {
-          console.warn('⚠️ RESEND_API_KEY not configured. Email verification link:', verificationUrl);
+          console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Email verification link:', verificationUrl);
         }
       } catch (emailError) {
         console.error('Failed to send verification email:', emailError);
@@ -409,47 +421,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
         
-        if (process.env.RESEND_API_KEY) {
-          const { Resend } = await import('resend');
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          
-          await resend.emails.send({
-            from: 'Accute <noreply@accute.app>',
-            to: email,
-            subject: 'Verify your email address',
-            html: `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <style>
-                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                  .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-                  .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <h1>Verify Your Email</h1>
-                  <p>Hi ${user.firstName || 'there'},</p>
-                  <p>Please verify your email address to activate your Accute account.</p>
-                  <p>
-                    <a href="${verificationUrl}" class="button">Verify Email Address</a>
-                  </p>
-                  <p>Or copy and paste this link into your browser:</p>
-                  <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-                  <p>This link will expire in 24 hours.</p>
-                  <div class="footer">
-                    <p>If you didn't create an account, you can safely ignore this email.</p>
-                    <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
-                  </div>
+        if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+          const formData = new FormData();
+          formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
+          formData.append('to', email);
+          formData.append('subject', 'Verify your email address');
+          formData.append('html', `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Verify Your Email</h1>
+                <p>Hi ${user.firstName || 'there'},</p>
+                <p>Please verify your email address to activate your Accute account.</p>
+                <p>
+                  <a href="${verificationUrl}" class="button">Verify Email Address</a>
+                </p>
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+                <p>This link will expire in 24 hours.</p>
+                <div class="footer">
+                  <p>If you didn't create an account, you can safely ignore this email.</p>
+                  <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
                 </div>
-              </body>
-              </html>
-            `,
-          });
+              </div>
+            </body>
+            </html>
+          `);
+          
+          const response = await fetch(
+            `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+              },
+              body: formData,
+            }
+          );
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
+          }
         } else {
-          console.warn('⚠️ RESEND_API_KEY not configured. Email verification link:', verificationUrl);
+          console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Email verification link:', verificationUrl);
         }
       } catch (emailError) {
         console.error('Failed to send verification email:', emailError);
