@@ -143,6 +143,7 @@ const PersonalityProfile = lazy(() => import("@/pages/personality-profile"));
 const LiveChat = lazy(() => import("@/pages/live-chat"));
 const AgentIntegrationGuide = lazy(() => import("@/pages/agent-integration-guide"));
 const Help = lazy(() => import("@/pages/help"));
+const AgentHealth = lazy(() => import("@/pages/agent-health"));
 
 // Competitive Gap Features
 const Forecasting = lazy(() => import("@/pages/forecasting"));
@@ -835,6 +836,15 @@ function Router() {
             <AIAgents />
           </AppLayout>
         </OrganizationRoute>
+      </Route>
+      <Route path="/agent-health">
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={["Admin", "Super Admin"]}>
+            <AppLayout>
+              <AgentHealth />
+            </AppLayout>
+          </RoleGuard>
+        </ProtectedRoute>
       </Route>
       <Route path="/roundtable/:id">
         <OrganizationRoute>
