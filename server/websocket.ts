@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { parse } from 'cookie';
 import { storage } from './storage';
+import { getLLMConfig } from './middleware/agent-llm-middleware';
 // Import static agent factory for reliable agent creation in both dev and production
 import { createStaticAgentInstance } from './agent-static-factory';
 import { agentRequiresToolExecution, agentSupportsStreaming } from './agent-loader';
@@ -209,13 +210,11 @@ async function handleAgentExecution(
       throw new Error('Organization access required');
     }
 
-    // Get LLM configuration using centralized service
-    const { getLLMConfigService } = await import('./llm-config-service');
-    const llmConfigService = getLLMConfigService();
-    const llmConfig = await llmConfigService.getConfig({ 
+    // Get LLM configuration using centralized middleware helper
+    const llmConfig = await getLLMConfig({
       organizationId: ws.organizationId,
       userId: ws.userId,
-      configId: llmConfigId 
+      configId: llmConfigId
     });
 
     // Handle Luca agent specially with its dedicated chat system
