@@ -3,6 +3,7 @@ import { Server } from 'http';
 import { parse } from 'cookie';
 import { storage } from './storage';
 import { chatThreadingService } from './services/ChatThreadingService';
+import { WebRTCSignalingService } from './services/WebRTCSignalingService';
 import crypto from 'crypto';
 
 interface TeamChatWebSocket extends WebSocket {
@@ -19,11 +20,25 @@ interface TeamChatMessage {
     | 'send_message'
     | 'start_typing'
     | 'stop_typing'
-    | 'ping';
+    | 'ping'
+    // WebRTC call signaling
+    | 'start_call'
+    | 'accept_call'
+    | 'reject_call'
+    | 'end_call'
+    | 'ice_candidate'
+    | 'sdp_offer'
+    | 'sdp_answer';
   teamId?: string;
   message?: string;
   metadata?: any;
   inReplyTo?: string; // Thread support - backward compatible
+  // WebRTC call data
+  callId?: string;
+  callType?: 'audio' | 'video';
+  receiverId?: string;
+  sdp?: any;
+  candidate?: any;
 }
 
 interface BroadcastMessage {
@@ -32,7 +47,16 @@ interface BroadcastMessage {
     | 'user_joined'
     | 'user_left'
     | 'typing_indicator'
-    | 'error';
+    | 'error'
+    // WebRTC call events
+    | 'call_started'
+    | 'incoming_call'
+    | 'call_accepted'
+    | 'call_rejected'
+    | 'call_ended'
+    | 'ice_candidate'
+    | 'sdp_offer'
+    | 'sdp_answer';
   data?: any;
   error?: string;
 }
@@ -163,6 +187,28 @@ export function setupTeamChatWebSocket(httpServer: Server): WebSocketServer {
               break;
             case 'stop_typing':
               await handleTypingIndicator(ws, message, teamConnections, false);
+              break;
+            // WebRTC call signaling
+            case 'start_call':
+              await handleStartCall(ws, message, teamConnections);
+              break;
+            case 'accept_call':
+              await handleAcceptCall(ws, message, teamConnections);
+              break;
+            case 'reject_call':
+              await handleRejectCall(ws, message, teamConnections);
+              break;
+            case 'end_call':
+              await handleEndCall(ws, message, teamConnections);
+              break;
+            case 'ice_candidate':
+              await handleIceCandidate(ws, message, teamConnections);
+              break;
+            case 'sdp_offer':
+              await handleSdpOffer(ws, message, teamConnections);
+              break;
+            case 'sdp_answer':
+              await handleSdpAnswer(ws, message, teamConnections);
               break;
           }
         } catch (error: any) {
@@ -380,4 +426,315 @@ function broadcastToTeam(
       client.send(messageStr);
     }
   }
+}
+
+/**
+ * Send message to specific user in team
+ */
+function sendToUser(
+  userId: string,
+  teamId: string,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>,
+  message: BroadcastMessage
+) {
+  const connections = teamConnections.get(teamId);
+  if (!connections) return;
+
+  const messageStr = JSON.stringify(message);
+  for (const client of Array.from(connections)) {
+    if (client.userId === userId && client.readyState === WebSocket.OPEN) {
+      client.send(messageStr);
+    }
+  }
+}
+
+// ==================== WebRTC Call Signal Handlers ====================
+
+/**
+ * Handle start call request
+ */
+async function handleStartCall(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callType, receiverId, teamId } = message;
+  
+  if (!callType || !receiverId || !teamId || !ws.userId || !ws.organizationId) {
+    throw new Error('Call type, receiver ID, team ID, user ID, and organization ID required');
+  }
+
+  // Validate users can start call
+  const validation = WebRTCSignalingService.canStartCall(ws.userId, receiverId);
+  if (!validation.valid) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      error: validation.reason
+    }));
+    return;
+  }
+
+  // Get user names
+  const caller = await storage.getUser(ws.userId);
+  const receiver = await storage.getUser(receiverId);
+  
+  if (!caller || !receiver) {
+    throw new Error('User not found');
+  }
+
+  // Verify both users are in the same team
+  const teamMembers = await storage.getTeamMembers(teamId);
+  const callerInTeam = teamMembers.some(m => m.userId === ws.userId);
+  const receiverInTeam = teamMembers.some(m => m.userId === receiverId);
+  
+  if (!callerInTeam || !receiverInTeam) {
+    throw new Error('Both users must be members of the team');
+  }
+
+  // Create call session
+  const callId = crypto.randomUUID();
+  const callSession = WebRTCSignalingService.createCall({
+    callId,
+    callerId: ws.userId,
+    callerName: caller.fullName || caller.email,
+    receiverId,
+    receiverName: receiver.fullName || receiver.email,
+    teamId,
+    callType,
+    organizationId: ws.organizationId,
+  });
+
+  // Send call started confirmation to caller (not accepted yet!)
+  ws.send(JSON.stringify({
+    type: 'call_started',
+    data: { 
+      callId, 
+      receiverId,
+      receiverName: receiver.fullName || receiver.email,
+      callType 
+    }
+  }));
+
+  // Notify receiver about incoming call
+  sendToUser(receiverId, teamId, teamConnections, {
+    type: 'incoming_call',
+    data: {
+      callId,
+      callerId: ws.userId,
+      callerName: caller.fullName || caller.email,
+      callType,
+      teamId,
+    }
+  });
+
+  console.log(`[Team Chat WS] Call started: ${callId}, ${ws.userId} -> ${receiverId}`);
+}
+
+/**
+ * Handle accept call
+ */
+async function handleAcceptCall(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, teamId } = message;
+  
+  if (!callId || !teamId || !ws.userId) {
+    throw new Error('Call ID, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Update call status
+  WebRTCSignalingService.updateCallStatus(callId, 'active');
+
+  // Notify caller that call was accepted
+  sendToUser(callSession.callerId, teamId, teamConnections, {
+    type: 'call_accepted',
+    data: { callId, receiverId: ws.userId }
+  });
+
+  console.log(`[Team Chat WS] Call accepted: ${callId}`);
+}
+
+/**
+ * Handle reject call
+ */
+async function handleRejectCall(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, teamId } = message;
+  
+  if (!callId || !teamId || !ws.userId) {
+    throw new Error('Call ID, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // End call
+  WebRTCSignalingService.endCall(callId);
+
+  // Notify caller that call was rejected
+  sendToUser(callSession.callerId, teamId, teamConnections, {
+    type: 'call_rejected',
+    data: { callId }
+  });
+
+  console.log(`[Team Chat WS] Call rejected: ${callId}`);
+}
+
+/**
+ * Handle end call
+ */
+async function handleEndCall(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, teamId } = message;
+  
+  if (!callId || !teamId || !ws.userId) {
+    throw new Error('Call ID, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    return; // Call already ended
+  }
+
+  // Verify user is part of the call
+  if (callSession.callerId !== ws.userId && callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // End call
+  WebRTCSignalingService.endCall(callId);
+
+  // Notify other participant
+  const otherUserId = callSession.callerId === ws.userId 
+    ? callSession.receiverId 
+    : callSession.callerId;
+
+  sendToUser(otherUserId, teamId, teamConnections, {
+    type: 'call_ended',
+    data: { callId }
+  });
+
+  console.log(`[Team Chat WS] Call ended: ${callId}`);
+}
+
+/**
+ * Handle ICE candidate
+ */
+async function handleIceCandidate(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, candidate, teamId } = message;
+  
+  if (!callId || !candidate || !teamId || !ws.userId) {
+    throw new Error('Call ID, candidate, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is part of the call
+  if (callSession.callerId !== ws.userId && callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward ICE candidate to other participant
+  const otherUserId = callSession.callerId === ws.userId 
+    ? callSession.receiverId 
+    : callSession.callerId;
+
+  sendToUser(otherUserId, teamId, teamConnections, {
+    type: 'ice_candidate',
+    data: { callId, candidate, from: ws.userId }
+  });
+}
+
+/**
+ * Handle SDP offer
+ */
+async function handleSdpOffer(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, sdp, teamId } = message;
+  
+  if (!callId || !sdp || !teamId || !ws.userId) {
+    throw new Error('Call ID, SDP, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the caller
+  if (callSession.callerId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward SDP offer to receiver
+  sendToUser(callSession.receiverId, teamId, teamConnections, {
+    type: 'sdp_offer',
+    data: { callId, sdp, from: ws.userId }
+  });
+}
+
+/**
+ * Handle SDP answer
+ */
+async function handleSdpAnswer(
+  ws: TeamChatWebSocket,
+  message: TeamChatMessage,
+  teamConnections: Map<string, Set<TeamChatWebSocket>>
+) {
+  const { callId, sdp, teamId } = message;
+  
+  if (!callId || !sdp || !teamId || !ws.userId) {
+    throw new Error('Call ID, SDP, team ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward SDP answer to caller
+  sendToUser(callSession.callerId, teamId, teamConnections, {
+    type: 'sdp_answer',
+    data: { callId, sdp, from: ws.userId }
+  });
 }

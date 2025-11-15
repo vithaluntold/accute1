@@ -5,6 +5,7 @@ import { storage } from './storage';
 import { canAccessLiveChat } from '../shared/accessControl';
 import type { LiveChatConversation, LiveChatMessage } from '../shared/schema';
 import { chatThreadingService } from './services/ChatThreadingService';
+import { WebRTCSignalingService } from './services/WebRTCSignalingService';
 import crypto from 'crypto';
 
 interface LiveChatWebSocket extends WebSocket {
@@ -24,12 +25,26 @@ interface LiveChatClientMessage {
     | 'stop_typing'
     | 'mark_read'
     | 'update_agent_status'
-    | 'ping';
+    | 'ping'
+    // WebRTC call signaling
+    | 'start_call'
+    | 'accept_call'
+    | 'reject_call'
+    | 'end_call'
+    | 'ice_candidate'
+    | 'sdp_offer'
+    | 'sdp_answer';
   conversationId?: string;
   content?: string;
   agentStatus?: string;
   metadata?: any;
   inReplyTo?: string; // Thread support - backward compatible
+  // WebRTC call data
+  callId?: string;
+  callType?: 'audio' | 'video';
+  receiverId?: string;
+  sdp?: any;
+  candidate?: any;
 }
 
 interface LiveChatBroadcastMessage {
@@ -41,7 +56,16 @@ interface LiveChatBroadcastMessage {
     | 'conversation_assigned'
     | 'conversation_resolved'
     | 'agent_status_changed'
-    | 'error';
+    | 'error'
+    // WebRTC call events
+    | 'call_started'
+    | 'incoming_call'
+    | 'call_accepted'
+    | 'call_rejected'
+    | 'call_ended'
+    | 'ice_candidate'
+    | 'sdp_offer'
+    | 'sdp_answer';
   data?: any;
   error?: string;
 }
@@ -216,6 +240,28 @@ export function setupLiveChatWebSocket(httpServer: Server): WebSocketServer {
               break;
             case 'update_agent_status':
               await handleUpdateAgentStatus(ws, message, agentConnections);
+              break;
+            // WebRTC call signaling
+            case 'start_call':
+              await handleStartLiveChatCall(ws, message, conversationConnections);
+              break;
+            case 'accept_call':
+              await handleAcceptLiveChatCall(ws, message, conversationConnections);
+              break;
+            case 'reject_call':
+              await handleRejectLiveChatCall(ws, message, conversationConnections);
+              break;
+            case 'end_call':
+              await handleEndLiveChatCall(ws, message, conversationConnections);
+              break;
+            case 'ice_candidate':
+              await handleLiveChatIceCandidate(ws, message, conversationConnections);
+              break;
+            case 'sdp_offer':
+              await handleLiveChatSdpOffer(ws, message, conversationConnections);
+              break;
+            case 'sdp_answer':
+              await handleLiveChatSdpAnswer(ws, message, conversationConnections);
               break;
           }
         } catch (error: any) {
@@ -564,5 +610,307 @@ function broadcastToConversation(
     if (client !== exclude && client.readyState === WebSocket.OPEN) {
       client.send(messageStr);
     }
+  });
+}
+
+/**
+ * Send message to specific user in conversation
+ */
+function sendToUserInConversation(
+  userId: string,
+  conversationId: string,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>,
+  message: LiveChatBroadcastMessage
+) {
+  const connections = conversationConnections.get(conversationId);
+  if (!connections) return;
+
+  const messageStr = JSON.stringify(message);
+  connections.forEach((client) => {
+    if (client.userId === userId && client.readyState === WebSocket.OPEN) {
+      client.send(messageStr);
+    }
+  });
+}
+
+// ==================== WebRTC Live Chat Call Signal Handlers ====================
+
+/**
+ * Handle start Live Chat call
+ */
+async function handleStartLiveChatCall(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callType, receiverId, conversationId } = message;
+  
+  if (!callType || !receiverId || !conversationId || !ws.userId || !ws.organizationId) {
+    throw new Error('Call type, receiver ID, conversation ID, user ID, and organization ID required');
+  }
+
+  // Validate users can start call
+  const validation = WebRTCSignalingService.canStartCall(ws.userId, receiverId);
+  if (!validation.valid) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      error: validation.reason
+    }));
+    return;
+  }
+
+  // Get user names
+  const caller = await storage.getUser(ws.userId);
+  const receiver = await storage.getUser(receiverId);
+  
+  if (!caller || !receiver) {
+    throw new Error('User not found');
+  }
+
+  // Create call session
+  const callId = crypto.randomUUID();
+  const callSession = WebRTCSignalingService.createCall({
+    callId,
+    callerId: ws.userId,
+    callerName: caller.fullName || caller.email,
+    receiverId,
+    receiverName: receiver.fullName || receiver.email,
+    conversationId,
+    callType,
+    organizationId: ws.organizationId,
+  });
+
+  // Send call started confirmation to caller (not accepted yet!)
+  ws.send(JSON.stringify({
+    type: 'call_started',
+    data: { 
+      callId, 
+      receiverId,
+      receiverName: receiver.fullName || receiver.email,
+      callType 
+    }
+  }));
+
+  // Notify receiver about incoming call
+  sendToUserInConversation(receiverId, conversationId, conversationConnections, {
+    type: 'incoming_call',
+    data: {
+      callId,
+      callerId: ws.userId,
+      callerName: caller.fullName || caller.email,
+      callType,
+      conversationId,
+    }
+  });
+
+  console.log(`[Live Chat WS] Call started: ${callId}, ${ws.userId} -> ${receiverId}`);
+}
+
+/**
+ * Handle accept Live Chat call
+ */
+async function handleAcceptLiveChatCall(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, conversationId } = message;
+  
+  if (!callId || !conversationId || !ws.userId) {
+    throw new Error('Call ID, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Update call status
+  WebRTCSignalingService.updateCallStatus(callId, 'active');
+
+  // Notify caller that call was accepted
+  sendToUserInConversation(callSession.callerId, conversationId, conversationConnections, {
+    type: 'call_accepted',
+    data: { callId, receiverId: ws.userId }
+  });
+
+  console.log(`[Live Chat WS] Call accepted: ${callId}`);
+}
+
+/**
+ * Handle reject Live Chat call
+ */
+async function handleRejectLiveChatCall(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, conversationId } = message;
+  
+  if (!callId || !conversationId || !ws.userId) {
+    throw new Error('Call ID, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // End call
+  WebRTCSignalingService.endCall(callId);
+
+  // Notify caller that call was rejected
+  sendToUserInConversation(callSession.callerId, conversationId, conversationConnections, {
+    type: 'call_rejected',
+    data: { callId }
+  });
+
+  console.log(`[Live Chat WS] Call rejected: ${callId}`);
+}
+
+/**
+ * Handle end Live Chat call
+ */
+async function handleEndLiveChatCall(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, conversationId } = message;
+  
+  if (!callId || !conversationId || !ws.userId) {
+    throw new Error('Call ID, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    return; // Call already ended
+  }
+
+  // Verify user is part of the call
+  if (callSession.callerId !== ws.userId && callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // End call
+  WebRTCSignalingService.endCall(callId);
+
+  // Notify other participant
+  const otherUserId = callSession.callerId === ws.userId 
+    ? callSession.receiverId 
+    : callSession.callerId;
+
+  sendToUserInConversation(otherUserId, conversationId, conversationConnections, {
+    type: 'call_ended',
+    data: { callId }
+  });
+
+  console.log(`[Live Chat WS] Call ended: ${callId}`);
+}
+
+/**
+ * Handle ICE candidate for Live Chat
+ */
+async function handleLiveChatIceCandidate(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, candidate, conversationId } = message;
+  
+  if (!callId || !candidate || !conversationId || !ws.userId) {
+    throw new Error('Call ID, candidate, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is part of the call
+  if (callSession.callerId !== ws.userId && callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward ICE candidate to other participant
+  const otherUserId = callSession.callerId === ws.userId 
+    ? callSession.receiverId 
+    : callSession.callerId;
+
+  sendToUserInConversation(otherUserId, conversationId, conversationConnections, {
+    type: 'ice_candidate',
+    data: { callId, candidate, from: ws.userId }
+  });
+}
+
+/**
+ * Handle SDP offer for Live Chat
+ */
+async function handleLiveChatSdpOffer(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, sdp, conversationId } = message;
+  
+  if (!callId || !sdp || !conversationId || !ws.userId) {
+    throw new Error('Call ID, SDP, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the caller
+  if (callSession.callerId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward SDP offer to receiver
+  sendToUserInConversation(callSession.receiverId, conversationId, conversationConnections, {
+    type: 'sdp_offer',
+    data: { callId, sdp, from: ws.userId }
+  });
+}
+
+/**
+ * Handle SDP answer for Live Chat
+ */
+async function handleLiveChatSdpAnswer(
+  ws: LiveChatWebSocket,
+  message: LiveChatClientMessage,
+  conversationConnections: Map<string, Set<LiveChatWebSocket>>
+) {
+  const { callId, sdp, conversationId } = message;
+  
+  if (!callId || !sdp || !conversationId || !ws.userId) {
+    throw new Error('Call ID, SDP, conversation ID, and user ID required');
+  }
+
+  const callSession = WebRTCSignalingService.getCall(callId);
+  if (!callSession) {
+    throw new Error('Call not found');
+  }
+
+  // Verify user is the receiver
+  if (callSession.receiverId !== ws.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Forward SDP answer to caller
+  sendToUserInConversation(callSession.callerId, conversationId, conversationConnections, {
+    type: 'sdp_answer',
+    data: { callId, sdp, from: ws.userId }
   });
 }
