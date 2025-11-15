@@ -383,8 +383,7 @@ export class MLModelFusionEngine {
    * 3. Cultural context ambiguity
    */
   async runLLMValidation(
-    context: ValidationContext,
-    organizationId: string
+    context: ValidationContext
   ): Promise<ModelOutput | null> {
     const llmConfigService = getLLMConfigService();
 
@@ -402,9 +401,9 @@ export class MLModelFusionEngine {
       // Build prompt for LLM validation
       const prompt = this.buildValidationPrompt(context);
 
-      // Get LLM response
+      // Get LLM response (organizationId from context)
       const response = await llmConfigService.chatCompletion(
-        organizationId,
+        context.organizationId,
         [
           {
             role: "system",
@@ -440,12 +439,20 @@ export class MLModelFusionEngine {
 
   /**
    * Detect conflicting signals between Tier 1 models
+   * Must match PersonalityProfilingService.detectConflictingSignals()
    */
   private hasConflictingSignals(results: ModelOutput[]): boolean {
     if (results.length < 2) return false;
 
     // Check for major disagreements in key traits
-    const keyTraits = ["extraversion", "agreeableness", "conscientiousness"];
+    // IMPORTANT: Keep in sync with PersonalityProfilingService.detectConflictingSignals
+    const keyTraits = [
+      "extraversion",
+      "agreeableness",
+      "conscientiousness",
+      "disc_dominance",
+      "disc_influence",
+    ];
 
     for (const trait of keyTraits) {
       const scores = results

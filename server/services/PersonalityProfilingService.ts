@@ -12,6 +12,7 @@ import {
   type InsertPersonalityTrait
 } from "@shared/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
+import crypto from "crypto";
 
 /**
  * ===================================================================
@@ -72,14 +73,14 @@ export interface IConversationAnalysisEngine {
 }
 
 /**
- * Interface for future MLModelFusionEngine dependency
- * TODO: Implement in Task 5
+ * Interface for MLModelFusionEngine dependency
+ * Used for dependency injection and testing
  */
 export interface IMLModelFusionEngine {
   runKeywordAnalysis(metrics: ConversationMetrics): Promise<ModelOutput>;
   runSentimentAnalysis(metrics: ConversationMetrics): Promise<ModelOutput>;
   runBehavioralPatterns(userId: string, metrics: ConversationMetrics): Promise<ModelOutput>;
-  runLLMValidation(context: ValidationContext): Promise<ModelOutput | null>;
+  runLLMValidation(context: ValidationContext): Promise<ModelOutput | null>;  // organizationId in context
   fuseResults(outputs: ModelOutput[]): Promise<ConsensusScores>;
 }
 
@@ -122,6 +123,7 @@ export interface ModelOutput {
  * Context for LLM validation
  */
 export interface ValidationContext {
+  organizationId: string;  // Required for tenant-specific LLM config
   tier1Results: ModelOutput[];
   conversationSummary: string;
   culturalContext?: {
@@ -143,8 +145,16 @@ export interface ConsensusScores {
  * 
  * Orchestrates multi-framework personality analysis using ML model fusion.
  * Privacy-first: Only processes aggregated metrics, never raw messages.
+ * 
+ * Requires dependency injection of IMLModelFusionEngine.
+ * Use createPersonalityProfilingService() factory function for default wiring.
  */
 export class PersonalityProfilingService {
+  private fusionEngine: IMLModelFusionEngine;
+
+  constructor(fusionEngine: IMLModelFusionEngine) {
+    this.fusionEngine = fusionEngine;
+  }
   
   // ==================== CONSENT MANAGEMENT ====================
   
@@ -394,15 +404,8 @@ export class PersonalityProfilingService {
   /**
    * Analyze a single user's personality
    * 
-   * ⚠️ NOT YET IMPLEMENTED ⚠️
-   * 
-   * Dependencies required:
-   * 1. ConversationAnalysisEngine - To get aggregated metrics
-   * 2. MLModelFusionEngine - To run keyword/sentiment/behavioral analysis
-   * 3. LLM validation adapter - For cultural context
-   * 
-   * Future implementation will:
-   * 1. Check consent
+   * Implementation:
+   * 1. Check consent (GDPR requirement)
    * 2. Get aggregated conversation metrics (privacy-safe)
    * 3. Run Tier 1 models (keyword, sentiment, behavioral)
    * 4. Conditionally run LLM validation if confidence < 70%
@@ -410,17 +413,353 @@ export class PersonalityProfilingService {
    * 6. Update personality_profiles and personality_traits tables
    * 7. Create ml_analysis_runs record for audit
    * 
-   * @throws Error - Method not yet implemented
+   * NOTE: Currently uses mock conversation metrics.
+   * TODO (Task 6): Replace with real ConversationAnalysisEngine
    */
   async analyzeUser(
     userId: string,
     organizationId: string
   ): Promise<PersonalityProfile> {
-    throw new Error(
-      "analyzeUser not yet implemented. " +
-      "Requires ConversationAnalysisEngine and MLModelFusionEngine. " +
-      "See PersonalityProfilingService.ts for planned implementation."
+    const startTime = Date.now();
+
+    // 1. Check consent
+    const hasConsent = await this.getConsent(userId, organizationId);
+    if (!hasConsent) {
+      throw new Error(
+        "User has not consented to personality profiling. " +
+        "Call updateConsent(userId, organizationId, true) first."
+      );
+    }
+
+    // 2. Get conversation metrics (MOCK DATA - Task 6 will replace with real)
+    const metrics = await this.getConversationMetrics(userId, organizationId);
+
+    // 3. Create ML analysis run record
+    const [analysisRun] = await db
+      .insert(mlAnalysisRuns)
+      .values({
+        organizationId,
+        status: "running",
+        modelsUsed: [], // Will be updated with actual models used
+        tokensConsumed: 0,
+        processingTimeSeconds: 0,
+        errorMessage: null,
+        createdAt: new Date(),
+        completedAt: null,
+      })
+      .returning();
+
+    try {
+      // 4. Run ML model fusion using injected engine
+      // Tier 1: Run fast models (always)
+      const tier1Results = await Promise.all([
+        this.fusionEngine.runKeywordAnalysis(metrics),
+        this.fusionEngine.runSentimentAnalysis(metrics),
+        this.fusionEngine.runBehavioralPatterns(userId, metrics),
+      ]);
+
+      // Tier 2: Conditionally run LLM validation
+      let tier2Result: any = null;
+      const avgConfidence =
+        tier1Results.reduce((sum, r) => sum + r.confidence, 0) /
+        tier1Results.length;
+
+      // Check for conflicting signals between Tier 1 models
+      const hasConflicts = this.detectConflictingSignals(tier1Results);
+
+      // Run LLM validation if:
+      // 1. Average confidence < 70%, OR
+      // 2. Conflicting signals detected
+      if (avgConfidence < 70 || hasConflicts) {
+        tier2Result = await this.fusionEngine.runLLMValidation({
+          organizationId,
+          tier1Results,
+          conversationSummary: this.buildConversationSummary(metrics),
+          culturalContext: undefined, // TODO: Add cultural context
+        });
+      }
+
+      // Combine all results
+      const allResults = tier2Result
+        ? [...tier1Results, tier2Result]
+        : tier1Results;
+
+      // 5. Fuse results
+      const consensusScores = await this.fusionEngine.fuseResults(allResults);
+
+      // 6. Store model outputs
+      for (const result of allResults) {
+        await db.insert(mlModelOutputs).values({
+          analysisRunId: analysisRun.id,
+          userId,
+          modelType: result.modelType,
+          output: result.traits,
+          confidence: result.confidence,
+          checksum: crypto
+            .createHash("sha256")
+            .update(JSON.stringify(result.traits))
+            .digest("hex"),
+          fusionWeight: this.getModelWeight(result.modelType),
+          tokensUsed: result.tokensUsed || 0,
+          createdAt: new Date(),
+        });
+      }
+
+      // 7. Update personality profile
+      const profile = await this.updateProfileFromConsensus(
+        userId,
+        organizationId,
+        consensusScores
+      );
+
+      // 8. Store personality traits
+      await this.storePersonalityTraits(profile.id, consensusScores);
+
+      // 9. Mark analysis run as completed
+      const processingTime = (Date.now() - startTime) / 1000;
+      const totalTokens = allResults.reduce(
+        (sum, r) => sum + (r.tokensUsed || 0),
+        0
+      );
+
+      await db
+        .update(mlAnalysisRuns)
+        .set({
+          status: "completed",
+          modelsUsed: allResults.map((r) => r.modelType),
+          tokensConsumed: totalTokens,
+          processingTimeSeconds: Math.round(processingTime),
+          completedAt: new Date(),
+        })
+        .where(eq(mlAnalysisRuns.id, analysisRun.id));
+
+      return profile;
+    } catch (error: any) {
+      // Mark run as failed
+      await db
+        .update(mlAnalysisRuns)
+        .set({
+          status: "failed",
+          errorMessage: error.message,
+        })
+        .where(eq(mlAnalysisRuns.id, analysisRun.id));
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get model weight for fusion algorithm
+   */
+  private getModelWeight(modelType: string): number {
+    const weights: Record<string, number> = {
+      keyword_analysis: 0.25,
+      sentiment_analysis: 0.25,
+      behavioral_patterns: 0.3,
+      llm_validation: 0.2,
+    };
+    return weights[modelType] || 0;
+  }
+
+  /**
+   * Detect conflicting signals between Tier 1 models
+   * Conflict = >40 point variance in key traits
+   */
+  private detectConflictingSignals(results: ModelOutput[]): boolean {
+    if (results.length < 2) return false;
+
+    // Key traits to check for conflicts
+    const keyTraits = [
+      "extraversion",
+      "agreeableness",
+      "conscientiousness",
+      "disc_dominance",
+      "disc_influence",
+    ];
+
+    for (const trait of keyTraits) {
+      const scores = results
+        .map((r) => r.traits[trait])
+        .filter((s) => s !== undefined);
+
+      if (scores.length >= 2) {
+        const max = Math.max(...scores);
+        const min = Math.min(...scores);
+        // Conflict if difference > 40 points
+        if (max - min > 40) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get conversation metrics for a user
+   * 
+   * TODO (Task 6): Replace with real ConversationAnalysisEngine
+   * For now, returns mock data based on user activity
+   */
+  private async getConversationMetrics(
+    userId: string,
+    organizationId: string
+  ): Promise<ConversationMetrics> {
+    // Mock data - Task 6 will replace with real aggregated metrics
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    return {
+      userId,
+      periodStart: oneMonthAgo,
+      periodEnd: now,
+      messageCount: 150,
+      avgMessageLength: 85,
+      avgResponseTimeSeconds: 240,
+      sentimentPositive: 65,
+      sentimentNeutral: 25,
+      sentimentNegative: 10,
+      questionAskedCount: 30,
+      exclamationCount: 15,
+      emojiUsageCount: 20,
+      conversationsInitiated: 25,
+      conversationsParticipated: 45,
+      linguisticMarkers: {
+        formalityAvg: 68,
+        vocabularyDiversity: 420,
+        technicalTermFrequency: 12,
+      },
+    };
+  }
+
+  /**
+   * Build conversation summary for LLM validation
+   */
+  private buildConversationSummary(metrics: ConversationMetrics): string {
+    return `User has sent ${metrics.messageCount} messages over 30 days with average length ${metrics.avgMessageLength} characters. ` +
+      `Sentiment distribution: ${metrics.sentimentPositive}% positive, ${metrics.sentimentNeutral}% neutral, ${metrics.sentimentNegative}% negative. ` +
+      `Initiated ${metrics.conversationsInitiated} conversations and participated in ${metrics.conversationsParticipated}. ` +
+      `Average response time: ${Math.round(metrics.avgResponseTimeSeconds / 60)} minutes. ` +
+      `Formality score: ${metrics.linguisticMarkers.formalityAvg}/100, vocabulary diversity: ${metrics.linguisticMarkers.vocabularyDiversity} words.`;
+  }
+
+  /**
+   * Update personality profile with consensus scores
+   */
+  private async updateProfileFromConsensus(
+    userId: string,
+    organizationId: string,
+    consensus: ConsensusScores
+  ): Promise<PersonalityProfile> {
+    // Calculate data quality score
+    const dataQualityScore = Math.min(
+      100,
+      Math.max(
+        0,
+        consensus.overallConfidence
+      )
     );
+
+    // Get existing profile or create new one
+    const [existingProfile] = await db
+      .select()
+      .from(personalityProfiles)
+      .where(
+        and(
+          eq(personalityProfiles.userId, userId),
+          eq(personalityProfiles.organizationId, organizationId)
+        )
+      )
+      .limit(1);
+
+    if (existingProfile) {
+      // Update existing profile
+      const [updated] = await db
+        .update(personalityProfiles)
+        .set({
+          confidenceScore: consensus.overallConfidence,
+          dataQualityScore,
+          lastAnalyzedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(personalityProfiles.id, existingProfile.id))
+        .returning();
+
+      return updated;
+    } else {
+      // Create new profile
+      const [created] = await db
+        .insert(personalityProfiles)
+        .values({
+          userId,
+          organizationId,
+          analysisConsented: true,
+          confidenceScore: consensus.overallConfidence,
+          dataQualityScore,
+          lastAnalyzedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      return created;
+    }
+  }
+
+  /**
+   * Store personality traits from consensus scores
+   */
+  private async storePersonalityTraits(
+    profileId: string,
+    consensus: ConsensusScores
+  ): Promise<void> {
+    // Delete existing traits for this profile
+    await db
+      .delete(personalityTraits)
+      .where(eq(personalityTraits.profileId, profileId));
+
+    // Map trait names to frameworks
+    const frameworkMap: Record<string, string> = {
+      openness: "big_five",
+      conscientiousness: "big_five",
+      extraversion: "big_five",
+      agreeableness: "big_five",
+      neuroticism: "big_five",
+      disc_dominance: "disc",
+      disc_influence: "disc",
+      disc_steadiness: "disc",
+      disc_compliance: "disc",
+      eq_selfAwareness: "emotional_intelligence",
+      eq_selfRegulation: "emotional_intelligence",
+      eq_motivation: "emotional_intelligence",
+      eq_empathy: "emotional_intelligence",
+      eq_socialSkills: "emotional_intelligence",
+    };
+
+    // Insert new traits
+    const traitsToInsert = Object.entries(consensus.traits).map(
+      ([traitName, traitData]) => ({
+        profileId,
+        framework: frameworkMap[traitName] as
+          | "big_five"
+          | "disc"
+          | "mbti"
+          | "emotional_intelligence",
+        traitName,
+        score: traitData.score,
+        confidence: traitData.confidence,
+        rawOutput: {
+          modelsUsed: traitData.modelsUsed,
+          calculatedAt: new Date().toISOString(),
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+
+    if (traitsToInsert.length > 0) {
+      await db.insert(personalityTraits).values(traitsToInsert);
+    }
   }
 
   /**
