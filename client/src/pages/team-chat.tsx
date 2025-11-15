@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,14 +9,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MessagesSquare, Plus, Send, Reply, X } from "lucide-react";
+import { MessagesSquare, Plus, Send, Reply, X, Phone, Video, PhoneOff, History } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import type { ChatMessage } from "@shared/schema";
+import { useTeamChatWebSocket } from "@/hooks/useTeamChatWebSocket";
+import IncomingCallModal from "@/components/IncomingCallModal";
+import VideoCallWindow from "@/components/VideoCallWindow";
+import CallHistoryDialog from "@/components/CallHistoryDialog";
 
 interface MessageWithReplies extends ChatMessage {
   replies: MessageWithReplies[];
+}
+
+interface ChannelMember {
+  id: string;
+  userId: string;
+  channelId: string;
+  role: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 // Recursive message thread component
@@ -91,9 +107,15 @@ export default function TeamChatPage() {
   const [newMessage, setNewMessage] = useState("");
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [callHistoryOpen, setCallHistoryOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelDescription, setNewChannelDescription] = useState("");
   const { toast } = useToast();
+
+  // Get current user from query
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/users/me"],
+  });
 
   const { data: channels } = useQuery({
     queryKey: ["/api/chat/channels"],
@@ -102,6 +124,24 @@ export default function TeamChatPage() {
   const { data: messages } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/channels", selectedChannel?.id, "messages"],
     enabled: !!selectedChannel,
+  });
+
+  const { data: members = [] } = useQuery<ChannelMember[]>({
+    queryKey: ["/api/chat/channels", selectedChannel?.id, "members"],
+    enabled: !!selectedChannel,
+  });
+
+  // WebRTC WebSocket integration
+  const webRTCSocket = useTeamChatWebSocket({
+    channelId: selectedChannel?.id || null,
+    userId: currentUser?.id || "",
+    onError: (error) => {
+      toast({
+        title: "WebRTC Error",
+        description: error,
+        variant: "destructive",
+      });
+    },
   });
 
   // Build message tree with all levels
@@ -202,11 +242,106 @@ export default function TeamChatPage() {
     setReplyToMessage(null);
   };
 
+  const handleStartCall = async (memberId: string, callType: 'audio' | 'video') => {
+    if (!currentUser) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to start a call",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!webRTCSocket.isConnected) {
+      toast({
+        title: "Error",
+        description: "Not connected to chat server. Please wait...",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await webRTCSocket.startCall(memberId, callType);
+      toast({
+        title: "Call initiated",
+        description: `${callType === 'audio' ? 'Audio' : 'Video'} call started`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start call",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAcceptCall = async () => {
+    if (!webRTCSocket.incomingCall) {
+      return;
+    }
+
+    if (!webRTCSocket.isConnected) {
+      toast({
+        title: "Error",
+        description: "Connection lost. Unable to accept call.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await webRTCSocket.acceptCall(
+        webRTCSocket.incomingCall.callId,
+        webRTCSocket.incomingCall.callType
+      );
+      toast({
+        title: "Call accepted",
+        description: "Connected to call",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to accept call",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRejectCall = () => {
+    if (!webRTCSocket.incomingCall) {
+      return;
+    }
+
+    webRTCSocket.rejectCall(webRTCSocket.incomingCall.callId);
+    toast({
+      title: "Call rejected",
+      description: "Call declined",
+    });
+  };
+
+  const handleEndCall = () => {
+    webRTCSocket.endCall();
+  };
+
+  // Hook handles connection automatically based on channelId changes
+
   return (
     <div className="flex flex-col gap-6 p-6">
-      <h1 className="text-3xl font-display">Team Chat</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-display">Team Chat</h1>
+        <Button
+          variant="outline"
+          onClick={() => setCallHistoryOpen(true)}
+          data-testid="button-call-history"
+        >
+          <History className="h-4 w-4 mr-2" />
+          Call History
+        </Button>
+      </div>
 
-      <div className="grid grid-cols-4 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-6 gap-6 h-[calc(100vh-200px)]">
+        {/* Channels Sidebar */}
         <Card className="col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-lg">Channels</CardTitle>
@@ -240,13 +375,22 @@ export default function TeamChatPage() {
           </CardContent>
         </Card>
 
-        <Card className="col-span-3">
+        {/* Messages Area */}
+        <Card className="col-span-4">
           {selectedChannel ? (
             <>
-              <CardHeader>
-                <CardTitle>#{selectedChannel.name}</CardTitle>
-                {selectedChannel.description && (
-                  <p className="text-sm text-muted-foreground">{selectedChannel.description}</p>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>#{selectedChannel.name}</CardTitle>
+                  {selectedChannel.description && (
+                    <p className="text-sm text-muted-foreground">{selectedChannel.description}</p>
+                  )}
+                </div>
+                {webRTCSocket.isConnected && (
+                  <Badge variant="outline" className="gap-1">
+                    <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                    Connected
+                  </Badge>
                 )}
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
@@ -316,7 +460,99 @@ export default function TeamChatPage() {
             </CardContent>
           )}
         </Card>
+
+        {/* Members Sidebar */}
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Members</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[calc(100vh-300px)]">
+              {selectedChannel ? (
+                <div className="space-y-2 p-4">
+                  {members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 p-2 rounded-md hover-elevate"
+                      data-testid={`member-${member.userId}`}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>
+                          {member.user?.name?.substring(0, 2).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {member.user?.name || member.user?.email || 'Unknown'}
+                        </p>
+                        {member.role === 'admin' && (
+                          <Badge variant="secondary" className="h-4 text-xs">Admin</Badge>
+                        )}
+                      </div>
+                      {currentUser && member.userId !== currentUser.id && (
+                        <div className="flex gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleStartCall(member.userId, 'audio')}
+                            disabled={!webRTCSocket.isConnected || webRTCSocket.webRTC.callState !== 'idle'}
+                            data-testid={`button-audio-call-${member.userId}`}
+                          >
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleStartCall(member.userId, 'video')}
+                            disabled={!webRTCSocket.isConnected || webRTCSocket.webRTC.callState !== 'idle'}
+                            data-testid={`button-video-call-${member.userId}`}
+                          >
+                            <Video className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-sm text-muted-foreground p-4">
+                  Select a channel to view members
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Incoming Call Modal */}
+      {webRTCSocket.incomingCall && (
+        <IncomingCallModal
+          isOpen={!!webRTCSocket.incomingCall}
+          callerName={webRTCSocket.incomingCall.callerName || 'Unknown'}
+          callType={webRTCSocket.incomingCall.callType}
+          onAccept={handleAcceptCall}
+          onReject={handleRejectCall}
+        />
+      )}
+
+      {/* Video Call Window */}
+      {webRTCSocket.callState === 'active' && (
+        <VideoCallWindow
+          isOpen={true}
+          callType={webRTCSocket.activeCall?.callType || 'audio'}
+          localStream={webRTCSocket.webRTC.localStream}
+          remoteStream={webRTCSocket.webRTC.remoteStream}
+          onToggleMute={() => webRTCSocket.webRTC.toggleMute()}
+          onToggleVideo={() => webRTCSocket.webRTC.toggleVideo()}
+          onToggleScreenShare={() => webRTCSocket.webRTC.toggleScreenShare()}
+          onHangUp={handleEndCall}
+          isMuted={webRTCSocket.webRTC.isMuted}
+          isVideoOff={webRTCSocket.webRTC.isVideoOff}
+          isScreenSharing={webRTCSocket.webRTC.isScreenSharing}
+        />
+      )}
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent data-testid="dialog-create-channel">
@@ -363,6 +599,13 @@ export default function TeamChatPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Call History Dialog */}
+      <CallHistoryDialog
+        isOpen={callHistoryOpen}
+        onClose={() => setCallHistoryOpen(false)}
+        channelId={selectedChannel?.id}
+      />
     </div>
   );
 }

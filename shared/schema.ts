@@ -2983,6 +2983,35 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// WebRTC Call Logs
+export const callLogs = pgTable("call_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  channelId: varchar("channel_id").references(() => chatChannels.id, { onDelete: "set null" }),
+  callerId: varchar("caller_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+  callType: text("call_type").notNull(), // 'audio' or 'video'
+  status: text("status").notNull(), // 'completed', 'missed', 'rejected', 'failed'
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  duration: integer("duration"), // Duration in seconds
+  quality: jsonb("quality"), // Connection quality metrics { iceConnectionState, avgRtt, packetsLost }
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  organizationIdx: index("call_logs_organization_idx").on(table.organizationId),
+  callerIdx: index("call_logs_caller_idx").on(table.callerId),
+  receiverIdx: index("call_logs_receiver_idx").on(table.receiverId),
+  channelIdx: index("call_logs_channel_idx").on(table.channelId),
+}));
+
+export type CallLog = typeof callLogs.$inferSelect;
+export type InsertCallLog = typeof callLogs.$inferInsert;
+
+export const insertCallLogSchema = createInsertSchema(callLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 // AI Agent Sessions (for Parity, Cadence, Forma)
 export const agentSessions = pgTable("agent_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

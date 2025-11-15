@@ -455,6 +455,15 @@ export interface IStorage {
   updateChatMessage(id: string, content: string): Promise<schema.ChatMessage | undefined>;
   deleteChatMessage(id: string): Promise<void>;
 
+  // WebRTC Call Logs
+  createCallLog(log: schema.InsertCallLog): Promise<schema.CallLog>;
+  getCallLog(id: string): Promise<schema.CallLog | undefined>;
+  getCallLogsByOrganization(organizationId: string): Promise<schema.CallLog[]>;
+  getCallLogsByChannel(channelId: string): Promise<schema.CallLog[]>;
+  getCallLogsByUser(userId: string): Promise<schema.CallLog[]>;
+  updateCallLog(id: string, log: Partial<schema.InsertCallLog>): Promise<schema.CallLog | undefined>;
+  deleteCallLog(id: string): Promise<void>;
+
   // AI Agent Sessions (Parity, Cadence, Forma)
   createAgentSession(session: schema.InsertAgentSession): Promise<schema.AgentSession>;
   getAgentSession(id: string): Promise<schema.AgentSession | undefined>;
@@ -4156,6 +4165,50 @@ export class DbStorage implements IStorage {
 
   async deleteChatMessage(id: string): Promise<void> {
     await db.delete(schema.chatMessages).where(eq(schema.chatMessages.id, id));
+  }
+
+  // WebRTC Call Logs
+  async createCallLog(log: schema.InsertCallLog): Promise<schema.CallLog> {
+    const result = await db.insert(schema.callLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getCallLog(id: string): Promise<schema.CallLog | undefined> {
+    const result = await db.select().from(schema.callLogs).where(eq(schema.callLogs.id, id));
+    return result[0];
+  }
+
+  async getCallLogsByOrganization(organizationId: string): Promise<schema.CallLog[]> {
+    return await db.select().from(schema.callLogs)
+      .where(eq(schema.callLogs.organizationId, organizationId))
+      .orderBy(desc(schema.callLogs.createdAt));
+  }
+
+  async getCallLogsByChannel(channelId: string): Promise<schema.CallLog[]> {
+    return await db.select().from(schema.callLogs)
+      .where(eq(schema.callLogs.channelId, channelId))
+      .orderBy(desc(schema.callLogs.createdAt));
+  }
+
+  async getCallLogsByUser(userId: string): Promise<schema.CallLog[]> {
+    return await db.select().from(schema.callLogs)
+      .where(or(
+        eq(schema.callLogs.callerId, userId),
+        eq(schema.callLogs.receiverId, userId)
+      ))
+      .orderBy(desc(schema.callLogs.createdAt));
+  }
+
+  async updateCallLog(id: string, log: Partial<schema.InsertCallLog>): Promise<schema.CallLog | undefined> {
+    const result = await db.update(schema.callLogs)
+      .set(log)
+      .where(eq(schema.callLogs.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCallLog(id: string): Promise<void> {
+    await db.delete(schema.callLogs).where(eq(schema.callLogs.id, id));
   }
 
   // AI Agent Sessions

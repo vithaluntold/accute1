@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Phone, PhoneOff, Video, PhoneMissed } from 'lucide-react';
 import { CallType } from '@/hooks/useWebRTC';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface IncomingCallModalProps {
-  open: boolean;
+  isOpen: boolean;
   callerName: string;
   callType: CallType;
   onAccept: () => void;
@@ -21,17 +21,25 @@ interface IncomingCallModalProps {
 }
 
 export function IncomingCallModal({
-  open,
+  isOpen,
   callerName,
   callType,
   onAccept,
   onReject,
 }: IncomingCallModalProps) {
   const [ringCount, setRingCount] = useState(0);
+  const handledRef = useRef(false);
+
+  // Reset handled flag when new call arrives
+  useEffect(() => {
+    if (isOpen) {
+      handledRef.current = false;
+    }
+  }, [isOpen]);
 
   // Animate ring effect
   useEffect(() => {
-    if (!open) {
+    if (!isOpen) {
       setRingCount(0);
       return;
     }
@@ -41,18 +49,40 @@ export function IncomingCallModal({
     }, 800);
 
     return () => clearInterval(interval);
-  }, [open]);
+  }, [isOpen]);
 
   // Play ring sound (optional - can be implemented later)
   useEffect(() => {
-    if (open) {
+    if (isOpen) {
       // TODO: Play ring sound
       console.log('[IncomingCall] Ringing...');
     }
-  }, [open]);
+  }, [isOpen]);
+
+  const handleAccept = () => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    onAccept();
+    // Parent handles clearing incomingCall, which closes modal
+  };
+
+  const handleReject = () => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    onReject();
+    // Parent handles clearing incomingCall, which closes modal
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    // Only reject if user is trying to close (Escape/outside click)
+    // AND we haven't already handled this call (accept/reject)
+    if (!open && !handledRef.current) {
+      handleReject();
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onReject()}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent 
         className="sm:max-w-md"
         data-testid="modal-incoming-call"
@@ -123,7 +153,7 @@ export function IncomingCallModal({
           <Button
             variant="destructive"
             className="flex-1"
-            onClick={onReject}
+            onClick={handleReject}
             data-testid="button-reject-call"
           >
             <PhoneOff className="w-4 h-4 mr-2" />
@@ -134,7 +164,7 @@ export function IncomingCallModal({
           <Button
             variant="default"
             className="flex-1 bg-green-600 hover:bg-green-700"
-            onClick={onAccept}
+            onClick={handleAccept}
             data-testid="button-accept-call"
           >
             <Phone className="w-4 h-4 mr-2" />

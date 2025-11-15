@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useWebRTC, CallType } from './useWebRTC';
 
 interface TeamChatWebSocketOptions {
-  channelId: string;
+  channelId: string | null;
   userId: string;
   onMessage?: (message: any) => void;
   onIncomingCall?: (data: { callId: string; callerId: string; callerName: string; callType: CallType; channelId: string }) => void;
@@ -12,10 +12,19 @@ interface TeamChatWebSocketOptions {
   onError?: (error: string) => void;
 }
 
+interface IncomingCallData {
+  callId: string;
+  callerId: string;
+  callerName: string;
+  callType: CallType;
+  channelId: string;
+}
+
 export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [currentCallId, setCurrentCallId] = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const currentCallIdRef = useRef<string | null>(null);
   const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
   const incomingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
@@ -63,10 +72,22 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
   });
 
   const connect = useCallback(() => {
+    // Don't connect if no channel is selected or no user is logged in
+    if (!options.channelId || !options.userId) {
+      console.log('[TeamChat WS] Skipping connection: missing channel or user', {
+        hasChannel: !!options.channelId,
+        hasUser: !!options.userId
+      });
+      return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/team-chat`;
     
-    console.log('[TeamChat WS] Connecting to:', wsUrl);
+    console.log('[TeamChat WS] Connecting to:', wsUrl, {
+      channelId: options.channelId,
+      userId: options.userId
+    });
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -117,24 +138,28 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
             webRTC.setCallId(message.data.callId);
             webRTC.setRemoteUserId(message.data.callerId);
             webRTC.setRemoteUserName(message.data.callerName);
+            setIncomingCall(message.data);
             options.onIncomingCall?.(message.data);
             break;
 
           case 'call_accepted':
             // Both parties receive this
             webRTC.setCallState('connecting');
+            setIncomingCall(null); // Clear incoming call
             break;
 
           case 'call_rejected':
             // Caller receives rejection
             webRTC.cleanup();
             setCurrentCallId(null);
+            setIncomingCall(null); // Clear incoming call
             break;
 
           case 'call_ended':
             // Either party hung up
             webRTC.cleanup();
             setCurrentCallId(null);
+            setIncomingCall(null); // Clear incoming call
             break;
 
           case 'sdp_offer':
@@ -242,6 +267,7 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
 
       webRTC.setCallId(callId);
       setCurrentCallId(callId);
+      setIncomingCall(null); // Clear incoming call immediately
 
       // Create WebRTC answer
       const config = { iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }] };
@@ -269,6 +295,7 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
   }, [webRTC, sendMessage, options.channelId, options.onError]);
 
   const rejectCall = useCallback((callId: string) => {
+    setIncomingCall(null); // Clear incoming call immediately
     sendMessage('reject_call', {
       callId,
       teamId: options.channelId,
@@ -286,18 +313,21 @@ export function useTeamChatWebSocket(options: TeamChatWebSocketOptions) {
     }
   }, [currentCallId, sendMessage, webRTC, options.channelId]);
 
-  // Connect on mount
+  // Connect/disconnect when channelId or userId changes
   useEffect(() => {
-    connect();
+    if (options.channelId && options.userId) {
+      connect();
+    }
     return () => {
       disconnect();
       webRTC.cleanup();
     };
-  }, [connect, disconnect]);
+  }, [options.channelId, options.userId]);
 
   return {
     isConnected,
     currentCallId,
+    incomingCall,
     webRTC,
     sendMessage,
     startCall,

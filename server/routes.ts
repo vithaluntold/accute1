@@ -9513,6 +9513,109 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  app.get("/api/chat/channels/:id/members", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const channel = await storage.getChatChannel(req.params.id);
+      if (!channel || channel.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      const members = await storage.getChatMembersByChannel(req.params.id);
+      
+      // Enrich members with user data
+      const enrichedMembers = await Promise.all(
+        members.map(async (member) => {
+          const user = await storage.getUser(member.userId);
+          return {
+            ...member,
+            user: user ? { id: user.id, name: user.name, email: user.email } : null
+          };
+        })
+      );
+      
+      res.json(enrichedMembers);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch channel members" });
+    }
+  });
+
+  // WebRTC Call Logs
+  app.get("/api/call-logs", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const logs = await storage.getCallLogsByOrganization(req.user!.organizationId!);
+      
+      // Enrich with user data
+      const enrichedLogs = await Promise.all(
+        logs.map(async (log) => {
+          const caller = await storage.getUser(log.callerId);
+          const receiver = await storage.getUser(log.receiverId);
+          return {
+            ...log,
+            caller: caller ? { id: caller.id, name: caller.name, email: caller.email } : null,
+            receiver: receiver ? { id: receiver.id, name: receiver.name, email: receiver.email } : null
+          };
+        })
+      );
+      
+      res.json(enrichedLogs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch call logs" });
+    }
+  });
+
+  app.get("/api/call-logs/user/:userId", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const logs = await storage.getCallLogsByUser(req.params.userId);
+      
+      // Filter by organizationId for multi-tenant security
+      const orgFilteredLogs = logs.filter(log => log.organizationId === req.user!.organizationId);
+      
+      // Enrich with user data
+      const enrichedLogs = await Promise.all(
+        orgFilteredLogs.map(async (log) => {
+          const caller = await storage.getUser(log.callerId);
+          const receiver = await storage.getUser(log.receiverId);
+          return {
+            ...log,
+            caller: caller ? { id: caller.id, name: caller.name, email: caller.email } : null,
+            receiver: receiver ? { id: receiver.id, name: receiver.name, email: receiver.email } : null
+          };
+        })
+      );
+      
+      res.json(enrichedLogs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch call logs" });
+    }
+  });
+
+  app.get("/api/chat/channels/:id/call-logs", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const channel = await storage.getChatChannel(req.params.id);
+      if (!channel || channel.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ error: "Channel not found" });
+      }
+      
+      const logs = await storage.getCallLogsByChannel(req.params.id);
+      
+      // Enrich with user data
+      const enrichedLogs = await Promise.all(
+        logs.map(async (log) => {
+          const caller = await storage.getUser(log.callerId);
+          const receiver = await storage.getUser(log.receiverId);
+          return {
+            ...log,
+            caller: caller ? { id: caller.id, name: caller.name, email: caller.email } : null,
+            receiver: receiver ? { id: receiver.id, name: receiver.name, email: receiver.email } : null
+          };
+        })
+      );
+      
+      res.json(enrichedLogs);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch call logs" });
+    }
+  });
+
   // Appointments
   app.get("/api/appointments", requireAuth, async (req: AuthRequest, res: Response) => {
     try {
