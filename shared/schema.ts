@@ -2476,6 +2476,8 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  organizationId: true, // Added by backend from auth context
+  createdBy: true, // Added by backend from auth context
 });
 
 export const insertClientContactSchema = createInsertSchema(clientContacts).omit({

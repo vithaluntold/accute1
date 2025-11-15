@@ -27,6 +27,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Bot, 
@@ -1037,21 +1043,30 @@ export function LucaChatWidget() {
             right: isMobile ? 'calc(16px + env(safe-area-inset-right))' : '24px',
           }}
         >
-          <Button
-            size="lg"
-            className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-primary border-2 border-primary/20"
-            onClick={() => setIsOpen(true)}
-            data-testid="button-open-luca-chat"
-          >
-            <img 
-              src={lucaLogoUrl} 
-              alt="Luca" 
-              className="w-full h-full object-contain pointer-events-none"
-              draggable={false}
-            />
-            <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white" />
-            <span className="sr-only">Open Luca AI Assistant</span>
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="lg"
+                  className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 p-2 bg-primary border-2 border-primary/20"
+                  onClick={() => setIsOpen(true)}
+                  data-testid="button-open-luca-chat"
+                >
+                  <img 
+                    src={lucaLogoUrl} 
+                    alt="Luca" 
+                    className="w-full h-full object-contain pointer-events-none"
+                    draggable={false}
+                  />
+                  <div className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-white" />
+                  <span className="sr-only">Open Luca AI Assistant</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="mr-2">
+                <p>Ask Luca - AI Accounting Expert</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 
@@ -1065,6 +1080,17 @@ export function LucaChatWidget() {
             maxWidth: isMobile ? 'calc(100vw - 32px)' : '400px',
           }}
         >
+          {/* Close Button */}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute -top-10 right-0 rounded-full"
+            onClick={() => setIsOpen(false)}
+            data-testid="button-close-luca-preview"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+
           {/* Palm Leaf Stack with Thread */}
           <div className="relative flex flex-col items-end gap-5">
             {/* Decorative Thread Line */}
@@ -1188,7 +1214,7 @@ export function LucaChatWidget() {
         }
       }}>
         <DialogContent 
-          className={`p-0 flex flex-col overflow-hidden ${
+          className={`p-0 flex flex-col overflow-hidden [&>button]:hidden ${
             isMobile 
               ? 'w-full h-full max-w-full max-h-full rounded-none m-0' 
               : 'max-w-4xl h-[600px] max-h-[85vh]'
