@@ -847,6 +847,17 @@ export async function initializeSystem(app: Express) {
       console.error("❌ Failed to start recurring scheduler:", error);
     }
 
+    // Initialize ML Analysis Queue Worker
+    console.log("🧠 Initializing ML analysis queue worker...");
+    try {
+      const { createMLAnalysisQueueService } = await import("./service-factory");
+      const queueService = createMLAnalysisQueueService();
+      await queueService.startWorker();
+      console.log("✅ ML analysis queue worker started");
+    } catch (error) {
+      console.error("❌ Failed to start ML analysis queue worker:", error);
+    }
+
     console.log("✅ System initialized successfully");
   } catch (error) {
     console.error("❌ System initialization failed:", error);

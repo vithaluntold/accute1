@@ -9,6 +9,7 @@
 import { PersonalityProfilingService } from "./services/PersonalityProfilingService";
 import { MLModelFusionEngine } from "./services/MLModelFusionEngine";
 import { ConversationAnalysisEngine } from "./services/ConversationAnalysisEngine";
+import { MLAnalysisQueueService } from "./services/MLAnalysisQueueService";
 
 /**
  * Create PersonalityProfilingService with default production wiring
@@ -34,4 +35,22 @@ export function createPersonalityProfilingService(): PersonalityProfilingService
   const fusionEngine = new MLModelFusionEngine();
   const conversationEngine = new ConversationAnalysisEngine();
   return new PersonalityProfilingService(fusionEngine, conversationEngine);
+}
+
+/**
+ * Create MLAnalysisQueueService with default production wiring
+ * 
+ * Wires:
+ * - PersonalityProfilingService: For processing individual user analyses
+ * 
+ * @returns Fully wired MLAnalysisQueueService instance
+ * 
+ * @example
+ * // In server initialization
+ * const queueService = createMLAnalysisQueueService();
+ * await queueService.startWorker();
+ */
+export function createMLAnalysisQueueService(): MLAnalysisQueueService {
+  const profilingService = createPersonalityProfilingService();
+  return new MLAnalysisQueueService(profilingService);
 }

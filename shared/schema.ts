@@ -5018,7 +5018,9 @@ export const mlAnalysisRuns = pgTable("ml_analysis_runs", {
   status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
   
   // Batch details
-  usersProcessed: integer("users_processed").notNull().default(0),
+  totalUsers: integer("total_users").notNull().default(0), // Total users to process in batch
+  usersProcessed: integer("users_processed").notNull().default(0), // Successfully completed
+  failedUsers: integer("failed_users").notNull().default(0), // Failed processing
   conversationsAnalyzed: integer("conversations_analyzed").notNull().default(0),
   
   // Model fusion details
@@ -5038,6 +5040,34 @@ export const mlAnalysisRuns = pgTable("ml_analysis_runs", {
   orgIdx: index("ml_analysis_runs_org_idx").on(table.organizationId),
   statusIdx: index("ml_analysis_runs_status_idx").on(table.status),
   startedIdx: index("ml_analysis_runs_started_idx").on(table.startedAt),
+}));
+
+// ML analysis jobs (individual user tasks for batch processing)
+export const mlAnalysisJobs = pgTable("ml_analysis_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  analysisRunId: varchar("analysis_run_id").notNull().references(() => mlAnalysisRuns.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Job status tracking
+  status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  attemptCount: integer("attempt_count").notNull().default(0), // Retry counter
+  maxAttempts: integer("max_attempts").notNull().default(3), // Maximum retry attempts
+  
+  // Result metadata
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  processingTimeMs: integer("processing_time_ms"), // Milliseconds
+  
+  // Error handling
+  errorMessage: text("error_message"),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  runIdx: index("ml_analysis_jobs_run_idx").on(table.analysisRunId),
+  statusIdx: index("ml_analysis_jobs_status_idx").on(table.status),
+  userRunUnique: unique("ml_analysis_jobs_user_run_unique").on(table.userId, table.analysisRunId),
 }));
 
 // Main personality profiles table - one per user per organization
@@ -5356,6 +5386,16 @@ export const insertMlAnalysisRunSchema = createInsertSchema(mlAnalysisRuns).omit
 });
 export type InsertMlAnalysisRun = z.infer<typeof insertMlAnalysisRunSchema>;
 export type MlAnalysisRun = typeof mlAnalysisRuns.$inferSelect;
+
+// ML Analysis Jobs
+export const insertMlAnalysisJobSchema = createInsertSchema(mlAnalysisJobs).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+export type InsertMlAnalysisJob = z.infer<typeof insertMlAnalysisJobSchema>;
+export type MlAnalysisJob = typeof mlAnalysisJobs.$inferSelect;
 
 // ML Model Outputs
 export const insertMlModelOutputSchema = createInsertSchema(mlModelOutputs).omit({

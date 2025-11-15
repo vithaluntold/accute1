@@ -11,6 +11,7 @@ import * as schema from "@shared/schema";
 import { registerPricingRoutes } from "./pricing-routes";
 import { registerSubscriptionRoutes } from "./subscription-routes";
 import { registerPerformanceMetricsRoutes } from "./performance-metrics-routes";
+import { registerPersonalityProfilingRoutes } from "./personality-profiling-routes";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
@@ -20182,6 +20183,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ==================== PERFORMANCE METRICS ROUTES ====================
   registerPerformanceMetricsRoutes(app);
+
+  // ==================== PERSONALITY PROFILING ROUTES ====================
+  registerPersonalityProfilingRoutes(app);
 
   const httpServer = createServer(app);
   
