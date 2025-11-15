@@ -18,7 +18,6 @@ import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
 const superAdminSchema = z.object({
   email: z.string().email("Invalid email address"),
   username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   superAdminKey: z.string().min(1, "Super admin key is required"),
@@ -27,7 +26,6 @@ const superAdminSchema = z.object({
 const adminSchema = z.object({
   email: z.string().email("Invalid email address"),
   username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   organizationName: z.string().min(1, "Organization name is required"),
@@ -99,7 +97,6 @@ export default function Register() {
     defaultValues: {
       email: "",
       username: "",
-      password: "",
       firstName: "",
       lastName: "",
       superAdminKey: "",
@@ -111,7 +108,6 @@ export default function Register() {
     defaultValues: {
       email: "",
       username: "",
-      password: "",
       firstName: "",
       lastName: "",
       organizationName: "",
@@ -405,25 +401,12 @@ export default function Register() {
                     )}
                   />
                 </div>
-                <FormField
-                  control={superAdminForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="password"
-                          placeholder="••••••••"
-                          data-testid="input-password"
-                          disabled={superAdminMutation.isPending}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    You'll set your password after verifying your email address.
+                  </AlertDescription>
+                </Alert>
                 <Button
                   type="submit"
                   className="w-full"
@@ -533,25 +516,12 @@ export default function Register() {
                     )}
                   />
                 </div>
-                <FormField
-                  control={adminForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="password"
-                          placeholder="••••••••"
-                          data-testid="input-password"
-                          disabled={adminMutation.isPending}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    You'll set your password after verifying your email address.
+                  </AlertDescription>
+                </Alert>
                 <Button
                   type="submit"
                   className="w-full"
