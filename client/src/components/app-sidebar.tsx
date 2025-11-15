@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
@@ -469,6 +470,7 @@ function WorkspaceSwitcher({ user }: { user: any }) {
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   
   // Use React Query to make sidebar reactive to user data changes
   const { data: queryUser } = useQuery<any>({
@@ -506,6 +508,11 @@ export function AppSidebar() {
 
   const menuCategories = getMenuCategories();
 
+  // Toggle category open/closed with accordion behavior
+  const toggleCategory = (categoryTitle: string) => {
+    setOpenCategory(openCategory === categoryTitle ? null : categoryTitle);
+  };
+
   const handleLogout = () => {
     clearAuth();
     setLocation("/login");
@@ -521,7 +528,12 @@ export function AppSidebar() {
           </div>
           
           {menuCategories.map((category) => (
-            <Collapsible key={category.title} defaultOpen className="group/collapsible">
+            <Collapsible 
+              key={category.title} 
+              open={openCategory === category.title}
+              onOpenChange={() => toggleCategory(category.title)}
+              className="group/collapsible"
+            >
               <SidebarGroupLabel asChild>
                 <CollapsibleTrigger className="w-full">
                   {category.title}
