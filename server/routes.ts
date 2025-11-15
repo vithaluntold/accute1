@@ -724,10 +724,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if this is first-time login
+      const isFirstLogin = !user.lastLoginAt;
+
       // Create session (password verified, MFA not required or device trusted)
       const token = generateToken(user.id);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, token, expiresAt);
+
+      // Update lastLoginAt
+      await storage.updateUser(user.id, {
+        lastLoginAt: new Date(),
+      });
 
       // Get role and permissions
       const role = await storage.getRole(user.roleId);
@@ -758,6 +766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         role,
         token,
+        isFirstLogin, // Indicate if this is the user's first login
       });
     } catch (error: any) {
       console.error("Login error:", error);
@@ -794,10 +803,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await mfaService.trustDevice(userId, deviceId, deviceName, ipAddress, userAgent);
       }
 
+      // Check if this is first-time login
+      const isFirstLogin = !user.lastLoginAt;
+
       // Create session
       const sessionToken = generateToken(user.id);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await storage.createSession(user.id, sessionToken, expiresAt);
+
+      // Update lastLoginAt
+      await storage.updateUser(user.id, {
+        lastLoginAt: new Date(),
+      });
 
       // Get role and permissions
       const role = await storage.getRole(user.roleId);
@@ -828,6 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         role,
         token: sessionToken,
+        isFirstLogin, // Indicate if this is the user's first login
       });
     } catch (error: any) {
       console.error("MFA login completion error:", error);

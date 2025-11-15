@@ -58,7 +58,7 @@ export default function Login() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       toast({
-        title: "Welcome back!",
+        title: data.isFirstLogin ? "Welcome!" : "Welcome back!",
         description: "You've successfully logged in.",
       });
       
@@ -88,14 +88,14 @@ export default function Login() {
     },
   });
 
-  const handleMFASuccess = (data: { user: any; role: any; token: string }) => {
+  const handleMFASuccess = (data: { user: any; role: any; token: string; isFirstLogin?: boolean }) => {
     localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(data.user));
     setShowMFAModal(false);
     setMFAData(null);
     
     toast({
-      title: "Welcome back!",
+      title: data.isFirstLogin ? "Welcome!" : "Welcome back!",
       description: "MFA verification successful",
     });
 

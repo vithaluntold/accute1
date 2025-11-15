@@ -25,6 +25,7 @@ interface MFAVerificationModalProps {
     user: any;
     role: any;
     token: string;
+    isFirstLogin?: boolean;
   }) => void;
   onCancel: () => void;
 }
@@ -60,11 +61,7 @@ export function MFAVerificationModal({
       return response.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Verification Successful",
-        description: "Welcome back!",
-      });
-      onSuccess(data);
+      onSuccess(data); // Parent will show the appropriate welcome message
       // Reset state
       setToken('');
       setBackupCode('');
