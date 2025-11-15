@@ -8,9 +8,14 @@
 
 import { PersonalityProfilingService } from "./services/PersonalityProfilingService";
 import { MLModelFusionEngine } from "./services/MLModelFusionEngine";
+import { ConversationAnalysisEngine } from "./services/ConversationAnalysisEngine";
 
 /**
  * Create PersonalityProfilingService with default production wiring
+ * 
+ * Wires:
+ * - MLModelFusionEngine: Multi-tier ML model orchestration
+ * - ConversationAnalysisEngine: Privacy-safe aggregated metrics
  * 
  * @returns Fully wired PersonalityProfilingService instance
  * 
@@ -21,10 +26,12 @@ import { MLModelFusionEngine } from "./services/MLModelFusionEngine";
  * 
  * @example
  * // In tests (bypass factory, inject mocks)
- * const mockEngine: IMLModelFusionEngine = {...};
- * const service = new PersonalityProfilingService(mockEngine);
+ * const mockFusionEngine: IMLModelFusionEngine = {...};
+ * const mockConversationEngine: IConversationAnalysisEngine = {...};
+ * const service = new PersonalityProfilingService(mockFusionEngine, mockConversationEngine);
  */
 export function createPersonalityProfilingService(): PersonalityProfilingService {
   const fusionEngine = new MLModelFusionEngine();
-  return new PersonalityProfilingService(fusionEngine);
+  const conversationEngine = new ConversationAnalysisEngine();
+  return new PersonalityProfilingService(fusionEngine, conversationEngine);
 }

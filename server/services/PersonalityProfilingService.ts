@@ -65,11 +65,15 @@ export interface UserAnalysisResult {
 }
 
 /**
- * Interface for future ConversationAnalysisEngine dependency
- * TODO: Implement in Task 6
+ * Interface for ConversationAnalysisEngine dependency
+ * Provides aggregated conversation metrics for personality analysis
  */
 export interface IConversationAnalysisEngine {
-  aggregateMetrics(userId: string, periodStart: Date, periodEnd: Date): Promise<ConversationMetrics>;
+  getConversationMetrics(
+    userId: string,
+    organizationId: string,
+    period?: { startDate: Date; endDate: Date }
+  ): Promise<ConversationMetrics>;
 }
 
 /**
@@ -141,19 +145,27 @@ export interface ConsensusScores {
 }
 
 /**
- * PersonalityProfilingService - Phase 1 Implementation
+ * PersonalityProfilingService - Complete Implementation
  * 
  * Orchestrates multi-framework personality analysis using ML model fusion.
  * Privacy-first: Only processes aggregated metrics, never raw messages.
  * 
- * Requires dependency injection of IMLModelFusionEngine.
+ * Requires dependency injection of:
+ * - IMLModelFusionEngine: ML model orchestration
+ * - IConversationAnalysisEngine: Aggregated conversation metrics
+ * 
  * Use createPersonalityProfilingService() factory function for default wiring.
  */
 export class PersonalityProfilingService {
   private fusionEngine: IMLModelFusionEngine;
+  private conversationEngine: IConversationAnalysisEngine;
 
-  constructor(fusionEngine: IMLModelFusionEngine) {
+  constructor(
+    fusionEngine: IMLModelFusionEngine,
+    conversationEngine: IConversationAnalysisEngine
+  ) {
     this.fusionEngine = fusionEngine;
+    this.conversationEngine = conversationEngine;
   }
   
   // ==================== CONSENT MANAGEMENT ====================
@@ -399,22 +411,24 @@ export class PersonalityProfilingService {
     return run;
   }
 
-  // ==================== STUBBED METHODS (FUTURE IMPLEMENTATION) ====================
+  // ==================== PERSONALITY ANALYSIS (FULLY IMPLEMENTED) ====================
 
   /**
-   * Analyze a single user's personality
+   * Analyze a single user's personality using multi-framework ML model fusion
    * 
    * Implementation:
    * 1. Check consent (GDPR requirement)
-   * 2. Get aggregated conversation metrics (privacy-safe)
+   * 2. Get aggregated conversation metrics (privacy-safe, real data)
    * 3. Run Tier 1 models (keyword, sentiment, behavioral)
-   * 4. Conditionally run LLM validation if confidence < 70%
+   * 4. Conditionally run LLM validation if confidence < 70% or conflicts detected
    * 5. Fuse results using weighted consensus
    * 6. Update personality_profiles and personality_traits tables
-   * 7. Create ml_analysis_runs record for audit
+   * 7. Create ml_analysis_runs record for audit trail
    * 
-   * NOTE: Currently uses mock conversation metrics.
-   * TODO (Task 6): Replace with real ConversationAnalysisEngine
+   * Privacy Architecture:
+   * - Uses ConversationAnalysisEngine for aggregated metrics
+   * - NO raw message content stored or returned
+   * - GDPR-compliant data minimization
    */
   async analyzeUser(
     userId: string,
@@ -431,7 +445,7 @@ export class PersonalityProfilingService {
       );
     }
 
-    // 2. Get conversation metrics (MOCK DATA - Task 6 will replace with real)
+    // 2. Get real aggregated conversation metrics (privacy-safe)
     const metrics = await this.getConversationMetrics(userId, organizationId);
 
     // 3. Create ML analysis run record
@@ -596,40 +610,27 @@ export class PersonalityProfilingService {
   }
 
   /**
-   * Get conversation metrics for a user
+   * Get conversation metrics using injected ConversationAnalysisEngine
    * 
-   * TODO (Task 6): Replace with real ConversationAnalysisEngine
-   * For now, returns mock data based on user activity
+   * Privacy-safe: Returns aggregated metrics only, no raw message content
+   * Analyzes user messages from team_chat_messages and live_chat_messages
    */
   private async getConversationMetrics(
     userId: string,
     organizationId: string
   ): Promise<ConversationMetrics> {
-    // Mock data - Task 6 will replace with real aggregated metrics
+    // Default to last 30 days
     const now = new Date();
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    return {
+    return await this.conversationEngine.getConversationMetrics(
       userId,
-      periodStart: oneMonthAgo,
-      periodEnd: now,
-      messageCount: 150,
-      avgMessageLength: 85,
-      avgResponseTimeSeconds: 240,
-      sentimentPositive: 65,
-      sentimentNeutral: 25,
-      sentimentNegative: 10,
-      questionAskedCount: 30,
-      exclamationCount: 15,
-      emojiUsageCount: 20,
-      conversationsInitiated: 25,
-      conversationsParticipated: 45,
-      linguisticMarkers: {
-        formalityAvg: 68,
-        vocabularyDiversity: 420,
-        technicalTermFrequency: 12,
-      },
-    };
+      organizationId,
+      {
+        startDate: oneMonthAgo,
+        endDate: now,
+      }
+    );
   }
 
   /**

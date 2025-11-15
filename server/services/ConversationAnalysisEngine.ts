@@ -120,20 +120,22 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
   /**
    * Analyze team chat messages for a user
    * (Privacy: aggregated metrics only, no message content)
+   * 
+   * Returns ConversationMetrics plus internal helper field responseTimeIntervalCount
    */
   private async analyzeTeamChatMessages(
     userId: string,
     organizationId: string,
     periodStart: Date,
     periodEnd: Date
-  ): Promise<Partial<ConversationMetrics>> {
+  ): Promise<Partial<ConversationMetrics> & { responseTimeIntervalCount?: number }> {
     // Query messages from the user in the period
     const messages = await db
       .select({
-        content: teamChatMessages.content,
+        content: teamChatMessages.message,
         createdAt: teamChatMessages.createdAt,
         threadId: teamChatMessages.threadId,
-        parentMessageId: teamChatMessages.parentMessageId,
+        inReplyTo: teamChatMessages.inReplyTo,
       })
       .from(teamChatMessages)
       .where(
@@ -143,7 +145,7 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
           between(teamChatMessages.createdAt, periodStart, periodEnd)
         )
       )
-      .orderBy(desc(teamChatMessages.createdAt));
+      .orderBy(teamChatMessages.createdAt); // Chronological for response time calc
 
     if (messages.length === 0) {
       return this.getEmptyMetrics();
@@ -170,10 +172,12 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
     // Emoji usage (simple heuristic)
     const emojiUsageCount = this.countEmojis(messages.map(m => m.content || ""));
 
-    // Conversations initiated (messages without parent)
-    const conversationsInitiated = messages.filter(m => 
-      !m.parentMessageId && !m.threadId
-    ).length;
+    // Conversations initiated (root messages: no inReplyTo)
+    // Note: Root messages may have threadId = their own ID, so only check inReplyTo
+    const conversationsInitiated = messages.filter(m => !m.inReplyTo).length;
+
+    // Calculate average response time (time between consecutive user messages)
+    const responseTime = this.calculateAvgResponseTime(messages);
 
     // Linguistic markers
     const linguisticMarkers = this.analyzeLinguisticMarkers(
@@ -183,6 +187,8 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
     return {
       messageCount,
       avgMessageLength,
+      avgResponseTimeSeconds: responseTime.avgSeconds,
+      responseTimeIntervalCount: responseTime.intervalCount,
       sentimentPositive: sentimentCounts.positive,
       sentimentNeutral: sentimentCounts.neutral,
       sentimentNegative: sentimentCounts.negative,
@@ -198,13 +204,15 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
   /**
    * Analyze live chat messages for a user
    * (Privacy: aggregated metrics only, no message content)
+   * 
+   * Returns ConversationMetrics plus internal helper field responseTimeIntervalCount
    */
   private async analyzeLiveChatMessages(
     userId: string,
     organizationId: string,
     periodStart: Date,
     periodEnd: Date
-  ): Promise<Partial<ConversationMetrics>> {
+  ): Promise<Partial<ConversationMetrics> & { responseTimeIntervalCount?: number }> {
     // Query messages from the user in the period
     const messages = await db
       .select({
@@ -220,7 +228,7 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
           between(liveChatMessages.createdAt, periodStart, periodEnd)
         )
       )
-      .orderBy(desc(liveChatMessages.createdAt));
+      .orderBy(liveChatMessages.createdAt); // Chronological for response time calc
 
     if (messages.length === 0) {
       return this.getEmptyMetrics();
@@ -250,6 +258,9 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
     // Conversations (unique conversation IDs)
     const uniqueConversations = new Set(messages.map(m => m.conversationId)).size;
 
+    // Calculate average response time
+    const responseTime = this.calculateAvgResponseTime(messages);
+
     // Linguistic markers
     const linguisticMarkers = this.analyzeLinguisticMarkers(
       messages.map(m => m.content || "")
@@ -258,6 +269,8 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
     return {
       messageCount,
       avgMessageLength,
+      avgResponseTimeSeconds: responseTime.avgSeconds,
+      responseTimeIntervalCount: responseTime.intervalCount,
       sentimentPositive: sentimentCounts.positive,
       sentimentNeutral: sentimentCounts.neutral,
       sentimentNegative: sentimentCounts.negative,
@@ -272,23 +285,29 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
 
   /**
    * Merge metrics from team chat and live chat
+   * 
+   * Accepts internal helper field (responseTimeIntervalCount) for proper weighting,
+   * but does NOT expose it in the returned ConversationMetrics
    */
   private mergeMetrics(
     userId: string,
     periodStart: Date,
     periodEnd: Date,
-    teamMetrics: Partial<ConversationMetrics>,
-    liveMetrics: Partial<ConversationMetrics>
+    teamMetrics: Partial<ConversationMetrics> & { responseTimeIntervalCount?: number },
+    liveMetrics: Partial<ConversationMetrics> & { responseTimeIntervalCount?: number }
   ): ConversationMetrics {
     const totalMessages = (teamMetrics.messageCount || 0) + (liveMetrics.messageCount || 0);
 
     if (totalMessages === 0) {
+      // Destructure to exclude internal helper field
+      const { responseTimeIntervalCount, ...emptyMetrics } = this.getEmptyMetrics();
+      
       return {
         userId,
         periodStart,
         periodEnd,
-        ...this.getEmptyMetrics(),
-      } as ConversationMetrics;
+        ...emptyMetrics,
+      };
     }
 
     // Weighted average for message length
@@ -332,8 +351,18 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
       totalMessages
     );
 
-    // Mock response time (future: calculate from actual message timestamps)
-    const avgResponseTimeSeconds = 240; // 4 minutes default
+    // Weighted average for response time (weight by interval count, not message count)
+    // This prevents fallback values from contaminating real response time data
+    const totalIntervals = (teamMetrics.responseTimeIntervalCount || 0) + 
+                           (liveMetrics.responseTimeIntervalCount || 0);
+    
+    const avgResponseTimeSeconds = totalIntervals > 0
+      ? Math.round(
+          ((teamMetrics.avgResponseTimeSeconds || 0) * (teamMetrics.responseTimeIntervalCount || 0) +
+           (liveMetrics.avgResponseTimeSeconds || 0) * (liveMetrics.responseTimeIntervalCount || 0)) /
+          totalIntervals
+        )
+      : 240; // Fallback only if both sources have no valid intervals
 
     return {
       userId,
@@ -356,6 +385,50 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
         technicalTermFrequency,
       },
     };
+  }
+
+  /**
+   * Calculate average response time between consecutive messages
+   * 
+   * Privacy-safe: Uses timestamps only, no message content
+   * 
+   * @param messages - Array of messages with createdAt timestamps (chronological order)
+   * @returns Object with average time in seconds and count of valid intervals
+   */
+  private calculateAvgResponseTime(
+    messages: Array<{ createdAt: Date | null; content?: string }>
+  ): { avgSeconds: number; intervalCount: number } {
+    if (messages.length < 2) {
+      return { avgSeconds: 240, intervalCount: 0 }; // Fallback: 4 minutes, no intervals
+    }
+
+    const responseTimes: number[] = [];
+
+    // Calculate time gaps between consecutive messages
+    for (let i = 1; i < messages.length; i++) {
+      const current = messages[i].createdAt;
+      const previous = messages[i - 1].createdAt;
+
+      if (current && previous) {
+        const gapSeconds = (current.getTime() - previous.getTime()) / 1000;
+        
+        // Only count reasonable gaps (1 second to 24 hours)
+        // Exclude very short gaps (rapid messages) and very long gaps (inactive periods)
+        if (gapSeconds >= 1 && gapSeconds <= 86400) {
+          responseTimes.push(gapSeconds);
+        }
+      }
+    }
+
+    if (responseTimes.length === 0) {
+      return { avgSeconds: 240, intervalCount: 0 }; // Fallback, no valid intervals
+    }
+
+    // Calculate average
+    const totalTime = responseTimes.reduce((sum, time) => sum + time, 0);
+    const avgSeconds = Math.round(totalTime / responseTimes.length);
+    
+    return { avgSeconds, intervalCount: responseTimes.length };
   }
 
   /**
@@ -484,10 +557,12 @@ export class ConversationAnalysisEngine implements IConversationAnalysisEngine {
   /**
    * Get empty metrics for users with no messages
    */
-  private getEmptyMetrics(): Partial<ConversationMetrics> {
+  private getEmptyMetrics(): Partial<ConversationMetrics> & { responseTimeIntervalCount: number } {
     return {
       messageCount: 0,
       avgMessageLength: 0,
+      avgResponseTimeSeconds: 240,
+      responseTimeIntervalCount: 0,
       sentimentPositive: 0,
       sentimentNeutral: 100,
       sentimentNegative: 0,
