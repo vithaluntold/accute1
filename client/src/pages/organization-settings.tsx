@@ -104,7 +104,7 @@ export default function OrganizationSettings() {
 
   // Fetch organization settings
   const { data: organization, isLoading: orgLoading } = useQuery<any>({
-    queryKey: ["/api/organizations", orgId, "settings"],
+    queryKey: ["/api/organizations", orgId],
     enabled: !!orgId,
   });
 
@@ -167,10 +167,10 @@ export default function OrganizationSettings() {
   // Update Company Info Mutation
   const updateCompanyMutation = useMutation({
     mutationFn: async (data: CompanyInfoFormData) => {
-      return await apiRequest(`/api/organizations/${orgId}/settings`, "PATCH", data);
+      return await apiRequest("PATCH", `/api/organizations/${orgId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/organizations", orgId, "settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/workspaces"] });
       toast({
         title: "Success",
@@ -189,10 +189,10 @@ export default function OrganizationSettings() {
   // Update Branding Mutation
   const updateBrandingMutation = useMutation({
     mutationFn: async (data: BrandingFormData) => {
-      return await apiRequest(`/api/organizations/${orgId}/settings`, "PATCH", data);
+      return await apiRequest("PATCH", `/api/organizations/${orgId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/organizations", orgId, "settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/workspaces"] });
       toast({
         title: "Success",
@@ -698,10 +698,13 @@ export default function OrganizationSettings() {
                               name="name"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Configuration Name</FormLabel>
+                                  <FormLabel>Configuration Name *</FormLabel>
                                   <FormControl>
                                     <Input {...field} placeholder="Production OpenAI" data-testid="input-llm-name" />
                                   </FormControl>
+                                  <FormDescription>
+                                    A friendly name to identify this configuration (min. 3 characters)
+                                  </FormDescription>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -712,7 +715,7 @@ export default function OrganizationSettings() {
                               name="provider"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Provider</FormLabel>
+                                  <FormLabel>Provider *</FormLabel>
                                   <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                       <SelectTrigger data-testid="select-llm-provider">
@@ -725,6 +728,9 @@ export default function OrganizationSettings() {
                                       <SelectItem value="anthropic">Anthropic Claude</SelectItem>
                                     </SelectContent>
                                   </Select>
+                                  <FormDescription>
+                                    Choose your AI provider (OpenAI, Azure, or Anthropic)
+                                  </FormDescription>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -735,10 +741,13 @@ export default function OrganizationSettings() {
                               name="apiKey"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>API Key</FormLabel>
+                                  <FormLabel>API Key *</FormLabel>
                                   <FormControl>
-                                    <Input {...field} type="password" data-testid="input-llm-api-key" />
+                                    <Input {...field} type="password" placeholder="sk-..." data-testid="input-llm-api-key" />
                                   </FormControl>
+                                  <FormDescription>
+                                    Your provider's API key (will be encrypted and stored securely)
+                                  </FormDescription>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -751,10 +760,13 @@ export default function OrganizationSettings() {
                                   name="azureEndpoint"
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Azure Endpoint</FormLabel>
+                                      <FormLabel>Azure Endpoint * (Required for Azure)</FormLabel>
                                       <FormControl>
                                         <Input {...field} placeholder="https://your-resource.openai.azure.com" data-testid="input-azure-endpoint" />
                                       </FormControl>
+                                      <FormDescription>
+                                        Your Azure OpenAI resource endpoint URL
+                                      </FormDescription>
                                       <FormMessage />
                                     </FormItem>
                                   )}
@@ -765,10 +777,13 @@ export default function OrganizationSettings() {
                                   name="azureApiVersion"
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Azure API Version</FormLabel>
+                                      <FormLabel>Azure API Version (Optional)</FormLabel>
                                       <FormControl>
                                         <Input {...field} placeholder="2024-02-15-preview" data-testid="input-azure-api-version" />
                                       </FormControl>
+                                      <FormDescription>
+                                        API version for Azure OpenAI (leave empty for default)
+                                      </FormDescription>
                                       <FormMessage />
                                     </FormItem>
                                   )}
@@ -781,10 +796,13 @@ export default function OrganizationSettings() {
                               name="model"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Model</FormLabel>
+                                  <FormLabel>Model *</FormLabel>
                                   <FormControl>
-                                    <Input {...field} placeholder="gpt-4" data-testid="input-llm-model" />
+                                    <Input {...field} placeholder="gpt-4, gpt-3.5-turbo, claude-3-opus, etc." data-testid="input-llm-model" />
                                   </FormControl>
+                                  <FormDescription>
+                                    Model name (e.g., gpt-4, gpt-3.5-turbo, claude-3-opus-20240229)
+                                  </FormDescription>
                                   <FormMessage />
                                 </FormItem>
                               )}
