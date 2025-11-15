@@ -3,6 +3,16 @@
 ## Overview
 Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms. Its core purpose is to automate tasks, enhance efficiency, ensure compliance, and improve overall accounting practices through intelligent automation. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to transform the accounting industry by providing an AI-native solution for accounting automation with significant market potential.
 
+## 🚨 CRITICAL: Database Safety Rules for Publishing
+
+**Production Database Protection:**
+- Replit automatically syncs production database schema to match `shared/schema.ts` when you click "Publish"
+- Removing or renaming columns/tables in schema.ts will DELETE production data
+- **RULE: ONLY ADD new columns/tables - NEVER remove or rename existing ones**
+- If a column is no longer needed, mark it `@deprecated` in comments but keep it in schema
+- Before publishing, always backup production data via Database Pane → Production → Export CSV
+- Development and Production are separate databases - schema changes auto-apply on publish
+
 ## User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
