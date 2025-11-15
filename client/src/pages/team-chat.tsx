@@ -16,7 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 import type { ChatMessage } from "@shared/schema";
 import { useTeamChatWebSocket } from "@/hooks/useTeamChatWebSocket";
 import { IncomingCallModal } from "@/components/IncomingCallModal";
-import VideoCallWindow from "@/components/VideoCallWindow";
+import { VideoCallWindow } from "@/components/VideoCallWindow";
 import CallHistoryDialog from "@/components/CallHistoryDialog";
 
 interface MessageWithReplies extends ChatMessage {
