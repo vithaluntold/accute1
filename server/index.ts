@@ -285,8 +285,43 @@ app.use((req, res, next) => {
       });
     });
     
-    // CRITICAL FIX: Setup Vite/static serving IMMEDIATELY after server starts listening
-    // This prevents "Cannot GET /" errors during initialization window
+    // WebSockets disabled at startup - lazy-load on-demand
+    console.log('ℹ️  WebSockets will initialize on-demand when needed');
+    
+    // CRITICAL: Initialize system FIRST to ensure agents are ready
+    // This blocks until AI agents and LLM configs are initialized
+    console.log('🔧 Starting system initialization...');
+    try {
+      await initializeSystem(app);
+      console.log('✅ System initialized successfully');
+      setInitializationStatus(true, null);
+      
+      // NOW register agent routes AFTER agents are initialized but BEFORE Vite
+      // This ensures routes exist before Vite's catch-all middleware
+      console.log('🔧 Registering AI agent routes (AFTER initialization)...');
+      try {
+        const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
+        const agentSlugs = getAvailableAgents();
+        
+        console.log(`📋 Registering ${agentSlugs.length} agent routes...`);
+        registerAllAgentRoutes(agentSlugs, app);
+        console.log('✅ Agent routes registered successfully');
+      } catch (agentError) {
+        console.error('❌ CRITICAL: Failed to register agent routes:', agentError);
+        throw new Error(`Agent registration failed: ${agentError}`);
+      }
+    } catch (initError) {
+      const errorMsg = initError instanceof Error ? initError.message : String(initError);
+      console.error('❌ System initialization failed:', initError);
+      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
+      setInitializationStatus(false, errorMsg);
+      console.warn('⚠️  Server running with limited functionality');
+    }
+    
+    console.log('🎉 System initialization complete!');
+    
+    // CRITICAL: Setup Vite/static serving AFTER agent routes are registered
+    // This prevents Vite's catch-all from intercepting agent endpoints
     const distPath = path.resolve(moduleDir, "public");
     const isDevelopment = app.get("env") === "development";
     
@@ -335,47 +370,6 @@ app.use((req, res, next) => {
     }));
     console.log('✅ Upload serving initialized');
     console.log(`   Serving from: ${uploadsPath}`);
-    
-    // Error handler MUST be registered AFTER static file serving
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      
-      console.error('Request error:', {
-        status,
-        message,
-        path: _req.path,
-        method: _req.method,
-        stack: err.stack
-      });
-
-      res.status(status).json({ message });
-    });
-    
-    // WebSockets disabled at startup - lazy-load on-demand
-    console.log('ℹ️  WebSockets will initialize on-demand when needed');
-    
-    // NOW do heavy initialization in the background (after server is listening AND routes are ready)
-    // This allows health checks AND user requests to work while initialization happens
-    console.log('🔧 Starting background initialization...');
-    
-    // Background initialization - don't await, let it run asynchronously
-    (async () => {
-      try {
-        // Initialize system (database, AI agents, etc.)
-        await initializeSystem(app);
-        console.log('✅ System initialized successfully');
-        setInitializationStatus(true, null);
-      } catch (initError) {
-        const errorMsg = initError instanceof Error ? initError.message : String(initError);
-        console.error('❌ System initialization failed:', initError);
-        console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
-        setInitializationStatus(false, errorMsg);
-        console.warn('⚠️  Server running with limited functionality');
-      }
-      
-      console.log('🎉 Background initialization complete!');
-    })();
     
   } catch (error) {
     console.error('❌ Fatal error during application startup:', error);

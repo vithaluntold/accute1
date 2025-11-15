@@ -819,22 +819,8 @@ export async function initializeSystem(app: Express) {
     await agentRegistry.initialize();
     console.log("✅ Agent Foundry initialized successfully");
 
-    // Register agent routes using STATIC registration (bulletproof approach)
-    console.log("🔧 Registering agent routes (STATIC METHOD)...");
-    try {
-      // Import the static agent loader
-      const { registerAllAgentRoutes } = await import("./agents-static.js");
-      
-      const agents = agentRegistry.getAllAgents();
-      const agentSlugs = agents.map((a: any) => a.slug);
-      
-      console.log(`📋 Found ${agentSlugs.length} agents to register routes for`);
-      
-      registerAllAgentRoutes(agentSlugs, app);
-      console.log("✅ Agent route registration complete (STATIC)");
-    } catch (error) {
-      console.error("❌ Failed to register agent routes:", error);
-    }
+    // NOTE: Agent routes are now registered in server/routes.ts BEFORE Vite middleware
+    // This ensures agent endpoints are not intercepted by Vite's catch-all route
 
     // Initialize Recurring Scheduler Service
     console.log("⏰ Initializing recurring scheduler service...");

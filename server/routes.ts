@@ -20962,6 +20962,10 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // ==================== PERSONALITY PROFILING ROUTES ====================
   registerPersonalityProfilingRoutes(app);
 
+  // NOTE: AI Agent routes are now registered in server/index.ts AFTER system initialization
+  // This ensures agents are fully initialized before routes are registered
+  // Agent routes MUST be registered AFTER initializeSystem() but BEFORE setupVite()
+
   const httpServer = createServer(app);
   
   // Setup lazy WebSocket initialization - will initialize on first upgrade request
