@@ -1,7 +1,7 @@
 # Accute - AI-Native Accounting Workflow Automation Platform
 
 ## Overview
-Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms using specialized AI agents. It automates tasks, enhances efficiency, ensures compliance, and improves accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to transform the accounting industry through intelligent automation.
+Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms using specialized AI agents. It automates tasks, enhances efficiency, ensures compliance, and improves accounting practices. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to transform the accounting industry through intelligent automation, offering significant market potential and ambitious project growth.
 
 ## User Preferences
 - Prefer database-backed storage over in-memory
@@ -29,6 +29,8 @@ Accute is an AI-native accounting workflow automation platform designed to revol
 - **Personalized Welcome Messages**: Login system tracks `lastLoginAt` to distinguish first-time vs. returning users. First-time users see "Welcome!" while returning users see "Welcome back!" for a more personalized experience. Both regular and MFA login flows support this feature.
 - **Country Code Phone Field**: Users table includes mandatory `countryCode` field (default "+1") with dropdown UI containing 30 common country codes. Employee profile form validates and combines countryCode + phone before OTP verification. Backend API whitelists countryCode for profile updates.
 - **LLM Auto-Selection Fix**: Luca chat widget properly auto-selects LLM configuration on load. Fixed bug where empty string initial state prevented auto-selection useEffect from running. Now correctly prioritizes workspace default configs over user configs, with fallback to first available config.
+- **Luca Chat Widget UI Enhancements**: Added tooltip to floating button showing "Ask Luca - AI Accounting Expert" on hover. Palm leaf preview state now includes a close button positioned above the stack. Fixed overlapping X icons in full chat dialog by hiding Dialog's default close button with `[&>button]:hidden` CSS selector. All buttons comply with Shadcn guidelines (no custom height/width overrides or hover colors).
+- **Contact Creation Bug Fix**: Fixed 500 error when creating contacts during client onboarding. Issue was insertContactSchema requiring organizationId and createdBy fields that are added by backend from auth context. Schema now omits these fields (marked with "Added by backend from auth context" comments), allowing validation to pass before backend enrichment.
 
 ## System Architecture
 
@@ -41,23 +43,15 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 ### Feature Specifications
 Accute features a multi-tenant architecture with a four-tier Role-Based Access Control (Super Admin, Admin, Employee, Client) and a dedicated Client Portal. Key features include an AI Client Onboarding System, conversational AI agent interfaces, a unified workflows system with visual automation, and an AI Agent Marketplace. Secure LLM Configuration Management with AES-256-GCM encryption, PKI Digital Signatures for document verification, and Secure Document Management with encrypted storage are provided.
 
-Additional features include a Marketplace System for templates, a hierarchical folder structure, Projects Management, and an AI Agent Foundry. A Template Scoping System supports global and organization-specific templates, alongside a Subscription Management System with regional pricing and automated billing via an Invoice Generation System.
+Additional features include a Marketplace System for templates, a hierarchical folder structure, Projects Management, an AI Agent Foundry, and a Template Scoping System supporting global and organization-specific templates. A Subscription Management System with regional pricing, automated billing, and an Invoice Generation System is integrated. Security is enhanced with AES-256-GCM encryption, HTTPS, rate limiting, audit logging for payments, and TOTP-based Multi-Factor Authentication (MFA). A comprehensive Pricing & Subscription Management system supports product families, SKUs, add-ons, volume tiers, and Multi-Gateway Payment Processing.
 
-Security is enhanced with AES-256-GCM encryption, HTTPS, rate limiting, audit logging for payments, and TOTP-based Multi-Factor Authentication (MFA). A comprehensive Pricing & Subscription Management system supports product families, SKUs, add-ons, volume tiers, and Multi-Gateway Payment Processing.
-
-The Service Plans Marketplace allows admins to create offerings with various pricing models, supported by a Multi-Tier Authorization System for purchases and Subscription-Based Feature Gating. A Task Dependencies System supports all four dependency types with lag/lead time, circular dependency detection, and critical path calculation.
-
-A Document Version Control System offers enterprise-grade versioning with SHA-256 hash integrity and optional PKI digital signatures. Visualizations include Gantt Chart and Timeline Views. An Enhanced Report Builder provides analytics with templates and custom queries. The Workload View offers capacity planning with team totals, distribution charts, and over-allocation warnings.
+The Service Plans Marketplace allows admins to create offerings with various pricing models, supported by a Multi-Tier Authorization System for purchases and Subscription-Based Feature Gating. A Task Dependencies System supports all four dependency types with lag/lead time, circular dependency detection, and critical path calculation. A Document Version Control System offers enterprise-grade versioning with SHA-256 hash integrity and optional PKI digital signatures. Visualizations include Gantt Chart and Timeline Views. An Enhanced Report Builder provides analytics with templates and custom queries. The Workload View offers capacity planning with team totals, distribution charts, and over-allocation warnings.
 
 A Unified Inbox consolidates Email, Team Chat, and Live Chat. Calendar & Event Management aggregates events and manages time-off requests. The Cadence Workflow Builder extracts hierarchies from documents and supports conversational building. AI Agent Pricing supports various models, and a Recurring Scheduler processes assignments every 5 minutes. Collaboration features include @Mention Collaboration, Tag-Based Routing, Conditional Automations, and Auto-Advance Triggers. Enhanced Automation Actions include 13 types. Workload Insights provide per-user metrics.
 
-Luca Chat features include File Attachments (PDF, DOCX, XLSX, XLS, CSV, TXT), Automatic Chat Title Generation, and Search & Archive capabilities. Idempotent Automatic Day 1 Task Creation and Admin Template Deletion are implemented. A 21-Day Onboarding Journey gamifies user adoption, and Profile Picture Upload provides user avatar management. A Two-Level LLM Configuration System supports user and workspace-level settings.
+Luca Chat features include File Attachments (PDF, DOCX, XLSX, XLS, CSV, TXT), Automatic Chat Title Generation, and Search & Archive capabilities. Idempotent Automatic Day 1 Task Creation and Admin Template Deletion are implemented. A 21-Day Onboarding Journey gamifies user adoption, and Profile Picture Upload provides user avatar management. A Two-Level LLM Configuration System supports user and workspace-level settings. A Client Payment Collection System offers full payment workflows with Razorpay integration. An Email Integration System provides OAuth-based Gmail and Outlook integration. SSO/SAML Enterprise Authentication supports various IdPs. Proposals & Quotes Management handles the full lifecycle of proposals. Chat Threading Extension provides production-ready threading for Team and Live Chat.
 
-A Client Payment Collection System offers full payment workflows with Razorpay integration. An Email Integration System provides OAuth-based Gmail and Outlook integration. SSO/SAML Enterprise Authentication supports various IdPs. Proposals & Quotes Management handles the full lifecycle of proposals. Chat Threading Extension provides production-ready threading for Team and Live Chat.
-
-The Resource Management Suite includes a comprehensive resource allocation planner with real-time conflict detection, a Skills Management System with taxonomy CRUD, and a Skill Matching Engine. A User Skill Profile UI enables self-service, and a `task_matching` endpoint provides ranked skill suggestions.
-
-A WebRTC Voice/Video Calling System provides production-ready in-app calling for Team Chat and Live Chat with peer-to-peer WebRTC, server-side signaling, and zero per-minute costs. This includes a backend signaling infrastructure, a frontend WebRTC core (`useWebRTC` hook), WebSocket integration (`useTeamChatWebSocket` hook), and UI components for calls.
+The Resource Management Suite includes a comprehensive resource allocation planner with real-time conflict detection, a Skills Management System with taxonomy CRUD, and a Skill Matching Engine. A User Skill Profile UI enables self-service, and a `task_matching` endpoint provides ranked skill suggestions. A WebRTC Voice/Video Calling System provides production-ready in-app calling for Team Chat and Live Chat with peer-to-peer WebRTC, server-side signaling, and zero per-minute costs, including backend signaling, a frontend WebRTC core, WebSocket integration, and UI components.
 
 ### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats. WebSocket management is lazy-loaded on-demand for chat sessions.
@@ -67,13 +61,13 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - **OpenAI API**: AI model integration.
 - **Azure OpenAI API**: AI model integration.
 - **Anthropic Claude API**: AI model integration.
-- **Mailgun**: Transactional email service for verification emails.
+- **Mailgun**: Transactional email service.
 - **MSG91**: SMS service for OTP verification.
 - **Razorpay**: Payment gateway.
 - **Stripe**: Payment gateway.
 - **PayU**: Payment gateway.
 - **Payoneer**: Payment gateway.
-- **Gmail API**: Per-user OAuth integration for email account connectivity.
+- **Gmail API**: Per-user OAuth integration.
 - **Multer**: For file uploads.
 - **expr-eval**: For secure expression evaluation.
 - **Recharts**: Frontend library for data visualizations.
