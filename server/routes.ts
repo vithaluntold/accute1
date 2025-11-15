@@ -228,6 +228,127 @@ async function sendVerificationEmail(
   }
 }
 
+// Shared portal welcome email helper
+async function sendPortalWelcomeEmail(
+  email: string,
+  firstName: string,
+  companyName: string,
+  invitationUrl: string,
+  tempPassword: string | undefined
+): Promise<void> {
+  try {
+    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+      const formData = new FormData();
+      formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
+      formData.append('to', email);
+      formData.append('subject', `Welcome to ${companyName} Client Portal`);
+      formData.append('html', `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+            .credentials { background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0; }
+            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Welcome to the ${companyName} Client Portal!</h1>
+            <p>Hi ${firstName},</p>
+            <p>You've been invited to access the ${companyName} client portal on Accute.</p>
+            ${tempPassword ? `
+            <div class="credentials">
+              <p><strong>Your Temporary Credentials:</strong></p>
+              <p>Email: ${email}</p>
+              <p>Temporary Password: <code>${tempPassword}</code></p>
+            </div>
+            <p><strong>Important:</strong> You'll be asked to change this password on your first login.</p>
+            ` : ''}
+            <p>
+              <a href="${invitationUrl}" class="button">Access Client Portal</a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #666;">${invitationUrl}</p>
+            <p>This invitation will expire in 7 days.</p>
+            <div class="footer">
+              <p>If you have any questions, please contact ${companyName}.</p>
+              <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      
+      const response = await fetch(
+        `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+          },
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
+      }
+      
+      console.log(`✓ Portal welcome email sent to ${email}`);
+    } else {
+      console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Portal invitation link:', invitationUrl);
+    }
+  } catch (emailError) {
+    console.error('Failed to send portal welcome email:', emailError);
+    // Don't throw - continue even if email fails
+  }
+}
+
+// Shared SMS verification helper using Twilio
+async function sendSMSVerification(
+  phone: string,
+  verificationLink: string,
+  firstName: string | null | undefined
+): Promise<void> {
+  try {
+    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+      const message = `Hi ${firstName || ''}! Welcome to Accute. Verify your account: ${verificationLink}`;
+      
+      const response = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            To: phone,
+            From: process.env.TWILIO_PHONE_NUMBER,
+            Body: message,
+          }).toString(),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Twilio API error: ${response.status} ${errorText}`);
+      }
+      
+      console.log(`✓ SMS verification sent to ${phone}`);
+    } else {
+      console.warn('⚠️ Twilio credentials not configured. SMS verification link:', verificationLink);
+    }
+  } catch (smsError) {
+    console.error('Failed to send SMS verification:', smsError);
+    // Don't throw - continue even if SMS fails
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check - ALWAYS responds immediately regardless of initialization status
   app.get("/api/health", (req, res) => {
@@ -6854,49 +6975,64 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         });
       }
 
-      // If portal invitation was created, prepare the welcome email
+      // Send onboarding emails and SMS verifications to BOTH client and primary contact
       if (portalInvitation && portalInvitation.invitationToken) {
         try {
-          // Get the organization
+          // Get the organization for email branding
           const organization = await storage.getOrganization(req.user!.organizationId!);
-          if (organization) {
-            // Get the welcome email template (organization-specific or default)
-            const template = await storage.getEmailTemplateByCategory(req.user!.organizationId!, 'welcome');
+          const organizationName = organization?.name || "Your Organization";
+          
+          // Get the primary contact
+          const contacts = await storage.getContactsByClient(client.id);
+          const primaryContact = contacts.find(c => c.isPrimary);
+          
+          if (primaryContact) {
+            console.log("📧 Sending onboarding communications...");
             
-            if (template) {
-              const { preparePortalWelcomeEmail } = await import('./services/portalInvitationService');
-              
-              // Get the contact that was just created
-              const contacts = await storage.getContactsByClient(client.id);
-              const primaryContact = contacts.find(c => c.isPrimary);
-              
-              if (primaryContact) {
-                // Prepare the welcome email
-                const welcomeEmail = preparePortalWelcomeEmail(template, {
-                  contact: primaryContact,
-                  organization,
-                  client: {
-                    id: client.id,
-                    companyName: client.companyName,
-                  },
-                  invitationToken: portalInvitation.invitationToken,
-                  invitationUrl: portalInvitation.invitationUrl,
-                  tempPassword: portalInvitation.tempPassword,
-                });
-                
-                // Add the rendered email to the portal invitation response
-                portalInvitation.welcomeEmail = welcomeEmail;
-                
-                console.log("✅ Prepared welcome email for:", primaryContact.email);
-                console.log("📧 Email subject:", welcomeEmail.subject);
-              }
-            } else {
-              console.log("⚠️ No welcome email template found");
+            // 1. Send portal welcome email to primary contact
+            await sendPortalWelcomeEmail(
+              primaryContact.email,
+              primaryContact.firstName,
+              organizationName,
+              portalInvitation.invitationUrl,
+              portalInvitation.tempPassword
+            );
+            
+            // 2. Send SMS to primary contact if phone number provided
+            if (primaryContact.phone && primaryContact.phone.trim()) {
+              await sendSMSVerification(
+                primaryContact.phone,
+                portalInvitation.invitationUrl,
+                primaryContact.firstName
+              );
             }
+            
+            // 3. Send email to client organization email if different from contact
+            if (client.email && client.email.toLowerCase() !== primaryContact.email.toLowerCase()) {
+              await sendPortalWelcomeEmail(
+                client.email,
+                client.contactName || "Team",
+                organizationName,
+                portalInvitation.invitationUrl,
+                portalInvitation.tempPassword
+              );
+            }
+            
+            // 4. Send SMS to client phone if different from contact
+            if (client.phone && client.phone.trim() && 
+                client.phone !== primaryContact.phone) {
+              await sendSMSVerification(
+                client.phone,
+                portalInvitation.invitationUrl,
+                client.contactName || null
+              );
+            }
+            
+            console.log("✅ Onboarding communications sent successfully");
           }
-        } catch (emailError: any) {
-          console.error("Failed to prepare welcome email:", emailError);
-          // Don't fail the whole request if email preparation fails
+        } catch (communicationError: any) {
+          console.error("Failed to send onboarding communications:", communicationError);
+          // Don't fail the whole request if communication fails
         }
       }
 
