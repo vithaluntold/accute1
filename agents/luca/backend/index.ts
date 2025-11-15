@@ -20,6 +20,7 @@ export interface LucaInput {
     userId?: string;
     req?: any;
     documents?: any[];  // Pre-loaded documents for context
+    conversationHistory?: Array<{role: 'user' | 'assistant'; content: string}>;  // Previous messages for context
   };
 }
 
@@ -64,8 +65,11 @@ export class LucaAgent {
     
     const systemPrompt = this.buildSystemPrompt(context, documents);
     
+    // Build query with conversation history if provided
+    const fullQuery = this.buildQueryWithHistory(query, context?.conversationHistory);
+    
     try {
-      const response = await this.llmService.sendPrompt(query, systemPrompt);
+      const response = await this.llmService.sendPrompt(fullQuery, systemPrompt);
       return response;
     } catch (error) {
       console.error('Luca agent execution failed:', error);
@@ -94,8 +98,11 @@ export class LucaAgent {
     
     const systemPrompt = this.buildSystemPrompt(context, documents);
     
+    // Build query with conversation history if provided
+    const fullQuery = this.buildQueryWithHistory(query, context?.conversationHistory);
+    
     try {
-      const response = await this.llmService.sendPromptStream(query, systemPrompt, onChunk);
+      const response = await this.llmService.sendPromptStream(fullQuery, systemPrompt, onChunk);
       return response;
     } catch (error) {
       console.error('Luca agent streaming failed:', error);
@@ -183,6 +190,33 @@ Your response (one word only):`;
     
     // No tool needed - signal that conversational mode should be used
     return { usedTool: false, response: '' };
+  }
+  
+  /**
+   * Build query with conversation history for context
+   */
+  private buildQueryWithHistory(
+    currentQuery: string,
+    history?: Array<{role: 'user' | 'assistant'; content: string}>
+  ): string {
+    if (!history || history.length === 0) {
+      return currentQuery;
+    }
+    
+    // Format conversation history into the prompt
+    // Limit to last 10 messages to avoid token limits
+    const recentHistory = history.slice(-10);
+    
+    let formattedHistory = '## Previous Conversation:\n\n';
+    for (const message of recentHistory) {
+      if (message.role === 'user') {
+        formattedHistory += `User: ${message.content}\n\n`;
+      } else {
+        formattedHistory += `You (Luca): ${message.content}\n\n`;
+      }
+    }
+    
+    return `${formattedHistory}## Current Message:\n\nUser: ${currentQuery}`;
   }
   
   /**

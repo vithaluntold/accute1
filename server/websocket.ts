@@ -284,6 +284,41 @@ async function handleAgentExecution(
     // Load agent using static factory (works reliably in both dev and production)
     const agent = createStaticAgentInstance(normalizedAgentName, llmConfig) as any;
     
+    // Load conversation history for Luca (critical for maintaining context)
+    let conversationHistory: Array<{role: 'user' | 'assistant'; content: string}> = [];
+    if (isLucaAgent && lucaSessionId) {
+      const messages = await storage.getLucaChatMessagesBySession(lucaSessionId);
+      console.log(`[WebSocket] Loaded ${messages.length} messages from Luca session ${lucaSessionId}`);
+      
+      // Exclude ONLY the most recent user message if it matches the current input
+      // This handles race conditions where the message might or might not be in DB yet
+      // Find the last message that is a user message matching the current input
+      const lastMatchingUserIndex = messages.reduce((lastIdx: number, msg: any, idx: number) => {
+        if (msg.role === 'user' && msg.content === input) {
+          return idx;
+        }
+        return lastIdx;
+      }, -1);
+      
+      let historyMessages;
+      if (lastMatchingUserIndex >= 0) {
+        // Exclude only that specific message (the most recent matching user message)
+        historyMessages = messages.filter((_: any, idx: number) => idx !== lastMatchingUserIndex);
+        console.log(`[WebSocket] Excluded message at index ${lastMatchingUserIndex} (current user input, ${messages.length - 1 === lastMatchingUserIndex ? 'latest' : 'NOT latest - possible race'})`);
+      } else {
+        // No matching message found - use all messages (race condition: message not in DB yet)
+        historyMessages = messages;
+        console.log(`[WebSocket] No matching user message found - using all ${messages.length} messages as history (race condition: user message not persisted yet)`);
+      }
+      
+      console.log(`[WebSocket] Using ${historyMessages.length}/${messages.length} messages as history`);
+      
+      conversationHistory = historyMessages.map((msg: any) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+    }
+    
     // Prepare input with context for agents
     const agentInput = {
       query: input,
@@ -291,6 +326,7 @@ async function handleAgentExecution(
         organizationId: ws.organizationId,
         userId: ws.userId,
         conversationId: isLucaAgent ? lucaSessionId : conversation?.id,
+        conversationHistory: isLucaAgent ? conversationHistory : undefined,
       }
     };
     
