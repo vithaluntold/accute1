@@ -2908,6 +2908,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check endpoint for all LLM configurations and agents
+  app.get("/api/agents/health", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const results: any[] = [];
+      
+      // Get all LLM configurations for the organization
+      const configs = await storage.getLlmConfigurationsByOrganization(req.user!.organizationId!);
+      
+      // Test each LLM configuration
+      for (const config of configs) {
+        const result = {
+          id: config.id,
+          name: config.name,
+          provider: config.provider,
+          model: config.model,
+          scope: config.scope,
+          isActive: config.isActive,
+          isDefault: config.isDefault,
+          status: 'unknown' as 'healthy' | 'unhealthy' | 'unknown',
+          message: '',
+          responseTime: 0
+        };
+
+        if (!config.isActive) {
+          result.status = 'unhealthy';
+          result.message = 'Configuration is inactive';
+          results.push(result);
+          continue;
+        }
+
+        try {
+          const startTime = Date.now();
+          
+          if (config.provider === "openai") {
+            const { OpenAI } = await import('openai');
+            const apiKey = cryptoUtils.decrypt(config.apiKeyEncrypted);
+            const client = new OpenAI({ apiKey });
+            
+            await client.models.list();
+            result.status = 'healthy';
+            result.message = 'Connection successful';
+          } else if (config.provider === "anthropic") {
+            const { Anthropic } = await import('@anthropic-ai/sdk');
+            const apiKey = cryptoUtils.decrypt(config.apiKeyEncrypted);
+            const client = new Anthropic({ apiKey });
+            
+            await client.messages.create({
+              model: config.model || "claude-3-5-sonnet-20241022",
+              max_tokens: 10,
+              messages: [{ role: "user", content: "test" }]
+            });
+            result.status = 'healthy';
+            result.message = 'Connection successful';
+          } else if (config.provider === "azure_openai") {
+            if (!config.azureEndpoint || !config.model) {
+              result.status = 'unhealthy';
+              result.message = 'Missing Azure endpoint or model deployment name';
+              results.push(result);
+              continue;
+            }
+            
+            const apiKey = cryptoUtils.decrypt(config.apiKeyEncrypted);
+            const cleanEndpoint = config.azureEndpoint.endsWith('/') 
+              ? config.azureEndpoint.slice(0, -1) 
+              : config.azureEndpoint;
+            const azureApiVersion = config.modelVersion || '2025-01-01-preview';
+            const testUrl = `${cleanEndpoint}/openai/deployments/${config.model}/chat/completions?api-version=${azureApiVersion}`;
+            
+            const response = await fetch(testUrl, {
+              method: 'POST',
+              headers: {
+                'api-key': apiKey,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                messages: [{ role: 'user', content: 'Hi' }],
+                max_tokens: 5
+              }),
+              signal: AbortSignal.timeout(10000)
+            });
+            
+            if (response.ok) {
+              result.status = 'healthy';
+              result.message = 'Connection successful';
+            } else {
+              result.status = 'unhealthy';
+              try {
+                const errorJson = await response.json();
+                result.message = errorJson.error?.message || errorJson.message || `HTTP ${response.status}`;
+              } catch {
+                result.message = `HTTP ${response.status}`;
+              }
+            }
+          } else {
+            result.status = 'unknown';
+            result.message = 'Unknown provider';
+          }
+          
+          result.responseTime = Date.now() - startTime;
+        } catch (error: any) {
+          result.status = 'unhealthy';
+          result.message = error.message || 'Connection failed';
+        }
+        
+        results.push(result);
+      }
+
+      // Get installed agents from database
+      const agents = await db
+        .select({
+          id: aiAgents.id,
+          slug: aiAgents.slug,
+          name: aiAgents.name,
+          category: aiAgents.category,
+          provider: aiAgents.provider
+        })
+        .from(aiAgents);
+
+      res.json({
+        llmConfigurations: results,
+        agents: agents,
+        summary: {
+          totalConfigurations: results.length,
+          healthyConfigurations: results.filter(r => r.status === 'healthy').length,
+          unhealthyConfigurations: results.filter(r => r.status === 'unhealthy').length,
+          totalAgents: agents.length
+        }
+      });
+    } catch (error: any) {
+      console.error('[Agent Health] Error checking health:', error);
+      res.status(500).json({ error: "Failed to check agent health" });
+    }
+  });
+
   // ==================== Luca Chat Session Routes ====================
 
   // Get all chat sessions for current user (excluding archived by default)
