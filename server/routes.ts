@@ -682,11 +682,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if email is verified
-      if (!user.emailVerified) {
+      // Legacy users (who have passwords from before email verification) are auto-allowed
+      // New users (registered via secure flow) have no password until after verification
+      const isLegacyUser = user.password && !user.emailVerified;
+      
+      if (!user.emailVerified && !isLegacyUser) {
         return res.status(403).json({ 
           error: "Please verify your email address before logging in. Check your inbox for the verification link.",
           emailVerificationRequired: true,
           email: user.email
+        });
+      }
+      
+      // Auto-verify legacy users on their first login
+      if (isLegacyUser) {
+        await storage.updateUser(user.id, {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
         });
       }
 
