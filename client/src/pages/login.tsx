@@ -70,11 +70,21 @@ export default function Login() {
       }
     },
     onError: (error: any) => {
-      toast({
-        title: "Login failed",
-        description: error.message || "Invalid credentials",
-        variant: "destructive",
-      });
+      // Check if it's an email verification error
+      if (error.emailVerificationRequired) {
+        toast({
+          title: "Email verification required",
+          description: error.message || "Please verify your email address before logging in. Check your inbox for the verification link.",
+          variant: "destructive",
+          duration: 6000,
+        });
+      } else {
+        toast({
+          title: "Login failed",
+          description: error.message || "Invalid credentials",
+          variant: "destructive",
+        });
+      }
     },
   });
 

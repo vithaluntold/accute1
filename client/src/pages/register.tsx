@@ -145,13 +145,12 @@ export default function Register() {
       return res.json();
     },
     onSuccess: (data) => {
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
       toast({
-        title: "Super Admin account created!",
-        description: "Welcome to Accute with full system access.",
+        title: "Account created!",
+        description: data.message || "Please check your email to verify your account before logging in.",
       });
-      setLocation("/dashboard");
+      // Redirect to login after successful registration
+      setTimeout(() => setLocation("/auth/login"), 2000);
     },
     onError: (error: any) => {
       toast({
@@ -168,13 +167,12 @@ export default function Register() {
       return res.json();
     },
     onSuccess: (data) => {
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
       toast({
         title: "Account and organization created!",
-        description: `Welcome to Accute! Your organization "${data.organization.name}" is ready.`,
+        description: data.message || `Please check your email to verify your account before logging in. Organization "${data.organization?.name}" is ready.`,
       });
-      setLocation("/dashboard");
+      // Redirect to login after successful registration  
+      setTimeout(() => setLocation("/auth/login"), 3000);
     },
     onError: (error: any) => {
       toast({

@@ -151,6 +151,78 @@ export function setInitializationStatus(complete: boolean, error: string | null 
   initializationError = error;
 }
 
+// Shared email verification helper
+async function sendVerificationEmail(
+  email: string,
+  verificationToken: string,
+  firstName: string | null | undefined,
+  req: Request
+): Promise<void> {
+  try {
+    const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
+    
+    if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
+      const formData = new FormData();
+      formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
+      formData.append('to', email);
+      formData.append('subject', 'Verify your email address');
+      formData.append('html', `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Welcome to Accute!</h1>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Thank you for signing up. Please verify your email address to activate your account.</p>
+            <p>
+              <a href="${verificationUrl}" class="button">Verify Email Address</a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
+            <p>This link will expire in 24 hours.</p>
+            <div class="footer">
+              <p>If you didn't create an account, you can safely ignore this email.</p>
+              <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      
+      const response = await fetch(
+        `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
+          },
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
+      }
+      
+      console.log(`✓ Verification email sent to ${email}`);
+    } else {
+      console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Email verification link:', verificationUrl);
+    }
+  } catch (emailError) {
+    console.error('Failed to send verification email:', emailError);
+    // Don't throw - continue even if email fails
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check - ALWAYS responds immediately regardless of initialization status
   app.get("/api/health", (req, res) => {
@@ -260,68 +332,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.createUser(userData);
 
-      // Send verification email
-      try {
-        const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
-        
-        if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
-          const formData = new FormData();
-          formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
-          formData.append('to', email);
-          formData.append('subject', 'Verify your email address');
-          formData.append('html', `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>Welcome to Accute!</h1>
-                <p>Hi ${firstName || 'there'},</p>
-                <p>Thank you for signing up. Please verify your email address to activate your account.</p>
-                <p>
-                  <a href="${verificationUrl}" class="button">Verify Email Address</a>
-                </p>
-                <p>Or copy and paste this link into your browser:</p>
-                <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-                <p>This link will expire in 24 hours.</p>
-                <div class="footer">
-                  <p>If you didn't create an account, you can safely ignore this email.</p>
-                  <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
-                </div>
-              </div>
-            </body>
-            </html>
-          `);
-          
-          const response = await fetch(
-            `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
-              },
-              body: formData,
-            }
-          );
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
-          }
-        } else {
-          console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Email verification link:', verificationUrl);
-        }
-      } catch (emailError) {
-        console.error('Failed to send verification email:', emailError);
-        // Continue registration even if email fails
-      }
+      // Send verification email using shared helper
+      await sendVerificationEmail(email, verificationToken, firstName, req);
 
       // Log activity
       await logActivity(user.id, organization?.id, "register", "user", user.id, { emailVerificationSent: true }, req);
@@ -417,67 +429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailVerificationTokenExpiry: tokenExpiry,
       });
 
-      // Send verification email
-      try {
-        const verificationUrl = `${process.env.APP_URL || req.get('origin')}/auth/verify-email?token=${verificationToken}`;
-        
-        if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
-          const formData = new FormData();
-          formData.append('from', `Accute <noreply@${process.env.MAILGUN_DOMAIN}>`);
-          formData.append('to', email);
-          formData.append('subject', 'Verify your email address');
-          formData.append('html', `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35 0%, #FF1493 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>Verify Your Email</h1>
-                <p>Hi ${user.firstName || 'there'},</p>
-                <p>Please verify your email address to activate your Accute account.</p>
-                <p>
-                  <a href="${verificationUrl}" class="button">Verify Email Address</a>
-                </p>
-                <p>Or copy and paste this link into your browser:</p>
-                <p style="word-break: break-all; color: #666;">${verificationUrl}</p>
-                <p>This link will expire in 24 hours.</p>
-                <div class="footer">
-                  <p>If you didn't create an account, you can safely ignore this email.</p>
-                  <p>&copy; ${new Date().getFullYear()} Accute. All rights reserved.</p>
-                </div>
-              </div>
-            </body>
-            </html>
-          `);
-          
-          const response = await fetch(
-            `https://api.mailgun.net/v3/${process.env.MAILGUN_DOMAIN}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Basic ${Buffer.from(`api:${process.env.MAILGUN_API_KEY}`).toString('base64')}`,
-              },
-              body: formData,
-            }
-          );
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Mailgun API error: ${response.status} ${errorText}`);
-          }
-        } else {
-          console.warn('⚠️ MAILGUN_API_KEY or MAILGUN_DOMAIN not configured. Email verification link:', verificationUrl);
-        }
-      } catch (emailError) {
-        console.error('Failed to send verification email:', emailError);
-      }
+      // Send verification email using shared helper
+      await sendVerificationEmail(email, verificationToken, user.firstName, req);
 
       // Log activity
       await logActivity(user.id, user.organizationId || undefined, "resend_verification", "user", user.id, {}, req);
@@ -1219,6 +1172,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hashedPassword = await hashPassword(password);
+      
+      // Generate email verification token
+      const verificationToken = crypto.randomUUID();
+      const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
       const userData = insertUserSchema.parse({
         email,
         username,
@@ -1228,35 +1186,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: superAdminRole.id,
         organizationId: null,
         isActive: true,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: tokenExpiry,
       });
 
       const user = await storage.createUser(userData);
       await storage.markSuperAdminKeyAsUsed(validation.keyRecord.id, user.id);
 
-      const token = generateToken(user.id);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await storage.createSession(user.id, token, expiresAt);
+      // Send verification email instead of auto-login
+      await sendVerificationEmail(email, verificationToken, firstName, req);
 
-      // Get role and permissions
-      const role = await storage.getRole(user.roleId);
-      const permissions = await storage.getPermissionsByRole(user.roleId);
-
-      await logActivity(user.id, undefined, "register_super_admin", "user", user.id, {}, req);
+      await logActivity(user.id, undefined, "register_super_admin", "user", user.id, { emailVerificationSent: true }, req);
 
       res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          roleId: user.roleId,
-          roleName: role?.name, // Add role name to user object
-          organizationId: user.organizationId,
-          permissions: permissions.map(p => p.name),
-        },
-        role,
-        token,
+        message: "Super Admin account created successfully! Please check your email to verify your account before logging in.",
+        email: user.email,
+        verificationRequired: true,
       });
     } catch (error: any) {
       console.error("Super admin registration error:", error);
@@ -1302,6 +1248,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const hashedPassword = await hashPassword(password);
+      
+      // Generate email verification token
+      const verificationToken = crypto.randomUUID();
+      const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
       const userData = insertUserSchema.parse({
         email,
         username,
@@ -1311,39 +1262,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: adminRole.id,
         organizationId: organization.id,
         isActive: true,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: tokenExpiry,
       });
 
       const user = await storage.createUser(userData);
 
-      const token = generateToken(user.id);
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await storage.createSession(user.id, token, expiresAt);
+      // Send verification email instead of auto-login
+      await sendVerificationEmail(email, verificationToken, firstName, req);
 
-      // Get role and permissions
-      const role = await storage.getRole(user.roleId);
-      const permissions = await storage.getPermissionsByRole(user.roleId);
-
-      await logActivity(user.id, organization.id, "register_admin", "user", user.id, { organizationId: organization.id }, req);
+      await logActivity(user.id, organization.id, "register_admin", "user", user.id, { organizationId: organization.id, emailVerificationSent: true }, req);
 
       res.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          roleId: user.roleId,
-          roleName: role?.name, // Add role name to user object
-          organizationId: user.organizationId,
-          permissions: permissions.map(p => p.name),
-        },
+        message: "Account and organization created successfully! Please check your email to verify your account before logging in.",
+        email: user.email,
         organization: {
           id: organization.id,
           name: organization.name,
           slug: organization.slug,
         },
-        role,
-        token,
+        verificationRequired: true,
       });
     } catch (error: any) {
       console.error("Admin registration error:", error);
@@ -1512,6 +1451,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleId: validation.invitation.roleId,
         organizationId: validation.invitation.organizationId,
         isActive: true,
+        emailVerified: true, // Auto-verify since they had the invitation link (proves mailbox access)
+        emailVerifiedAt: new Date(),
       });
 
       const user = await storage.createUser(userData);
