@@ -2468,16 +2468,102 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
+  app.get("/api/users/:id", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const isSelfView = id === req.userId;
+      
+      // SECURITY: Staff/Manager can only view their own profile
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isStaff = requesterRole?.name === 'staff';
+      const isManager = requesterRole?.name === 'manager';
+      
+      if ((isStaff || isManager) && !isSelfView) {
+        return res.status(403).json({ error: `${isStaff ? 'Staff' : 'Managers'} can only view their own profile` });
+      }
+      
+      // For Admin/Owner viewing other users, check permissions
+      if (!isSelfView) {
+        const effectivePermissions = await (await import('./rbac-subscription-bridge')).getEffectivePermissions(
+          req.user!.id,
+          req.user!.roleId,
+          req.user!.organizationId
+        );
+        const hasPermission = effectivePermissions.some(p => p.name === 'users.view');
+        
+        if (!hasPermission) {
+          return res.status(403).json({ error: "Insufficient permissions to view other users" });
+        }
+      }
+      
+      const user = await storage.getUser(id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Ensure user can only view users in their organization (unless Super Admin)
+      const isSuperAdmin = requesterRole?.scope === "platform";
+      if (!isSuperAdmin && user.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Cannot view users from other organizations" });
+      }
+      
+      const formattedUser = await formatUserResponse(user);
+      res.json(formattedUser);
+    } catch (error: any) {
+      console.error("Failed to fetch user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   app.patch("/api/users/:id", requireAuth, requirePermission("users.edit"), async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
       const { password, roleId, ...userData } = req.body;
+      
+      // SECURITY: Get user being edited to check organization membership
+      const userToEdit = await storage.getUser(id);
+      if (!userToEdit) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // SECURITY: Manager/Staff role can only edit their own profile (self-edit restriction)
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isStaff = requesterRole?.name === 'staff';
+      const isManager = requesterRole?.name === 'manager';
+      const isOwner = requesterRole?.name === 'owner';
+      const isAdmin = requesterRole?.name === 'admin';
+      const isSelfEdit = id === req.userId;
+      
+      // SECURITY: Cross-org protection - can't edit users from other organizations
+      const isSuperAdmin = requesterRole?.scope === "platform";
+      if (!isSuperAdmin && userToEdit.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Cannot edit users from other organizations" });
+      }
+      
+      if ((isManager || isStaff) && !isSelfEdit) {
+        return res.status(403).json({ error: `${isManager ? 'Managers' : 'Staff'} can only update their own profile` });
+      }
+      
+      // Managers/Staff cannot change ANY roles (including their own)
+      if ((isManager || isStaff) && roleId !== undefined) {
+        return res.status(403).json({ error: `${isManager ? 'Managers' : 'Staff'} cannot change user roles` });
+      }
+      
+      // Reject attempts to set organizationId in request body (prevent tampering)
+      if ('organizationId' in userData || 'organizationId' in req.body) {
+        return res.status(400).json({ error: "Cannot change organization membership via this endpoint" });
+      }
       
       // Prevent assigning users to platform roles
       if (roleId) {
         const role = await storage.getRole(roleId);
         if (role && role.scope === "platform") {
           return res.status(403).json({ error: "Cannot assign users to platform roles" });
+        }
+        
+        // SECURITY: Role hierarchy enforcement - only owners can promote to admin/owner
+        if (!isOwner && (role.name === 'admin' || role.name === 'owner')) {
+          return res.status(403).json({ error: "Only owners can promote users to admin or owner roles" });
         }
       }
       
@@ -2529,6 +2615,16 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       if (roleToDelete?.scope === "platform" && roleToDelete?.isSystemRole === true) {
         if (!isSuperAdmin) {
           return res.status(403).json({ error: "Only Super Admins can delete platform administrators" });
+        }
+      }
+      
+      // SECURITY: Role hierarchy enforcement - only owners can delete admins/owners
+      if (!isSuperAdmin && (roleToDelete?.name === 'admin' || roleToDelete?.name === 'owner')) {
+        const requesterRole = await storage.getRole(req.user!.roleId);
+        const isOwner = requesterRole?.name === 'owner';
+        
+        if (!isOwner) {
+          return res.status(403).json({ error: "Only owners can delete admins or other owners" });
         }
       }
 

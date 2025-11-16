@@ -136,10 +136,10 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     rolePermAssignments.push({ roleId: ownerRoleId, permissionId: permId });
   }
   
-  // Admin gets most permissions (no org delete/transfer)
+  // Admin gets most permissions (no org edit/delete/transfer - owner-only)
   const adminPerms = [
     'users.create', 'users.edit', 'users.delete', 'users.view',
-    'organization.edit', 'organization.billing',
+    'organization.billing', // Can view billing, but NOT edit org settings
     'clients.create', 'clients.edit', 'clients.delete', 'clients.view'
   ];
   for (const permName of adminPerms) {
@@ -161,8 +161,8 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     }
   }
   
-  // Staff gets basic view permissions
-  const staffPerms = ['users.view', 'clients.view'];
+  // Staff gets basic view permissions (self-view/edit only via endpoint logic)
+  const staffPerms = ['users.edit', 'clients.view']; // users.edit for self-edit only
   for (const permName of staffPerms) {
     const permId = permissionMap.get(permName);
     if (permId) {
