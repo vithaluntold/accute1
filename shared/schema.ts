@@ -4097,7 +4097,7 @@ export type Proposal = typeof proposals.$inferSelect;
 
 export const subscriptionPlanFormSchema = insertSubscriptionPlanSchema.extend({
   featuresInput: z.string().optional(),
-}).omit({ stripePriceIdMonthly: true, stripePriceIdYearly: true, stripeProductId: true });
+}).omit({ stripePriceMonthlyId: true, stripePriceYearlyId: true, stripeProductId: true });
 
 export const pricingRegionFormSchema = insertPricingRegionSchema.extend({
   countriesInput: z.string().optional(),
@@ -4115,7 +4115,7 @@ export function transformPlanFormData(data: SubscriptionPlanFormData): InsertSub
   const { featuresInput, ...rest } = data;
   return {
     ...rest,
-    features: featuresInput ? featuresInput.split("\n").filter(f => f.trim()) : [],
+    features: (featuresInput ? featuresInput.split("\n").filter((f: string) => f.trim()) : []) as any,
   };
 }
 
@@ -4131,9 +4131,9 @@ export function transformCouponFormData(data: CouponFormData): Omit<InsertCoupon
   const { allowedPlansInput, ...rest } = data;
   return {
     ...rest,
-    allowedPlans: allowedPlansInput
-      ? allowedPlansInput.split("\n").filter(p => p.trim())
-      : null,
+    allowedPlans: (allowedPlansInput
+      ? allowedPlansInput.split("\n").filter((p: string) => p.trim())
+      : null) as any,
   };
 }
 
@@ -4427,7 +4427,7 @@ export const defaultCouponFormValues: CouponFormData = {
   allowedPlans: null,
   allowedPlansInput: "",
   maxRedemptions: null,
-  validFrom: new Date().toISOString().split('T')[0],
+  validFrom: new Date() as any,
   validUntil: null,
   isActive: true,
 };
