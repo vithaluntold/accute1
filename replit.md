@@ -1,7 +1,7 @@
-### Overview
-Accute is an AI-native platform designed to automate accounting workflows for modern accounting firms. Its core purpose is to enhance efficiency, ensure compliance, and revolutionize the accounting industry by offering features such as multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace. The platform aims to streamline accounting operations and capitalize on significant market potential with its AI-native solution.
+# Overview
+Accute is an AI-native platform for accounting firms, automating workflows to enhance efficiency and compliance. It features multi-agent orchestration, a comprehensive template library, multi-provider AI support, and an AI agent marketplace, aiming to revolutionize the accounting industry.
 
-### User Preferences
+# User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
 - Multi-provider AI support essential
@@ -37,21 +37,21 @@ Accute is an AI-native platform designed to automate accounting workflows for mo
 - WebSocket URL Parsing Fix: WebSocket upgrade handler now parses pathname from URL instead of strict equality check. Old (broken): `request.url === '/ws/ai-stream'` failed with query params. New (fixed): `new URL(request.url!).pathname === '/ws/ai-stream'` correctly handles client query parameters (agentSlug, sessionId).
 - Agent Route Paths: Agents use `/ai-agents/:slug` pattern in frontend router, NOT `/agents/:slug`. Route defined in App.tsx as `/ai-agents/:slug` rendering AgentDetail component. Example: Luca agent accessible at `/ai-agents/luca`.
 
-### System Architecture
+# System Architecture
 
-#### UI/UX Decisions
-The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, Orbitron, Inter, and Fira Code fonts, a collapsible sidebar, top navigation, card-based dashboards, and data tables. It is implemented as a responsive Progressive Web App (PWA).
+## UI/UX Decisions
+The UI/UX is inspired by Linear and Notion, using Carbon Design System with a Porsche-to-Pink gradient, Orbitron, Inter, and Fira Code fonts. It features a collapsible sidebar, top navigation, card-based dashboards, and data tables, implemented as a responsive Progressive Web App (PWA).
 
-#### Technical Implementations
-The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript with PostgreSQL (Neon) via Drizzle ORM. Authentication is handled with JWT and bcrypt, complemented by AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
+## Technical Implementations
+The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend uses Node.js, Express, and TypeScript with PostgreSQL (Neon) via Drizzle ORM. Authentication utilizes JWT, bcrypt, AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude.
 
-#### Feature Specifications
-Accute provides a multi-tenant architecture with a four-tier Role-Based Access Control (Super Admin, Admin, Employee, Client) and a Client Portal. Key features include an AI Client Onboarding System, conversational AI agent interfaces, a unified workflows system with visual automation, an AI Agent Marketplace, Secure LLM Configuration Management with AES-256-GCM encryption, PKI Digital Signatures, and Secure Document Management. Additional features include a Marketplace for templates, Projects Management, an AI Agent Foundry, Subscription Management, Document Version Control, Enhanced Report Builder, Workload View, Unified Inbox, Calendar & Event Management, Recurring Scheduler, Collaboration, Enhanced Automation Actions, Workload Insights, Luca Chat (with File Attachments, Auto Chat Title, Search & Archive), Idempotent Automatic Day 1 Task Creation, a 21-Day Onboarding Journey, Profile Picture Upload, a Two-Level LLM Configuration System, Client Payment Collection System, Email Integration, SSO/SAML, Proposals & Quotes Management, Chat Threading Extension, a Resource Management Suite with a Skills Management System and Skill Matching Engine, and a WebRTC Voice/Video Calling System.
+## Feature Specifications
+Accute offers a multi-tenant architecture with a four-tier Role-Based Access Control and a Client Portal. Key features include an AI Client Onboarding System, conversational AI agent interfaces, a unified workflows system, an AI Agent Marketplace, Secure LLM Configuration Management with AES-256-GCM encryption, PKI Digital Signatures, Secure Document Management, Template Marketplace, Projects Management, AI Agent Foundry, Subscription Management, Document Version Control, Enhanced Report Builder, Workload View, Unified Inbox, Calendar & Event Management, Recurring Scheduler, Collaboration, Enhanced Automation Actions, Workload Insights, Luca Chat (with File Attachments, Auto Chat Title, Search & Archive), Idempotent Automatic Day 1 Task Creation, a 21-Day Onboarding Journey, Profile Picture Upload, a Two-Level LLM Configuration System, Client Payment Collection System, Email Integration, SSO/SAML, Proposals & Quotes Management, Chat Threading Extension, a Resource Management Suite with Skills Management and Skill Matching Engine, and a WebRTC Voice/Video Calling System.
 
-#### System Design Choices
-The project is organized into `client/`, `server/`, and `shared/` directories. Security is a primary concern, implemented through robust authentication, encryption, and multi-tenancy. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations, featuring 5-minute caching and workspace→user fallback logic, accessed via `withLLMConfig` middleware and `getLLMConfig` helper. File attachments for AI agents are processed by a `FileParserService` that supports PDF, DOCX, XLSX/XLS, CSV, and TXT formats. WebSocket management is lazy-loaded on-demand. The server initialization sequence prioritizes health checks, system initialization, agent route registration, and then Vite middleware to ensure proper routing for `/api/agents/*` endpoints.
+## System Design Choices
+The project is structured into `client/`, `server/`, and `shared/` directories. Security, multi-tenancy, and robust authentication/encryption are paramount. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages configurations, featuring 5-minute caching and workspace→user fallback, accessed via `withLLMConfig` middleware and `getLLMConfig` helper. File attachments are processed by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT. WebSocket management is lazy-loaded. Server initialization prioritizes health checks, system initialization, agent route registration, and then Vite middleware to ensure correct `/api/agents/*` routing.
 
-### External Dependencies
+# External Dependencies
 - PostgreSQL (Neon)
 - OpenAI API
 - Azure OpenAI API

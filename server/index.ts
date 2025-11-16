@@ -285,8 +285,31 @@ app.use((req, res, next) => {
       });
     });
     
-    // WebSockets disabled at startup - lazy-load on-demand
-    console.log('ℹ️  WebSockets will initialize on-demand when needed');
+    // Initialize WebSocket server EAGERLY (not lazy)
+    console.log('🔧 Initializing WebSocket Bootstrap...');
+    try {
+      const { wsBootstrap } = await import('./websocket-bootstrap');
+      wsBootstrap.initialize(server);
+    } catch (wsError) {
+      console.error('❌ WebSocket Bootstrap initialization failed:', wsError);
+      console.warn('⚠️  Continuing without WebSocket support');
+    }
+    
+    // Initialize Agent Orchestrator
+    console.log('🔧 Initializing Agent Orchestrator...');
+    try {
+      const { orchestrator } = await import('./agent-orchestrator');
+      const { AGENT_REGISTRY } = await import('@shared/agent-registry');
+      
+      for (const agentMetadata of AGENT_REGISTRY) {
+        orchestrator.registerAgent(agentMetadata);
+      }
+      
+      console.log(`✅ Agent Orchestrator initialized with ${AGENT_REGISTRY.length} agents`);
+    } catch (orchError) {
+      console.error('❌ Agent Orchestrator initialization failed:', orchError);
+      console.warn('⚠️  Continuing with limited agent functionality');
+    }
     
     // CRITICAL: Initialize system FIRST to ensure agents are ready
     // This blocks until AI agents and LLM configs are initialized
