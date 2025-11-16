@@ -7,6 +7,8 @@ import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { setupWebSocket } from "./websocket";
+import { validatePasswordComplexity } from "./security";
+import { organizationCreationRateLimiter, userCreationRateLimiter, checkAccountLockout, recordFailedLogin } from "./rate-limit";
 import * as schema from "@shared/schema";
 import { registerPricingRoutes } from "./pricing-routes";
 import { registerSubscriptionRoutes } from "./subscription-routes";
@@ -809,6 +811,14 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
         return res.status(400).json({ error: "Email and password are required" });
       }
 
+      // SECURITY: Check account lockout BEFORE password verification
+      const lockoutStatus = checkAccountLockout(email);
+      if (lockoutStatus.isLocked) {
+        return res.status(429).json({ 
+          error: `Account temporarily locked due to too many failed login attempts. Try again in ${lockoutStatus.minutesRemaining} minutes.` 
+        });
+      }
+
       // Find user
       const user = await storage.getUserByEmail(email);
       if (!user) {
@@ -818,6 +828,8 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       // Verify password
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
+        // SECURITY: Record failed login attempt for account lockout tracking
+        recordFailedLogin(email);
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -2688,7 +2700,7 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
 
   // ==================== Organization Routes ====================
 
-  app.post("/api/organizations", requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post("/api/organizations", organizationCreationRateLimiter, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
       const { name, slug: providedSlug } = req.body;
       
@@ -2994,10 +3006,19 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
   });
 
   // Create user in organization (alias endpoint for better RESTful design)
-  app.post("/api/organizations/:id/users", requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {
+  app.post("/api/organizations/:id/users", userCreationRateLimiter, requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {
     try {
       const { id: orgId } = req.params;
       const { password, role: roleName, email, firstName, lastName } = req.body;
+      
+      // SECURITY: Validate password complexity
+      const passwordValidation = validatePasswordComplexity(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ 
+          error: 'Password does not meet complexity requirements',
+          details: passwordValidation.errors 
+        });
+      }
       
       // Verify user can only create users in their own organization (unless Super Admin)
       const requesterRole = await storage.getRole(req.user!.roleId);

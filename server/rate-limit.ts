@@ -212,3 +212,15 @@ export function isAccountLocked(identifier: string): { isLocked: boolean; lockUn
   
   return { isLocked: false };
 }
+
+// Aliases for better semantics in route handlers
+export const checkAccountLockout = (identifier: string) => {
+  const status = isAccountLocked(identifier);
+  if (status.isLocked && status.lockUntil) {
+    const minutesRemaining = Math.ceil((status.lockUntil.getTime() - Date.now()) / (60 * 1000));
+    return { isLocked: true, minutesRemaining };
+  }
+  return { isLocked: false, minutesRemaining: 0 };
+};
+
+export const recordFailedLogin = trackFailedLogin;
