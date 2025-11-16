@@ -9,6 +9,13 @@ import bcrypt from 'bcrypt';
 let roleCache: Map<string, string> | null = null;
 
 /**
+ * Clear role cache (called during test cleanup)
+ */
+export function clearRoleCache(): void {
+  roleCache = null;
+}
+
+/**
  * Get or create roles for testing
  */
 async function ensureRolesExist(): Promise<Map<string, string>> {

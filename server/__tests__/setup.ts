@@ -9,6 +9,7 @@ import {
 } from '@shared/schema';
 import { sql } from 'drizzle-orm';
 import { beforeEach, afterAll } from 'vitest';
+import { clearRoleCache } from './helpers';
 
 // CRITICAL SAFETY CHECK: Only allow tests to run in test environment
 if (process.env.NODE_ENV !== 'test') {
@@ -40,6 +41,9 @@ beforeEach(async () => {
         sessions
       CASCADE
     `);
+    
+    // Clear role cache so ensureRolesExist() re-checks the database
+    clearRoleCache();
     
     console.log('🧹 Test database cleaned');
   } catch (error) {
