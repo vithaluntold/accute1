@@ -436,7 +436,7 @@ export default function WorkflowBuilder() {
       {/* Main Content: Split View */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel: Hierarchical Tree */}
-        <div className="w-80 border-r flex flex-col bg-muted/30">
+        <div className="w-80 border-r flex flex-col overflow-hidden bg-muted/30">
           <div className="p-4 border-b bg-background">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-semibold">Workflow Structure</h2>
