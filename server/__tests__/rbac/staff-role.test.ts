@@ -6,7 +6,7 @@
 
 import request from 'supertest';
 import app from '../../test-app';
-import { createAuthenticatedUser, authenticatedRequest } from '../helpers';
+import { createAuthenticatedUser, authenticatedRequest, getRoleId } from '../helpers';
 
 describe('Layer 3D: Staff Role Permissions (10 tests)', () => {
   
@@ -106,9 +106,11 @@ describe('Layer 3D: Staff Role Permissions (10 tests)', () => {
   it('TC-RBAC-STAFF-009: Staff cannot change their own role', async () => {
     const { token, user } = await createAuthenticatedUser({ role: 'staff' });
     
+    const adminRoleId = await getRoleId('admin');
+    
     const response = await authenticatedRequest(token)
       .patch(`/api/users/${user.id}`)
-      .send({ role: 'admin' });
+      .send({ roleId: adminRoleId });
     
     expect(response.status).toBe(403);
   });

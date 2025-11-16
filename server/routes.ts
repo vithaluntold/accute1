@@ -355,6 +355,24 @@ async function sendSMSVerification(
  * @param app Express application
  */
 export async function registerRoutesOnly(app: Express): Promise<void> {
+  // Helper function to format user response with roleName
+  async function formatUserResponse(user: any) {
+    if (!user) return null;
+    
+    // Get role name if roleId exists
+    let roleName = undefined;
+    if (user.roleId) {
+      const role = await storage.getRole(user.roleId);
+      roleName = role?.name;
+    }
+    
+    return {
+      ...user,
+      roleName,
+      password: undefined // Never expose password
+    };
+  }
+
   // Health check - ALWAYS responds immediately regardless of initialization status
   app.get("/api/health", (req, res) => {
     res.status(200).json({ 
@@ -2243,7 +2261,8 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       }
 
       await logActivity(req.userId, req.user!.organizationId || undefined, "update", "user", user.id, { action: "self_update", fields: Object.keys(updateData) }, req);
-      res.json({ ...user, password: undefined });
+      const formattedUser = await formatUserResponse(user);
+      res.json(formattedUser);
     } catch (error: any) {
       console.error("Failed to update user profile:", error);
       res.status(500).json({ error: "Failed to update user profile" });
@@ -2472,7 +2491,8 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       }
 
       await logActivity(req.userId, req.user!.organizationId || undefined, "update", "user", user.id, {}, req);
-      res.json({ ...user, password: undefined });
+      const formattedUser = await formatUserResponse(user);
+      res.json(formattedUser);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to update user" });
     }

@@ -16,6 +16,20 @@ export function clearRoleCache(): void {
 }
 
 /**
+ * Helper to get roleId from role name (for use in tests)
+ */
+export async function getRoleId(roleName: 'owner' | 'admin' | 'manager' | 'staff'): Promise<string> {
+  const roleMap = await ensureRolesExist();
+  const roleId = roleMap.get(roleName);
+  
+  if (!roleId) {
+    throw new Error(`Role ${roleName} not found`);
+  }
+  
+  return roleId;
+}
+
+/**
  * Get or create roles for testing
  */
 async function ensureRolesExist(): Promise<Map<string, string>> {

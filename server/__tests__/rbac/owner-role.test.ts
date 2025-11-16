@@ -6,7 +6,7 @@
 
 import request from 'supertest';
 import app from '../../test-app';
-import { createAuthenticatedUser, createOrgAPI, authenticatedRequest } from '../helpers';
+import { createAuthenticatedUser, createOrgAPI, authenticatedRequest, getRoleId } from '../helpers';
 
 describe('Layer 3A: Owner Role Permissions (10 tests)', () => {
   
@@ -69,12 +69,14 @@ describe('Layer 3A: Owner Role Permissions (10 tests)', () => {
       organizationId: owner.user.organizationId
     });
     
+    const adminRoleId = await getRoleId('admin');
+    
     const response = await authenticatedRequest(owner.token)
       .patch(`/api/users/${staff.user.id}`)
-      .send({ role: 'admin' });
+      .send({ roleId: adminRoleId });
     
     expect(response.status).toBe(200);
-    expect(response.body.roleName).toBe('admin');
+    expect(response.body.roleId).toBe(adminRoleId);
   });
 
   it('TC-RBAC-OWNER-006: Owner can demote admins to staff', async () => {
@@ -84,12 +86,14 @@ describe('Layer 3A: Owner Role Permissions (10 tests)', () => {
       organizationId: owner.user.organizationId
     });
     
+    const staffRoleId = await getRoleId('staff');
+    
     const response = await authenticatedRequest(owner.token)
       .patch(`/api/users/${admin.user.id}`)
-      .send({ role: 'staff' });
+      .send({ roleId: staffRoleId });
     
     expect(response.status).toBe(200);
-    expect(response.body.roleName).toBe('staff');
+    expect(response.body.roleId).toBe(staffRoleId);
   });
 
   it('TC-RBAC-OWNER-007: Owner cannot access other organizations', async () => {

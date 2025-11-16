@@ -6,7 +6,7 @@
 
 import request from 'supertest';
 import app from '../../test-app';
-import { createAuthenticatedUser, authenticatedRequest } from '../helpers';
+import { createAuthenticatedUser, authenticatedRequest, getRoleId } from '../helpers';
 
 describe('Layer 3B: Admin Role Permissions (10 tests)', () => {
   
@@ -70,9 +70,11 @@ describe('Layer 3B: Admin Role Permissions (10 tests)', () => {
       organizationId: admin.user.organizationId
     });
     
+    const adminRoleId = await getRoleId('admin');
+    
     const response = await authenticatedRequest(admin.token)
       .patch(`/api/users/${staff.user.id}`)
-      .send({ role: 'admin' });
+      .send({ roleId: adminRoleId });
     
     expect(response.status).toBe(403);
   });
