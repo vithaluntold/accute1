@@ -22,7 +22,9 @@ interface RegionPricing {
   edge: { monthly: number; yearly: number; threeYear: number };
 }
 
-// Pricing data from Accute_Revised_Global_Pricing.xlsx
+// PENETRATION PRICING STRATEGY - 20%/15%/12% Margins (monthly/annual/3-year)
+// Target markets: India, UAE, Turkey, USA
+// See PENETRATION_PRICING_STRATEGY.md for full strategy
 const REGIONAL_PRICING: RegionPricing[] = [
   {
     region: "USA",
@@ -30,99 +32,100 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "$",
     multiplier: 1.0,
     countryCodes: ["US"],
-    core: { monthly: 35, yearly: 29, threeYear: 26 },
-    ai: { monthly: 75, yearly: 59, threeYear: 54 },
-    edge: { monthly: 125, yearly: 99, threeYear: 89 }
+    core: { monthly: 9, yearly: 8, threeYear: 8 },      // 84-86% cheaper than TaxDome
+    ai: { monthly: 23, yearly: 21, threeYear: 20 },     // 58-65% cheaper than TaxDome
+    edge: { monthly: 38, yearly: 35, threeYear: 34 }    // 33-41% cheaper than TaxDome
   },
   {
     region: "UK",
     currency: "GBP",
     currencySymbol: "£",
-    multiplier: 0.91, // 32/35
+    multiplier: 0.79, // GBP exchange rate
     countryCodes: ["GB"],
-    core: { monthly: 32, yearly: 27, threeYear: 24 },
-    ai: { monthly: 69, yearly: 55, threeYear: 50 },
-    edge: { monthly: 115, yearly: 91, threeYear: 82 }
+    core: { monthly: 7, yearly: 6, threeYear: 6 },
+    ai: { monthly: 18, yearly: 17, threeYear: 16 },
+    edge: { monthly: 30, yearly: 28, threeYear: 27 }
   },
   {
     region: "EU",
     currency: "EUR",
     currencySymbol: "€",
-    multiplier: 0.94, // 33/35
+    multiplier: 0.93, // EUR exchange rate
     countryCodes: ["DE", "FR", "IT", "ES", "NL", "BE", "AT", "IE", "PT", "GR", "FI", "DK", "SE", "NO"],
-    core: { monthly: 33, yearly: 28, threeYear: 25 },
-    ai: { monthly: 70, yearly: 56, threeYear: 51 },
-    edge: { monthly: 118, yearly: 94, threeYear: 85 }
+    core: { monthly: 8, yearly: 7, threeYear: 7 },
+    ai: { monthly: 21, yearly: 20, threeYear: 19 },
+    edge: { monthly: 35, yearly: 33, threeYear: 32 }
   },
   {
     region: "UAE",
     currency: "AED",
     currencySymbol: "د.إ",
-    multiplier: 3.71, // 130/35
+    multiplier: 3.67, // AED exchange rate
     countryCodes: ["AE", "SA", "QA", "KW", "BH", "OM"],
-    core: { monthly: 130, yearly: 108, threeYear: 97 },
-    ai: { monthly: 285, yearly: 228, threeYear: 205 },
-    edge: { monthly: 480, yearly: 379, threeYear: 341 }
+    core: { monthly: 33, yearly: 26, threeYear: 22 },    // Premium market pricing
+    ai: { monthly: 84, yearly: 66, threeYear: 59 },      // Targets UAE SMEs
+    edge: { monthly: 139, yearly: 110, threeYear: 99 }   // Enterprise-level pricing
   },
   {
     region: "India",
     currency: "INR",
     currencySymbol: "₹",
-    multiplier: 37.11, // 1299/35
+    multiplier: 29.05, // PPP-adjusted for India (0.35x USA base)
     countryCodes: ["IN"],
-    core: { monthly: 1299, yearly: 999, threeYear: 899 },
-    ai: { monthly: 2699, yearly: 1999, threeYear: 1799 },
-    edge: { monthly: 4499, yearly: 3499, threeYear: 3149 }
+    core: { monthly: 260, yearly: 200, threeYear: 180 },    // 80% cheaper than old pricing
+    ai: { monthly: 670, yearly: 525, threeYear: 465 },      // Aggressive market entry
+    edge: { monthly: 1100, yearly: 870, threeYear: 780 }    // 75% cheaper than old pricing
   },
+  {
+    region: "Turkey",
+    currency: "TRY",
+    currencySymbol: "₺",
+    multiplier: 13.2, // PPP-adjusted for Turkey (0.40x USA base)
+    countryCodes: ["TR"],
+    core: { monthly: 120, yearly: 92, threeYear: 79 },     // New market entry pricing
+    ai: { monthly: 305, yearly: 237, threeYear: 211 },     // Emerging market strategy
+    edge: { monthly: 500, yearly: 396, threeYear: 356 }    // Enterprise Turkish market
+  },
+  // Secondary markets (not focus, but available)
   {
     region: "Australia",
     currency: "AUD",
     currencySymbol: "A$",
-    multiplier: 1.11, // 39/35
+    multiplier: 1.52, // AUD exchange rate
     countryCodes: ["AU"],
-    core: { monthly: 39, yearly: 33, threeYear: 30 },
-    ai: { monthly: 82, yearly: 65, threeYear: 59 },
-    edge: { monthly: 136, yearly: 108, threeYear: 97 }
+    core: { monthly: 14, yearly: 11, threeYear: 9 },
+    ai: { monthly: 35, yearly: 27, threeYear: 24 },
+    edge: { monthly: 58, yearly: 46, threeYear: 41 }
   },
   {
-    region: "New Zealand",
-    currency: "NZD",
-    currencySymbol: "NZ$",
-    multiplier: 1.20, // 42/35
-    countryCodes: ["NZ"],
-    core: { monthly: 42, yearly: 36, threeYear: 32 },
-    ai: { monthly: 88, yearly: 70, threeYear: 63 },
-    edge: { monthly: 146, yearly: 116, threeYear: 104 }
+    region: "Canada",
+    currency: "CAD",
+    currencySymbol: "C$",
+    multiplier: 1.39, // CAD exchange rate
+    countryCodes: ["CA"],
+    core: { monthly: 13, yearly: 10, threeYear: 8 },
+    ai: { monthly: 32, yearly: 25, threeYear: 22 },
+    edge: { monthly: 53, yearly: 42, threeYear: 38 }
   },
   {
     region: "Singapore",
     currency: "SGD",
     currencySymbol: "S$",
-    multiplier: 1.09, // 38/35
+    multiplier: 1.35, // SGD exchange rate
     countryCodes: ["SG"],
-    core: { monthly: 38, yearly: 32, threeYear: 29 },
-    ai: { monthly: 79, yearly: 63, threeYear: 57 },
-    edge: { monthly: 131, yearly: 104, threeYear: 94 }
+    core: { monthly: 12, yearly: 9, threeYear: 8 },
+    ai: { monthly: 31, yearly: 24, threeYear: 22 },
+    edge: { monthly: 51, yearly: 41, threeYear: 36 }
   },
   {
-    region: "SE Asia",
+    region: "Rest of World",
     currency: "USD",
     currencySymbol: "$",
-    multiplier: 0.86, // 30/35 (PPP discount)
-    countryCodes: ["TH", "MY", "ID", "PH", "VN", "MM", "KH", "LA", "BN"],
-    core: { monthly: 30, yearly: 25, threeYear: 22 },
-    ai: { monthly: 64, yearly: 50, threeYear: 45 },
-    edge: { monthly: 105, yearly: 83, threeYear: 74 }
-  },
-  {
-    region: "Africa",
-    currency: "USD",
-    currencySymbol: "$",
-    multiplier: 0.80, // 28/35 (PPP discount)
-    countryCodes: ["ZA", "NG", "KE", "GH", "TZ", "UG", "ET", "EG", "MA", "DZ", "AO", "SD"],
-    core: { monthly: 28, yearly: 23, threeYear: 21 },
-    ai: { monthly: 60, yearly: 47, threeYear: 42 },
-    edge: { monthly: 98, yearly: 78, threeYear: 70 }
+    multiplier: 0.70, // Discounted for other markets
+    countryCodes: ["*"], // All other countries
+    core: { monthly: 6, yearly: 5, threeYear: 4 },
+    ai: { monthly: 16, yearly: 13, threeYear: 11 },
+    edge: { monthly: 27, yearly: 21, threeYear: 19 }
   }
 ];
 

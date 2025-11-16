@@ -44,6 +44,19 @@ The project is structured into `client/`, `server/`, and `shared/` directories, 
 - mammoth
 - xlsx
 
+# Business Strategy
+## Penetration Pricing (November 2025)
+Accute adopts aggressive penetration pricing with **20% margins** to rapidly capture market share before competitors can replicate AI Psychology Profiling capabilities. Target markets: India, UAE, Turkey, USA.
+
+### Pricing Strategy
+- **Core Plan:** $9/mo (USA), ₹260/mo (India), 33 AED/mo (UAE), ₺120/mo (Turkey)
+- **AI Plan:** $23/mo (USA), ₹670/mo (India), 84 AED/mo (UAE), ₺305/mo (Turkey)  
+- **Edge Plan:** $38/mo (USA), ₹1100/mo (India), 139 AED/mo (UAE), ₺500/mo (Turkey)
+- **Competitive Advantage:** 70-88% cheaper than TaxDome/Karbon while offering superior AI capabilities
+- **Goal:** 5,000 customers by end of Year 1, expanding to 100,000 by Year 3
+- **Margin Expansion:** Gradually increase to 35-40% margins by Year 4-5 after market dominance
+
 # Key Documentation
-- **PATENT_DOCUMENTATION.md**: Comprehensive patent documentation covering multi-agent AI orchestration system, two-level LLM configuration architecture, WebSocket streaming with auto-title generation, agent marketplace, and unified cross-agent session routing. Details 7 novel technical contributions and 5 patentable claims with 12-18 month competitive advantage.
-- **COMPETITIVE_ANALYSIS_2025.md**: Comprehensive competitive analysis across 7 major competitors (TaxDome, Karbon, Canopy, Trullion, Financial Cents, Jetpack Workflow, ClickUp) with accurate AI capability scores, 4-quadrant market positioning, and strategic recommendations. Accute leads with 90/100 AI score (2x nearest competitor) through unique multi-agent conversational AI vs. competitors' task-specific AI automation.
+- **PATENT_DOCUMENTATION.md**: AI Psychology Profiling & Performance Review System patent documentation covering 5 psychological frameworks (Big Five OCEAN, DISC, MBTI, Emotional Intelligence, Cultural Dimensions), hybrid ML model fusion, privacy-first aggregation, and consensus scoring algorithm. Details 5 formal patent claims with 24-36 month competitive moat and $12B TAM commercialization potential.
+- **COMPETITIVE_ANALYSIS_2025.md**: Comprehensive competitive analysis across 7 major competitors with 7-category AI scoring framework (added Employee Performance AI at 20% weight). Accute leads with 95/100 AI score (2.5x TaxDome at 38/100, 2x Karbon at 46/100) through unique multi-agent conversational AI + psychology profiling vs. competitors' task-specific AI automation.
+- **PENETRATION_PRICING_STRATEGY.md**: Complete penetration pricing strategy with 20% margins, cost structure analysis, regional pricing (India, UAE, Turkey, USA), competitive comparison, market penetration goals (5K→100K customers over 3 years), and margin expansion roadmap.
