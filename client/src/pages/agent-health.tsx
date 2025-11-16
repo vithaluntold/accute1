@@ -35,7 +35,10 @@ interface Agent {
   slug: string;
   name: string;
   category: string;
-  provider: string;
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  message: string;
+  llmConfigUsed: string;
+  responseTime: number;
 }
 
 interface HealthResponse {
@@ -46,6 +49,8 @@ interface HealthResponse {
     healthyConfigurations: number;
     unhealthyConfigurations: number;
     totalAgents: number;
+    healthyAgents: number;
+    unhealthyAgents: number;
   };
 }
 
@@ -209,9 +214,9 @@ export default function AgentHealth() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-summary-healthy">
+        <Card data-testid="card-summary-healthy-configs">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Healthy</CardTitle>
+            <CardTitle className="text-sm font-medium">Healthy Configs</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
           </CardHeader>
           <CardContent>
@@ -220,21 +225,6 @@ export default function AgentHealth() {
             </div>
             <p className="text-xs text-muted-foreground">
               {healthPercentage}% operational
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card data-testid="card-summary-unhealthy">
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unhealthy</CardTitle>
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-unhealthy-configs">
-              {data?.summary.unhealthyConfigurations || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Requires attention
             </p>
           </CardContent>
         </Card>
@@ -249,7 +239,22 @@ export default function AgentHealth() {
               {data?.summary.totalAgents || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              Installed agents
+              Available agents
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-summary-healthy-agents">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Healthy Agents</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-healthy-agents">
+              {data?.summary.healthyAgents || 0}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data?.summary.totalAgents ? Math.round((data.summary.healthyAgents / data.summary.totalAgents) * 100) : 0}% ready
             </p>
           </CardContent>
         </Card>
@@ -328,41 +333,65 @@ export default function AgentHealth() {
         </CardContent>
       </Card>
 
-      {/* Installed AI Agents */}
+      {/* Available AI Agents with Health Status */}
       <Card data-testid="card-ai-agents">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            Installed AI Agents
+            Available AI Agents
           </CardTitle>
           <CardDescription>
-            All AI agents currently installed and available in your workspace
+            Health status for all AI agents in your workspace
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!data?.agents.length ? (
             <div className="text-center py-8 text-muted-foreground">
               <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No AI agents installed</p>
+              <p>No AI agents available</p>
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {data.agents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-3 p-4 rounded-md border hover-elevate"
+                  className="flex flex-col gap-2 p-4 rounded-md border hover-elevate"
                   data-testid={`agent-${agent.slug}`}
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                    <Zap className="h-5 w-5 text-primary" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 shrink-0">
+                      {getStatusIcon(agent.status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate" data-testid={`agent-name-${agent.slug}`}>
+                        {agent.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {agent.category}
+                      </p>
+                    </div>
+                    {getStatusBadge(agent.status)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate" data-testid={`agent-name-${agent.slug}`}>
-                      {agent.name}
+                  <div className="text-xs text-muted-foreground">
+                    <p className="truncate" title={agent.message}>
+                      {agent.message}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {agent.category}
-                    </p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {agent.llmConfigUsed && (
+                        <p className="truncate" title={`Using: ${agent.llmConfigUsed}`}>
+                          Using: {agent.llmConfigUsed}
+                        </p>
+                      )}
+                      {agent.responseTime > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {agent.responseTime}ms
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

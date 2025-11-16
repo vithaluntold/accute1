@@ -3461,6 +3461,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
+        // Check if API key exists before attempting decryption
+        if (!config.apiKeyEncrypted) {
+          result.status = 'unhealthy';
+          result.message = 'Missing API key - please configure in settings';
+          results.push(result);
+          continue;
+        }
+
         try {
           const startTime = Date.now();
           
@@ -3538,7 +3546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results.push(result);
       }
 
-      // Get installed agents from database
+      // Get all agents from database
       const agents = await db
         .select({
           id: aiAgents.id,
@@ -3549,14 +3557,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .from(aiAgents);
 
+      // Build agent health results by mapping LLM config test results to agents
+      // Note: Since all agents use the same default config, we can reuse the test results
+      const agentHealthResults: any[] = [];
+      const defaultConfig = configs.find(c => c.isDefault && c.isActive) || configs.find(c => c.isActive);
+
+      if (!defaultConfig) {
+        // No config available - mark all agents as unhealthy
+        for (const agent of agents) {
+          agentHealthResults.push({
+            id: agent.id,
+            slug: agent.slug,
+            name: agent.name,
+            category: agent.category,
+            status: 'unhealthy' as const,
+            message: 'No active LLM configuration available',
+            llmConfigUsed: 'None',
+            responseTime: 0
+          });
+        }
+      } else {
+        // Find the test result for the default config
+        const configTestResult = results.find(r => r.id === defaultConfig.id);
+        
+        if (!configTestResult) {
+          // Config wasn't tested (shouldn't happen, but handle gracefully)
+          for (const agent of agents) {
+            agentHealthResults.push({
+              id: agent.id,
+              slug: agent.slug,
+              name: agent.name,
+              category: agent.category,
+              status: 'unknown' as const,
+              message: 'LLM configuration test result not found',
+              llmConfigUsed: defaultConfig.name,
+              responseTime: 0
+            });
+          }
+        } else {
+          // Map the config test result to all agents
+          for (const agent of agents) {
+            agentHealthResults.push({
+              id: agent.id,
+              slug: agent.slug,
+              name: agent.name,
+              category: agent.category,
+              status: configTestResult.status,
+              message: configTestResult.status === 'healthy' 
+                ? `Connected via ${defaultConfig.name}`
+                : configTestResult.message,
+              llmConfigUsed: defaultConfig.name,
+              responseTime: configTestResult.responseTime
+            });
+          }
+        }
+      }
+
       res.json({
         llmConfigurations: results,
-        agents: agents,
+        agents: agentHealthResults,
         summary: {
           totalConfigurations: results.length,
           healthyConfigurations: results.filter(r => r.status === 'healthy').length,
           unhealthyConfigurations: results.filter(r => r.status === 'unhealthy').length,
-          totalAgents: agents.length
+          totalAgents: agents.length,
+          healthyAgents: agentHealthResults.filter(a => a.status === 'healthy').length,
+          unhealthyAgents: agentHealthResults.filter(a => a.status === 'unhealthy').length
         }
       });
     } catch (error: any) {
