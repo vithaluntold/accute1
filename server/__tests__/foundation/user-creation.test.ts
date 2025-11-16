@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createOrg, createUser, verifyPassword } from '../helpers';
 import { db } from '../../db';
 import { users } from '@shared/schema';

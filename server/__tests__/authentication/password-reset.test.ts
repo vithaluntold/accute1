@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createUserAPI, login, requestPasswordReset, resetPassword, getUserByEmail } from '../helpers';
 
 describe('Layer 2C: Password Reset Flow (15 tests)', () => {

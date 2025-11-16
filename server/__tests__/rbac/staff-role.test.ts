@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, authenticatedRequest } from '../helpers';
 
 describe('Layer 3D: Staff Role Permissions (10 tests)', () => {

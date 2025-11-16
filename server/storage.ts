@@ -962,13 +962,6 @@ export class DbStorage implements IStorage {
     return await this.getSubscriptionAddonsBySubscription(subscription.id);
   }
 
-  // Get organization (includes test account flag)
-  async getOrganization(organizationId: string): Promise<schema.Organization | undefined> {
-    const result = await db.select().from(schema.organizations)
-      .where(eq(schema.organizations.id, organizationId));
-    return result[0];
-  }
-
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(schema.users);
   }

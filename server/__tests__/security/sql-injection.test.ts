@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, login, createUserAPI, authenticatedRequest } from '../helpers';
 
 describe('Layer 4A: SQL Injection Prevention (10 tests)', () => {

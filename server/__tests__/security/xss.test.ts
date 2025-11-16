@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, createUserAPI, authenticatedRequest } from '../helpers';
 
 describe('Layer 4B: XSS Prevention (10 tests)', () => {

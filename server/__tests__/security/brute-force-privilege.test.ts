@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, createUserAPI, login, authenticatedRequest, wait } from '../helpers';
 
 describe('Layer 4E: Brute Force Prevention (10 tests)', () => {

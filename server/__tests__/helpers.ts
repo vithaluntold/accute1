@@ -1,9 +1,48 @@
 import { testDb as db } from '../test-db';
-import { users, organizations, type User, type Organization } from '@shared/schema';
+import { users, organizations, roles, type User, type Organization, type Role } from '@shared/schema';
 import request from 'supertest';
 import app from '../test-app'; // Use test-friendly app export
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+
+// Cache for role IDs
+let roleCache: Map<string, string> | null = null;
+
+/**
+ * Get or create roles for testing
+ */
+async function ensureRolesExist(): Promise<Map<string, string>> {
+  if (roleCache) {
+    return roleCache;
+  }
+  
+  roleCache = new Map<string, string>();
+  
+  // Try to find existing roles
+  const existingRoles = await db.select().from(roles);
+  
+  if (existingRoles.length > 0) {
+    for (const role of existingRoles) {
+      roleCache.set(role.name, role.id);
+    }
+    return roleCache;
+  }
+  
+  // Create default roles if they don't exist
+  const defaultRoles = [
+    { name: 'owner', description: 'Organization owner with full access', permissions: [], isSystem: true },
+    { name: 'admin', description: 'Administrator with most permissions', permissions: [], isSystem: true },
+    { name: 'manager', description: 'Manager with team permissions', permissions: [], isSystem: true },
+    { name: 'staff', description: 'Staff member with limited permissions', permissions: [], isSystem: true }
+  ];
+  
+  for (const roleData of defaultRoles) {
+    const [role] = await db.insert(roles).values(roleData).returning();
+    roleCache.set(role.name, role.id);
+  }
+  
+  return roleCache;
+}
 
 /**
  * Helper function to create a test organization via API
@@ -46,6 +85,15 @@ export async function createUserAPI(data: {
   organizationId?: string;
   token?: string;
 } = {}): Promise<{ status: number; user?: User; body: any }> {
+  // Get role ID from role name
+  const roleMap = await ensureRolesExist();
+  const roleName = data.role || 'staff';
+  const roleId = roleMap.get(roleName);
+  
+  if (!roleId) {
+    throw new Error(`Role ${roleName} not found`);
+  }
+  
   const password = data.password || 'SecurePass123!';
   const email = data.email || `test${Date.now()}@test.com`;
   
@@ -55,7 +103,7 @@ export async function createUserAPI(data: {
     username: email.split('@')[0] + Date.now(),
     firstName: data.firstName || 'Test',
     lastName: data.lastName || 'User',
-    roleId: data.role || 'staff', // Will need to map to actual role ID
+    roleId, // Now using actual UUID
   };
 
   if (data.organizationId) {
@@ -206,6 +254,15 @@ export async function createUser(data: {
   organizationId?: string;
   status?: 'active' | 'inactive' | 'suspended';
 } = {}): Promise<User> {
+  // Ensure roles exist and get role ID
+  const roleMap = await ensureRolesExist();
+  const roleName = data.role || 'staff';
+  const roleId = roleMap.get(roleName);
+  
+  if (!roleId) {
+    throw new Error(`Role ${roleName} not found`);
+  }
+  
   // Create organization if not provided
   let orgId = data.organizationId;
   if (!orgId) {
@@ -213,20 +270,20 @@ export async function createUser(data: {
     orgId = org.id;
   }
   
-  const password = data.password || 'SecurePass123!';
-  const passwordHash = await bcrypt.hash(password, 10);
+  const plainPassword = data.password || 'SecurePass123!';
+  const password = await bcrypt.hash(plainPassword, 10);
   const email = data.email || `test${Date.now()}@test.com`;
   const username = email.split('@')[0] + Date.now();
   
   const [user] = await db.insert(users).values({
     email,
     username,
-    passwordHash,
+    password,
     firstName: data.firstName || 'Test',
     lastName: data.lastName || 'User',
-    role: data.role || 'staff',
+    roleId,
     organizationId: orgId,
-    status: data.status || 'active'
+    isActive: data.status === 'active' || data.status === undefined
   }).returning();
   
   return user;
@@ -296,4 +353,11 @@ export async function resetPassword(token: string, newPassword: string): Promise
     status: response.status,
     body: response.body
   };
+}
+
+/**
+ * Helper to verify password hash
+ */
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
 }

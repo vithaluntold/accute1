@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, logout, authenticatedRequest } from '../helpers';
 
 describe('Layer 2B: Logout Flow (10 tests)', () => {

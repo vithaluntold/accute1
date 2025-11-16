@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createUserAPI, getUserByEmail, login, wait } from '../helpers';
 
 describe('Layer 2A: Login Flow (25 tests)', () => {

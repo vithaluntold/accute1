@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, login, logout, authenticatedRequest, wait } from '../helpers';
 
 describe('Layer 4C: CSRF Protection (10 tests)', () => {

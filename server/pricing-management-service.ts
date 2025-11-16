@@ -23,20 +23,6 @@ export class PricingManagementService {
     return subscription;
   }
   
-  async getSubscriptionAddon(id: string): Promise<schema.SubscriptionAddon | undefined> {
-    const [addon] = await db.select()
-      .from(schema.subscriptionAddons)
-      .where(eq(schema.subscriptionAddons.id, id));
-    return addon;
-  }
-  
-  async getServicePlanPurchase(id: string): Promise<schema.ServicePlanPurchase | undefined> {
-    const [purchase] = await db.select()
-      .from(schema.servicePlanPurchases)
-      .where(eq(schema.servicePlanPurchases.id, id));
-    return purchase;
-  }
-  
   // ============================
   // PRODUCT FAMILIES
   // ============================

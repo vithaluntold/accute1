@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import app from '../../index';
+import app from '../../test-app';
 import { createAuthenticatedUser, createOrgAPI, authenticatedRequest } from '../helpers';
 
 describe('Layer 3E: Cross-Organization Access Control (10 tests)', () => {
