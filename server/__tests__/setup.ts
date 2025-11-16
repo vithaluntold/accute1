@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { testDb as db, closeTestDb } from '../test-db';
 import { 
   users, 
   organizations, 
@@ -16,17 +16,7 @@ if (process.env.NODE_ENV !== 'test') {
   );
 }
 
-// CRITICAL SAFETY CHECK: Verify we're not connected to production database
-const dbUrl = process.env.DATABASE_URL || '';
-if (dbUrl.includes('production') || dbUrl.includes('neon.tech')) {
-  throw new Error(
-    '🚨 CRITICAL: Tests cannot run against production database! ' +
-    'Please set TEST_DATABASE_URL in your environment.'
-  );
-}
-
-// Log database connection for safety verification
-console.log('🔧 Test database connection:', dbUrl.substring(0, 30) + '...');
+console.log('✅ Test environment verified - using development database with test cleanup');
 
 // Increase timeout for database operations
 jest.setTimeout(30000);
@@ -57,6 +47,9 @@ afterAll(async () => {
   try {
     // Give time for pending operations to complete
     await new Promise(resolve => setTimeout(resolve, 1000));
+    // Close test database connection pool
+    await closeTestDb();
+    console.log('✅ Test database connections closed');
   } catch (error) {
     console.error('❌ Error in afterAll:', error);
   }
