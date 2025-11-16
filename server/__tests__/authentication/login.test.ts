@@ -25,8 +25,8 @@ describe('Layer 2A: Login Flow (25 tests)', () => {
       expect(response.token).toBeDefined();
       expect(response.user).toBeDefined();
       expect(response.user.email).toBe(email);
-      expect(response.user.role).toBe('owner');
-      expect(response.user.passwordHash).toBeUndefined(); // Should not expose password
+      expect(response.user.roleName).toBe('owner');
+      expect(response.user.password).toBeUndefined(); // Should not expose password
     });
 
     it('TC-LOGIN-002: Admin can login with valid credentials', async () => {
@@ -39,7 +39,7 @@ describe('Layer 2A: Login Flow (25 tests)', () => {
       
       expect(response.status).toBe(200);
       expect(response.token).toBeDefined();
-      expect(response.user.role).toBe('admin');
+      expect(response.user.roleName).toBe('admin');
     });
 
     it('TC-LOGIN-003: Manager can login with valid credentials', async () => {
@@ -52,7 +52,7 @@ describe('Layer 2A: Login Flow (25 tests)', () => {
       
       expect(response.status).toBe(200);
       expect(response.token).toBeDefined();
-      expect(response.user.role).toBe('manager');
+      expect(response.user.roleName).toBe('manager');
     });
 
     it('TC-LOGIN-004: Staff can login with valid credentials', async () => {
@@ -65,7 +65,7 @@ describe('Layer 2A: Login Flow (25 tests)', () => {
       
       expect(response.status).toBe(200);
       expect(response.token).toBeDefined();
-      expect(response.user.role).toBe('staff');
+      expect(response.user.roleName).toBe('staff');
     });
 
     it('TC-LOGIN-005: Login is case-insensitive for email', async () => {

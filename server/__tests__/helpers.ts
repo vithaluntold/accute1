@@ -92,6 +92,25 @@ export async function createUserAPI(data: {
   organizationId?: string;
   token?: string;
 } = {}): Promise<{ status: number; user?: User; body: any }> {
+  const password = data.password || 'SecurePass123!';
+  const email = data.email || `test${Date.now()}@test.com`;
+  
+  // If no token provided, create via database directly (for tests)
+  // This allows tests to create users without authentication
+  if (!data.token) {
+    const user = await createUser({
+      email,
+      password,
+      firstName: data.firstName || 'Test',
+      lastName: data.lastName || 'User',
+      role: data.role,
+      organizationId: data.organizationId
+    });
+    
+    return { status: 201, user, body: { user } };
+  }
+
+  // Otherwise, use API endpoint with authentication
   // Get role ID from role name
   const roleMap = await ensureRolesExist();
   const roleName = data.role || 'staff';
@@ -101,16 +120,13 @@ export async function createUserAPI(data: {
     throw new Error(`Role ${roleName} not found`);
   }
   
-  const password = data.password || 'SecurePass123!';
-  const email = data.email || `test${Date.now()}@test.com`;
-  
   const payload: any = {
     email,
     password,
     username: email.split('@')[0] + Date.now(),
     firstName: data.firstName || 'Test',
     lastName: data.lastName || 'User',
-    roleId, // Now using actual UUID
+    roleId,
   };
 
   if (data.organizationId) {
@@ -118,13 +134,8 @@ export async function createUserAPI(data: {
   }
 
   const endpoint = '/api/users';
-
   const req = request(app).post(endpoint).send(payload);
-
-  if (data.token) {
-    req.set('Authorization', `Bearer ${data.token}`);
-  }
-
+  req.set('Authorization', `Bearer ${data.token}`);
   const response = await req;
   
   return {

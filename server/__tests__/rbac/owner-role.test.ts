@@ -74,7 +74,7 @@ describe('Layer 3A: Owner Role Permissions (10 tests)', () => {
       .send({ role: 'admin' });
     
     expect(response.status).toBe(200);
-    expect(response.body.role).toBe('admin');
+    expect(response.body.roleName).toBe('admin');
   });
 
   it('TC-RBAC-OWNER-006: Owner can demote admins to staff', async () => {
@@ -89,7 +89,7 @@ describe('Layer 3A: Owner Role Permissions (10 tests)', () => {
       .send({ role: 'staff' });
     
     expect(response.status).toBe(200);
-    expect(response.body.role).toBe('staff');
+    expect(response.body.roleName).toBe('staff');
   });
 
   it('TC-RBAC-OWNER-007: Owner cannot access other organizations', async () => {

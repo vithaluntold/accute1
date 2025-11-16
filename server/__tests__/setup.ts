@@ -10,6 +10,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { beforeEach, afterAll } from 'vitest';
 import { clearRoleCache } from './helpers';
+import { clearRateLimitMap } from '../auth';
 
 // CRITICAL SAFETY CHECK: Only allow tests to run in test environment
 if (process.env.NODE_ENV !== 'test') {
@@ -44,6 +45,9 @@ beforeEach(async () => {
     
     // Clear role cache so ensureRolesExist() re-checks the database
     clearRoleCache();
+    
+    // Clear rate limit map to prevent test interference
+    clearRateLimitMap();
     
     console.log('🧹 Test database cleaned');
   } catch (error) {

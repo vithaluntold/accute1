@@ -82,7 +82,7 @@ describe('Layer 4A: SQL Injection Prevention (10 tests)', () => {
     
     // Verify user is still staff
     const checkResponse = await authenticatedRequest(token).get('/api/users/me');
-    expect(checkResponse.body.role).toBe('staff');
+    expect(checkResponse.body.roleName).toBe('staff');
   });
 
   it('TC-SEC-SQL-007: SQL injection in ID parameters is prevented', async () => {
