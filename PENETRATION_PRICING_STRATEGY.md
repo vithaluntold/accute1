@@ -43,14 +43,14 @@ Accute is adopting an **aggressive penetration pricing strategy** with **20% mar
 | Plan | Billing Cycle | **OLD Price/mo** | **NEW Price/mo** | **Savings** | Annual Total (NEW) |
 |------|---------------|------------------|------------------|-------------|-------------------|
 | **Core** | Monthly | ₹1,299 | **₹260** | **80%** ↓ | ₹3,120 |
-| | Yearly | ₹999 | **₹200** | **80%** ↓ | ₹2,400 |
-| | 3-Year | ₹899 | **₹180** | **80%** ↓ | ₹6,480 |
+| | Yearly | ₹999 | **₹232** | **77%** ↓ | ₹2,784 |
+| | 3-Year | ₹899 | **₹232** | **74%** ↓ | ₹8,352 |
 | **AI** | Monthly | ₹2,699 | **₹670** | **75%** ↓ | ₹8,040 |
-| | Yearly | ₹1,999 | **₹525** | **74%** ↓ | ₹6,300 |
-| | 3-Year | ₹1,799 | **₹465** | **74%** ↓ | ₹16,740 |
+| | Yearly | ₹1,999 | **₹610** | **69%** ↓ | ₹7,320 |
+| | 3-Year | ₹1,799 | **₹581** | **68%** ↓ | ₹20,916 |
 | **Edge** | Monthly | ₹4,499 | **₹1,100** | **76%** ↓ | ₹13,200 |
-| | Yearly | ₹3,499 | **₹870** | **75%** ↓ | ₹10,440 |
-| | 3-Year | ₹3,149 | **₹780** | **75%** ↓ | ₹28,080 |
+| | Yearly | ₹3,499 | **₹1,017** | **71%** ↓ | ₹12,204 |
+| | 3-Year | ₹3,149 | **₹988** | **69%** ↓ | ₹35,568 |
 
 **Market Strategy (India):**
 - PPP Multiplier: 0.35x (65% discount vs USA due to purchasing power parity)
@@ -64,14 +64,14 @@ Accute is adopting an **aggressive penetration pricing strategy** with **20% mar
 | Plan | Billing Cycle | **OLD Price/mo** | **NEW Price/mo** | **Savings** | Annual Total (NEW) |
 |------|---------------|------------------|------------------|-------------|-------------------|
 | **Core** | Monthly | 130 AED | **33 AED** | **75%** ↓ | 396 AED |
-| | Yearly | 108 AED | **26 AED** | **76%** ↓ | 312 AED |
-| | 3-Year | 97 AED | **22 AED** | **77%** ↓ | 792 AED |
+| | Yearly | 108 AED | **29 AED** | **73%** ↓ | 348 AED |
+| | 3-Year | 97 AED | **29 AED** | **70%** ↓ | 1,044 AED |
 | **AI** | Monthly | 285 AED | **84 AED** | **71%** ↓ | 1,008 AED |
-| | Yearly | 228 AED | **66 AED** | **71%** ↓ | 792 AED |
-| | 3-Year | 205 AED | **59 AED** | **71%** ↓ | 2,124 AED |
+| | Yearly | 228 AED | **77 AED** | **66%** ↓ | 924 AED |
+| | 3-Year | 205 AED | **73 AED** | **64%** ↓ | 2,628 AED |
 | **Edge** | Monthly | 480 AED | **139 AED** | **71%** ↓ | 1,668 AED |
-| | Yearly | 379 AED | **110 AED** | **71%** ↓ | 1,320 AED |
-| | 3-Year | 341 AED | **99 AED** | **71%** ↓ | 3,564 AED |
+| | Yearly | 379 AED | **128 AED** | **66%** ↓ | 1,536 AED |
+| | 3-Year | 341 AED | **125 AED** | **63%** ↓ | 4,500 AED |
 
 **Market Strategy (UAE/GCC):**
 - PPP Multiplier: 1.0x (premium market, similar purchasing power to USA)
@@ -85,14 +85,14 @@ Accute is adopting an **aggressive penetration pricing strategy** with **20% mar
 | Plan | Billing Cycle | **OLD Price/mo** | **NEW Price/mo** | Status | Annual Total (NEW) |
 |------|---------------|------------------|------------------|--------|-------------------|
 | **Core** | Monthly | N/A | **₺120** | 🆕 NEW | ₺1,440 |
-| | Yearly | N/A | **₺92** | 🆕 NEW | ₺1,104 |
-| | 3-Year | N/A | **₺79** | 🆕 NEW | ₺2,844 |
+| | Yearly | N/A | **₺106** | 🆕 NEW | ₺1,272 |
+| | 3-Year | N/A | **₺106** | 🆕 NEW | ₺3,816 |
 | **AI** | Monthly | N/A | **₺305** | 🆕 NEW | ₺3,660 |
-| | Yearly | N/A | **₺237** | 🆕 NEW | ₺2,844 |
-| | 3-Year | N/A | **₺211** | 🆕 NEW | ₺7,596 |
+| | Yearly | N/A | **₺278** | 🆕 NEW | ₺3,336 |
+| | 3-Year | N/A | **₺265** | 🆕 NEW | ₺9,540 |
 | **Edge** | Monthly | N/A | **₺500** | 🆕 NEW | ₺6,000 |
-| | Yearly | N/A | **₺396** | 🆕 NEW | ₺4,752 |
-| | 3-Year | N/A | **₺356** | 🆕 NEW | ₺12,816 |
+| | Yearly | N/A | **₺462** | 🆕 NEW | ₺5,544 |
+| | 3-Year | N/A | **₺450** | 🆕 NEW | ₺16,200 |
 
 **Market Strategy (Turkey):**
 - PPP Multiplier: 0.40x (60% discount vs USA for emerging market)

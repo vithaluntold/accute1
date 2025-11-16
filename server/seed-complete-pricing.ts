@@ -62,9 +62,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "د.إ",
     multiplier: 3.67, // AED exchange rate
     countryCodes: ["AE", "SA", "QA", "KW", "BH", "OM"],
-    core: { monthly: 33, yearly: 26, threeYear: 22 },    // Premium market pricing
-    ai: { monthly: 84, yearly: 66, threeYear: 59 },      // Targets UAE SMEs
-    edge: { monthly: 139, yearly: 110, threeYear: 99 }   // Enterprise-level pricing
+    core: { monthly: 33, yearly: 29, threeYear: 29 },      // Premium market, maintains margins
+    ai: { monthly: 84, yearly: 77, threeYear: 73 },        // Targets UAE SMEs
+    edge: { monthly: 139, yearly: 128, threeYear: 125 }    // Enterprise-level pricing
   },
   {
     region: "India",
@@ -72,9 +72,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "₹",
     multiplier: 29.05, // PPP-adjusted for India (0.35x USA base)
     countryCodes: ["IN"],
-    core: { monthly: 260, yearly: 200, threeYear: 180 },    // 80% cheaper than old pricing
-    ai: { monthly: 670, yearly: 525, threeYear: 465 },      // Aggressive market entry
-    edge: { monthly: 1100, yearly: 870, threeYear: 780 }    // 75% cheaper than old pricing
+    core: { monthly: 260, yearly: 232, threeYear: 232 },   // 80% cheaper than old pricing, maintains margins
+    ai: { monthly: 670, yearly: 610, threeYear: 581 },     // Aggressive market entry
+    edge: { monthly: 1100, yearly: 1017, threeYear: 988 }  // 75% cheaper than old pricing
   },
   {
     region: "Turkey",
@@ -82,9 +82,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "₺",
     multiplier: 13.2, // PPP-adjusted for Turkey (0.40x USA base)
     countryCodes: ["TR"],
-    core: { monthly: 120, yearly: 92, threeYear: 79 },     // New market entry pricing
-    ai: { monthly: 305, yearly: 237, threeYear: 211 },     // Emerging market strategy
-    edge: { monthly: 500, yearly: 396, threeYear: 356 }    // Enterprise Turkish market
+    core: { monthly: 120, yearly: 106, threeYear: 106 },   // New market entry pricing
+    ai: { monthly: 305, yearly: 278, threeYear: 265 },     // Emerging market strategy
+    edge: { monthly: 500, yearly: 462, threeYear: 450 }    // Enterprise Turkish market
   },
   // Secondary markets (not focus, but available)
   {
@@ -93,9 +93,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "A$",
     multiplier: 1.52, // AUD exchange rate
     countryCodes: ["AU"],
-    core: { monthly: 14, yearly: 11, threeYear: 9 },
-    ai: { monthly: 35, yearly: 27, threeYear: 24 },
-    edge: { monthly: 58, yearly: 46, threeYear: 41 }
+    core: { monthly: 14, yearly: 12, threeYear: 12 },
+    ai: { monthly: 35, yearly: 32, threeYear: 30 },
+    edge: { monthly: 58, yearly: 53, threeYear: 52 }
   },
   {
     region: "Canada",
@@ -103,9 +103,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "C$",
     multiplier: 1.39, // CAD exchange rate
     countryCodes: ["CA"],
-    core: { monthly: 13, yearly: 10, threeYear: 8 },
-    ai: { monthly: 32, yearly: 25, threeYear: 22 },
-    edge: { monthly: 53, yearly: 42, threeYear: 38 }
+    core: { monthly: 13, yearly: 11, threeYear: 11 },
+    ai: { monthly: 32, yearly: 29, threeYear: 28 },
+    edge: { monthly: 53, yearly: 49, threeYear: 47 }
   },
   {
     region: "Singapore",
@@ -113,9 +113,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "S$",
     multiplier: 1.35, // SGD exchange rate
     countryCodes: ["SG"],
-    core: { monthly: 12, yearly: 9, threeYear: 8 },
-    ai: { monthly: 31, yearly: 24, threeYear: 22 },
-    edge: { monthly: 51, yearly: 41, threeYear: 36 }
+    core: { monthly: 12, yearly: 11, threeYear: 11 },
+    ai: { monthly: 31, yearly: 28, threeYear: 27 },
+    edge: { monthly: 51, yearly: 47, threeYear: 46 }
   },
   {
     region: "Rest of World",
@@ -123,9 +123,9 @@ const REGIONAL_PRICING: RegionPricing[] = [
     currencySymbol: "$",
     multiplier: 0.70, // Discounted for other markets
     countryCodes: ["*"], // All other countries
-    core: { monthly: 6, yearly: 5, threeYear: 4 },
-    ai: { monthly: 16, yearly: 13, threeYear: 11 },
-    edge: { monthly: 27, yearly: 21, threeYear: 19 }
+    core: { monthly: 6, yearly: 6, threeYear: 6 },
+    ai: { monthly: 16, yearly: 15, threeYear: 14 },
+    edge: { monthly: 27, yearly: 25, threeYear: 24 }
   }
 ];
 

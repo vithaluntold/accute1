@@ -49,10 +49,12 @@ The project is structured into `client/`, `server/`, and `shared/` directories, 
 Accute adopts aggressive penetration pricing with **20% margins** to rapidly capture market share before competitors can replicate AI Psychology Profiling capabilities. Target markets: India, UAE, Turkey, USA.
 
 ### Pricing Strategy
-- **Core Plan:** $9/mo (USA), ₹260/mo (India), 33 AED/mo (UAE), ₺120/mo (Turkey)
-- **AI Plan:** $23/mo (USA), ₹670/mo (India), 84 AED/mo (UAE), ₺305/mo (Turkey)  
-- **Edge Plan:** $38/mo (USA), ₹1100/mo (India), 139 AED/mo (UAE), ₺500/mo (Turkey)
-- **Competitive Advantage:** 70-88% cheaper than TaxDome/Karbon while offering superior AI capabilities
+- **Core Plan:** $9/mo (USA), ₹260/mo (India), 33 AED/mo (UAE), ₺120/mo (Turkey) - Monthly with 20% margin
+- **AI Plan:** $23/mo (USA), ₹670/mo (India), 84 AED/mo (UAE), ₺305/mo (Turkey) - Monthly with 20% margin
+- **Edge Plan:** $38/mo (USA), ₹1,100/mo (India), 139 AED/mo (UAE), ₺500/mo (Turkey) - Monthly with 20% margin
+- **Annual Pricing:** 11% discount vs monthly (15% margin maintained)
+- **3-Year Pricing:** 18% discount vs monthly (12% margin maintained)
+- **Competitive Advantage:** 58-77% cheaper than TaxDome/Karbon while offering superior AI capabilities (95/100 vs 38-46/100)
 - **Goal:** 5,000 customers by end of Year 1, expanding to 100,000 by Year 3
 - **Margin Expansion:** Gradually increase to 35-40% margins by Year 4-5 after market dominance
 
