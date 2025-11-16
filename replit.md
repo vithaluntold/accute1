@@ -1,9 +1,7 @@
-# Accute - AI-Native Accounting Workflow Automation Platform
-
-## Overview
+### Overview
 Accute is an AI-native accounting workflow automation platform designed to revolutionize accounting workflows for modern firms. Its core purpose is to automate tasks, enhance efficiency, ensure compliance, and improve overall accounting practices through intelligent automation. Key capabilities include multi-agent orchestration, a comprehensive template library, multi-provider AI support, an AI agent marketplace, global payment coverage, native mobile apps, multi-role authentication, custom workflow building, and secure document management. The platform aims to transform the accounting industry by providing an AI-native solution for accounting automation with significant market potential.
 
-## User Preferences
+### User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
 - Multi-provider AI support essential
@@ -37,35 +35,35 @@ Accute is an AI-native accounting workflow automation platform designed to revol
 - Critical Agent Routing Fix: Restructured server initialization to prevent Vite's catch-all middleware from intercepting /api/agents/* endpoints. ROOT CAUSE: Agent routes were registered during background initialization AFTER Vite's catch-all was active, causing HTML responses instead of JSON. SOLUTION: Sequential initialization order in server/index.ts: (1) server.listen() for fast health checks, (2) await initializeSystem(app) blocks until agents ready, (3) register all agent routes AFTER agents initialized, (4) setupVite() adds catch-all middleware LAST. Each step wrapped in try/catch with graceful degradation via setInitializationStatus(). This eliminates race conditions and ensures /api/agents/* routes exist before Vite intercepts requests.
 - Universal LLM Selectors: All 10 AI agents now feature frontend LLM configuration selectors with consistent UX. Agents with session sidebars (Cadence, Parity, Forma, Echo, Relay, Scribe, Luca, Lynk) display selector in CardFooter at sidebar bottom; agents without sidebars (Radar, OmniSpectra) show selector in CardHeader. Auto-selection prioritizes default configs with fallback to first available config. API integration uses conditional spreading `...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })` to prevent empty string payloads that trigger 400 errors. File uploads conditionally append llmConfigId only when truthy. All agents gracefully handle loading states and missing configs.
 
-## System Architecture
+### System Architecture
 
-### UI/UX Decisions
+#### UI/UX Decisions
 The UI/UX is inspired by Linear and Notion, utilizing the Carbon Design System. It features a Porsche-to-Pink gradient, specific fonts (Orbitron, Inter, Fira Code), a collapsible sidebar, top navigation, card-based dashboards, and data tables. The platform is implemented as a responsive Progressive Web App (PWA).
 
-### Technical Implementations
+#### Technical Implementations
 The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The backend is built with Node.js, Express, and TypeScript, storing data in PostgreSQL (Neon) via Drizzle ORM. Authentication relies on JWT and bcrypt, with AES-256 encryption, RBAC, rate limiting, and SQL injection prevention. AI integration supports OpenAI, Azure OpenAI, and Anthropic Claude. The platform is optimized for Replit's Cloud Run/Autoscale.
 
-### Feature Specifications
-Accute features a multi-tenant architecture with a four-tier Role-Based Access Control (Super Admin, Admin, Employee, Client) and a Client Portal. Core features include an AI Client Onboarding System, conversational AI agent interfaces, a unified workflows system with visual automation, an AI Agent Marketplace, Secure LLM Configuration Management with AES-256-GCM encryption, PKI Digital Signatures for document verification, and Secure Document Management with encrypted storage. Additional features include a Marketplace System for templates, hierarchical folder structure, Projects Management, an AI Agent Foundry, Template Scoping, Subscription Management, Task Dependencies System, Document Version Control, Enhanced Report Builder, Workload View, Unified Inbox, Calendar & Event Management, Cadence Workflow Builder, AI Agent Pricing, Recurring Scheduler, Collaboration features, Enhanced Automation Actions, Workload Insights, Luca Chat features (File Attachments, Auto Chat Title, Search & Archive), Idempotent Automatic Day 1 Task Creation, Admin Template Deletion, 21-Day Onboarding Journey, Profile Picture Upload, Two-Level LLM Configuration System, Client Payment Collection System, Email Integration, SSO/SAML Enterprise Authentication, Proposals & Quotes Management, Chat Threading Extension, and a Resource Management Suite with a Skills Management System and Skill Matching Engine. A WebRTC Voice/Video Calling System provides production-ready in-app calling.
+#### Feature Specifications
+Accute features a multi-tenant architecture with a four-tier Role-Based Access Control (Super Admin, Admin, Employee, Client) and a Client Portal. Core features include an AI Client Onboarding System, conversational AI agent interfaces, a unified workflows system with visual automation, an AI Agent Marketplace, Secure LLM Configuration Management with AES-256-GCM encryption, PKI Digital Signatures for document verification, and Secure Document Management with encrypted storage. Additional features include a Marketplace System for templates, Projects Management, an AI Agent Foundry, Subscription Management, Document Version Control, Enhanced Report Builder, Workload View, Unified Inbox, Calendar & Event Management, Recurring Scheduler, Collaboration features, Enhanced Automation Actions, Workload Insights, Luca Chat features (File Attachments, Auto Chat Title, Search & Archive), Idempotent Automatic Day 1 Task Creation, 21-Day Onboarding Journey, Profile Picture Upload, Two-Level LLM Configuration System, Client Payment Collection System, Email Integration, SSO/SAML Enterprise Authentication, Proposals & Quotes Management, Chat Threading Extension, and a Resource Management Suite with a Skills Management System and Skill Matching Engine. A WebRTC Voice/Video Calling System provides production-ready in-app calling.
 
-### System Design Choices
+#### System Design Choices
 The project is structured into `client/`, `server/`, and `shared/` directories. Security is a core focus, with robust authentication, encryption, and multi-tenancy. The Automation Engine supports various action types with context propagation. AI agents are accessed via dynamic routing with lazy-loaded components. A centralized `LLMConfigService` manages all LLM configurations with 5-minute caching and workspace→user fallback logic, accessed via `withLLMConfig` middleware for HTTP endpoints and `getLLMConfig` helper for WebSocket handlers. File attachments for AI agents are handled by a `FileParserService` supporting PDF, DOCX, XLSX/XLS, CSV, and TXT formats. WebSocket management is lazy-loaded on-demand for chat sessions.
 
-## External Dependencies
-- **PostgreSQL (via Neon)**: Primary database.
-- **OpenAI API**: AI model integration.
-- **Azure OpenAI API**: AI model integration.
-- **Anthropic Claude API**: AI model integration.
-- **Mailgun**: Transactional email service.
-- **MSG91**: SMS service for OTP verification.
-- **Razorpay**: Payment gateway.
-- **Stripe**: Payment gateway.
-- **PayU**: Payment gateway.
-- **Payoneer**: Payment gateway.
-- **Gmail API**: Per-user OAuth integration.
-- **Multer**: For file uploads.
-- **expr-eval**: For secure expression evaluation.
-- **Recharts**: Frontend library for data visualizations.
-- **pdf-parse**: PDF text extraction.
-- **mammoth**: DOCX text extraction.
-- **xlsx**: Excel file parsing (XLSX, XLS).
+### External Dependencies
+- PostgreSQL (via Neon)
+- OpenAI API
+- Azure OpenAI API
+- Anthropic Claude API
+- Mailgun
+- MSG91
+- Razorpay
+- Stripe
+- PayU
+- Payoneer
+- Gmail API
+- Multer
+- expr-eval
+- Recharts
+- pdf-parse
+- mammoth
+- xlsx
