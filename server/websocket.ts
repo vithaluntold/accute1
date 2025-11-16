@@ -177,16 +177,16 @@ export function setupWebSocket(httpServer: Server): void {
       console.log('[WebSocket] Upgrade request received for WebSocket connection');
       
       // Initialize WebSocket server on first upgrade request
-      if (!wssInstance) {
+      let wss = wssInstance;
+      if (!wss) {
         console.log('[WebSocket] First connection detected - initializing WebSocket server');
-        const wss = initializeWebSocketServer(httpServer);
-        
-        // Handle this first upgrade request explicitly
-        wss.handleUpgrade(request, socket, head, (ws) => {
-          wss.emit('connection', ws, request);
-        });
+        wss = initializeWebSocketServer(httpServer);
       }
-      // Subsequent requests are handled automatically by the WebSocketServer
+      
+      // Handle ALL upgrade requests explicitly (not just the first one)
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
     }
   });
 }
