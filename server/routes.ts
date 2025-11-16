@@ -349,7 +349,12 @@ async function sendSMSVerification(
   }
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+/**
+ * Register all API routes on the Express app
+ * This is the lightweight version for testing - just registers routes without server creation
+ * @param app Express application
+ */
+export async function registerRoutesOnly(app: Express): Promise<void> {
   // Health check - ALWAYS responds immediately regardless of initialization status
   app.get("/api/health", (req, res) => {
     res.status(200).json({ 
@@ -21031,7 +21036,19 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // NOTE: AI Agent routes are now registered in server/index.ts AFTER system initialization
   // This ensures agents are fully initialized before routes are registered
   // Agent routes MUST be registered AFTER initializeSystem() but BEFORE setupVite()
+}
 
+/**
+ * Register routes AND create HTTP server with WebSocket support
+ * This is the full production version used by server/index.ts
+ * @param app Express application
+ * @returns HTTP Server instance
+ */
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Register all routes (lightweight) - MUST await to ensure routes are ready
+  await registerRoutesOnly(app);
+  
+  // Create HTTP server
   const httpServer = createServer(app);
   
   // Setup lazy WebSocket initialization - will initialize on first upgrade request

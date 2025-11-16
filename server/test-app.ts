@@ -7,7 +7,7 @@
 import express, { type Express } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
-import { registerRoutes } from "./routes";
+import { registerRoutesOnly } from "./routes";
 
 // SAFETY: Ensure we're in test mode
 if (process.env.NODE_ENV !== 'test') {
@@ -36,28 +36,20 @@ app.use(
   })
 );
 
-// Register routes synchronously
-// Note: registerRoutes returns a Promise<Server> but we don't await it here
-// because Supertest creates its own server. We just need the routes registered.
-// The HTTP server creation inside registerRoutes is not used by tests.
-let routesInitialized = false;
-let initPromise: Promise<any> | null = null;
-
-// Initialize routes once
-if (!routesInitialized) {
-  initPromise = registerRoutes(app)
-    .then(() => {
-      routesInitialized = true;
-      console.log('✅ Test app routes initialized');
-    })
-    .catch((error) => {
-      console.error('❌ Failed to initialize test app routes:', error);
-      throw error;
-    });
-}
+// Register routes only (no server creation, no WebSocket, no heavy initialization)
+// This is fast and perfect for testing
+// Note: This is async, so tests need to wait for initialization
+let initialized = false;
+const initPromise = registerRoutesOnly(app).then(() => {
+  initialized = true;
+  console.log('✅ Test app routes initialized (lightweight mode)');
+}).catch(error => {
+  console.error('❌ Failed to initialize test app routes:', error);
+  throw error;
+});
 
 // Export the app - Supertest will handle server creation
 export default app;
 
-// Export initialization promise for tests that need to wait
-export { initPromise };
+// Export initialization status for tests that need to wait
+export { initPromise, initialized };
