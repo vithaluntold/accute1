@@ -1,24 +1,17 @@
 import { decrypt } from './crypto-utils';
 import { db } from './db';
-import { llmConfigurations } from '@shared/schema';
+import { llmConfigurations, type LlmConfiguration } from '@shared/schema';
 import { and, eq, or, isNull } from 'drizzle-orm';
 
-export interface ResolvedConfig {
-  id: number;
-  provider: string;
-  apiKey: string;
-  endpoint?: string;
-  deploymentName?: string;
-  organizationId: number;
-  userId: number | null;
-  isDefault: boolean;
-  validatedAt: Date | null;
-  cacheKey: string;
+interface ConfigCache {
+  config: LlmConfiguration;
+  expiresAt: Date;
 }
 
-interface ConfigCache {
-  config: ResolvedConfig;
-  expiresAt: Date;
+interface ResolveOptions {
+  organizationId?: string;
+  userId?: string;
+  configId?: string;
 }
 
 class ConfigResolver {
@@ -29,13 +22,16 @@ class ConfigResolver {
   
   /**
    * Resolve LLM configuration with caching and fallback logic
+   * Throws error if no configuration found
    */
-  async resolve(
-    userId: number,
-    organizationId: number,
-    llmConfigId?: number
-  ): Promise<ResolvedConfig | null> {
-    const cacheKey = this.getCacheKey(userId, organizationId, llmConfigId);
+  async resolve(options: ResolveOptions): Promise<LlmConfiguration> {
+    const { organizationId, userId, configId } = options;
+    
+    if (!organizationId) {
+      throw new Error('Organization access required to use AI agents');
+    }
+    
+    const cacheKey = this.getCacheKey(organizationId, userId, configId);
     const cached = this.getCached(cacheKey);
     
     if (cached) {
@@ -47,31 +43,25 @@ class ConfigResolver {
     this.misses++;
     console.log(`[ConfigResolver] Cache MISS: ${cacheKey} (hit rate: ${this.getHitRate()}%)`);
     
-    const config = await this.fetchConfig(userId, organizationId, llmConfigId);
+    const config = await this.fetchConfig(organizationId, userId, configId);
     if (!config) {
       console.log(`[ConfigResolver] No config found for user ${userId}, org ${organizationId}`);
-      return null;
+      throw new Error('No active LLM configuration found. Please configure an AI provider in Workspace Settings or your User Settings.');
     }
     
+    // Decrypt API key
     let decryptedKey: string;
     try {
-      decryptedKey = decrypt(config.apiKey);
+      decryptedKey = decrypt(config.apiKeyEncrypted);
     } catch (error) {
       console.error(`[ConfigResolver] Failed to decrypt API key for config ${config.id}:`, error);
-      return null;
+      throw new Error('Failed to decrypt LLM credentials. Please contact your administrator.');
     }
     
-    const resolved: ResolvedConfig = {
-      id: config.id,
-      provider: config.provider,
-      apiKey: decryptedKey,
-      endpoint: config.azureEndpoint || undefined,
-      deploymentName: config.azureDeploymentName || undefined,
-      organizationId: config.organizationId,
-      userId: config.userId,
-      isDefault: config.isDefault || false,
-      validatedAt: config.validatedAt,
-      cacheKey,
+    // Return decrypted configuration
+    const resolved: LlmConfiguration = {
+      ...config,
+      apiKeyEncrypted: decryptedKey, // Return decrypted key in the same field
     };
     
     this.setCache(cacheKey, resolved);
@@ -80,28 +70,41 @@ class ConfigResolver {
   }
   
   /**
-   * Invalidate cache for a specific organization (event-driven)
+   * Invalidate cache (for middleware clearLLMConfigCache)
    */
-  invalidate(organizationId: number): void {
+  invalidateCache(options?: {
+    organizationId?: string;
+    userId?: string;
+  }): void {
+    if (!options) {
+      // Invalidate all
+      const size = this.cache.size;
+      this.cache.clear();
+      console.log(`[ConfigResolver] Invalidated all ${size} cache entries`);
+      return;
+    }
+    
     let invalidatedCount = 0;
+    const { organizationId, userId } = options;
     
     for (const [key, _] of this.cache.entries()) {
-      if (key.includes(`org:${organizationId}`)) {
+      let shouldInvalidate = false;
+      
+      if (organizationId && key.includes(`org:${organizationId}`)) {
+        shouldInvalidate = true;
+      }
+      
+      if (userId && key.includes(`user:${userId}`)) {
+        shouldInvalidate = true;
+      }
+      
+      if (shouldInvalidate) {
         this.cache.delete(key);
         invalidatedCount++;
       }
     }
     
-    console.log(`[ConfigResolver] Invalidated ${invalidatedCount} cache entries for org ${organizationId}`);
-  }
-  
-  /**
-   * Invalidate all cache entries
-   */
-  invalidateAll(): void {
-    const size = this.cache.size;
-    this.cache.clear();
-    console.log(`[ConfigResolver] Invalidated all ${size} cache entries`);
+    console.log(`[ConfigResolver] Invalidated ${invalidatedCount} cache entries for org ${organizationId}, user ${userId}`);
   }
   
   /**
@@ -130,14 +133,14 @@ class ConfigResolver {
   }
   
   private getCacheKey(
-    userId: number,
-    organizationId: number,
-    llmConfigId?: number
+    organizationId: string,
+    userId?: string,
+    llmConfigId?: string
   ): string {
-    return `user:${userId}:org:${organizationId}:config:${llmConfigId || 'default'}`;
+    return `user:${userId || 'none'}:org:${organizationId}:config:${llmConfigId || 'default'}`;
   }
   
-  private getCached(key: string): ResolvedConfig | null {
+  private getCached(key: string): LlmConfiguration | null {
     const cached = this.cache.get(key);
     if (!cached) return null;
     
@@ -149,7 +152,7 @@ class ConfigResolver {
     return cached.config;
   }
   
-  private setCache(key: string, config: ResolvedConfig): void {
+  private setCache(key: string, config: LlmConfiguration): void {
     this.cache.set(key, {
       config,
       expiresAt: new Date(Date.now() + this.CACHE_TTL),
@@ -157,28 +160,38 @@ class ConfigResolver {
   }
   
   private async fetchConfig(
-    userId: number,
-    organizationId: number,
-    llmConfigId?: number
-  ): Promise<any | null> {
+    organizationId: string,
+    userId?: string,
+    llmConfigId?: string
+  ): Promise<LlmConfiguration | null> {
+    // If specific config ID requested, fetch it
     if (llmConfigId) {
       const config = await db.query.llmConfigurations.findFirst({
         where: and(
           eq(llmConfigurations.id, llmConfigId),
-          eq(llmConfigurations.organizationId, organizationId)
+          eq(llmConfigurations.organizationId, organizationId),
+          eq(llmConfigurations.isActive, true)
         ),
       });
       
-      return config || null;
+      if (!config) {
+        throw new Error('LLM configuration not found or is inactive');
+      }
+      
+      return config;
     }
     
+    // Fetch default workspace or user config
     const configs = await db.query.llmConfigurations.findMany({
       where: and(
         eq(llmConfigurations.organizationId, organizationId),
-        or(
-          isNull(llmConfigurations.userId),
-          eq(llmConfigurations.userId, userId)
-        )
+        eq(llmConfigurations.isActive, true),
+        userId
+          ? or(
+              isNull(llmConfigurations.userId),
+              eq(llmConfigurations.userId, userId)
+            )
+          : isNull(llmConfigurations.userId)
       ),
       orderBy: (llmConfigurations, { desc }) => [
         desc(llmConfigurations.isDefault),
