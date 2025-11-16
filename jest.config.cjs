@@ -4,7 +4,7 @@ module.exports = {
   roots: ['<rootDir>/server'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/server/__tests__/setup.ts'],
-  extensionsToTreatAsESM: ['.ts'],
+  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/shared/$1',
     '^@/(.*)$': '<rootDir>/client/src/$1',

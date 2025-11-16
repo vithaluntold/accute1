@@ -1,6 +1,6 @@
 /**
  * Test-friendly Express app export
- * This file exports the Express app without starting the HTTP server
+ * This file exports the Express app WITHOUT starting the HTTP server
  * Used by Jest/Supertest for API testing
  */
 
@@ -36,11 +36,28 @@ app.use(
   })
 );
 
-// Initialize routes (this returns a Server but we only need app for testing)
-// The registerRoutes function registers all routes on the app
-// We don't actually start the server - Supertest will handle that
-registerRoutes(app).catch(error => {
-  console.error('Failed to register routes in test app:', error);
-});
+// Register routes synchronously
+// Note: registerRoutes returns a Promise<Server> but we don't await it here
+// because Supertest creates its own server. We just need the routes registered.
+// The HTTP server creation inside registerRoutes is not used by tests.
+let routesInitialized = false;
+let initPromise: Promise<any> | null = null;
 
+// Initialize routes once
+if (!routesInitialized) {
+  initPromise = registerRoutes(app)
+    .then(() => {
+      routesInitialized = true;
+      console.log('✅ Test app routes initialized');
+    })
+    .catch((error) => {
+      console.error('❌ Failed to initialize test app routes:', error);
+      throw error;
+    });
+}
+
+// Export the app - Supertest will handle server creation
 export default app;
+
+// Export initialization promise for tests that need to wait
+export { initPromise };
