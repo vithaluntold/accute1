@@ -23,7 +23,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../auth';
 import type { LlmConfiguration } from '@shared/schema';
-import { getLLMConfigService } from '../llm-config-service';
+import { configResolver } from '../config-resolver';
 
 /**
  * Handler function that receives LLM configuration
@@ -58,10 +58,9 @@ export function withLLMConfig(handler: LLMConfigHandler) {
         });
       }
       
-      // Get LLM configuration using centralized service
+      // Get LLM configuration using ConfigResolver
       // Priority: specific config → workspace default → user default
-      const llmConfigService = getLLMConfigService();
-      const llmConfig = await llmConfigService.getConfig({
+      const llmConfig = await configResolver.resolve({
         organizationId: req.user.organizationId,
         userId: req.userId,
         configId: llmConfigId
@@ -148,8 +147,7 @@ export async function getLLMConfig(options: {
   userId?: string;
   configId?: string;
 }): Promise<LlmConfiguration> {
-  const llmConfigService = getLLMConfigService();
-  return llmConfigService.getConfig(options);
+  return configResolver.resolve(options);
 }
 
 /**
@@ -161,6 +159,5 @@ export function clearLLMConfigCache(options?: {
   organizationId?: string; 
   userId?: string;
 }): void {
-  const llmConfigService = getLLMConfigService();
-  llmConfigService.clearCache(options);
+  configResolver.invalidateCache(options);
 }
