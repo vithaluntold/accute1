@@ -1,4 +1,5 @@
 import { testDb as db } from '../test-db';
+import * as schema from '@shared/schema';
 import { users, organizations, roles, permissions, rolePermissions, type User, type Organization, type Role } from '@shared/schema';
 import request from 'supertest';
 import app from '../test-app'; // Use test-friendly app export
@@ -675,7 +676,7 @@ export async function createUserInOrg(data: {
 }
 
 /**
- * Login user and return token
+ * Login user and return token (returns string for cookie)
  */
 export async function loginUser(email: string, password: string, organizationId?: string) {
   const payload: any = { email, password };
@@ -691,8 +692,79 @@ export async function loginUser(email: string, password: string, organizationId?
     throw new Error(`Login failed: ${response.status} - ${JSON.stringify(response.body)}`);
   }
   
-  return {
-    token: response.body.token,
-    user: response.body.user
+  // Return cookie string for use with supertest .set('Cookie', ...)
+  const cookies = response.headers['set-cookie'];
+  if (cookies && cookies.length > 0) {
+    return cookies[0];
+  }
+  
+  // Fallback: if no cookie, user might have JWT in body
+  return `token=${response.body.token}`;
+}
+
+/**
+ * Clear all test data from database
+ * CRITICAL: Only use in NODE_ENV=test
+ */
+export async function clearDatabase() {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('clearDatabase can only be called in test environment!');
+  }
+  
+  // Helper to safely delete from table (ignores if table doesn't exist)
+  const safeDelete = async (table: any, tableName: string) => {
+    try {
+      await db.delete(table);
+    } catch (error: any) {
+      // Ignore "relation does not exist" errors for tables that haven't been created yet
+      if (!error?.message?.includes('does not exist')) {
+        console.error(`Error clearing table ${tableName}:`, error);
+        throw error;
+      }
+    }
   };
+  
+  // Clear in reverse dependency order
+  // Billing tables (may not exist yet)
+  await safeDelete(schema.subscriptionEvents, 'subscriptionEvents');
+  await safeDelete(schema.subscriptionInvoices, 'subscriptionInvoices');
+  await safeDelete(schema.couponRedemptions, 'couponRedemptions');
+  await safeDelete(schema.platformSubscriptions, 'platformSubscriptions');
+  await safeDelete(schema.coupons, 'coupons');
+  // DON'T delete subscriptionPlans or pricingRegions - they're seeded once and reused
+  
+  // User/org tables
+  await db.delete(schema.rolePermissions);
+  await db.delete(schema.users);
+  await db.delete(schema.organizations);
+  
+  // Note: Don't delete roles/permissions/subscriptionPlans/pricingRegions as they're seeded and reused across tests
+}
+
+/**
+ * Alias for createOrgWithOwner - for test consistency
+ */
+export async function createTestOrganization(data?: {
+  orgName?: string;
+  ownerEmail?: string;
+  ownerPassword?: string;
+}) {
+  return createOrgWithOwner(data || {});
+}
+
+/**
+ * Alias for createUser - for test consistency
+ */
+export async function createTestUser(data: {
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  roleSlug?: 'owner' | 'admin' | 'manager' | 'staff';
+  organizationId: string;
+}) {
+  return createUser({
+    ...data,
+    role: data.roleSlug,
+  });
 }
