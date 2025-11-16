@@ -1,5 +1,5 @@
 import { testDb as db } from '../test-db';
-import { users, organizations, roles, type User, type Organization, type Role } from '@shared/schema';
+import { users, organizations, roles, permissions, rolePermissions, type User, type Organization, type Role } from '@shared/schema';
 import request from 'supertest';
 import app from '../test-app'; // Use test-friendly app export
 import { eq } from 'drizzle-orm';
@@ -51,15 +51,76 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   
   // Create default roles if they don't exist
   const defaultRoles = [
-    { name: 'owner', description: 'Organization owner with full access', permissions: [], isSystem: true },
-    { name: 'admin', description: 'Administrator with most permissions', permissions: [], isSystem: true },
-    { name: 'manager', description: 'Manager with team permissions', permissions: [], isSystem: true },
-    { name: 'staff', description: 'Staff member with limited permissions', permissions: [], isSystem: true }
+    { name: 'owner', description: 'Organization owner with full access', scope: 'tenant', isSystemRole: true },
+    { name: 'admin', description: 'Administrator with most permissions', scope: 'tenant', isSystemRole: true },
+    { name: 'manager', description: 'Manager with team permissions', scope: 'tenant', isSystemRole: true },
+    { name: 'staff', description: 'Staff member with limited permissions', scope: 'tenant', isSystemRole: true }
   ];
   
   for (const roleData of defaultRoles) {
     const [role] = await db.insert(roles).values(roleData).returning();
     roleCache.set(role.name, role.id);
+  }
+  
+  // Create baseline permissions for tests
+  const basePermissions = [
+    // User management
+    { name: 'users.create', resource: 'users', action: 'create', description: 'Create new users' },
+    { name: 'users.edit', resource: 'users', action: 'edit', description: 'Edit user details' },
+    { name: 'users.delete', resource: 'users', action: 'delete', description: 'Delete users' },
+    { name: 'users.view', resource: 'users', action: 'view', description: 'View user list' },
+    // Organization management
+    { name: 'org.edit', resource: 'organization', action: 'edit', description: 'Edit organization' },
+    { name: 'org.delete', resource: 'organization', action: 'delete', description: 'Delete organization' },
+    { name: 'org.billing', resource: 'organization', action: 'billing', description: 'View billing' },
+    { name: 'org.transfer', resource: 'organization', action: 'transfer', description: 'Transfer ownership' },
+    // Client management
+    { name: 'clients.create', resource: 'clients', action: 'create', description: 'Create clients' },
+    { name: 'clients.edit', resource: 'clients', action: 'edit', description: 'Edit clients' },
+    { name: 'clients.delete', resource: 'clients', action: 'delete', description: 'Delete clients' },
+    { name: 'clients.view', resource: 'clients', action: 'view', description: 'View clients' },
+  ];
+  
+  const permissionMap = new Map<string, string>();
+  for (const perm of basePermissions) {
+    const [created] = await db.insert(permissions).values(perm).returning();
+    permissionMap.set(created.name, created.id);
+  }
+  
+  // Assign permissions to roles
+  const ownerRoleId = roleCache.get('owner')!;
+  const adminRoleId = roleCache.get('admin')!;
+  const managerRoleId = roleCache.get('manager')!;
+  const staffRoleId = roleCache.get('staff')!;
+  
+  // Owner gets all permissions
+  for (const permId of permissionMap.values()) {
+    await db.insert(rolePermissions).values({ roleId: ownerRoleId, permissionId: permId });
+  }
+  
+  // Admin gets most permissions (no org delete/transfer)
+  const adminPerms = [
+    'users.create', 'users.edit', 'users.delete', 'users.view',
+    'org.edit', 'org.billing',
+    'clients.create', 'clients.edit', 'clients.delete', 'clients.view'
+  ];
+  for (const permName of adminPerms) {
+    await db.insert(rolePermissions).values({ roleId: adminRoleId, permissionId: permissionMap.get(permName)! });
+  }
+  
+  // Manager gets team + client permissions
+  const managerPerms = [
+    'users.view', 'users.edit',
+    'clients.create', 'clients.edit', 'clients.view'
+  ];
+  for (const permName of managerPerms) {
+    await db.insert(rolePermissions).values({ roleId: managerRoleId, permissionId: permissionMap.get(permName)! });
+  }
+  
+  // Staff gets basic view permissions
+  const staffPerms = ['users.view', 'clients.view'];
+  for (const permName of staffPerms) {
+    await db.insert(rolePermissions).values({ roleId: staffRoleId, permissionId: permissionMap.get(permName)! });
   }
   
   return roleCache;
