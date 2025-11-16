@@ -23,10 +23,7 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count successful requests
   skipFailedRequests: false, // Count failed requests
-  keyGenerator: (req: Request) => {
-    // Use IP address as key
-    return req.ip || req.socket.remoteAddress || 'unknown';
-  },
+  // Default keyGenerator handles IPv6 properly
   handler: (req: Request, res: Response) => {
     console.log(`❌ [RATE LIMIT] Login attempt blocked for IP: ${req.ip}`);
     res.status(429).json({
@@ -47,7 +44,7 @@ export const organizationCreationRateLimiter = rateLimit({
   message: 'Too many organization creation attempts. Please try again in 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => req.ip || 'unknown',
+  // Default keyGenerator handles IPv6 properly
   handler: (req: Request, res: Response) => {
     console.log(`❌ [RATE LIMIT] Organization creation blocked for IP: ${req.ip}`);
     res.status(429).json({
@@ -68,12 +65,9 @@ export const userCreationRateLimiter = rateLimit({
   message: 'Too many user creation attempts. Please try again in 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => {
-    // Use user ID if authenticated, otherwise IP
-    return req.userId || req.ip || 'unknown';
-  },
+  // Default keyGenerator handles IPv6 properly (uses IP address)
   handler: (req: Request, res: Response) => {
-    console.log(`❌ [RATE LIMIT] User creation blocked for user/IP: ${(req as any).userId || req.ip}`);
+    console.log(`❌ [RATE LIMIT] User creation blocked for IP: ${req.ip}`);
     res.status(429).json({
       error: 'Too many user creation attempts. Please try again in 1 hour.',
       retryAfter: Math.ceil((req.rateLimit?.resetTime?.getTime() || Date.now() - Date.now()) / 1000),
@@ -92,7 +86,7 @@ export const passwordResetRateLimiter = rateLimit({
   message: 'Too many password reset attempts. Please try again in 1 hour.',
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => req.ip || 'unknown',
+  // Default keyGenerator handles IPv6 properly
   handler: (req: Request, res: Response) => {
     console.log(`❌ [RATE LIMIT] Password reset blocked for IP: ${req.ip}`);
     res.status(429).json({
@@ -113,7 +107,7 @@ export const generalApiRateLimiter = rateLimit({
   message: 'Too many requests. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: Request) => req.ip || 'unknown',
+  // Default keyGenerator handles IPv6 properly
   skip: (req: Request) => {
     // Skip rate limiting for health checks and static assets
     return req.path === '/health' || req.path.startsWith('/assets/');
