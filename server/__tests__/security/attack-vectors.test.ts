@@ -14,6 +14,7 @@ import { testDb as db } from '../../test-db';
 import { users, organizations, sessions } from '@shared/schema';
 import { createTestContext, createOrgWithOwner, createUserInOrg, loginUser } from '../helpers';
 import { eq } from 'drizzle-orm';
+import { resetRateLimiters } from '../../rate-limit';
 
 describe('Security - Attack Vectors (Layer 4)', () => {
   let ownerToken: string;
@@ -21,10 +22,17 @@ describe('Security - Attack Vectors (Layer 4)', () => {
   let testOrg: any;
 
   beforeEach(async () => {
+    // Reset BEFORE context creation to ensure previous test's rate limiting doesn't block setup
+    resetRateLimiters();
+    
     const context = await createTestContext();
     ownerToken = context.ownerToken;
     ownerUser = context.ownerUser;
     testOrg = context.testOrg;
+    
+    // Reset AFTER context creation to ensure each test starts with fresh state
+    // (createTestContext makes login calls that increment the counter)
+    resetRateLimiters();
   });
 
   // ==================== SQL INJECTION (10 tests) ====================
@@ -663,11 +671,10 @@ describe('Security - Attack Vectors (Layer 4)', () => {
       const responses = [];
       
       // Make 6 sequential login attempts (not parallel) to test rate limiting
-      // X-Test-Rate-Limit header enables rate limiting in test mode
+      // Rate limiter resets between tests via resetRateLimiters() in beforeEach
       for (let i = 0; i < 6; i++) {
         const response = await request(app)
           .post('/api/auth/login')
-          .set('X-Test-Rate-Limit', 'enforce')
           .send({
             email: victimEmail,
             password: `wrong${i}`

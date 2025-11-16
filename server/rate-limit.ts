@@ -3,21 +3,78 @@
  * 
  * P0 Security Control: Brute Force Protection
  * Implements express-rate-limit for authentication endpoints
+ * 
+ * TEST MODE: Uses custom resettable in-memory store to ensure
+ * each test has isolated rate limiting state without interference.
  */
 
 import rateLimit from 'express-rate-limit';
 import type { Request, Response } from 'express';
 
-// ==================== CONFIGURATION ====================
+// ==================== CUSTOM STORE FOR TESTING ====================
+
+/**
+ * Simple in-memory store with reset capability for testing
+ */
+class ResettableMemoryStore {
+  private hits: Map<string, number> = new Map();
+  private resetTime: Map<string, Date> = new Map();
+
+  increment(key: string): { totalHits: number; resetTime: Date | undefined } {
+    const current = this.hits.get(key) || 0;
+    const newCount = current + 1;
+    this.hits.set(key, newCount);
+    
+    if (!this.resetTime.has(key)) {
+      const reset = new Date();
+      reset.setTime(reset.getTime() + 15 * 60 * 1000); // 15 minutes
+      this.resetTime.set(key, reset);
+    }
+    
+    return {
+      totalHits: newCount,
+      resetTime: this.resetTime.get(key),
+    };
+  }
+
+  decrement(key: string): void {
+    const current = this.hits.get(key) || 0;
+    if (current > 0) {
+      this.hits.set(key, current - 1);
+    }
+  }
+
+  resetKey(key: string): void {
+    this.hits.delete(key);
+    this.resetTime.delete(key);
+  }
+
+  resetAll(): void {
+    this.hits.clear();
+    this.resetTime.clear();
+  }
+}
+
+// Create store instance for test mode
+let testStore: ResettableMemoryStore | undefined;
+if (process.env.NODE_ENV === 'test') {
+  testStore = new ResettableMemoryStore();
+}
+
+/**
+ * Reset rate limiter store (for testing)
+ * This ensures each test has fresh rate limiting state
+ */
+export function resetRateLimiters() {
+  if (testStore) {
+    testStore.resetAll();
+  }
+}
 
 /**
  * Login endpoint rate limiting
  * - 5 attempts per 15 minutes per IP
  * - Prevents brute force password attacks
- * 
- * TEST MODE: In test environment, rate limiting is skipped by default
- * to prevent test interference. Tests can enable rate limiting by setting
- * the X-Test-Rate-Limit: enforce header.
  */
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -27,14 +84,8 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count successful requests
   skipFailedRequests: false, // Count failed requests
-  // In test mode, skip rate limiting UNLESS explicitly requested via header
-  skip: (req: Request) => {
-    if (process.env.NODE_ENV === 'test') {
-      // Only enforce rate limiting if test explicitly requests it
-      return req.headers['x-test-rate-limit'] !== 'enforce';
-    }
-    return false; // Always enforce in production
-  },
+  // Use custom resettable store in test mode
+  store: testStore as any,
   // Default keyGenerator handles IPv6 properly
   handler: (req: Request, res: Response) => {
     console.log(`❌ [RATE LIMIT] Login attempt blocked for IP: ${req.ip}`);
