@@ -30,7 +30,7 @@ export async function getRoleId(roleName: 'owner' | 'admin' | 'manager' | 'staff
 }
 
 /**
- * Get or create roles for testing (fully idempotent)
+ * Get or create roles for testing (creates test roles with permissions)
  */
 async function ensureRolesExist(): Promise<Map<string, string>> {
   if (roleCache) {
@@ -39,140 +39,100 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   
   roleCache = new Map<string, string>();
   
-  // Define all default roles
-  const defaultRoleNames = ['owner', 'admin', 'manager', 'staff'];
-  const defaultRolesData = [
-    { name: 'owner', description: 'Organization owner with full access', scope: 'tenant', isSystemRole: true },
-    { name: 'admin', description: 'Administrator with most permissions', scope: 'tenant', isSystemRole: true },
-    { name: 'manager', description: 'Manager with team permissions', scope: 'tenant', isSystemRole: true },
-    { name: 'staff', description: 'Staff member with limited permissions', scope: 'tenant', isSystemRole: true }
+  // Define test roles (needed for RBAC tests)
+  const testRoles = [
+    { name: 'owner', description: 'Organization owner', scope: 'tenant', isSystemRole: true },
+    { name: 'admin', description: 'Organization admin', scope: 'tenant', isSystemRole: true },
+    { name: 'manager', description: 'Team manager', scope: 'tenant', isSystemRole: true },
+    { name: 'staff', description: 'Staff member', scope: 'tenant', isSystemRole: true }
   ];
   
-  // Load existing roles
-  const existingRoles = await db.select().from(roles);
-  const existingRoleMap = new Map(existingRoles.map(r => [r.name, r.id]));
-  
-  // Create missing roles
-  for (const roleData of defaultRolesData) {
-    if (existingRoleMap.has(roleData.name)) {
-      // Role exists - use it
-      roleCache.set(roleData.name, existingRoleMap.get(roleData.name)!);
+  // Create or get test roles
+  for (const roleData of testRoles) {
+    const existing = await db.select().from(roles).where(eq(roles.name, roleData.name));
+    if (existing.length > 0) {
+      roleCache.set(roleData.name, existing[0].id);
     } else {
-      // Role missing - create it
-      const [role] = await db.insert(roles).values(roleData).returning();
-      roleCache.set(role.name, role.id);
+      const [newRole] = await db.insert(roles).values(roleData).returning();
+      roleCache.set(roleData.name, newRole.id);
     }
   }
   
-  // Create baseline permissions for tests (using DOT notation to match route requirements)
+  // Define baseline permissions (DOT notation)
   const basePermissions = [
-    // User management
-    { name: 'users.create', resource: 'users', action: 'create', description: 'Create new users' },
-    { name: 'users.edit', resource: 'users', action: 'edit', description: 'Edit user details' },
+    { name: 'users.create', resource: 'users', action: 'create', description: 'Create users' },
+    { name: 'users.edit', resource: 'users', action: 'edit', description: 'Edit users' },
     { name: 'users.delete', resource: 'users', action: 'delete', description: 'Delete users' },
-    { name: 'users.view', resource: 'users', action: 'view', description: 'View user list' },
-    // Organization management
-    { name: 'organization.edit', resource: 'organization', action: 'edit', description: 'Edit organization' },
-    { name: 'organization.delete', resource: 'organization', action: 'delete', description: 'Delete organization' },
+    { name: 'users.view', resource: 'users', action: 'view', description: 'View users' },
+    { name: 'organization.edit', resource: 'organization', action: 'edit', description: 'Edit org' },
+    { name: 'organization.delete', resource: 'organization', action: 'delete', description: 'Delete org' },
     { name: 'organization.billing', resource: 'organization', action: 'billing', description: 'View billing' },
     { name: 'organization.transfer', resource: 'organization', action: 'transfer', description: 'Transfer ownership' },
-    // Client management
     { name: 'clients.create', resource: 'clients', action: 'create', description: 'Create clients' },
     { name: 'clients.edit', resource: 'clients', action: 'edit', description: 'Edit clients' },
     { name: 'clients.delete', resource: 'clients', action: 'delete', description: 'Delete clients' },
     { name: 'clients.view', resource: 'clients', action: 'view', description: 'View clients' },
   ];
   
-  // Check if permissions already exist and create missing ones
-  const existingPerms = await db.select().from(permissions);
+  // Create or get permissions
   const permissionMap = new Map<string, string>();
-  
-  // Load existing permissions
-  for (const perm of existingPerms) {
-    permissionMap.set(perm.name, perm.id);
-  }
-  
-  // Create missing permissions (batch operation)
-  const missingPerms = basePermissions.filter(p => !permissionMap.has(p.name));
-  if (missingPerms.length > 0) {
-    // Create all missing permissions in one query (use onConflictDoNothing for safety)
-    const newPerms = await db.insert(permissions).values(missingPerms).onConflictDoNothing().returning();
-    for (const perm of newPerms) {
-      permissionMap.set(perm.name, perm.id);
-    }
-    // Re-load all permissions to ensure we have everything
-    const allPerms = await db.select().from(permissions);
-    permissionMap.clear();
-    for (const perm of allPerms) {
-      permissionMap.set(perm.name, perm.id);
+  for (const perm of basePermissions) {
+    const existing = await db.select().from(permissions).where(eq(permissions.name, perm.name));
+    if (existing.length > 0) {
+      permissionMap.set(perm.name, existing[0].id);
+    } else {
+      const [newPerm] = await db.insert(permissions).values(perm).returning();
+      permissionMap.set(perm.name, newPerm.id);
     }
   }
   
-  // Get role IDs
+  // Assign permissions to roles (delete existing first for idempotency)
   const ownerRoleId = roleCache.get('owner')!;
   const adminRoleId = roleCache.get('admin')!;
   const managerRoleId = roleCache.get('manager')!;
   const staffRoleId = roleCache.get('staff')!;
   
-  // Delete existing rolePermissions for default roles to rebuild deterministically
-  await db.delete(rolePermissions).where(
-    eq(rolePermissions.roleId, ownerRoleId)
-  );
-  await db.delete(rolePermissions).where(
-    eq(rolePermissions.roleId, adminRoleId)
-  );
-  await db.delete(rolePermissions).where(
-    eq(rolePermissions.roleId, managerRoleId)
-  );
-  await db.delete(rolePermissions).where(
-    eq(rolePermissions.roleId, staffRoleId)
-  );
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, ownerRoleId));
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, adminRoleId));
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, managerRoleId));
+  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, staffRoleId));
   
-  // Build role-permission assignments (batch inserts)
-  const rolePermAssignments = [];
+  const assignments = [];
   
-  // Owner gets all permissions
+  // Owner gets ALL permissions
   for (const permId of permissionMap.values()) {
-    rolePermAssignments.push({ roleId: ownerRoleId, permissionId: permId });
+    assignments.push({ roleId: ownerRoleId, permissionId: permId });
   }
   
-  // Admin gets most permissions (no org edit/delete/transfer - owner-only)
-  const adminPerms = [
-    'users.create', 'users.edit', 'users.delete', 'users.view',
-    'organization.billing', // Can view billing, but NOT edit org settings
-    'clients.create', 'clients.edit', 'clients.delete', 'clients.view'
-  ];
+  // Admin gets most (no org delete/transfer)
+  const adminPerms = ['users.create', 'users.edit', 'users.delete', 'users.view', 
+    'organization.edit', 'organization.billing', 
+    'clients.create', 'clients.edit', 'clients.delete', 'clients.view'];
   for (const permName of adminPerms) {
-    const permId = permissionMap.get(permName);
-    if (permId) {
-      rolePermAssignments.push({ roleId: adminRoleId, permissionId: permId });
+    if (permissionMap.has(permName)) {
+      assignments.push({ roleId: adminRoleId, permissionId: permissionMap.get(permName)! });
     }
   }
   
-  // Manager gets team + client permissions
-  const managerPerms = [
-    'users.view', 'users.edit',
-    'clients.create', 'clients.edit', 'clients.view'
-  ];
+  // Manager gets team + client perms
+  const managerPerms = ['users.view', 'users.edit', 'clients.create', 'clients.edit', 'clients.view'];
   for (const permName of managerPerms) {
-    const permId = permissionMap.get(permName);
-    if (permId) {
-      rolePermAssignments.push({ roleId: managerRoleId, permissionId: permId });
+    if (permissionMap.has(permName)) {
+      assignments.push({ roleId: managerRoleId, permissionId: permissionMap.get(permName)! });
     }
   }
   
-  // Staff gets basic view permissions (self-view/edit only via endpoint logic)
-  const staffPerms = ['users.edit', 'clients.view']; // users.edit for self-edit only
+  // Staff gets minimal perms
+  const staffPerms = ['users.edit', 'clients.view'];
   for (const permName of staffPerms) {
-    const permId = permissionMap.get(permName);
-    if (permId) {
-      rolePermAssignments.push({ roleId: staffRoleId, permissionId: permId });
+    if (permissionMap.has(permName)) {
+      assignments.push({ roleId: staffRoleId, permissionId: permissionMap.get(permName)! });
     }
   }
   
-  // Insert all role-permission assignments in one batch
-  if (rolePermAssignments.length > 0) {
-    await db.insert(rolePermissions).values(rolePermAssignments);
+  // Insert all assignments
+  if (assignments.length > 0) {
+    await db.insert(rolePermissions).values(assignments);
   }
   
   return roleCache;
