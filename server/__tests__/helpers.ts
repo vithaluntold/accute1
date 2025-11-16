@@ -1,8 +1,9 @@
-import { db } from '../db';
+import { testDb as db } from '../test-db';
 import { users, organizations, type User, type Organization } from '@shared/schema';
 import request from 'supertest';
 import app from '../test-app'; // Use test-friendly app export
 import { eq } from 'drizzle-orm';
+import bcrypt from 'bcrypt';
 
 /**
  * Helper function to create a test organization via API
@@ -171,8 +172,65 @@ export function wait(ms: number): Promise<void> {
 }
 
 /**
- * DATABASE QUERY HELPERS - For verification only, not for test setup
+ * DATABASE DIRECT HELPERS - For test setup and verification
  */
+
+/**
+ * Helper function to create organization directly in database
+ */
+export async function createOrg(data: {
+  name?: string;
+  slug?: string;
+  industry?: string;
+  size?: string;
+} = {}): Promise<Organization> {
+  const [org] = await db.insert(organizations).values({
+    name: data.name || `Test Org ${Date.now()}`,
+    slug: data.slug || `test-org-${Date.now()}`,
+    industry: data.industry || 'accounting',
+    size: data.size || '1-10'
+  }).returning();
+  
+  return org;
+}
+
+/**
+ * Helper function to create user directly in database
+ */
+export async function createUser(data: {
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: 'owner' | 'admin' | 'manager' | 'staff';
+  organizationId?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+} = {}): Promise<User> {
+  // Create organization if not provided
+  let orgId = data.organizationId;
+  if (!orgId) {
+    const org = await createOrg();
+    orgId = org.id;
+  }
+  
+  const password = data.password || 'SecurePass123!';
+  const passwordHash = await bcrypt.hash(password, 10);
+  const email = data.email || `test${Date.now()}@test.com`;
+  const username = email.split('@')[0] + Date.now();
+  
+  const [user] = await db.insert(users).values({
+    email,
+    username,
+    passwordHash,
+    firstName: data.firstName || 'Test',
+    lastName: data.lastName || 'User',
+    role: data.role || 'staff',
+    organizationId: orgId,
+    status: data.status || 'active'
+  }).returning();
+  
+  return user;
+}
 
 /**
  * Helper function to get user by email (for verification)

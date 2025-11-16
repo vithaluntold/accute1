@@ -7,6 +7,8 @@ import {
   agentSessions,
   agentMessages
 } from '@shared/schema';
+import { sql } from 'drizzle-orm';
+import { beforeEach, afterAll } from 'vitest';
 
 // CRITICAL SAFETY CHECK: Only allow tests to run in test environment
 if (process.env.NODE_ENV !== 'test') {
@@ -18,9 +20,6 @@ if (process.env.NODE_ENV !== 'test') {
 
 console.log('✅ Test environment verified - using development database with test cleanup');
 
-// Increase timeout for database operations
-jest.setTimeout(30000);
-
 // Clean up database before each test
 beforeEach(async () => {
   try {
@@ -29,13 +28,20 @@ beforeEach(async () => {
       throw new Error('Cannot clean database outside of test environment!');
     }
 
-    // Delete in correct order to respect foreign key constraints
-    await db.delete(agentMessages);
-    await db.delete(agentSessions);
-    await db.delete(sessions);
-    await db.delete(clients);
-    await db.delete(users);
-    await db.delete(organizations);
+    // Delete in REVERSE dependency order to respect foreign key constraints
+    // Use CASCADE to automatically handle dependencies
+    await db.execute(sql`
+      TRUNCATE TABLE 
+        users,
+        organizations,
+        clients,
+        agent_sessions,
+        agent_messages,
+        sessions
+      CASCADE
+    `);
+    
+    console.log('🧹 Test database cleaned');
   } catch (error) {
     console.error('❌ Error cleaning test database:', error);
     throw error;
