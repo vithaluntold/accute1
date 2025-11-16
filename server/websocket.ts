@@ -44,9 +44,9 @@ function initializeWebSocketServer(httpServer: Server): WebSocketServer {
   isInitializing = true;
   console.log('[WebSocket] Initializing WebSocket server on first connection...');
   
+  // Create WebSocket server in noServer mode to avoid double-handling of upgrade events
   const wss = new WebSocketServer({ 
-    server: httpServer,
-    path: '/ws/ai-stream'
+    noServer: true
   });
 
   // Heartbeat to detect broken connections
