@@ -199,6 +199,36 @@ export const generalApiRateLimiter = rateLimit({
   },
 });
 
+/**
+ * Billing/Pricing endpoint rate limiting
+ * - 20 requests per 15 minutes per IP
+ * - Prevents price enumeration, coupon abuse, and billing system abuse
+ * 
+ * PRODUCTION NOTE: Uses default MemoryStore which works for single-instance deployments.
+ * For horizontal scaling (multiple instances), implement Redis-backed store:
+ * - Install: npm install rate-limit-redis redis
+ * - Configure: store: new RedisStore({ client: redisClient })
+ * 
+ * KNOWN LIMITATIONS:
+ * - Limits reset on process restart (acceptable for Replit single-instance)
+ * - No cross-instance state sharing (implement Redis for production scale-out)
+ */
+export const billingRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 requests per window
+  message: 'Too many pricing requests. Please try again in 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // NOTE: Uses default MemoryStore (works for single instance, use Redis for multi-instance)
+  handler: (req: Request, res: Response) => {
+    console.log(`❌ [RATE LIMIT] Billing API limit exceeded for IP: ${req.ip}, Path: ${req.path}`);
+    res.status(429).json({
+      error: 'Too many pricing requests. Please try again in 15 minutes.',
+      retryAfter: Math.ceil((req.rateLimit?.resetTime?.getTime() || Date.now() - Date.now()) / 1000),
+    });
+  },
+});
+
 // ==================== FAILED LOGIN TRACKING ====================
 
 // In-memory failed login tracking (in production, use Redis)

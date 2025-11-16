@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { setupWebSocket } from "./websocket";
 import { validatePasswordComplexity } from "./security";
-import { organizationCreationRateLimiter, userCreationRateLimiter, checkAccountLockout, recordFailedLogin } from "./rate-limit";
+import { organizationCreationRateLimiter, userCreationRateLimiter, billingRateLimiter, checkAccountLockout, recordFailedLogin } from "./rate-limit";
 import * as schema from "@shared/schema";
 import { registerPricingRoutes } from "./pricing-routes";
 import { registerSubscriptionRoutes } from "./subscription-routes";
@@ -17316,14 +17316,35 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
-  // Calculate subscription price (public)
-  app.post("/api/subscription-price/calculate", async (req: Request, res: Response) => {
+  // Zod schema for pricing calculation request
+  const pricingCalculationSchema = z.object({
+    planId: z.string().uuid("Invalid plan ID format"),
+    billingCycle: z.enum(['monthly', 'yearly', '3_year'], {
+      errorMap: () => ({ message: "billingCycle must be 'monthly', 'yearly', or '3_year'" })
+    }),
+    seatCount: z.number().int().min(1).max(10000, "seatCount must be between 1 and 10,000"),
+    regionId: z.string().uuid("Invalid region ID format").optional(),
+    couponCode: z.string().max(50).optional(),
+  });
+
+  // Calculate subscription price (PUBLIC with rate limiting - supports marketing & transparency)
+  // Rate limited to 20 req/15min to prevent abuse while maintaining low-friction conversion
+  app.post("/api/subscription-price/calculate", billingRateLimiter, async (req: Request, res: Response) => {
     try {
-      const { planId, billingCycle, seatCount, regionId, couponCode } = req.body;
+      // Validate request body with Zod (prevents NaN/type errors)
+      const validationResult = pricingCalculationSchema.safeParse(req.body);
       
-      if (!planId || !billingCycle || !seatCount) {
-        return res.status(400).json({ error: "planId, billingCycle, and seatCount are required" });
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request parameters",
+          details: validationResult.error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
+        });
       }
+      
+      const { planId, billingCycle, seatCount, regionId, couponCode } = validationResult.data;
       
       // Get plan
       const [plan] = await db
