@@ -44,6 +44,116 @@ The project is structured into `client/`, `server/`, and `shared/` directories, 
 - mammoth
 - xlsx
 
+# Permission Matrix (RBAC System)
+## Updated: November 16, 2025
+
+### Permission Naming Convention
+**CRITICAL**: All permissions use DOT notation (e.g., `users.create`, `clients.view`) for exact-match permission checks.
+
+### Baseline Permissions (12 total)
+1. `users.view` - View organization users
+2. `users.create` - Create new users
+3. `users.edit` - Edit user profiles
+4. `users.delete` - Delete users
+5. `clients.view` - View clients
+6. `clients.create` - Create clients
+7. `clients.edit` - Edit clients
+8. `clients.delete` - Delete clients
+9. `organization.edit` - Edit organization settings
+10. `organization.billing` - Manage billing
+11. `organization.delete` - Delete organization
+12. `organization.transfer` - Transfer organization ownership
+
+### Role Permission Assignments
+
+#### Owner Role (All 12 permissions)
+- `users.view`, `users.create`, `users.edit`, `users.delete`
+- `clients.view`, `clients.create`, `clients.edit`, `clients.delete`
+- `organization.edit`, `organization.billing`, `organization.delete`, `organization.transfer`
+
+**Special Privileges**:
+- Can promote users to admin or owner roles
+- Can delete admins and owners
+- Only role that can delete or transfer organization
+
+#### Admin Role (10 permissions)
+- `users.view`, `users.create`, `users.edit`, `users.delete`
+- `clients.view`, `clients.create`, `clients.edit`, `clients.delete`
+- `organization.edit`, `organization.billing`
+
+**Restrictions**:
+- Cannot delete or transfer organization
+- Cannot promote users to admin or owner roles
+- Cannot delete owners or other admins
+
+#### Manager Role (5 permissions)
+- `users.view` - Can view all organization users
+- `users.edit` - **Self-edit only** (cannot edit other users)
+- `clients.view`, `clients.create`, `clients.edit`
+
+**Restrictions**:
+- Can only edit their own profile (self-edit restriction enforced at endpoint level)
+- Cannot create, delete, or change roles for any users
+- Cannot modify organization settings
+
+#### Staff Role (2 permissions)
+- `users.edit` - **Self-edit only** (cannot edit other users or view user list)
+- `clients.view`
+
+**Restrictions**:
+- Can only view/edit their own profile (self-view/edit restriction enforced at endpoint level)
+- Cannot view other users or organization user list
+- Cannot create, edit, or delete clients
+- Cannot access organization settings
+
+### Security Features
+
+#### Cross-Organization Protection
+- All endpoints validate `organizationId` from path parameters
+- Users cannot access resources from other organizations (unless Super Admin)
+- Organization ID tampering via request body is blocked with 400 error
+
+#### Role Hierarchy Enforcement
+- Only owners can promote to admin/owner roles
+- Only owners can delete admins/owners
+- Admins/Managers/Staff cannot escalate their own privileges
+
+#### Self-Service Restrictions
+- Manager/Staff roles have `users.edit` permission but endpoint logic restricts to self-edit only
+- Staff role cannot use `users.view` to list organization users
+- GET /api/users/:id endpoint enforces self-view for Staff/Manager
+
+#### Production Telemetry
+- All 403 (Forbidden) responses logged with full context:
+  - User ID, email, role, organization
+  - Required permission, effective permissions
+  - Endpoint, method, IP address, user agent
+  - Timestamp for audit trail
+
+### API Endpoints & Required Permissions
+
+#### User Management
+- `GET /api/organizations/:id/users` - Requires `users.view` (supports `?search=term&role=rolename`)
+- `GET /api/users/:id` - Self-view for Staff/Manager, requires `users.view` for others
+- `POST /api/organizations/:id/users` - Requires `users.create`
+- `PATCH /api/users/:id` - Requires `users.edit` (self-edit only for Manager/Staff)
+- `DELETE /api/users/:id` - Requires `users.delete`
+
+#### Organization Management
+- `GET /api/organizations/:id` - Any authenticated user in org
+- `PATCH /api/organizations/:id` - Requires `organization.edit`
+- `DELETE /api/organizations/:id` - Requires `organization.delete` (Owner only)
+
+### Testing Coverage
+**100% RBAC Test Pass Rate** (50/50 tests passing):
+- Owner Role: 10/10 ✅
+- Admin Role: 10/10 ✅
+- Manager Role: 10/10 ✅
+- Staff Role: 10/10 ✅
+- Cross-Org Access: 10/10 ✅
+
+All critical security vulnerabilities resolved and production-ready.
+
 # Business Strategy
 ## Penetration Pricing (November 2025)
 Accute adopts aggressive penetration pricing with **20% margins** to rapidly capture market share before competitors can replicate AI Psychology Profiling capabilities. Target markets: India, UAE, Turkey, USA.

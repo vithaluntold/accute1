@@ -2937,6 +2937,7 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
   app.get("/api/organizations/:id/users", requireAuth, requirePermission("users.view"), async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
+      const { search, role } = req.query;
 
       // Verify user has access to this organization
       const requesterRole = await storage.getRole(req.user!.roleId);
@@ -2950,7 +2951,32 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       }
 
       // Get all users in this organization
-      const users = await storage.getUsersByOrganization(id);
+      let users = await storage.getUsersByOrganization(id);
+      
+      // SEARCH FILTERING: Filter by search term (email, firstName, lastName)
+      if (search && typeof search === 'string') {
+        const searchLower = search.toLowerCase();
+        users = users.filter(user => {
+          const emailMatch = user.email?.toLowerCase()?.includes(searchLower) || false;
+          const firstNameMatch = user.firstName?.toLowerCase()?.includes(searchLower) || false;
+          const lastNameMatch = user.lastName?.toLowerCase()?.includes(searchLower) || false;
+          return emailMatch || firstNameMatch || lastNameMatch;
+        });
+      }
+      
+      // ROLE FILTERING: Filter by role name
+      if (role && typeof role === 'string') {
+        const roleIds = await Promise.all(
+          users.map(async (user) => {
+            const userRole = await storage.getRole(user.roleId);
+            return { userId: user.id, roleName: userRole?.name };
+          })
+        );
+        const filteredUserIds = roleIds
+          .filter(r => r.roleName === role)
+          .map(r => r.userId);
+        users = users.filter(u => filteredUserIds.includes(u.id));
+      }
       
       // Enrich with roleName for consistency
       const usersWithRoles = await Promise.all(

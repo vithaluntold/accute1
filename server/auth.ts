@@ -135,7 +135,25 @@ export function requirePermission(permission: string) {
     console.log(`   Has permission: ${hasPermission}`);
 
     if (!hasPermission) {
+      // PRODUCTION TELEMETRY: Log denied access attempts for security monitoring
+      const telemetryData = {
+        timestamp: new Date().toISOString(),
+        event: 'ACCESS_DENIED',
+        userId: req.user.id,
+        email: req.user.email,
+        roleId: req.user.roleId,
+        organizationId: req.user.organizationId,
+        requiredPermission: permission,
+        effectivePermissions: effectivePermissions.map(p => p.name),
+        endpoint: req.path,
+        method: req.method,
+        ip: req.ip || req.headers['x-forwarded-for'] || 'unknown',
+        userAgent: req.headers['user-agent'] || 'unknown'
+      };
+      
       console.log(`❌ [PERMISSION] DENIED: User ${req.user.email} lacks "${permission}" (filtered by subscription)`);
+      console.log(`📊 [TELEMETRY] Access denied:`, JSON.stringify(telemetryData));
+      
       return res.status(403).json({ 
         error: "Insufficient permissions", 
         required: permission,
