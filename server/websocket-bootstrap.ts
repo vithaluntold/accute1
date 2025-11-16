@@ -168,7 +168,8 @@ class WebSocketBootstrap {
         message.message,
         user,
         message.llmConfigId,
-        ws
+        ws,
+        sessionId // Pass sessionId to the handler
       );
     } catch (error) {
       console.error('[WebSocket] Error handling message:', error);

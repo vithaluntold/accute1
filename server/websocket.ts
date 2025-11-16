@@ -164,6 +164,177 @@ function initializeWebSocketServer(httpServer: Server): WebSocketServer {
 }
 
 /**
+ * Handle AI Agent Execution for new WebSocket Bootstrap architecture
+ * This function is called by websocket-bootstrap.ts for all agent messages
+ */
+export async function handleAIAgentExecution(
+  agentSlug: string,
+  message: string,
+  user: { userId: string; organizationId: string },
+  llmConfigId: string | undefined,
+  ws: WebSocket,
+  sessionId?: string
+): Promise<void> {
+  const startTime = Date.now();
+  const { sessionService } = await import('./agent-session-service');
+  
+  try {
+    if (!message || !agentSlug) {
+      throw new Error('Agent slug and message are required');
+    }
+    
+    // Get or create session
+    const actualSessionId = sessionId || `session-${Date.now()}`;
+    const session = await sessionService.getOrCreateSession(
+      agentSlug,
+      actualSessionId,
+      user.userId,
+      user.organizationId
+    );
+    
+    console.log(`[handleAIAgentExecution] Processing ${agentSlug} message for session ${session.id}`);
+    
+    // Get LLM configuration
+    const llmConfig = await getLLMConfig({
+      organizationId: user.organizationId,
+      userId: user.userId,
+      configId: llmConfigId
+    });
+    
+    // Save user message
+    await sessionService.saveMessage(session.id, 'user', message, {
+      llmConfigId: llmConfig.id
+    });
+    
+    // Get conversation history
+    const history = await sessionService.getHistory(session.id);
+    const conversationHistory = history
+      .filter(msg => msg.role !== 'system')
+      .map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+    
+    // Send stream start
+    ws.send(JSON.stringify({
+      type: 'stream_start',
+      sessionId: actualSessionId
+    }));
+    
+    // Create agent instance
+    const agent = createStaticAgentInstance(agentSlug, llmConfig) as any;
+    
+    // Prepare agent input
+    const agentInput = {
+      query: message,
+      context: {
+        organizationId: user.organizationId,
+        userId: user.userId,
+        sessionId: actualSessionId,
+        conversationHistory
+      }
+    };
+    
+    // Execute agent with streaming
+    let fullResponse = '';
+    
+    if (agentRequiresToolExecution(agentSlug)) {
+      const executionContext = {
+        organizationId: user.organizationId,
+        userId: user.userId,
+        req: { user: { organizationId: user.organizationId, id: user.userId } } as any
+      };
+      
+      const toolResult = await agent.executeWithTools(agentInput, executionContext);
+      
+      if (toolResult.usedTool) {
+        fullResponse = toolResult.response;
+        ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
+      } else {
+        fullResponse = await agent.executeStream(agentInput, (chunk: string) => {
+          ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
+        });
+      }
+    } else if (agentSupportsStreaming(agentSlug)) {
+      fullResponse = await agent.executeStream(agentInput, (chunk: string) => {
+        ws.send(JSON.stringify({ type: 'stream_chunk', chunk }));
+      });
+    } else {
+      const result = await agent.execute(agentInput);
+      fullResponse = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+      ws.send(JSON.stringify({ type: 'stream_chunk', chunk: fullResponse }));
+    }
+    
+    const executionTime = Date.now() - startTime;
+    
+    // Save assistant message
+    await sessionService.saveMessage(session.id, 'assistant', fullResponse, {
+      llmConfigId: llmConfig.id,
+      executionTimeMs: executionTime
+    });
+    
+    // Auto-generate title after first exchange
+    const allMessages = await sessionService.getHistory(session.id);
+    if (allMessages.length === 2 && !session.title) {
+      console.log(`[handleAIAgentExecution] First exchange complete! Auto-generating title for ${agentSlug}...`);
+      
+      try {
+        const firstUserMsg = allMessages.find(m => m.role === 'user');
+        const firstAssistantMsg = allMessages.find(m => m.role === 'assistant');
+        
+        if (firstUserMsg && firstAssistantMsg) {
+          const { LLMService } = await import('./llm-service');
+          const titleLlmService = new LLMService(llmConfig);
+          
+          const titlePrompt = `Generate a short, descriptive title (3-6 words max) for this conversation. Return ONLY the title, nothing else.
+
+User: ${firstUserMsg.content.substring(0, 500)}
+Assistant: ${firstAssistantMsg.content.substring(0, 500)}
+
+Title:`;
+          
+          const generatedTitle = await titleLlmService.generateCompletion(titlePrompt, {
+            maxTokens: 20,
+            temperature: 0.7
+          });
+          
+          const title = generatedTitle.trim()
+            .replace(/^["']|["']$/g, '')
+            .replace(/\n.*/g, '')
+            .substring(0, 100);
+          
+          await sessionService.updateSessionTitle(session.id, title);
+          console.log(`[handleAIAgentExecution] ✅ Title auto-generated for ${agentSlug}:`, title);
+          
+          // Send title update to client
+          ws.send(JSON.stringify({
+            type: 'title_updated',
+            sessionId: actualSessionId,
+            title
+          }));
+        }
+      } catch (titleError: any) {
+        console.error(`[handleAIAgentExecution] Failed to auto-generate title:`, titleError.message);
+      }
+    }
+    
+    // Send stream end
+    ws.send(JSON.stringify({
+      type: 'stream_end',
+      sessionId: actualSessionId,
+      executionTime
+    }));
+    
+  } catch (error: any) {
+    console.error('[handleAIAgentExecution] Error:', error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      error: error.message || 'Failed to process message'
+    }));
+  }
+}
+
+/**
  * Setup lazy WebSocket initialization on HTTP server
  * WebSocket will only be initialized when first upgrade request is received
  */
