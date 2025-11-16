@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { users, organizations, type User, type Organization } from '@shared/schema';
 import request from 'supertest';
-import app from '../index';
+import app from '../test-app'; // Use test-friendly app export
 import { eq } from 'drizzle-orm';
 
 /**
@@ -15,6 +15,7 @@ export async function createOrgAPI(data: {
 } = {}): Promise<{ status: number; org?: Organization; body: any }> {
   const req = request(app).post('/api/organizations').send({
     name: data.name || `Test Org ${Date.now()}`,
+    slug: `test-org-${Date.now()}`,
     industry: data.industry || 'accounting',
     size: data.size || '1-10'
   });
@@ -41,22 +42,26 @@ export async function createUserAPI(data: {
   firstName?: string;
   lastName?: string;
   role?: 'owner' | 'admin' | 'manager' | 'staff';
-  organizationId?: number;
+  organizationId?: string;
   token?: string;
 } = {}): Promise<{ status: number; user?: User; body: any }> {
   const password = data.password || 'SecurePass123!';
-  const payload = {
-    email: data.email || `test${Date.now()}@test.com`,
+  const email = data.email || `test${Date.now()}@test.com`;
+  
+  const payload: any = {
+    email,
     password,
+    username: email.split('@')[0] + Date.now(),
     firstName: data.firstName || 'Test',
     lastName: data.lastName || 'User',
-    role: data.role || 'staff',
-    organizationId: data.organizationId
+    roleId: data.role || 'staff', // Will need to map to actual role ID
   };
 
-  const endpoint = data.organizationId 
-    ? `/api/organizations/${data.organizationId}/users`
-    : '/api/users';
+  if (data.organizationId) {
+    payload.organizationId = data.organizationId;
+  }
+
+  const endpoint = '/api/users';
 
   const req = request(app).post(endpoint).send(payload);
 
@@ -118,7 +123,7 @@ export async function createAuthenticatedUser(data: {
   email?: string;
   password?: string;
   role?: 'owner' | 'admin' | 'manager' | 'staff';
-  organizationId?: number;
+  organizationId?: string;
 } = {}): Promise<{ user: User; token: string; password: string }> {
   const password = data.password || 'SecurePass123!';
   
@@ -129,14 +134,14 @@ export async function createAuthenticatedUser(data: {
   });
 
   if (createResult.status !== 201 || !createResult.user) {
-    throw new Error(`Failed to create user: ${createResult.status}`);
+    throw new Error(`Failed to create user: ${createResult.status} - ${JSON.stringify(createResult.body)}`);
   }
 
   // Login to get token
   const loginResponse = await login(createResult.user.email, password);
 
   if (!loginResponse.token) {
-    throw new Error('Failed to get authentication token');
+    throw new Error(`Failed to get authentication token: ${JSON.stringify(loginResponse.body)}`);
   }
 
   return {
@@ -181,7 +186,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
 /**
  * Helper function to get organization by ID (for verification)
  */
-export async function getOrgById(id: number): Promise<Organization | undefined> {
+export async function getOrgById(id: string): Promise<Organization | undefined> {
   return await db.query.organizations.findFirst({
     where: eq(organizations.id, id)
   });
@@ -209,7 +214,7 @@ export async function requestPasswordReset(email: string): Promise<{
   body: any;
 }> {
   const response = await request(app)
-    .post('/api/auth/password-reset-request')
+    .post('/api/auth/forgot-password')
     .send({ email });
 
   return {
@@ -226,7 +231,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
   body: any;
 }> {
   const response = await request(app)
-    .post('/api/auth/password-reset')
+    .post('/api/auth/reset-password')
     .send({ token, newPassword });
 
   return {
