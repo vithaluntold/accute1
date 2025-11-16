@@ -7,12 +7,14 @@ import bcrypt from 'bcrypt';
 
 // Cache for role IDs
 let roleCache: Map<string, string> | null = null;
+let ensureRolesPromise: Promise<Map<string, string>> | null = null;
 
 /**
  * Clear role cache (called during test cleanup)
  */
 export function clearRoleCache(): void {
   roleCache = null;
+  ensureRolesPromise = null;
 }
 
 /**
@@ -31,13 +33,23 @@ export async function getRoleId(roleName: 'owner' | 'admin' | 'manager' | 'staff
 
 /**
  * Get or create roles for testing (creates test roles with permissions)
+ * IDEMPOTENT: Safe to call multiple times, handles existing roles/permissions
+ * THREAD-SAFE: Uses promise to prevent concurrent execution
  */
 async function ensureRolesExist(): Promise<Map<string, string>> {
+  // Return cached result if available
   if (roleCache) {
     return roleCache;
   }
   
-  roleCache = new Map<string, string>();
+  // If another call is in progress, wait for it
+  if (ensureRolesPromise) {
+    return ensureRolesPromise;
+  }
+  
+  // Start the initialization and cache the promise
+  ensureRolesPromise = (async () => {
+    roleCache = new Map<string, string>();
   
   // Define test roles (needed for RBAC tests)
   const testRoles = [
@@ -47,14 +59,30 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     { name: 'staff', description: 'Staff member', scope: 'tenant', isSystemRole: true }
   ];
   
-  // Create or get test roles
+  // Create or get test roles (idempotent - uses onConflictDoNothing)
   for (const roleData of testRoles) {
     const existing = await db.select().from(roles).where(eq(roles.name, roleData.name));
     if (existing.length > 0) {
       roleCache.set(roleData.name, existing[0].id);
     } else {
-      const [newRole] = await db.insert(roles).values(roleData).returning();
-      roleCache.set(roleData.name, newRole.id);
+      try {
+        const [newRole] = await db.insert(roles).values(roleData).onConflictDoNothing().returning();
+        if (newRole) {
+          roleCache.set(roleData.name, newRole.id);
+        } else {
+          // Race condition: role was created by another test, fetch it
+          const refetch = await db.select().from(roles).where(eq(roles.name, roleData.name));
+          if (refetch.length > 0) {
+            roleCache.set(roleData.name, refetch[0].id);
+          }
+        }
+      } catch (e) {
+        // Fallback: fetch existing role
+        const refetch = await db.select().from(roles).where(eq(roles.name, roleData.name));
+        if (refetch.length > 0) {
+          roleCache.set(roleData.name, refetch[0].id);
+        }
+      }
     }
   }
   
@@ -74,15 +102,31 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     { name: 'clients.view', resource: 'clients', action: 'view', description: 'View clients' },
   ];
   
-  // Create or get permissions
+  // Create or get permissions (idempotent - uses onConflictDoNothing)
   const permissionMap = new Map<string, string>();
   for (const perm of basePermissions) {
     const existing = await db.select().from(permissions).where(eq(permissions.name, perm.name));
     if (existing.length > 0) {
       permissionMap.set(perm.name, existing[0].id);
     } else {
-      const [newPerm] = await db.insert(permissions).values(perm).returning();
-      permissionMap.set(perm.name, newPerm.id);
+      try {
+        const [newPerm] = await db.insert(permissions).values(perm).onConflictDoNothing().returning();
+        if (newPerm) {
+          permissionMap.set(perm.name, newPerm.id);
+        } else {
+          // Race condition: fetch existing
+          const refetch = await db.select().from(permissions).where(eq(permissions.name, perm.name));
+          if (refetch.length > 0) {
+            permissionMap.set(perm.name, refetch[0].id);
+          }
+        }
+      } catch (e) {
+        // Fallback: fetch existing
+        const refetch = await db.select().from(permissions).where(eq(permissions.name, perm.name));
+        if (refetch.length > 0) {
+          permissionMap.set(perm.name, refetch[0].id);
+        }
+      }
     }
   }
   
@@ -130,12 +174,15 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     }
   }
   
-  // Insert all assignments
-  if (assignments.length > 0) {
-    await db.insert(rolePermissions).values(assignments);
-  }
+    // Insert all assignments
+    if (assignments.length > 0) {
+      await db.insert(rolePermissions).values(assignments).onConflictDoNothing();
+    }
+    
+    return roleCache;
+  })(); // Close the async IIFE
   
-  return roleCache;
+  return ensureRolesPromise;
 }
 
 /**
