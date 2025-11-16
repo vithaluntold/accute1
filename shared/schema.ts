@@ -3021,17 +3021,22 @@ export const insertCallLogSchema = createInsertSchema(callLogs).omit({
   createdAt: true,
 });
 
-// AI Agent Sessions (for Parity, Cadence, Forma)
+// AI Agent Sessions (Unified for all 10 AI agents)
 export const agentSessions = pgTable("agent_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  agentSlug: text("agent_slug").notNull(), // 'parity', 'cadence', 'forma'
+  agentSlug: text("agent_slug").notNull(),
+  sessionId: varchar("session_id", { length: 255 }).notNull().unique(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  name: text("name").notNull(), // User-editable session name
+  name: text("name"),
+  title: varchar("title", { length: 500 }),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   userAgentIdx: index("agent_sessions_user_agent_idx").on(table.userId, table.agentSlug),
+  sessionIdIdx: index("agent_sessions_session_id_idx").on(table.sessionId),
+  userOrgIdx: index("agent_sessions_user_org_idx").on(table.userId, table.organizationId),
 }));
 
 export const agentMessages = pgTable("agent_messages", {
