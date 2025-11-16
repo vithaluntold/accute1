@@ -10,6 +10,7 @@
 
 import rateLimit from 'express-rate-limit';
 import type { Request, Response } from 'express';
+import { clearRateLimitMap } from './auth';
 
 // ==================== CUSTOM STORE FOR TESTING ====================
 
@@ -64,11 +65,25 @@ if (process.env.NODE_ENV === 'test') {
 /**
  * Reset rate limiter store (for testing)
  * This ensures each test has fresh rate limiting state
+ * 
+ * Resets:
+ * - loginRateLimiter (express-rate-limit with ResettableMemoryStore)
+ * - organizationCreationRateLimiter (express-rate-limit with ResettableMemoryStore)
+ * - userCreationRateLimiter (express-rate-limit with ResettableMemoryStore)
+ * - Generic rateLimit() map (from auth.ts - used by password reset, etc.)
  */
 export function resetRateLimiters() {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('resetRateLimiters can only be called in test mode');
+  }
+  
+  // Reset express-rate-limit stores
   if (testStore) {
     testStore.resetAll();
   }
+  
+  // Reset generic rateLimit() map from auth.ts
+  clearRateLimitMap();
 }
 
 /**

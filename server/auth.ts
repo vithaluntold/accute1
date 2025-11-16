@@ -250,24 +250,20 @@ export async function requireAdmin(req: AuthRequest, res: Response, next: NextFu
 // Rate limiting helper (simple in-memory implementation)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-// Clear rate limit map (for testing)
+// Clear rate limit map (for testing) - exported for use by rate-limit.ts
 export function clearRateLimitMap() {
   rateLimitMap.clear();
 }
 
 export function rateLimit(maxRequests: number, windowMs: number) {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Skip rate limiting in test mode
-    if (process.env.NODE_ENV === 'test') {
-      return next();
-    }
-
     const key = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
     const record = rateLimitMap.get(key);
 
     if (record && record.resetAt > now) {
       if (record.count >= maxRequests) {
+        console.log(`❌ [RATE LIMIT] Request blocked for IP: ${req.ip}`);
         return res.status(429).json({ error: "Too many requests" });
       }
       record.count++;

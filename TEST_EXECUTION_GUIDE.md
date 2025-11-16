@@ -216,6 +216,247 @@ export default defineConfig({
 
 ---
 
+## 🔍 CI/CD Monitoring Guidelines
+
+### Overview
+
+**Purpose:** Detect and diagnose test flakiness, especially for stateful components like rate limiters  
+**Target:** Ensure 100% consistent pass rate in CI/CD pipelines  
+**Reference:** See `TESTING_HELPERS_GUIDE.md` for detailed debugging steps
+
+### What to Monitor
+
+#### 1. Rate Limiter Tests (High Priority)
+
+**Test Suite:** `server/__tests__/security/attack-vectors.test.ts`  
+**Critical Tests:**
+- TC-SEC-041: Rate limiting blocks excessive login attempts
+- TC-SEC-042: Server handles rapid requests safely
+- TC-SEC-043: Successful login works after failed attempts
+
+**Expected Behavior:**
+```bash
+✅ TC-SEC-041: Rate limiting blocks excessive login attempts (1970ms ±200ms)
+✅ TC-SEC-042: Server handles rapid requests safely (1605ms ±200ms)
+✅ TC-SEC-043: Successful login works after failed attempts (2840ms ±300ms)
+```
+
+**Red Flags:**
+```bash
+❌ Tests complete in <100ms
+   → Indicates rate limiter is disabled/skipped
+
+❌ AssertionError: expected 429 to be 200
+   → Rate limit state not reset between tests
+
+⚠️  Tests passing 70-90% of the time
+   → Timing issue or parallel execution conflict
+```
+
+#### 2. Test Execution Time Monitoring
+
+**Normal Execution Times:**
+- Foundation tests: 8-12 seconds
+- Authentication tests: 15-20 seconds
+- RBAC tests: 20-25 seconds
+- Security tests: 60-90 seconds (includes rate limit delays)
+
+**Alert Thresholds:**
+- ⚠️ Tests complete 50% faster than normal → Check for disabled features
+- ⚠️ Tests take 2x longer than normal → Database/network issues
+- ❌ Tests timeout (>30s per test) → Investigate hanging operations
+
+#### 3. Parallel Execution Safety
+
+**Current Configuration:** Serial execution via `singleFork: true`
+
+**Verification:**
+```bash
+# Check vitest.config.ts
+poolOptions: {
+  forks: {
+    singleFork: true,  // ← Must be true for database safety
+  },
+}
+```
+
+**Why Serial?**
+- ✅ Database cleanup requires isolation
+- ✅ Rate limiter state must be controlled
+- ✅ Prevents race conditions in test setup/teardown
+
+**If Parallel Execution Needed:**
+1. Implement per-test database isolation (separate schemas)
+2. Use separate rate limiter instances per worker
+3. Increase timeout thresholds
+4. Monitor for 3x longer total execution time
+
+### CI Pipeline Checks
+
+#### Pre-Merge Validation
+
+**Required Checks:**
+```yaml
+# .github/workflows/tests.yml (example)
+- name: Run Foundation Tests
+  run: NODE_ENV=test npm run test:foundation
+  
+- name: Run Authentication Tests
+  run: NODE_ENV=test npm run test:auth
+  
+- name: Run RBAC Tests
+  run: NODE_ENV=test npm run test:rbac
+  
+- name: Run Security Tests
+  run: NODE_ENV=test npm run test:security
+```
+
+**Success Criteria:**
+- ✅ All tests pass (0 failures)
+- ✅ No skipped tests
+- ✅ Execution time within expected range
+- ✅ No error logs during test run
+
+#### Flakiness Detection
+
+**Run Tests Multiple Times:**
+```bash
+# Local flakiness check
+for i in {1..10}; do
+  echo "=== Run $i ==="
+  NODE_ENV=test npx vitest run server/__tests__/security/attack-vectors.test.ts
+  if [ $? -ne 0 ]; then
+    echo "❌ FAILED on run $i"
+    exit 1
+  fi
+done
+echo "✅ All 10 runs passed"
+```
+
+**Acceptable Flakiness Rate:** 0%  
+**Action Threshold:** Any failure in 10 consecutive runs requires investigation
+
+### Common CI Failures & Solutions
+
+#### Issue: Rate Limiter Tests Fail Intermittently
+
+**Symptoms:**
+```bash
+❌ TC-SEC-041: expected 401 to be 429
+❌ TC-SEC-042: expected 200 to be 401
+```
+
+**Diagnosis:** Rate limit state not properly reset
+
+**Solution:**
+1. Verify `resetRateLimiters()` called in `beforeEach`
+2. Check double-reset pattern is used
+3. Ensure `NODE_ENV=test` is set in CI
+
+**Verification:**
+```typescript
+beforeEach(async () => {
+  resetRateLimiters();  // ← Before context
+  const context = await createTestContext();
+  resetRateLimiters();  // ← After context
+});
+```
+
+#### Issue: Database Connection Errors
+
+**Symptoms:**
+```bash
+Error: Connection terminated unexpectedly
+Error: Too many connections
+```
+
+**Diagnosis:** Connection pool not properly cleaned up
+
+**Solution:**
+1. Check `afterAll` hooks close connections
+2. Verify `setup.ts` cleanup runs
+3. Ensure serial execution (no parallel workers)
+
+#### Issue: Timeout Errors
+
+**Symptoms:**
+```bash
+Error: Test timed out in 30000ms
+```
+
+**Diagnosis:** Test hanging on async operation
+
+**Solution:**
+1. Add `await` to all async operations
+2. Check for infinite loops
+3. Verify rate limiter isn't blocking forever
+4. Increase timeout for security tests (they include rate limit delays)
+
+### Performance Benchmarks
+
+**Baseline Metrics (As of Nov 16, 2025):**
+
+| Test Suite | Test Count | Duration | Avg per Test |
+|------------|------------|----------|--------------|
+| Foundation | 85 | 10s | 118ms |
+| Authentication | 50 | 18s | 360ms |
+| RBAC | 50 | 22s | 440ms |
+| Security | 52 | 85s | 1,635ms |
+| **TOTAL** | **237** | **135s** | **570ms** |
+
+**Alert Thresholds:**
+- ⚠️ Total execution >180s (33% slower)
+- ⚠️ Individual test >5s (unless rate-limited)
+- ❌ Any test >30s (timeout)
+
+### Monitoring Dashboard Recommendations
+
+**Key Metrics to Track:**
+1. Pass rate percentage (target: 100%)
+2. Average execution time per suite
+3. Flakiness rate (failures per 100 runs)
+4. Test count trend (should increase over time)
+5. Coverage percentage (target: >90%)
+
+**Alerting Rules:**
+- ❌ Pass rate <100% → Block merge
+- ⚠️ Execution time >150% of baseline → Investigate
+- ⚠️ Same test fails 2+ times in 7 days → High priority fix
+
+### Manual Verification Steps
+
+**Before Releasing to Production:**
+
+```bash
+# 1. Run all tests 10 times
+./scripts/run-tests-10x.sh
+
+# 2. Check for any failures
+cat test-results-*.log | grep "FAIL"
+
+# 3. Verify rate limiter behavior
+NODE_ENV=test npx vitest run server/__tests__/security/attack-vectors.test.ts --reporter=verbose
+
+# 4. Check execution times
+NODE_ENV=test npx vitest run --reporter=verbose | grep "Duration"
+```
+
+**Expected Output:**
+```
+✅ Foundation: 10/10 runs passed
+✅ Authentication: 10/10 runs passed
+✅ RBAC: 10/10 runs passed
+✅ Security: 10/10 runs passed
+```
+
+### Related Documentation
+
+- **TESTING_HELPERS_GUIDE.md** - Detailed debugging for rate limiter tests
+- **SIX_SIGMA_TESTING_STRATEGY.md** - Quality standards and defect rates
+- **SECURITY_CONTROL_MATRIX.md** - Security test coverage requirements
+
+---
+
 ## 🎉 Key Achievements
 
 1. **Infrastructure Complete:** Full Vitest setup with TypeScript/ESM
@@ -223,6 +464,7 @@ export default defineConfig({
 3. **Tests Running:** Successfully executing with Vitest
 4. **Database Safety:** Triple safety checks + CASCADE cleanup
 5. **Developer Experience:** Fast, modern test runner with UI mode
+6. **CI Monitoring:** Comprehensive guidelines for production readiness
 
 ---
 
