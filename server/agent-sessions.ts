@@ -66,6 +66,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
         return res.status(404).json({ error: "Session not found" });
       }
 
+      // Verify organization ownership
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       const messages = await sessionService.getHistory(session.id);
       
       res.json({
@@ -96,6 +101,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
         return res.status(404).json({ error: "Session not found" });
       }
 
+      // Verify organization ownership
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       await sessionService.updateSessionTitle(session.id, newTitle);
       
       const updated = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
@@ -116,6 +126,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
         return res.status(404).json({ error: "Session not found" });
       }
 
+      // Verify organization ownership
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
       await sessionService.deleteSession(session.id, req.user!.id);
       res.json({ success: true });
     } catch (error) {
@@ -132,6 +147,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
       const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Verify organization ownership
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
       }
 
       const messages = await sessionService.getHistory(session.id);
@@ -155,6 +175,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
       const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Verify organization ownership
+      if (session.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Unauthorized" });
       }
 
       await sessionService.saveMessage(session.id, role, content, metadata || {});
