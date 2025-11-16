@@ -19,20 +19,19 @@
 Feature Completeness (Accounting Firms)
         │
     100 │                    
-        │         ◉ TaxDome
-        │         (10, 95)
-     90 │                        ◉ Accute
-        │                        (90, 92)
+        │         
+        │         
+     90 │         ◉ TaxDome                ◉ Accute
+        │         (45, 90)                 (90, 92)
         │
-     80 │              ◉ Canopy
+     80 │              
+        │              ◉ Canopy
         │              (8, 85)
-        │    
      70 │                   
         │         
         │    ◉ Financial Cents
-     60 │    (0, 65)
-        │                  ◉ Karbon
-        │                  (10, 58)*
+     60 │    (0, 65)        ◉ Karbon
+        │                  (55, 58)*
      50 │                        
         │              
         │                   
@@ -51,7 +50,7 @@ Feature Completeness (Accounting Firms)
         0    10   20   30   40   50   60   70   80   90   100
                         AI & Automation Capability
 
-*Karbon: No client portal (-40 points) but excellent analytics
+*Karbon: No client portal (-40 points) but excellent analytics + AI acquisition (Aider)
 ```
 
 ### Quadrant Definitions
@@ -59,17 +58,31 @@ Feature Completeness (Accounting Firms)
 #### **Quadrant I: Leaders** (High AI, High Features)
 **Position: Top Right**
 - **Accute** (90, 92) ✅✅
-  - **Only platform in this quadrant**
-  - 10 AI agents + complete feature set
-  - Best positioning for future market
+  - 10 specialized AI agents + agent marketplace
+  - Multi-agent orchestration + agentic AI
+  - Complete feature set for accounting firms
+  - **Strongest AI positioning**
 
-#### **Quadrant II: Established Players** (Low AI, High Features)
-**Position: Top Left**
-- **TaxDome** (10, 95) - Market leader, zero AI strategy
+- **TaxDome** (45, 90) ✅
+  - Document AI (auto-tagging, categorizing, organizing)
+  - AI-powered reporting with natural language queries
+  - Workflow automation (saves 40 hrs/month)
+  - Market leader + growing AI capabilities
+
+**Analysis:** Two platforms competing in Leaders quadrant. Accute has **2x the AI capability** but TaxDome has market dominance + strong AI foundation.
+
+#### **Quadrant II: Established Players** (Moderate AI, High Features)
+**Position: Top Middle**
+- **Karbon** (55, 58)* - AI communication tools, Aider acquisition, Practice Intelligence
 - **Canopy** (8, 85) - Tax specialist, basic email AI
+
+*Karbon has strong AI (55/100) but lacks client portal (-40 feature points)
+
+#### **Quadrant III: Basic Players** (Low AI, Moderate Features)
+**Position: Bottom Left**
 - **Financial Cents** (0, 65) - Simple all-in-one, no AI
 
-**Analysis:** Vulnerable to AI disruption. Strong today, at risk tomorrow.
+**Analysis:** Moderate features but vulnerable to AI disruption.
 
 #### **Quadrant III: Niche Players** (Low AI, Low Features)
 **Position: Bottom Left**
@@ -93,19 +106,24 @@ Feature Completeness (Accounting Firms)
 3. **Defensible Moat** - AI infrastructure (ConfigResolver, multi-provider LLM) takes 12+ months to build
 
 **Competitive Dynamics:**
-- **TaxDome** could add AI (move right) but would take 12-18 months
-- **Karbon** has basic AI but lacks client portal (stuck in middle)
-- **Canopy** focused on tax resolution (won't expand broadly)
-- **ClickUp** won't build accounting-specific features (wrong market)
+- **TaxDome** (45/100 AI) - Already has document AI + reporting AI + Juno integration coming
+- **Karbon** (55/100 AI) - Acquired Aider (Sept 2025) for bookkeeping AI, aggressive AI roadmap
+- **Canopy** (8/100 AI) - Focused on tax resolution, minimal AI investment
+- **ClickUp** (7/100 AI) - Won't build accounting-specific features (wrong market)
 
 **Market Movement Prediction (Next 24 Months):**
 ```
 Expected Movement:
-→ TaxDome: (10→30, 95→95) - Adds basic AI
-→ Karbon: (10→25, 58→65) - Expands AI, still no portal
+→ TaxDome: (45→60, 90→92) - Expands AI to more workflows, Juno fully integrated
+→ Karbon: (55→70, 58→70) - Aider integration complete, possibly adds portal
 → Canopy: (8→20, 85→85) - Modest AI improvements
-→ Accute: (90→95, 92→98) - Strengthens lead
+→ Accute: (90→100, 92→98) - Agent marketplace scales, strengthens lead
 ```
+
+**Key Insight:** TaxDome and Karbon are **actively investing in AI** (not sitting idle). However:
+- **Accute still leads** with 2x TaxDome's AI capability (90 vs 45)
+- **Accute's advantage:** Multi-agent architecture vs. their single-purpose AI tools
+- **Window closing:** 12-18 month lead, but competitors are moving fast
 
 ---
 
@@ -190,12 +208,12 @@ This analysis examines Accute's competitive position across **10 critical market
 
 | Competitor | Market Share | Pricing | AI Capability | Threat Level |
 |------------|--------------|---------|---------------|--------------|
-| **TaxDome** | Leader | $50-58/user/mo (annual) | None | 🔴 Very High |
-| **Karbon** | Strong #2 | $59-89/user/mo | Basic (ChatGPT) | 🟡 High |
-| **Canopy** | Specialist | $45+/user/mo + modules | Basic (email) | 🟡 Medium |
-| **ClickUp** | Adjacent | $7-12/user/mo | Basic automation | 🟢 Low |
-| **Financial Cents** | Mid-tier | $59-69/user/mo | None | 🟢 Low |
-| **Jetpack Workflow** | Niche | $36-45/user/mo | None | 🟢 Very Low |
+| **TaxDome** | Leader | $50-58/user/mo (annual) | Document AI + Reporting AI (45/100) | 🔴 **VERY HIGH** |
+| **Karbon** | Strong #2 | $59-89/user/mo | Communication AI + Aider (55/100) | 🔴 **HIGH** |
+| **Canopy** | Specialist | $45+/user/mo + modules | Basic email AI (8/100) | 🟡 Medium |
+| **ClickUp** | Adjacent | $7-12/user/mo | Basic automation (7/100) | 🟢 Low |
+| **Financial Cents** | Mid-tier | $59-69/user/mo | None (0/100) | 🟢 Low |
+| **Jetpack Workflow** | Niche | $36-45/user/mo | None (0/100) | 🟢 Very Low |
 
 ---
 
@@ -586,8 +604,8 @@ This analysis examines Accute's competitive position across **10 critical market
 
 | Feature | Accute | TaxDome | Karbon | Canopy | ClickUp | Financial Cents |
 |---------|--------|---------|--------|--------|---------|-----------------|
-| **Number of AI Agents** | **10** ✅✅ | 0 | 1 | 1 | 0 | 0 |
-| **Conversational AI** | ✅✅ | ❌ | ✅ | ✅ | ⚠️ | ❌ |
+| **Number of AI Agents** | **10** ✅✅ | 0 | 0 | 0 | 0 | 0 |
+| **Conversational AI** | ✅✅ | ⚠️ (NL queries) | ✅ (email) | ✅ (email) | ⚠️ | ❌ |
 | **Specialized AI Agents** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Agent Marketplace** | ✅✅ | ❌ | ❌ | ❌ | ⚠️ | ❌ |
 | **Custom Agent Creation** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -596,28 +614,55 @@ This analysis examines Accute's competitive position across **10 critical market
 | **Agent Session Management** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Auto-Title Generation** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **WebSocket Streaming** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Chat Threading** | ✅✅ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **File Attachments in Chat** | ✅✅ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **AI Chat Search** | ✅✅ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **Chat Archive** | ✅✅ | ❌ | ❌ | ❌ | ⚠️ | ❌ |
+| **AI Document Auto-Tagging** | ✅ | ✅✅ (launched 2024) | ❌ | ❌ | ❌ | ❌ |
+| **AI Document Auto-Renaming** | ✅ | ✅✅ (launched 2024) | ❌ | ❌ | ❌ | ❌ |
+| **AI Document Auto-Organizing** | ✅ | ✅✅ (launched 2024) | ❌ | ❌ | ❌ | ❌ |
+| **Natural Language Reporting** | ✅ | ✅✅ (13 languages) | ❌ | ❌ | ❌ | ❌ |
+| **AI Email Drafting** | ✅ | ❌ | ✅✅ (brand voice) | ✅ | ❌ | ❌ |
+| **AI Email Summaries** | ✅ | ❌ | ✅✅ (threads) | ❌ | ❌ | ❌ |
+| **AI Meeting Summaries** | ✅ | ❌ | ✅✅ (transcripts) | ❌ | ❌ | ❌ |
+| **Chat Threading** | ✅✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| **File Attachments in Chat** | ✅✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
 
 **Gap Analysis:**
-- **Accute Dominance:** Complete AI superiority across all metrics
-- **10 AI Agents** (replit.md):
-  1. Luca - Tax & Compliance
-  2. Cadence - Client Onboarding
-  3. Parity - Reconciliation & Bookkeeping
-  4. Forma - Advisory & Insights
-  5. Echo - Communication & Follow-ups
-  6. Relay - Workflow Orchestration
-  7. Scribe - Documentation
-  8. Sentinel - Compliance Monitoring
-  9. Nexus - Client Intelligence
-  10. (10th agent from system)
-- **Karbon AI:** Basic ChatGPT integration for email drafting (not agentic)
-- **Canopy AI:** Basic email assistant (not agentic)
-- **Competitive Gap:** Nobody has multi-agent systems
-- **Market Opportunity:** This is Accute's primary differentiator
+- **Accute Advantages:**
+  - ✅ **10 Specialized AI Agents** (replit.md):
+    1. Luca - Tax & Compliance
+    2. Cadence - Client Onboarding
+    3. Parity - Reconciliation & Bookkeeping
+    4. Forma - Advisory & Insights
+    5. Echo - Communication & Follow-ups
+    6. Relay - Workflow Orchestration
+    7. Scribe - Documentation
+    8. Sentinel - Compliance Monitoring
+    9. Nexus - Client Intelligence
+    10. (10th agent)
+  - ✅ Multi-agent orchestration (unique)
+  - ✅ Agent marketplace (unique)
+  - ✅ Agentic AI vs. task-specific AI
+
+- **TaxDome AI Features** (Launched 2024):
+  - ✅ Document AI: Auto-tags, renames, organizes documents (W-2s, 1099s, etc.)
+  - ✅ AI Reporting: Natural language queries in 13 languages
+  - ✅ Workflow automation (40 hrs/month savings)
+  - ✅ Juno AI: Automated data entry to tax software (2025)
+  - ⚠️ **Not agentic** - Single-purpose AI tools, not conversational agents
+
+- **Karbon AI Features** (2024-2025):
+  - ✅ Email draft generation with brand voice alignment
+  - ✅ Email thread summaries + action items
+  - ✅ Meeting transcript summaries (40% adoption)
+  - ✅ Aider acquisition (Sept 2025): Period close automation, bookkeeping AI
+  - ✅ Practice Intelligence: Predictive analytics
+  - ✅ Saves 18 hours/employee/month
+  - ⚠️ **Not agentic** - Workflow automation, not conversational agents
+
+- **Competitive Gap:** 
+  - Accute is **only platform** with multi-agent conversational AI system
+  - TaxDome/Karbon have **task-specific AI** (document processing, email drafting)
+  - **Neither has agentic AI** like Accute's 10 specialized agents
+  
+- **Market Opportunity:** Multi-agent systems are Accute's primary differentiator
 
 #### 5.2 LLM & AI Infrastructure
 
@@ -650,42 +695,67 @@ This analysis examines Accute's competitive position across **10 critical market
 | Feature | Accute | TaxDome | Karbon | Canopy | ClickUp | Financial Cents |
 |---------|--------|---------|--------|--------|---------|-----------------|
 | **AI Client Onboarding** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Task Prioritization** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Skill Matching** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Email Drafting** | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
-| **AI Document Parsing** | ✅✅ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ |
-| **AI Workpaper Organization** | ✅✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
-| **AI Workflow Optimization** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Capacity Planning** | ✅✅ | ❌ | ⚠️ | ❌ | ❌ | ❌ |
-| **AI Anomaly Detection** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Predictive Analytics** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **AI Report Generation** | ✅✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| **AI Task Prioritization** | ✅✅ | ❌ | ✅ (smart assign) | ❌ | ❌ | ❌ |
+| **AI Skill Matching** | ✅✅ | ❌ | ✅ (work history) | ❌ | ❌ | ❌ |
+| **AI Email Drafting** | ✅ | ❌ | ✅✅ (brand voice) | ✅ | ❌ | ❌ |
+| **AI Document Parsing** | ✅✅ | ✅✅ (auto-tag) | ❌ | ⚠️ | ❌ | ❌ |
+| **AI Workpaper Organization** | ✅✅ | ✅✅ (auto-organize) | ❌ | ❌ | ❌ | ❌ |
+| **AI Workflow Optimization** | ✅✅ | ✅ (automation) | ✅ (triggers) | ❌ | ❌ | ❌ |
+| **AI Capacity Planning** | ✅✅ | ❌ | ✅ (predictive) | ❌ | ❌ | ❌ |
+| **AI Anomaly Detection** | ✅✅ | ❌ | ✅ (time entry) | ❌ | ❌ | ❌ |
+| **AI Predictive Analytics** | ✅✅ | ❌ | ✅✅ (Practice Intel) | ❌ | ❌ | ❌ |
+| **AI Report Generation** | ✅✅ | ✅✅ (NL queries) | ❌ | ❌ | ❌ | ❌ |
 | **AI Compliance Checks** | ✅✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **AI Bookkeeping Automation** | ✅ | ❌ | ✅✅ (Aider) | ❌ | ❌ | ❌ |
+| **AI Period Close** | ✅ | ❌ | ✅✅ (Aider) | ❌ | ❌ | ❌ |
 
 **Gap Analysis:**
 - **Accute Features** (from replit.md):
-  - ✅ AI Client Onboarding System
-  - ✅ Skills Management + Skill Matching Engine
+  - ✅ AI Client Onboarding System (unique)
+  - ✅ Skills Management + Skill Matching Engine (unique)
   - ✅ FileParserService (PDF, Word, Excel)
   - ✅ Workload Insights
   - ✅ Enhanced Report Builder
-- **TaxDome:** AI-powered reporting mentioned (basic)
-- **Karbon:** Practice Intelligence (data analytics, not AI)
-- **Competitive Gap:** Accute has 10-15 AI-powered features vs. 0-1 for competitors
-- **Market Timing:** Competitors are 12-18 months behind on AI
+  - ✅ AI Compliance Checks (unique)
+
+- **TaxDome AI Features:**
+  - ✅ Document AI: Auto-tagging, renaming, organizing (strong)
+  - ✅ NL Report Generation: Ask questions in 13 languages (strong)
+  - ✅ Workflow automation
+  - ⚠️ No predictive analytics, compliance checks, or agentic capabilities
+
+- **Karbon AI Features:**
+  - ✅ Smart task assignment based on work history
+  - ✅ AI email drafting with brand voice
+  - ✅ Predictive analytics (Practice Intelligence)
+  - ✅ Aider acquisition: Bookkeeping + period close automation
+  - ✅ Time entry anomaly detection
+  - ⚠️ No document AI, compliance checks, or conversational agents
+
+- **Competitive Gap:** 
+  - Accute: **Agentic AI** with 10 conversational agents
+  - TaxDome: **Document + Reporting AI** (task-specific)
+  - Karbon: **Workflow + Communication AI** (task-specific)
+  - **Key Difference:** Accute has conversational agents, competitors have automation tools
 
 **Segment 5 Summary Score:**
 
 | Competitor | AI Agents Score | LLM Infra Score | AI Features Score | **Total** |
 |------------|-----------------|-----------------|-------------------|-----------|
-| **Accute** | **100/100** ✅✅ | **100/100** ✅✅ | **100/100** ✅✅ | **100/100** |
-| Karbon | 10/100 | 5/100 | 15/100 | 10/100 |
+| **Accute** | **100/100** ✅✅ | **100/100** ✅✅ | **95/100** ✅✅ | **98/100** |
+| Karbon | 20/100 | 15/100 | **70/100** ✅ | **55/100** |
+| TaxDome | 10/100 | 10/100 | **60/100** ✅ | **45/100** |
 | Canopy | 10/100 | 5/100 | 10/100 | 8/100 |
 | ClickUp | 5/100 | 5/100 | 10/100 | 7/100 |
-| TaxDome | 0/100 | 0/100 | 5/100 | 2/100 |
 | Financial Cents | 0/100 | 0/100 | 0/100 | 0/100 |
 
-**Analysis:** Accute has **complete dominance** in AI segment. This is the primary competitive moat.
+**Analysis:** 
+- **Accute leads** (98/100) with agentic AI architecture
+- **Karbon #2** (55/100) - Strong workflow AI + Aider acquisition
+- **TaxDome #3** (45/100) - Document AI + reporting AI
+- **Key Differentiation:** Accute has 10 conversational agents vs. competitors' task-specific AI tools
+- **Competitive Gap:** Multi-agent orchestration is unique to Accute
+- **Market Timing:** TaxDome/Karbon investing heavily (window closing in 12-18 months)
 
 ---
 
