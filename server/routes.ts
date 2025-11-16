@@ -3114,6 +3114,88 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
+  // Get organization billing (for RBAC testing)
+  app.get("/api/organizations/:id/billing", requireAuth, requirePermission("organization.billing"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify user belongs to this organization
+      if (req.user!.organizationId !== id) {
+        return res.status(403).json({ error: "Access denied to this organization" });
+      }
+      
+      const org = await storage.getOrganization(id);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Return mock billing data for now (can be extended later)
+      res.json({
+        organizationId: id,
+        organizationName: org.name,
+        billingStatus: "active",
+        message: "Billing information endpoint - implementation pending"
+      });
+    } catch (error: any) {
+      console.error("Failed to get billing:", error);
+      res.status(500).json({ error: "Failed to get billing information" });
+    }
+  });
+
+  // Transfer organization ownership (owner only)
+  app.post("/api/organizations/:id/transfer", requireAuth, requirePermission("organization.transfer"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { newOwnerId } = req.body;
+      
+      // Verify user belongs to this organization
+      if (req.user!.organizationId !== id) {
+        return res.status(403).json({ error: "Access denied to this organization" });
+      }
+      
+      if (!newOwnerId) {
+        return res.status(400).json({ error: "newOwnerId is required" });
+      }
+      
+      const org = await storage.getOrganization(id);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      
+      // Verify new owner exists and belongs to this organization
+      const newOwner = await storage.getUser(newOwnerId);
+      if (!newOwner || newOwner.organizationId !== id) {
+        return res.status(400).json({ error: "New owner must be a member of this organization" });
+      }
+      
+      // Get owner role
+      const roles = await storage.getRolesByOrganization(id);
+      const ownerRole = roles.find(r => r.name === 'owner');
+      if (!ownerRole) {
+        return res.status(500).json({ error: "Owner role not found" });
+      }
+      
+      // Update new owner's role
+      await storage.updateUser(newOwnerId, { roleId: ownerRole.id });
+      
+      // Optionally downgrade current owner to admin role
+      const adminRole = roles.find(r => r.name === 'admin');
+      if (adminRole && req.userId) {
+        await storage.updateUser(req.userId, { roleId: adminRole.id });
+      }
+      
+      await logActivity(req.userId, id, "transfer", "organization", id, { newOwnerId }, req);
+      res.json({ 
+        message: "Organization ownership transferred successfully",
+        newOwnerId,
+        organizationId: id
+      });
+    } catch (error: any) {
+      console.error("Failed to transfer organization:", error);
+      res.status(500).json({ error: "Failed to transfer organization ownership" });
+    }
+  });
+
   // ==================== Role Routes ====================
   
   app.get("/api/roles", requireAuth, async (req: AuthRequest, res: Response) => {
@@ -6221,6 +6303,46 @@ Title:`;
       console.error("  Error message:", error.message);
       console.error("  Error code:", error.code);
       res.status(500).json({ error: error.message || "Failed to delete client" });
+    }
+  });
+
+  // Organization-scoped client endpoints (for RBAC testing)
+  app.get("/api/organizations/:id/clients", requireAuth, requirePermission("clients.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: orgId } = req.params;
+      
+      // Verify user belongs to this organization
+      if (req.user!.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied to this organization" });
+      }
+      
+      const clients = await storage.getClientsByOrganization(orgId);
+      res.json(clients);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  app.post("/api/organizations/:id/clients", requireAuth, requirePermission("clients.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: orgId } = req.params;
+      
+      // Verify user belongs to this organization
+      if (req.user!.organizationId !== orgId) {
+        return res.status(403).json({ error: "Access denied to this organization" });
+      }
+      
+      const validated = insertClientSchema.omit({ organizationId: true, createdBy: true }).parse(req.body);
+      const client = await storage.createClient({
+        ...validated,
+        organizationId: orgId,
+        createdBy: req.userId!,
+      });
+      await logActivity(req.userId, orgId, "create", "client", client.id, { name: client.companyName }, req);
+      res.status(201).json(client);
+    } catch (error: any) {
+      console.error("[ERROR] Failed to create client:", error);
+      res.status(500).json({ error: "Failed to create client" });
     }
   });
 
