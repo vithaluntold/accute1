@@ -2709,13 +2709,14 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       // Verify user has access to this organization
       const membership = await storage.getUserOrganizationMembership(req.userId, id);
       const isSuperAdmin = !req.user!.organizationId; // Super Admin has no org
+      const isMemberViaOrgId = req.user!.organizationId === id; // Direct org membership
       
       // Only members of this organization or Super Admins can update settings
-      if (!membership && !isSuperAdmin) {
+      if (!membership && !isSuperAdmin && !isMemberViaOrgId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Ensure membership is active (if not Super Admin)
+      // Ensure membership is active (if using userOrganizations table)
       if (membership && membership.status !== 'active') {
         return res.status(403).json({ error: "Organization membership is not active" });
       }
@@ -2833,6 +2834,140 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     } catch (error: any) {
       console.error("Failed to fetch organization members:", error);
       res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  // Get organization users (simpler endpoint returning user objects with roleName)
+  app.get("/api/organizations/:id/users", requireAuth, requirePermission("users.view"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Verify user has access to this organization
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isSuperAdmin = requesterRole?.scope === "platform";
+      
+      if (!isSuperAdmin) {
+        // Regular users can only access their own organization
+        if (id !== req.user!.organizationId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      // Get all users in this organization
+      const users = await storage.getUsersByOrganization(id);
+      
+      // Enrich with roleName for consistency
+      const usersWithRoles = await Promise.all(
+        users.map(async (user) => {
+          const role = await storage.getRole(user.roleId);
+          return formatUserResponse(user, role);
+        })
+      );
+
+      res.json(usersWithRoles);
+    } catch (error: any) {
+      console.error("Failed to fetch organization users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Create user in organization (alias endpoint for better RESTful design)
+  app.post("/api/organizations/:id/users", requireAuth, requirePermission("users.create"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id: orgId } = req.params;
+      const { password, role: roleName, email, firstName, lastName } = req.body;
+      
+      // Verify user can only create users in their own organization (unless Super Admin)
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isSuperAdmin = requesterRole?.scope === "platform";
+      
+      if (!isSuperAdmin && orgId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Cannot create users in other organizations" });
+      }
+      
+      // Get roleId from role name if provided
+      let roleId = req.body.roleId;
+      if (roleName && !roleId) {
+        const userRole = await storage.getRoleByName(roleName);
+        if (!userRole) {
+          return res.status(400).json({ error: `Role '${roleName}' not found` });
+        }
+        roleId = userRole.id;
+      }
+      
+      // Prevent assigning users to platform roles
+      if (roleId) {
+        const assignedRole = await storage.getRole(roleId);
+        if (assignedRole && assignedRole.scope === "platform") {
+          return res.status(403).json({ error: "Cannot assign users to platform roles" });
+        }
+      }
+      
+      // Auto-generate username from email if not provided
+      const username = req.body.username || email.split('@')[0] + Date.now();
+      
+      const hashedPassword = await hashPassword(password);
+      
+      // SECURITY: Force organizationId from path parameter - never trust body
+      const user = await storage.createUser({
+        email,
+        username,
+        firstName,
+        lastName,
+        roleId,
+        password: hashedPassword,
+        organizationId: orgId, // Always use path parameter, not request body
+      });
+
+      await logActivity(req.userId, orgId, "create", "user", user.id, { email: user.email }, req);
+      
+      const userRole = await storage.getRole(user.roleId);
+      res.status(201).json(formatUserResponse(user, userRole));
+    } catch (error: any) {
+      console.error("Failed to create user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Delete organization (owner/super admin only)
+  app.delete("/api/organizations/:id", requireAuth, requirePermission("organization.delete"), async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Get the organization
+      const org = await storage.getOrganization(id);
+      if (!org) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      // Check permissions: Only Super Admins or the organization owner can delete
+      const requesterRole = await storage.getRole(req.user!.roleId);
+      const isSuperAdmin = requesterRole?.scope === "platform";
+      const isOwner = req.user!.organizationId === id;
+
+      if (!isSuperAdmin && !isOwner) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Prevent deletion if there are active users (other than the requester)
+      const orgUsers = await storage.getUsersByOrganization(id);
+      const activeUsers = orgUsers.filter(u => u.isActive && u.id !== req.userId);
+      
+      if (activeUsers.length > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete organization with active users. Please remove or deactivate all users first.",
+          activeUserCount: activeUsers.length
+        });
+      }
+
+      // Delete the organization (cascade deletion handled in storage)
+      await storage.deleteOrganization(id);
+      await logActivity(req.userId, id, "delete", "organization", id, { name: org.name }, req);
+
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Failed to delete organization:", error);
+      res.status(500).json({ error: "Failed to delete organization" });
     }
   });
 

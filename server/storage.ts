@@ -76,6 +76,7 @@ export interface IStorage {
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
   createOrganization(org: InsertOrganization): Promise<Organization>;
   updateOrganization(id: string, org: Partial<InsertOrganization>): Promise<Organization | undefined>;
+  deleteOrganization(id: string): Promise<void>;
   getAllOrganizations(): Promise<Organization[]>;
 
   // User-Organization Memberships (Multi-Workspace)
@@ -801,6 +802,35 @@ export class DbStorage implements IStorage {
       .where(eq(schema.organizations.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteOrganization(id: string): Promise<void> {
+    // CASCADE DELETION: Delete all organization-related data
+    // Order matters: delete child records before parent
+    
+    // 1. Delete activity logs
+    await db.delete(schema.activityLogs).where(eq(schema.activityLogs.organizationId, id));
+    
+    // 2. Delete user-organization memberships
+    await db.delete(schema.userOrganizations).where(eq(schema.userOrganizations.organizationId, id));
+    
+    // 3. Delete users in this organization
+    await db.delete(schema.users).where(eq(schema.users.organizationId, id));
+    
+    // 4. Delete clients
+    await db.delete(schema.clients).where(eq(schema.clients.organizationId, id));
+    
+    // 5. Delete workflows
+    await db.delete(schema.workflows).where(eq(schema.workflows.organizationId, id));
+    
+    // 6. Delete projects
+    await db.delete(schema.projects).where(eq(schema.projects.organizationId, id));
+    
+    // 7. Delete platform subscription if exists
+    await db.delete(schema.platformSubscriptions).where(eq(schema.platformSubscriptions.organizationId, id));
+    
+    // 8. Finally, delete the organization itself
+    await db.delete(schema.organizations).where(eq(schema.organizations.id, id));
   }
 
   async getAllOrganizations(): Promise<Organization[]> {

@@ -64,23 +64,23 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     }
   }
   
-  // Create baseline permissions for tests (using colon notation to match RBAC middleware)
+  // Create baseline permissions for tests (using DOT notation to match route requirements)
   const basePermissions = [
     // User management
-    { name: 'users:create', resource: 'users', action: 'create', description: 'Create new users' },
-    { name: 'users:edit', resource: 'users', action: 'edit', description: 'Edit user details' },
-    { name: 'users:delete', resource: 'users', action: 'delete', description: 'Delete users' },
-    { name: 'users:view', resource: 'users', action: 'view', description: 'View user list' },
+    { name: 'users.create', resource: 'users', action: 'create', description: 'Create new users' },
+    { name: 'users.edit', resource: 'users', action: 'edit', description: 'Edit user details' },
+    { name: 'users.delete', resource: 'users', action: 'delete', description: 'Delete users' },
+    { name: 'users.view', resource: 'users', action: 'view', description: 'View user list' },
     // Organization management
-    { name: 'organization:edit', resource: 'organization', action: 'edit', description: 'Edit organization' },
-    { name: 'organization:delete', resource: 'organization', action: 'delete', description: 'Delete organization' },
-    { name: 'organization:billing', resource: 'organization', action: 'billing', description: 'View billing' },
-    { name: 'organization:transfer', resource: 'organization', action: 'transfer', description: 'Transfer ownership' },
+    { name: 'organization.edit', resource: 'organization', action: 'edit', description: 'Edit organization' },
+    { name: 'organization.delete', resource: 'organization', action: 'delete', description: 'Delete organization' },
+    { name: 'organization.billing', resource: 'organization', action: 'billing', description: 'View billing' },
+    { name: 'organization.transfer', resource: 'organization', action: 'transfer', description: 'Transfer ownership' },
     // Client management
-    { name: 'clients:create', resource: 'clients', action: 'create', description: 'Create clients' },
-    { name: 'clients:edit', resource: 'clients', action: 'edit', description: 'Edit clients' },
-    { name: 'clients:delete', resource: 'clients', action: 'delete', description: 'Delete clients' },
-    { name: 'clients:view', resource: 'clients', action: 'view', description: 'View clients' },
+    { name: 'clients.create', resource: 'clients', action: 'create', description: 'Create clients' },
+    { name: 'clients.edit', resource: 'clients', action: 'edit', description: 'Edit clients' },
+    { name: 'clients.delete', resource: 'clients', action: 'delete', description: 'Delete clients' },
+    { name: 'clients.view', resource: 'clients', action: 'view', description: 'View clients' },
   ];
   
   // Check if permissions already exist and create missing ones
@@ -138,9 +138,9 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   
   // Admin gets most permissions (no org delete/transfer)
   const adminPerms = [
-    'users:create', 'users:edit', 'users:delete', 'users:view',
-    'organization:edit', 'organization:billing',
-    'clients:create', 'clients:edit', 'clients:delete', 'clients:view'
+    'users.create', 'users.edit', 'users.delete', 'users.view',
+    'organization.edit', 'organization.billing',
+    'clients.create', 'clients.edit', 'clients.delete', 'clients.view'
   ];
   for (const permName of adminPerms) {
     const permId = permissionMap.get(permName);
@@ -151,8 +151,8 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   
   // Manager gets team + client permissions
   const managerPerms = [
-    'users:view', 'users:edit',
-    'clients:create', 'clients:edit', 'clients:view'
+    'users.view', 'users.edit',
+    'clients.create', 'clients.edit', 'clients.view'
   ];
   for (const permName of managerPerms) {
     const permId = permissionMap.get(permName);
@@ -162,7 +162,7 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   }
   
   // Staff gets basic view permissions
-  const staffPerms = ['users:view', 'clients:view'];
+  const staffPerms = ['users.view', 'clients.view'];
   for (const permName of staffPerms) {
     const permId = permissionMap.get(permName);
     if (permId) {
