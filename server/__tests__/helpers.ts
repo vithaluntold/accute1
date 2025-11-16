@@ -130,22 +130,39 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     }
   }
   
-  // Assign permissions to roles (delete existing first for idempotency)
-  const ownerRoleId = roleCache.get('owner')!;
-  const adminRoleId = roleCache.get('admin')!;
-  const managerRoleId = roleCache.get('manager')!;
-  const staffRoleId = roleCache.get('staff')!;
+  // Assign permissions to roles (idempotent - uses onConflictDoNothing)
+  const ownerRoleId = roleCache.get('owner');
+  const adminRoleId = roleCache.get('admin');
+  const managerRoleId = roleCache.get('manager');
+  const staffRoleId = roleCache.get('staff');
   
-  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, ownerRoleId));
-  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, adminRoleId));
-  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, managerRoleId));
-  await db.delete(rolePermissions).where(eq(rolePermissions.roleId, staffRoleId));
+  // Verify all roles exist (safety check)
+  if (!ownerRoleId || !adminRoleId || !managerRoleId || !staffRoleId) {
+    throw new Error(`Missing roles in cache: owner=${!!ownerRoleId}, admin=${!!adminRoleId}, manager=${!!managerRoleId}, staff=${!!staffRoleId}`);
+  }
+  
+  // Verify roles exist in database (additional safety check for concurrency)
+  const roleVerification = await db.select().from(roles).where(
+    eq(roles.id, ownerRoleId)
+  );
+  if (roleVerification.length === 0) {
+    throw new Error(`Owner role ${ownerRoleId} not found in database - possible race condition`);
+  }
+  
+  // Check which assignments already exist to avoid duplicates
+  const existingAssignments = await db.select().from(rolePermissions);
+  const assignmentSet = new Set(
+    existingAssignments.map(a => `${a.roleId}:${a.permissionId}`)
+  );
   
   const assignments = [];
   
-  // Owner gets ALL permissions
+  // Owner gets ALL permissions (only add if not exists)
   for (const permId of permissionMap.values()) {
-    assignments.push({ roleId: ownerRoleId, permissionId: permId });
+    const key = `${ownerRoleId}:${permId}`;
+    if (!assignmentSet.has(key)) {
+      assignments.push({ roleId: ownerRoleId, permissionId: permId });
+    }
   }
   
   // Admin gets most (no org delete/transfer)
@@ -154,7 +171,11 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
     'clients.create', 'clients.edit', 'clients.delete', 'clients.view'];
   for (const permName of adminPerms) {
     if (permissionMap.has(permName)) {
-      assignments.push({ roleId: adminRoleId, permissionId: permissionMap.get(permName)! });
+      const permId = permissionMap.get(permName)!;
+      const key = `${adminRoleId}:${permId}`;
+      if (!assignmentSet.has(key)) {
+        assignments.push({ roleId: adminRoleId, permissionId: permId });
+      }
     }
   }
   
@@ -162,7 +183,11 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   const managerPerms = ['users.view', 'users.edit', 'clients.create', 'clients.edit', 'clients.view'];
   for (const permName of managerPerms) {
     if (permissionMap.has(permName)) {
-      assignments.push({ roleId: managerRoleId, permissionId: permissionMap.get(permName)! });
+      const permId = permissionMap.get(permName)!;
+      const key = `${managerRoleId}:${permId}`;
+      if (!assignmentSet.has(key)) {
+        assignments.push({ roleId: managerRoleId, permissionId: permId });
+      }
     }
   }
   
@@ -170,7 +195,11 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   const staffPerms = ['users.edit', 'clients.view'];
   for (const permName of staffPerms) {
     if (permissionMap.has(permName)) {
-      assignments.push({ roleId: staffRoleId, permissionId: permissionMap.get(permName)! });
+      const permId = permissionMap.get(permName)!;
+      const key = `${staffRoleId}:${permId}`;
+      if (!assignmentSet.has(key)) {
+        assignments.push({ roleId: staffRoleId, permissionId: permId });
+      }
     }
   }
   
