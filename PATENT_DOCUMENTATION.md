@@ -15,13 +15,13 @@
 
 **Novel Technical Contributions:**
 
-1. **Multi-Agent Orchestration Architecture** - 10 specialized AI agents with domain-specific capabilities, shared infrastructure, and unified session management
+1. **Multi-Agent Orchestration Architecture** - 11 specialized AI agents with domain-specific capabilities, shared infrastructure, and unified session management
 2. **Two-Level LLM Configuration System** - Organization-level and user-level LLM credential management with AES-256-GCM encryption and ConfigResolver caching
-3. **WebSocket Streaming Infrastructure** - Real-time bidirectional communication with auto-title generation and session state persistence
+3. **WebSocket Streaming Infrastructure** - Real-time bidirectional communication with session state persistence
 4. **Agent Marketplace Architecture** - Dynamic agent discovery, registration, and deployment with custom agent foundry
 5. **Unified Session Management** - Cross-agent session routing with organization isolation and security validation
-6. **Automated Conversation Title Generation** - LLM-powered context-aware title generation after first message exchange
-7. **Encrypted Credential Management** - AES-256-GCM encryption for API keys with ENCRYPTION_KEY stability requirements
+6. **Automated Conversation Title Generation** - LLM-powered context-aware title generation after first message exchange with WebSocket broadcast
+7. **Encrypted Credential Management** - AES-256-GCM encryption for API keys with ENCRYPTION_KEY stability requirements and secure rotation
 
 ---
 
@@ -57,7 +57,7 @@ Traditional practice management software lacks specialized AI capabilities. Exis
 | Karbon | 0 | ❌ | ❌ | ❌ |
 | Canopy | 0 | ❌ | ❌ | ❌ |
 | Trullion | 1 (Trulli) | ✅ | ❌ | ❌ |
-| **Accute** | **10** | **✅** | **✅** | **✅** |
+| **Accute** | **11** | **✅** | **✅** | **✅** |
 
 **Key Differentiation:** Accute is the only platform with multi-agent conversational AI system, multi-provider LLM support, and agent marketplace.
 
@@ -75,10 +75,11 @@ Traditional practice management software lacks specialized AI capabilities. Exis
    - Domain-specific message handling
    - Unified interface for all agents
 
-2. **Shared Agent Registry** (`server/shared-agent-registry.ts`)
-   - Centralized agent metadata storage
-   - Agent capabilities and routing rules
-   - Version management and updates
+2. **Agent Registry** (`server/agent-registry.ts`)
+   - Centralized agent metadata storage from manifest-driven system
+   - Agent capabilities and routing rules loaded from `/agents/{slug}/manifest.json`
+   - Version management, database sync, and updates
+   - Dynamic agent loading without system recompilation
 
 3. **ConfigResolver** (`server/config-resolver.ts`)
    - Two-level LLM configuration (org + user)
@@ -125,17 +126,18 @@ export class AgentOrchestrator {
 }
 ```
 
-**10 Specialized Agents:**
+**11 Specialized Agents:**
 1. **Luca** - Tax & Compliance (IRS, tax law, filing)
 2. **Cadence** - Client Onboarding (21-day journey automation)
 3. **Parity** - Reconciliation & Bookkeeping
-4. **Forma** - Advisory & Insights
-5. **Echo** - Communication & Follow-ups
+4. **Echo** - Communication & Follow-ups
+5. **Forma** - Advisory & Insights
 6. **Relay** - Workflow Orchestration
 7. **Scribe** - Documentation
-8. **Sentinel** - Compliance Monitoring
-9. **Nexus** - Client Intelligence
-10. **[10th Agent]** - Specialized domain
+8. **Radar** - Compliance Monitoring & Alerts
+9. **Lynk** - Client Relationship Management
+10. **Omnispectra** - Analytics & Reporting
+11. **Kanban** - Project Management
 
 **Patentable Claims:**
 - Multi-agent architecture with unified orchestration layer
@@ -344,11 +346,11 @@ export class AgentFoundry {
 **Technical Innovation:**
 
 ```typescript
-// Unified session routes for all 10 agents
+// Unified session routes for all 11 agents
 export function registerAgentSessionRoutes(app: Express) {
   const agentSlugs = [
-    'luca', 'cadence', 'parity', 'forma', 'echo',
-    'relay', 'scribe', 'sentinel', 'nexus', 'agent10'
+    'luca', 'cadence', 'parity', 'echo', 'forma',
+    'relay', 'scribe', 'radar', 'lynk', 'omnispectra', 'kanban'
   ];
   
   agentSlugs.forEach(slug => {
@@ -390,6 +392,288 @@ export function registerAgentSessionRoutes(app: Express) {
 - Organization-level session isolation with security validation
 - Cross-agent session state persistence
 - Dynamic route registration for scalable agent ecosystem
+
+#### Feature 6: Automated Conversation Title Generation
+
+**Problem Solved:** Manual conversation titling, generic timestamp-based titles, no context-aware title generation.
+
+**Technical Innovation:**
+
+```typescript
+// Auto-title generation after first message exchange
+async function handleAIAgentExecution(
+  ws: WebSocket,
+  data: AIAgentExecutionMessage,
+  userId: number,
+  organizationId: number
+) {
+  const session = await AgentSessionService.getSession(data.sessionId);
+  
+  // Stream AI response
+  const stream = await agent.streamResponse(data.message);
+  let fullResponse = '';
+  
+  for await (const chunk of stream) {
+    fullResponse += chunk;
+    ws.send(JSON.stringify({ type: 'ai_chunk', data: chunk }));
+  }
+  
+  // Auto-generate title after first exchange (2 messages total)
+  const messageCount = await db.query.agentMessages.count({
+    where: eq(agentMessages.sessionId, session.id)
+  });
+  
+  if (messageCount === 2 && !session.title) {
+    // Generate contextual title using LLM
+    const title = await generateContextualTitle(
+      session,
+      data.message,
+      fullResponse
+    );
+    
+    // Persist title
+    await AgentSessionService.updateSessionTitle(session.id, title);
+    
+    // Broadcast title update via WebSocket
+    ws.send(JSON.stringify({ 
+      type: 'title_updated', 
+      data: { sessionId: session.id, title } 
+    }));
+  }
+}
+
+// LLM-powered title generation with temperature 0.7
+async function generateContextualTitle(
+  session: Session,
+  firstUserMessage: string,
+  firstAIResponse: string
+): Promise<string> {
+  // Analyze first 500 characters of each message for context
+  const userContext = firstUserMessage.substring(0, 500);
+  const aiContext = firstAIResponse.substring(0, 500);
+  
+  const prompt = `Generate a concise 3-6 word title for this conversation:
+  
+User: ${userContext}
+Assistant: ${aiContext}
+
+Title (3-6 words):`;
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.7,  // Balanced creativity
+    max_tokens: 20     // Constrain to short titles
+  });
+  
+  return completion.choices[0].message.content.trim();
+}
+```
+
+**Technical Components:**
+
+1. **Message Count Trigger**
+   - Monitors message count in session
+   - Triggers after first exchange (exactly 2 messages)
+   - Prevents duplicate title generation
+
+2. **LLM-Powered Analysis**
+   - Uses GPT-4 for contextual understanding
+   - Analyzes first 500 characters of user + AI messages
+   - Temperature 0.7 for balanced creativity
+   - Max 20 tokens to ensure concise titles
+
+3. **WebSocket Broadcast**
+   - Real-time title update to connected clients
+   - `title_updated` event with sessionId + title
+   - Enables instant UI refresh without polling
+
+4. **Database Persistence**
+   - Title stored in agent_sessions table
+   - Enables search and filtering by conversation title
+   - Session title remains stable after generation
+
+**Patentable Claims:**
+- Automatic trigger mechanism after first message exchange
+- LLM-powered contextual title generation (3-6 words)
+- WebSocket broadcast for real-time title updates
+- Integration with session state persistence
+
+#### Feature 7: Encrypted Credential Management
+
+**Problem Solved:** Insecure API key storage, plaintext credentials in database, unstable encryption keys causing data loss.
+
+**Technical Innovation:**
+
+```typescript
+// AES-256-GCM encryption for API keys
+import crypto from 'crypto';
+
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
+const SALT_LENGTH = 64;
+
+export function encrypt(text: string, encryptionKey: string): string {
+  // Require stable ENCRYPTION_KEY environment variable
+  if (!encryptionKey) {
+    throw new Error('ENCRYPTION_KEY environment variable required');
+  }
+  
+  // Generate random salt for key derivation
+  const salt = crypto.randomBytes(SALT_LENGTH);
+  
+  // Derive encryption key using PBKDF2
+  const key = crypto.pbkdf2Sync(
+    encryptionKey,
+    salt,
+    100000,  // 100k iterations
+    32,      // 256 bits
+    'sha512'
+  );
+  
+  // Generate random IV for GCM mode
+  const iv = crypto.randomBytes(IV_LENGTH);
+  
+  // Create cipher with AES-256-GCM
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+  
+  // Encrypt data
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  // Get authentication tag for integrity verification
+  const authTag = cipher.getAuthTag();
+  
+  // Combine salt + IV + authTag + encrypted data
+  const result = Buffer.concat([
+    salt,
+    iv,
+    authTag,
+    Buffer.from(encrypted, 'hex')
+  ]);
+  
+  return result.toString('base64');
+}
+
+export function decrypt(encryptedData: string, encryptionKey: string): string {
+  if (!encryptionKey) {
+    throw new Error('ENCRYPTION_KEY environment variable required');
+  }
+  
+  // Decode base64 data
+  const buffer = Buffer.from(encryptedData, 'base64');
+  
+  // Extract components
+  const salt = buffer.subarray(0, SALT_LENGTH);
+  const iv = buffer.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const authTag = buffer.subarray(
+    SALT_LENGTH + IV_LENGTH,
+    SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH
+  );
+  const encrypted = buffer.subarray(SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
+  
+  // Derive same encryption key using salt
+  const key = crypto.pbkdf2Sync(
+    encryptionKey,
+    salt,
+    100000,
+    32,
+    'sha512'
+  );
+  
+  // Create decipher
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  
+  // Decrypt data with integrity verification
+  let decrypted = decipher.update(encrypted);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  
+  return decrypted.toString('utf8');
+}
+
+// ConfigResolver integration with encrypted credentials
+export class ConfigResolver {
+  private cache: Map<string, DecryptedConfig> = new Map();
+  
+  async getLLMConfig(userId: number, orgId: number): Promise<DecryptedConfig> {
+    const cacheKey = `${orgId}:${userId}`;
+    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey)!;
+    
+    // Fetch encrypted config from database
+    let config = await this.fetchUserOrOrgConfig(userId, orgId);
+    
+    // Decrypt API key using stable ENCRYPTION_KEY
+    const decryptedKey = decrypt(
+      config.apiKey,
+      process.env.ENCRYPTION_KEY!
+    );
+    
+    const decryptedConfig = { ...config, apiKey: decryptedKey };
+    
+    // Cache decrypted config to reduce decryption overhead
+    this.cache.set(cacheKey, decryptedConfig);
+    
+    return decryptedConfig;
+  }
+  
+  // Credential rotation support
+  async rotateCredential(
+    configId: number,
+    newApiKey: string
+  ): Promise<void> {
+    const encryptedKey = encrypt(newApiKey, process.env.ENCRYPTION_KEY!);
+    
+    await db.update(llmConfigurations)
+      .set({ apiKey: encryptedKey, updatedAt: new Date() })
+      .where(eq(llmConfigurations.id, configId));
+    
+    // Invalidate cache to force re-fetch
+    this.cache.clear();
+  }
+}
+```
+
+**Technical Components:**
+
+1. **AES-256-GCM Encryption**
+   - Industry-standard authenticated encryption
+   - Galois/Counter Mode for integrity + confidentiality
+   - Authentication tag prevents tampering
+   - Random IV per encryption operation
+
+2. **PBKDF2 Key Derivation**
+   - 100,000 iterations (OWASP recommended)
+   - SHA-512 hashing algorithm
+   - Random 64-byte salt per encrypted value
+   - Derives 256-bit key from ENCRYPTION_KEY
+
+3. **ENCRYPTION_KEY Stability Requirement**
+   - Must be stable across deployments
+   - Changing key causes decryption failures
+   - All encrypted data becomes inaccessible
+   - Critical operational requirement documented
+
+4. **Secure Credential Rotation**
+   - Re-encrypt with new API key
+   - Invalidate cache to prevent stale credentials
+   - Audit trail with updatedAt timestamp
+   - Zero-downtime rotation support
+
+**Security Properties:**
+
+- **Confidentiality**: AES-256 encryption protects API keys
+- **Integrity**: GCM authentication tag prevents tampering
+- **Non-Deterministic**: Random salt + IV ensure different ciphertext each time
+- **Key Derivation**: PBKDF2 adds computational cost to brute-force attacks
+- **Cache Security**: Decrypted credentials only in memory, cleared on rotation
+
+**Patentable Claims:**
+- AES-256-GCM encryption for LLM API credentials
+- PBKDF2 key derivation with random salt
+- ENCRYPTION_KEY stability requirement for operational continuity
+- Credential rotation with cache invalidation
 
 ---
 
@@ -551,10 +835,11 @@ a) An **Agent Orchestrator** module that:
    - Routes messages to appropriate agents based on domain expertise
    - Provides unified interface for agent interaction
 
-b) A **Shared Agent Registry** that:
-   - Stores agent metadata including capabilities and routing rules
+b) An **Agent Registry** that:
+   - Stores agent metadata from manifest-driven system (`/agents/{slug}/manifest.json`)
    - Enables version management and updates
    - Supports dynamic agent discovery
+   - Syncs agent definitions to database
 
 c) A **Unified Session Management** system that:
    - Creates isolated sessions for each agent-user interaction
@@ -562,17 +847,18 @@ c) A **Unified Session Management** system that:
    - Persists session state across multiple interactions
    - Enables cross-agent session routing
 
-d) At least 10 specialized AI agents with domain-specific knowledge in:
-   - Tax & compliance
-   - Client onboarding
-   - Bookkeeping & reconciliation
-   - Advisory services
-   - Communication automation
-   - Workflow orchestration
-   - Documentation
-   - Compliance monitoring
-   - Client intelligence
-   - [Additional specialized domain]
+d) At least 11 specialized AI agents with domain-specific knowledge in:
+   - Tax & compliance (Luca)
+   - Client onboarding (Cadence)
+   - Bookkeeping & reconciliation (Parity)
+   - Communication automation (Echo)
+   - Advisory services (Forma)
+   - Workflow orchestration (Relay)
+   - Documentation (Scribe)
+   - Compliance monitoring (Radar)
+   - Client relationship management (Lynk)
+   - Analytics & reporting (Omnispectra)
+   - Project management (Kanban)
 
 ### Claim 2: Two-Level LLM Configuration Architecture
 
@@ -705,7 +991,7 @@ d) A **Cross-Agent Analytics** system that:
 
 | Feature | Accute | TaxDome | Karbon | Canopy | Trullion |
 |---------|--------|---------|--------|--------|----------|
-| **Agentic AI** | ✅ 10 agents | ❌ | ❌ | ❌ | ✅ 1 agent |
+| **Agentic AI** | ✅ 11 agents | ❌ | ❌ | ❌ | ✅ 1 agent |
 | **Agent Marketplace** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Multi-Provider LLM** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **WebSocket Streaming** | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -738,10 +1024,10 @@ d) A **Cross-Agent Analytics** system that:
 
 **Agent System:**
 - `server/agent-orchestrator.ts` - Agent registration and routing
-- `server/shared-agent-registry.ts` - Agent metadata storage
-- `server/agents/luca-agent.ts` - Tax & compliance agent
-- `server/agents/cadence-agent.ts` - Client onboarding agent
-- (8 additional agent files)
+- `server/agent-registry.ts` - Agent metadata storage from manifest-driven system
+- `/agents/luca/manifest.json` - Tax & compliance agent configuration
+- `/agents/cadence/manifest.json` - Client onboarding agent configuration
+- (9 additional agent manifests: parity, echo, forma, relay, scribe, radar, lynk, omnispectra, kanban)
 
 **Configuration:**
 - `server/config-resolver.ts` - LLM configuration resolution
@@ -837,7 +1123,7 @@ d) A **Cross-Agent Analytics** system that:
 
 Accute's multi-agent AI practice management system introduces **seven novel technical contributions**:
 
-1. ✅ Multi-agent orchestration with 10 specialized conversational AI agents
+1. ✅ Multi-agent orchestration with 11 specialized conversational AI agents
 2. ✅ Two-level LLM configuration hierarchy with encrypted credential management
 3. ✅ WebSocket streaming infrastructure with auto-title generation
 4. ✅ Agent marketplace with dynamic registration and custom agent foundry
@@ -848,7 +1134,7 @@ Accute's multi-agent AI practice management system introduces **seven novel tech
 ### 8.2 Competitive Position
 
 **Market Gap:** Accute is the **only platform** with:
-- Multi-agent conversational AI (10 agents vs. 0-1 competitors)
+- Multi-agent conversational AI (11 agents vs. 0-1 competitors)
 - Agent marketplace for dynamic discovery and deployment
 - Multi-provider LLM support (OpenAI, Azure, Anthropic)
 - Agentic AI vs. task-specific AI automation

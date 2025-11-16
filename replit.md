@@ -43,3 +43,7 @@ The project is structured into `client/`, `server/`, and `shared/` directories, 
 - pdf-parse
 - mammoth
 - xlsx
+
+# Key Documentation
+- **PATENT_DOCUMENTATION.md**: Comprehensive patent documentation covering multi-agent AI orchestration system, two-level LLM configuration architecture, WebSocket streaming with auto-title generation, agent marketplace, and unified cross-agent session routing. Details 7 novel technical contributions and 5 patentable claims with 12-18 month competitive advantage.
+- **COMPETITIVE_ANALYSIS_2025.md**: Comprehensive competitive analysis across 7 major competitors (TaxDome, Karbon, Canopy, Trullion, Financial Cents, Jetpack Workflow, ClickUp) with accurate AI capability scores, 4-quadrant market positioning, and strategic recommendations. Accute leads with 90/100 AI score (2x nearest competitor) through unique multi-agent conversational AI vs. competitors' task-specific AI automation.
