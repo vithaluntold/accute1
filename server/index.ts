@@ -324,10 +324,18 @@ app.use((req, res, next) => {
       console.log('🔧 Registering AI agent routes (AFTER initialization)...');
       try {
         const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
+        const { registerAgentSessionRoutes } = await import("./agent-sessions");
         const agentSlugs = getAvailableAgents();
         
         console.log(`📋 Registering ${agentSlugs.length} agent routes...`);
         registerAllAgentRoutes(agentSlugs, app);
+        
+        // Register session routes for all agents
+        console.log(`📋 Registering session routes for ${agentSlugs.length} agents...`);
+        for (const slug of agentSlugs) {
+          registerAgentSessionRoutes(app, slug);
+        }
+        
         console.log('✅ Agent routes registered successfully');
       } catch (agentError) {
         console.error('❌ CRITICAL: Failed to register agent routes:', agentError);

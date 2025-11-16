@@ -1,10 +1,11 @@
 import type { Express, Response } from "express";
 import { requireAuth, type AuthRequest } from "./auth";
-import { storage } from "./storage";
+import { sessionService } from "./agent-session-service";
+import { nanoid } from "nanoid";
 
 /**
- * Common session management routes for AI agents (Parity, Cadence, Forma)
- * These routes handle CRUD operations for agent conversation sessions
+ * Common session management routes for AI agents (All 10 agents with auto-title generation)
+ * These routes handle CRUD operations for agent conversation sessions using AgentSessionService
  */
 export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   const basePath = `/api/agents/${agentSlug}/sessions`;
@@ -12,18 +13,26 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   // Create a new session
   app.post(basePath, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { name } = req.body;
+      const { name, title } = req.body;
       
-      if (!name) {
-        return res.status(400).json({ error: "Session name is required" });
-      }
+      // Support both name and title for backward compatibility
+      const sessionTitle = title || name || null;
+      
+      // Generate unique session ID
+      const sessionId = `${agentSlug}-${nanoid(16)}`;
 
-      const session = await storage.createAgentSession({
+      const session = await sessionService.getOrCreateSession(
         agentSlug,
-        userId: req.user!.id,
-        organizationId: req.user!.organizationId!,
-        name,
-      });
+        sessionId,
+        req.user!.id,
+        req.user!.organizationId!
+      );
+
+      // Update title if provided
+      if (sessionTitle) {
+        await sessionService.updateSessionTitle(session.id, sessionTitle);
+        session.title = sessionTitle;
+      }
 
       res.json(session);
     } catch (error) {
@@ -35,7 +44,11 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   // Get all sessions for current user
   app.get(basePath, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const sessions = await storage.getAgentSessionsByUser(req.user!.id, agentSlug);
+      const sessions = await sessionService.getUserSessions(
+        req.user!.id,
+        req.user!.organizationId!,
+        agentSlug
+      );
       res.json(sessions);
     } catch (error) {
       console.error(`Error fetching ${agentSlug} sessions:`, error);
@@ -44,21 +57,16 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   });
 
   // Get a specific session with its messages
-  app.get(`${basePath}/:id`, requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get(`${basePath}/:sessionId`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const { sessionId } = req.params;
       
-      const session = await storage.getAgentSession(id);
+      const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      // Verify ownership
-      if (session.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
-
-      const messages = await storage.getAgentMessagesBySession(id);
+      const messages = await sessionService.getHistory(session.id);
       
       res.json({
         ...session,
@@ -70,27 +78,27 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
     }
   });
 
-  // Update session name
-  app.patch(`${basePath}/:id`, requireAuth, async (req: AuthRequest, res: Response) => {
+  // Update session title/name
+  app.patch(`${basePath}/:sessionId`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
-      const { name } = req.body;
+      const { sessionId } = req.params;
+      const { name, title } = req.body;
 
-      if (!name) {
-        return res.status(400).json({ error: "Session name is required" });
+      // Support both name and title for backward compatibility
+      const newTitle = title || name;
+      
+      if (!newTitle) {
+        return res.status(400).json({ error: "Title or name is required" });
       }
 
-      const session = await storage.getAgentSession(id);
+      const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      // Verify ownership
-      if (session.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
-
-      const updated = await storage.updateAgentSession(id, name);
+      await sessionService.updateSessionTitle(session.id, newTitle);
+      
+      const updated = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       res.json(updated);
     } catch (error) {
       console.error(`Error updating ${agentSlug} session:`, error);
@@ -99,21 +107,16 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   });
 
   // Delete a session
-  app.delete(`${basePath}/:id`, requireAuth, async (req: AuthRequest, res: Response) => {
+  app.delete(`${basePath}/:sessionId`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const { sessionId } = req.params;
 
-      const session = await storage.getAgentSession(id);
+      const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      // Verify ownership
-      if (session.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
-
-      await storage.deleteAgentSession(id);
+      await sessionService.deleteSession(session.id, req.user!.id);
       res.json({ success: true });
     } catch (error) {
       console.error(`Error deleting ${agentSlug} session:`, error);
@@ -122,21 +125,16 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   });
 
   // Get messages for a session
-  app.get(`${basePath}/:id/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
+  app.get(`${basePath}/:sessionId/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const { sessionId } = req.params;
 
-      const session = await storage.getAgentSession(id);
+      const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      // Verify ownership
-      if (session.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
-
-      const messages = await storage.getAgentMessagesBySession(id);
+      const messages = await sessionService.getHistory(session.id);
       res.json(messages);
     } catch (error) {
       console.error(`Error fetching messages for ${agentSlug} session:`, error);
@@ -145,33 +143,26 @@ export function registerAgentSessionRoutes(app: Express, agentSlug: string) {
   });
 
   // Add a message to a session
-  app.post(`${basePath}/:id/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
+  app.post(`${basePath}/:sessionId/messages`, requireAuth, async (req: AuthRequest, res: Response) => {
     try {
-      const { id } = req.params;
+      const { sessionId } = req.params;
       const { role, content, metadata } = req.body;
 
       if (!role || !content) {
         return res.status(400).json({ error: "Role and content are required" });
       }
 
-      const session = await storage.getAgentSession(id);
+      const session = await sessionService.getSessionBySessionId(sessionId, req.user!.id);
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      // Verify ownership
-      if (session.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
-
-      const message = await storage.createAgentMessage({
-        sessionId: id,
-        role,
-        content,
-        metadata: metadata || {},
-      });
-
-      res.json(message);
+      await sessionService.saveMessage(session.id, role, content, metadata || {});
+      
+      const messages = await sessionService.getHistory(session.id);
+      const newMessage = messages[messages.length - 1];
+      
+      res.json(newMessage);
     } catch (error) {
       console.error(`Error adding message to ${agentSlug} session:`, error);
       res.status(500).json({ error: "Failed to add message" });
