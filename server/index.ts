@@ -115,6 +115,11 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, log } from "./vite";
 import { initializeSystem } from "./init";
+import {
+  loginRateLimiter,
+  organizationCreationRateLimiter,
+  userCreationRateLimiter,
+} from "./rate-limit";
 // DISABLED: WebSockets now lazy-load with chat sessions, not at server startup
 // import { setupWebSocket } from "./websocket";
 // import { setupRoundtableWebSocket } from "./roundtable-websocket";
@@ -227,6 +232,13 @@ const paymentLimiter = rateLimit({
 app.use('/api/payment-methods', paymentLimiter);
 app.use('/api/subscription-invoices/:id/pay', paymentLimiter);
 app.use('/api/subscription-invoices/:id/complete-payment', paymentLimiter);
+
+// SECURITY: P0 Rate Limiting for Authentication Endpoints
+// Prevents brute-force attacks and account enumeration
+app.post('/api/auth/login', loginRateLimiter); // Login attempts
+// Note: organizationCreationRateLimiter will be applied by routes.ts on POST /api/organizations
+// Note: userCreationRateLimiter will be applied by routes.ts on POST /api/organizations/:id/users
+console.log('✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)');
 
 app.use((req, res, next) => {
   const start = Date.now();
