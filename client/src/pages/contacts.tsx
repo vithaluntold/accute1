@@ -25,55 +25,64 @@ export default function Contacts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  // Get current user for workspace context
+  const { data: user } = useQuery<any>({
+    queryKey: ["/api/users/me"],
+  });
+  const orgId = user?.defaultOrganizationId;
+
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
-    queryKey: ["/api/contacts", selectedClientFilter],
-    queryFn: (selectedClientFilter && selectedClientFilter !== "all") ? () => fetch(`/api/contacts?clientId=${selectedClientFilter}`).then(r => r.json()) : undefined,
+    queryKey: ["/api/contacts", orgId, selectedClientFilter],
+    enabled: !!orgId,
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/clients", orgId],
+    enabled: !!orgId,
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertContact) => {
-      return await apiRequest("/api/contacts", "POST", data);
+      return await apiRequest("POST", "/api/contacts", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", orgId] });
       setDialogOpen(false);
-      toast({ title: "Contact created successfully" });
+      form.reset();
+      toast({ title: "Success", description: "Contact created successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to create contact", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create contact", variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<InsertContact> }) => {
-      return await apiRequest(`/api/contacts/${id}`, "PATCH", data);
+      return await apiRequest("PATCH", `/api/contacts/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", orgId] });
       setDialogOpen(false);
       setEditingContact(null);
-      toast({ title: "Contact updated successfully" });
+      form.reset();
+      toast({ title: "Success", description: "Contact updated successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to update contact", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update contact", variant: "destructive" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/contacts/${id}`, "DELETE");
+      return await apiRequest("DELETE", `/api/contacts/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts", orgId] });
       setDeletingContact(null);
-      toast({ title: "Contact deleted successfully" });
+      toast({ title: "Success", description: "Contact deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to delete contact", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete contact", variant: "destructive" });
     },
   });
 
@@ -132,12 +141,18 @@ export default function Contacts() {
     setDialogOpen(true);
   };
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (contact.title && contact.title.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredContacts = contacts.filter(contact => {
+    // Filter by search term
+    const matchesSearch = contact.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.title && contact.title.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Filter by client if not "all"
+    const matchesClient = selectedClientFilter === "all" || contact.clientId === selectedClientFilter;
+    
+    return matchesSearch && matchesClient;
+  });
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return "Unknown";
