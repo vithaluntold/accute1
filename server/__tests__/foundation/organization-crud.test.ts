@@ -1,14 +1,17 @@
 import request from 'supertest';
 import app from '../../test-app';
-import { createOrg, createAuthenticatedUser } from '../helpers';
+import { createOrg, createAuthenticatedUser, clearRoleCache } from '../helpers';
 import { db } from '../../db';
 import { organizations } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { resetRateLimiters } from '../../rate-limit';
 
 describe('Organization Creation', () => {
   let ownerToken: string;
 
   beforeEach(async () => {
+    resetRateLimiters();
+    clearRoleCache();
     const { token } = await createAuthenticatedUser({ role: 'owner' });
     ownerToken = token;
   });

@@ -5,12 +5,19 @@
  * Tests: Connection pooling, schema validation, transaction handling
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { testDb as db } from '../../test-db';
 import { users, organizations, roles, permissions } from '@shared/schema';
 import { sql } from 'drizzle-orm';
+import { resetRateLimiters } from '../../rate-limit';
+import { clearRoleCache } from '../helpers';
 
 describe('Layer 1A: Database Connectivity & Migrations (10 tests)', () => {
+  
+  beforeEach(async () => {
+    resetRateLimiters();
+    clearRoleCache();
+  });
   
   // ==================== DATABASE CONNECTION (3 tests) ====================
   

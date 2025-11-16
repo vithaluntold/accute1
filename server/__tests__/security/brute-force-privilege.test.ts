@@ -6,9 +6,16 @@
 
 import request from 'supertest';
 import app from '../../test-app';
-import { createAuthenticatedUser, createUserAPI, login, authenticatedRequest, wait } from '../helpers';
+import { createAuthenticatedUser, createUserAPI, login, authenticatedRequest, wait, clearRoleCache } from '../helpers';
+import { resetRateLimiters } from '../../rate-limit';
+import { beforeEach } from 'vitest';
 
 describe('Layer 4E: Brute Force Prevention (10 tests)', () => {
+  
+  beforeEach(async () => {
+    resetRateLimiters();
+    clearRoleCache();
+  });
   
   it('TC-SEC-BRUTE-001: Failed login attempts are tracked', async () => {
     const email = `user${Date.now()}@test.com`;

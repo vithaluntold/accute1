@@ -8,11 +8,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { testDb as db } from '../../test-db';
 import { organizations, users } from '@shared/schema';
-import { createOrgWithOwner } from '../helpers';
+import { createOrgWithOwner, clearRoleCache } from '../helpers';
 import { sql } from 'drizzle-orm';
 import { generateQuickOrgData } from '../test-automation-toolkit';
+import { resetRateLimiters } from '../../rate-limit';
 
 describe('Layer 1D: Organization Creation (15 tests)', () => {
+  
+  beforeEach(async () => {
+    resetRateLimiters();
+    clearRoleCache();
+  });
   
   // ==================== SUCCESSFUL ORGANIZATION CREATION (5 tests) ====================
   

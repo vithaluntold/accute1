@@ -6,9 +6,16 @@
 
 import request from 'supertest';
 import app from '../../test-app';
-import { createAuthenticatedUser, login, logout, authenticatedRequest, wait } from '../helpers';
+import { createAuthenticatedUser, login, logout, authenticatedRequest, wait, clearRoleCache } from '../helpers';
+import { resetRateLimiters } from '../../rate-limit';
+import { beforeEach } from 'vitest';
 
 describe('Layer 4C: CSRF Protection (10 tests)', () => {
+  
+  beforeEach(async () => {
+    resetRateLimiters();
+    clearRoleCache();
+  });
   
   it('TC-SEC-CSRF-001: State-changing operations require authentication', async () => {
     const response = await request(app)

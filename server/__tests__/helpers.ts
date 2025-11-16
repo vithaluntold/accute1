@@ -136,17 +136,9 @@ async function ensureRolesExist(): Promise<Map<string, string>> {
   const managerRoleId = roleCache.get('manager');
   const staffRoleId = roleCache.get('staff');
   
-  // Verify all roles exist (safety check)
+  // Verify all roles exist in cache
   if (!ownerRoleId || !adminRoleId || !managerRoleId || !staffRoleId) {
     throw new Error(`Missing roles in cache: owner=${!!ownerRoleId}, admin=${!!adminRoleId}, manager=${!!managerRoleId}, staff=${!!staffRoleId}`);
-  }
-  
-  // Verify roles exist in database (additional safety check for concurrency)
-  const roleVerification = await db.select().from(roles).where(
-    eq(roles.id, ownerRoleId)
-  );
-  if (roleVerification.length === 0) {
-    throw new Error(`Owner role ${ownerRoleId} not found in database - possible race condition`);
   }
   
   // Check which assignments already exist to avoid duplicates
@@ -625,7 +617,7 @@ export async function createOrgWithOwner(data: {
   const loginResp = await login(ownerUser.email, data.ownerPassword || 'SecurePass123!');
   
   return {
-    testOrg: {
+    organization: {
       ...testOrg,
       ownerRoleId: roleMap.get('owner')!,
       adminRoleId: roleMap.get('admin')!,
