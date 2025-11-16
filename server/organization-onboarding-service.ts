@@ -23,12 +23,12 @@ export class OrganizationOnboardingService {
    * 
    * @param organizationId Organization ID
    * @param createdById User ID of the creator (for audit trail)
-   * @returns Created or existing LLM configuration
+   * @returns Created or existing LLM configuration, or null if no credentials available
    */
   async ensureDefaultLlmConfig(
     organizationId: string,
     createdById: string
-  ): Promise<any> {
+  ): Promise<any | null> {
     // Check if organization already has a default LLM config
     const existingDefault = await this.storage.getDefaultLlmConfiguration(organizationId);
     
@@ -65,7 +65,7 @@ export class OrganizationOnboardingService {
     let azureDeploymentNameValue: string | null = null;
     let modelVersion: string | null = null;
     
-    // Priority: OpenAI > Anthropic > Azure (requires full config) > Placeholder
+    // Priority: OpenAI > Anthropic > Azure (requires full config) > None (skip creation)
     if (openaiApiKey && openaiApiKey.length > 0) {
       provider = 'openai';
       apiKey = openaiApiKey;
@@ -109,15 +109,14 @@ export class OrganizationOnboardingService {
         configured = false; // Mark as not fully configured (will be inactive)
       }
     } else {
-      // No API keys available - use placeholder
-      provider = 'openai'; // Default to OpenAI for UI consistency
-      apiKey = 'PLACEHOLDER_API_KEY_PLEASE_UPDATE';
-      configured = false;
+      // No API keys available - skip creating LLM config
       console.warn(`⚠️  No LLM provider credentials found in environment for organization ${organizationId}`);
-      console.warn(`   Creating placeholder config - admin must update credentials via Settings`);
+      console.warn(`   Skipping LLM config creation - admin must configure via Settings manually`);
+      console.warn(`   Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or Azure credentials to enable auto-configuration`);
+      return null;
     }
     
-    // Encrypt the API key (even if placeholder)
+    // Encrypt the API key
     const encryptedKey = encrypt(apiKey);
     
     // Determine model based on provider
@@ -154,11 +153,7 @@ export class OrganizationOnboardingService {
       createdBy: createdById,
     });
     
-    if (configured) {
-      console.log(`✅ Created default ${provider} LLM config for organization ${organizationId}`);
-    } else {
-      console.log(`⚠️  Created placeholder LLM config for organization ${organizationId} - requires API key update`);
-    }
+    console.log(`✅ Created default ${provider} LLM config for organization ${organizationId}`);
     
     return config;
   }
