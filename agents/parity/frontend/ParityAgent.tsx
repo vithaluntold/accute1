@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare, Store, Upload } from "lucide-react";
+import { FileText, Send, Sparkles, Download, Copy, CheckCircle2, Save, Plus, Trash2, Edit2, MessageSquare, Store, Upload, Settings2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +84,9 @@ export default function ParityAgent() {
     category?: string;
   }>({});
   
+  // LLM configuration state
+  const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +119,22 @@ export default function ParityAgent() {
   const { data: sessions = [] } = useQuery<AgentSession[]>({
     queryKey: ["/api/agents/parity/sessions"],
   });
+
+  // Fetch available LLM configurations
+  const { data: llmConfigs = [] } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
+  // Auto-select default LLM config (or first available)
+  useEffect(() => {
+    if (llmConfigs.length > 0 && !selectedLlmConfig) {
+      const defaultConfig = llmConfigs.find((c) => c.isDefault);
+      const configToSelect = defaultConfig || llmConfigs[0];
+      if (configToSelect) {
+        setSelectedLlmConfig(configToSelect.id);
+      }
+    }
+  }, [llmConfigs, selectedLlmConfig]);
 
   // Create new session (explicit creation via UI button)
   const createSessionMutation = useMutation({
@@ -239,7 +258,8 @@ export default function ParityAgent() {
         body: JSON.stringify({ 
           message: userInput, 
           history: messages,
-          currentDocument: currentDocument 
+          currentDocument: currentDocument,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
         }),
       });
 
@@ -329,6 +349,9 @@ export default function ParityAgent() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (selectedLlmConfig) {
+        formData.append("llmConfigId", selectedLlmConfig);
+      }
 
       setMessages(prev => [...prev, {
         role: "user",
@@ -556,6 +579,27 @@ export default function ParityAgent() {
                   </div>
                 </ScrollArea>
               </CardContent>
+              <CardFooter className="border-t p-3">
+                <div className="w-full space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Settings2 className="h-3 w-3" />
+                    <span>LLM Configuration</span>
+                  </div>
+                  <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-llm-config">
+                      <SelectValue placeholder="Select LLM..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {llmConfigs.map((config: any) => (
+                        <SelectItem key={config.id} value={config.id} className="text-xs">
+                          {config.name}
+                          {config.isDefault && <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardFooter>
             </Card>
           </ResizablePanel>
           <ResizableHandle />

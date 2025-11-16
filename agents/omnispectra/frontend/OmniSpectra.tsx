@@ -1,12 +1,19 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Send } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Send, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,6 +37,23 @@ export default function OmniSpectra() {
     "Show me team workload distribution",
     "What are the current bottlenecks?",
   ]);
+  const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+
+  // Fetch available LLM configurations
+  const { data: llmConfigs = [] } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
+  // Auto-select default LLM config (or first available)
+  useEffect(() => {
+    if (llmConfigs.length > 0 && !selectedLlmConfig) {
+      const defaultConfig = llmConfigs.find((c) => c.isDefault);
+      const configToSelect = defaultConfig || llmConfigs[0];
+      if (configToSelect) {
+        setSelectedLlmConfig(configToSelect.id);
+      }
+    }
+  }, [llmConfigs, selectedLlmConfig]);
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -41,6 +65,7 @@ export default function OmniSpectra() {
           message,
           history: messages.slice(-10),
           context: {},
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
         }),
       });
       if (!res.ok) throw new Error("Failed to send message");
@@ -90,10 +115,31 @@ export default function OmniSpectra() {
     <div className="flex flex-col h-full max-w-4xl mx-auto p-6 pb-20 gap-4">
       <Card className="flex-1 flex flex-col">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            OmniSpectra
-            <Badge variant="secondary">AI Assistant</Badge>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              OmniSpectra
+              <Badge variant="secondary">AI Assistant</Badge>
+            </CardTitle>
+            <div className="w-64">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <Settings2 className="h-3 w-3" />
+                <span>LLM Configuration</span>
+              </div>
+              <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-llm-config">
+                  <SelectValue placeholder="Select LLM..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {llmConfigs.map((config: any) => (
+                    <SelectItem key={config.id} value={config.id} className="text-xs">
+                      {config.name}
+                      {config.isDefault && <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col gap-4">
           <ScrollArea className="flex-1 pr-4">

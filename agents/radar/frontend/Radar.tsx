@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, Calendar, FileText, Activity } from "lucide-react";
+import { Send, Calendar, FileText, Activity, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +8,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   role: "user" | "assistant";
@@ -36,6 +43,23 @@ export default function Radar() {
   ]);
   const [input, setInput] = useState("");
   const [selectedResource, setSelectedResource] = useState<{type: string, id: string} | null>(null);
+  const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+
+  // Fetch available LLM configurations
+  const { data: llmConfigs = [] } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
+  // Auto-select default LLM config (or first available)
+  useEffect(() => {
+    if (llmConfigs.length > 0 && !selectedLlmConfig) {
+      const defaultConfig = llmConfigs.find((c) => c.isDefault);
+      const configToSelect = defaultConfig || llmConfigs[0];
+      if (configToSelect) {
+        setSelectedLlmConfig(configToSelect.id);
+      }
+    }
+  }, [llmConfigs, selectedLlmConfig]);
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -48,6 +72,7 @@ export default function Radar() {
           history: messages.slice(-10),
           assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
           projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
         }),
       });
       if (!res.ok) throw new Error("Failed to send message");
@@ -107,7 +132,7 @@ export default function Radar() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <CardTitle className="flex items-center gap-2">
                 <Activity className="h-5 w-5" />
                 Radar
@@ -116,6 +141,25 @@ export default function Radar() {
               <CardDescription className="mt-2">
                 Comprehensive activity tracking for legal evidence and client accountability
               </CardDescription>
+            </div>
+            <div className="w-64">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <Settings2 className="h-3 w-3" />
+                <span>LLM Configuration</span>
+              </div>
+              <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-llm-config">
+                  <SelectValue placeholder="Select LLM..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {llmConfigs.map((config: any) => (
+                    <SelectItem key={config.id} value={config.id} className="text-xs">
+                      {config.name}
+                      {config.isDefault && <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>

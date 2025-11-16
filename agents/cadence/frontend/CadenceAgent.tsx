@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText, MessageSquare, Trash2, Edit2, Store } from "lucide-react";
+import { Bot, Send, Sparkles, Workflow, Plus, ArrowRight, Clock, CheckCircle2, Upload, FileText, MessageSquare, Trash2, Edit2, Store, Settings2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -16,6 +16,13 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Message {
   role: "user" | "assistant";
@@ -81,6 +88,9 @@ export default function CadenceAgent() {
     category?: string;
   }>({});
   
+  // LLM configuration state
+  const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +118,22 @@ export default function CadenceAgent() {
   const { data: sessions = [] } = useQuery<AgentSession[]>({
     queryKey: ["/api/agents/cadence/sessions"],
   });
+
+  // Fetch available LLM configurations
+  const { data: llmConfigs = [] } = useQuery<any[]>({
+    queryKey: ["/api/llm-configurations"],
+  });
+
+  // Auto-select default LLM config (or first available)
+  useEffect(() => {
+    if (llmConfigs.length > 0 && !selectedLlmConfig) {
+      const defaultConfig = llmConfigs.find((c) => c.isDefault);
+      const configToSelect = defaultConfig || llmConfigs[0];
+      if (configToSelect) {
+        setSelectedLlmConfig(configToSelect.id);
+      }
+    }
+  }, [llmConfigs, selectedLlmConfig]);
 
   // Create new session (explicit creation via UI button)
   const createSessionMutation = useMutation({
@@ -231,7 +257,8 @@ export default function CadenceAgent() {
         body: JSON.stringify({ 
           message: userInput, 
           history: messages,
-          currentWorkflow: workflowState 
+          currentWorkflow: workflowState,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
         }),
       });
 
@@ -287,6 +314,9 @@ export default function CadenceAgent() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (selectedLlmConfig) {
+        formData.append("llmConfigId", selectedLlmConfig);
+      }
 
       setMessages(prev => [...prev, {
         role: "user",
@@ -446,6 +476,27 @@ export default function CadenceAgent() {
                   </div>
                 </ScrollArea>
               </CardContent>
+              <CardFooter className="border-t p-3">
+                <div className="w-full space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Settings2 className="h-3 w-3" />
+                    <span>LLM Configuration</span>
+                  </div>
+                  <Select value={selectedLlmConfig} onValueChange={setSelectedLlmConfig}>
+                    <SelectTrigger className="h-8 text-xs" data-testid="select-llm-config">
+                      <SelectValue placeholder="Select LLM..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {llmConfigs.map((config: any) => (
+                        <SelectItem key={config.id} value={config.id} className="text-xs">
+                          {config.name}
+                          {config.isDefault && <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardFooter>
             </Card>
           </ResizablePanel>
           <ResizableHandle />
