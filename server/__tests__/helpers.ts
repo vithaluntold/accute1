@@ -506,3 +506,150 @@ export async function resetPassword(token: string, newPassword: string): Promise
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return await bcrypt.compare(password, hash);
 }
+
+/**
+ * Create a test context with organization, owner, and role IDs
+ * Perfect for starting tests
+ */
+export async function createTestContext() {
+  const roleMap = await ensureRolesExist();
+  
+  const ownerRoleId = roleMap.get('owner')!;
+  const adminRoleId = roleMap.get('admin')!;
+  const managerRoleId = roleMap.get('manager')!;
+  const staffRoleId = roleMap.get('staff')!;
+  
+  // Create organization
+  const testOrg = await createOrg({
+    name: 'Test Organization',
+    slug: `test-org-${Date.now()}`
+  });
+  
+  // Create owner user
+  const ownerUser = await createUser({
+    email: `owner-${Date.now()}@test.com`,
+    password: 'SecurePass123!',
+    firstName: 'Owner',
+    lastName: 'User',
+    role: 'owner',
+    organizationId: testOrg.id
+  });
+  
+  // Login to get token
+  const loginResp = await login(ownerUser.email, 'SecurePass123!');
+  
+  return {
+    testOrg: {
+      ...testOrg,
+      ownerRoleId,
+      adminRoleId,
+      managerRoleId,
+      staffRoleId
+    },
+    ownerUser,
+    ownerToken: loginResp.token!,
+    roleIds: {
+      owner: ownerRoleId,
+      admin: adminRoleId,
+      manager: managerRoleId,
+      staff: staffRoleId
+    }
+  };
+}
+
+/**
+ * Create organization with owner user
+ */
+export async function createOrgWithOwner(data: {
+  orgName?: string;
+  ownerEmail?: string;
+  ownerPassword?: string;
+  ownerFirstName?: string;
+  ownerLastName?: string;
+}) {
+  const roleMap = await ensureRolesExist();
+  
+  // Create organization
+  const testOrg = await createOrg({
+    name: data.orgName || `Test Org ${Date.now()}`,
+    slug: `test-org-${Date.now()}`
+  });
+  
+  // Create owner user
+  const ownerUser = await createUser({
+    email: data.ownerEmail || `owner-${Date.now()}@test.com`,
+    password: data.ownerPassword || 'SecurePass123!',
+    firstName: data.ownerFirstName || 'Owner',
+    lastName: data.ownerLastName || 'User',
+    role: 'owner',
+    organizationId: testOrg.id
+  });
+  
+  // Login to get token
+  const loginResp = await login(ownerUser.email, data.ownerPassword || 'SecurePass123!');
+  
+  return {
+    testOrg: {
+      ...testOrg,
+      ownerRoleId: roleMap.get('owner')!,
+      adminRoleId: roleMap.get('admin')!,
+      managerRoleId: roleMap.get('manager')!,
+      staffRoleId: roleMap.get('staff')!
+    },
+    ownerUser,
+    ownerToken: loginResp.token!
+  };
+}
+
+/**
+ * Create user in organization
+ */
+export async function createUserInOrg(data: {
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  roleId: string;
+  organizationId: string;
+}) {
+  const plainPassword = data.password || 'SecurePass123!';
+  const password = await bcrypt.hash(plainPassword, 10);
+  const email = data.email || `user-${Date.now()}@test.com`;
+  const username = email.split('@')[0] + Date.now();
+  
+  const [user] = await db.insert(users).values({
+    email,
+    username,
+    password,
+    firstName: data.firstName || 'Test',
+    lastName: data.lastName || 'User',
+    roleId: data.roleId,
+    organizationId: data.organizationId,
+    isActive: true
+  }).returning();
+  
+  return user;
+}
+
+/**
+ * Login user and return token
+ */
+export async function loginUser(email: string, password: string, organizationId?: string) {
+  const payload: any = { email, password };
+  if (organizationId) {
+    payload.organizationId = organizationId;
+  }
+  
+  const response = await request(app)
+    .post('/api/auth/login')
+    .send(payload);
+  
+  if (response.status !== 200) {
+    throw new Error(`Login failed: ${response.status} - ${JSON.stringify(response.body)}`);
+  }
+  
+  return {
+    token: response.body.token,
+    user: response.body.user
+  };
+}
