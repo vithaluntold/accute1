@@ -172,21 +172,29 @@ export function setupWebSocket(httpServer: Server): void {
   
   // Intercept upgrade requests to initialize WebSocket on-demand
   httpServer.on('upgrade', (request, socket, head) => {
-    // Check if this is a WebSocket upgrade for our path
-    if (request.url === '/ws/ai-stream') {
-      console.log('[WebSocket] Upgrade request received for WebSocket connection');
+    // Parse URL to check pathname only (ignore query parameters)
+    try {
+      const { pathname } = new URL(request.url!, `http://${request.headers.host}`);
       
-      // Initialize WebSocket server on first upgrade request
-      let wss = wssInstance;
-      if (!wss) {
-        console.log('[WebSocket] First connection detected - initializing WebSocket server');
-        wss = initializeWebSocketServer(httpServer);
+      // Check if this is a WebSocket upgrade for our path
+      if (pathname === '/ws/ai-stream') {
+        console.log('[WebSocket] Upgrade request received for WebSocket connection');
+        
+        // Initialize WebSocket server on first upgrade request
+        let wss = wssInstance;
+        if (!wss) {
+          console.log('[WebSocket] First connection detected - initializing WebSocket server');
+          wss = initializeWebSocketServer(httpServer);
+        }
+        
+        // Handle ALL upgrade requests explicitly (not just the first one)
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
       }
-      
-      // Handle ALL upgrade requests explicitly (not just the first one)
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
+    } catch (error) {
+      console.error('[WebSocket] Error parsing upgrade URL:', error);
+      socket.destroy();
     }
   });
 }
