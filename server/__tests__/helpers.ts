@@ -603,13 +603,15 @@ export async function createOrgWithOwner(data: {
 
 /**
  * Create user in organization
+ * Can accept either roleId or role name (owner, admin, manager, staff)
  */
 export async function createUserInOrg(data: {
   email?: string;
   password?: string;
   firstName?: string;
   lastName?: string;
-  roleId: string;
+  role?: 'owner' | 'admin' | 'manager' | 'staff';
+  roleId?: string;
   organizationId: string;
 }) {
   const plainPassword = data.password || 'SecurePass123!';
@@ -617,13 +619,26 @@ export async function createUserInOrg(data: {
   const email = data.email || `user-${Date.now()}@test.com`;
   const username = email.split('@')[0] + Date.now();
   
+  // Get roleId - either directly provided or looked up by role name
+  let roleId = data.roleId;
+  if (!roleId && data.role) {
+    const roleMap = await ensureRolesExist();
+    roleId = roleMap.get(data.role);
+    if (!roleId) {
+      throw new Error(`Role "${data.role}" not found in organization`);
+    }
+  }
+  if (!roleId) {
+    throw new Error('Either roleId or role must be provided');
+  }
+  
   const [user] = await db.insert(users).values({
     email,
     username,
     password,
     firstName: data.firstName || 'Test',
     lastName: data.lastName || 'User',
-    roleId: data.roleId,
+    roleId,
     organizationId: data.organizationId,
     isActive: true
   }).returning();
