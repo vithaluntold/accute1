@@ -1,0 +1,68 @@
+import { db } from '../db';
+import { 
+  users, 
+  organizations, 
+  sessions,
+  clients,
+  agentSessions,
+  agentMessages
+} from '@shared/schema';
+
+// CRITICAL SAFETY CHECK: Only allow tests to run in test environment
+if (process.env.NODE_ENV !== 'test') {
+  throw new Error(
+    '🚨 CRITICAL: Tests can only run in NODE_ENV=test to prevent data loss! ' +
+    `Current NODE_ENV: ${process.env.NODE_ENV}`
+  );
+}
+
+// CRITICAL SAFETY CHECK: Verify we're not connected to production database
+const dbUrl = process.env.DATABASE_URL || '';
+if (dbUrl.includes('production') || dbUrl.includes('neon.tech')) {
+  throw new Error(
+    '🚨 CRITICAL: Tests cannot run against production database! ' +
+    'Please set TEST_DATABASE_URL in your environment.'
+  );
+}
+
+// Log database connection for safety verification
+console.log('🔧 Test database connection:', dbUrl.substring(0, 30) + '...');
+
+// Increase timeout for database operations
+jest.setTimeout(30000);
+
+// Clean up database before each test
+beforeEach(async () => {
+  try {
+    // SAFETY: Triple-check we're in test mode
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('Cannot clean database outside of test environment!');
+    }
+
+    // Delete in correct order to respect foreign key constraints
+    await db.delete(agentMessages);
+    await db.delete(agentSessions);
+    await db.delete(sessions);
+    await db.delete(clients);
+    await db.delete(users);
+    await db.delete(organizations);
+  } catch (error) {
+    console.error('❌ Error cleaning test database:', error);
+    throw error;
+  }
+});
+
+// Close database connection after all tests
+afterAll(async () => {
+  try {
+    // Give time for pending operations to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  } catch (error) {
+    console.error('❌ Error in afterAll:', error);
+  }
+});
+
+// Global error handler for unhandled rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ Unhandled Rejection at:', promise, 'reason:', reason);
+});
