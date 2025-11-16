@@ -8,6 +8,11 @@ import express, { type Express } from "express";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import { registerRoutesOnly } from "./routes";
+import {
+  loginRateLimiter,
+  organizationCreationRateLimiter,
+  userCreationRateLimiter,
+} from "./rate-limit";
 
 // SAFETY: Ensure we're in test mode
 if (process.env.NODE_ENV !== 'test') {
@@ -35,6 +40,13 @@ app.use(
     },
   })
 );
+
+// SECURITY: P0 Rate Limiting for Authentication Endpoints
+// Applied BEFORE routes to ensure tests validate rate limiting behavior
+app.post('/api/auth/login', loginRateLimiter);
+// Note: organizationCreationRateLimiter and userCreationRateLimiter 
+// will be applied by routes.ts on their respective endpoints
+console.log('✅ [TEST-APP] P0 authentication rate limiting enabled (login endpoint)');
 
 // Register routes only (no server creation, no WebSocket, no heavy initialization)
 // This is fast and perfect for testing

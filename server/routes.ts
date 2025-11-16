@@ -2563,7 +2563,7 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
       
       // Reject attempts to set organizationId in request body (prevent tampering)
       if ('organizationId' in userData || 'organizationId' in req.body) {
-        return res.status(400).json({ error: "Cannot change organization membership via this endpoint" });
+        return res.status(400).json({ error: "Cannot change organizationId via this endpoint. Organization membership is immutable." });
       }
       
       // Prevent assigning users to platform roles

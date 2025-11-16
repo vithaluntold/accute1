@@ -663,9 +663,11 @@ describe('Security - Attack Vectors (Layer 4)', () => {
       const responses = [];
       
       // Make 6 sequential login attempts (not parallel) to test rate limiting
+      // X-Test-Rate-Limit header enables rate limiting in test mode
       for (let i = 0; i < 6; i++) {
         const response = await request(app)
           .post('/api/auth/login')
+          .set('X-Test-Rate-Limit', 'enforce')
           .send({
             email: victimEmail,
             password: `wrong${i}`

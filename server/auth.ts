@@ -28,17 +28,24 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return await bcrypt.compare(password, hash);
 }
 
-// Generate JWT token
+// Generate JWT token with unique identifier (jti) to prevent collisions
 export function generateToken(userId: string): string {
-  return jwt.sign({ userId }, JWT_SECRET, {
-    expiresIn: `${SESSION_EXPIRY_HOURS}h`,
-  });
+  return jwt.sign(
+    { 
+      userId,
+      jti: crypto.randomUUID() // Ensures unique token even with same userId and timestamp
+    }, 
+    JWT_SECRET, 
+    {
+      expiresIn: `${SESSION_EXPIRY_HOURS}h`,
+    }
+  );
 }
 
 // Verify JWT token
-export function verifyToken(token: string): { userId: string } | null {
+export function verifyToken(token: string): { userId: string; jti?: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; jti?: string };
     return decoded;
   } catch (error) {
     return null;

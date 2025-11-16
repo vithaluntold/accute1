@@ -14,6 +14,10 @@ import type { Request, Response } from 'express';
  * Login endpoint rate limiting
  * - 5 attempts per 15 minutes per IP
  * - Prevents brute force password attacks
+ * 
+ * TEST MODE: In test environment, rate limiting is skipped by default
+ * to prevent test interference. Tests can enable rate limiting by setting
+ * the X-Test-Rate-Limit: enforce header.
  */
 export const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -23,6 +27,14 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: false, // Count successful requests
   skipFailedRequests: false, // Count failed requests
+  // In test mode, skip rate limiting UNLESS explicitly requested via header
+  skip: (req: Request) => {
+    if (process.env.NODE_ENV === 'test') {
+      // Only enforce rate limiting if test explicitly requests it
+      return req.headers['x-test-rate-limit'] !== 'enforce';
+    }
+    return false; // Always enforce in production
+  },
   // Default keyGenerator handles IPv6 properly
   handler: (req: Request, res: Response) => {
     console.log(`❌ [RATE LIMIT] Login attempt blocked for IP: ${req.ip}`);
