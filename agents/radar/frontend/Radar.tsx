@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, Calendar, FileText, Activity, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -44,6 +45,10 @@ export default function Radar() {
   const [input, setInput] = useState("");
   const [selectedResource, setSelectedResource] = useState<{type: string, id: string} | null>(null);
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -60,6 +65,38 @@ export default function Radar() {
       }
     }
   }, [llmConfigs, selectedLlmConfig]);
+  
+  // Initialize WebSocket for streaming
+  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'radar',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: fullResponse,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Clear streaming state
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+    },
+    onError: (error: string) => {
+      console.error('[Radar WebSocket] Error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+    }
+  });
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -97,8 +134,8 @@ export default function Radar() {
     },
   });
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
 
     const userMessage: Message = {
       role: "user",
@@ -106,12 +143,32 @@ export default function Radar() {
       timestamp: new Date().toISOString(),
     };
 
+    const userInput = input;
     setMessages((prev) => [...prev, userMessage]);
-    chatMutation.mutate(input);
     setInput("");
+    streamingResponseRef.current = "";
+
+    // Try WebSocket first
+    const wsSuccess = await sendWebSocketMessage({
+      input: userInput,
+      llmConfigId: selectedLlmConfig,
+      contextData: {
+        history: messages.slice(-10),
+        assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
+        projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
+      }
+    });
+
+    // Fallback to HTTP if WebSocket fails
+    if (!wsSuccess) {
+      console.log('[Radar] WebSocket unavailable, using HTTP fallback');
+      chatMutation.mutate(userInput);
+    }
   };
 
-  const handleQuickQuery = (query: string) => {
+  const handleQuickQuery = async (query: string) => {
+    if (isStreaming) return;
+    
     // Add user message immediately
     const userMessage: Message = {
       role: "user",
@@ -119,12 +176,24 @@ export default function Radar() {
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMessage]);
+    streamingResponseRef.current = "";
     
-    // Send query directly to mutation (don't rely on input state)
-    chatMutation.mutate(query);
-    
-    // Clear input field
-    setInput("");
+    // Try WebSocket first
+    const wsSuccess = await sendWebSocketMessage({
+      input: query,
+      llmConfigId: selectedLlmConfig,
+      contextData: {
+        history: messages.slice(-10),
+        assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
+        projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
+      }
+    });
+
+    // Fallback to HTTP if WebSocket fails
+    if (!wsSuccess) {
+      console.log('[Radar] WebSocket unavailable, using HTTP fallback');
+      chatMutation.mutate(query);
+    }
   };
 
   return (
@@ -208,7 +277,15 @@ export default function Radar() {
                       </div>
                     </div>
                   ))}
-                  {chatMutation.isPending && (
+                  {streamingMessage && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted rounded-lg p-4">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{streamingMessage}</p>
+                        <p className="text-xs mt-2 opacity-70">Streaming...</p>
+                      </div>
+                    </div>
+                  )}
+                  {chatMutation.isPending && !isStreaming && (
                     <div className="flex justify-start">
                       <div className="bg-muted rounded-lg p-4">
                         <p className="text-sm">Analyzing activity logs...</p>
@@ -259,12 +336,12 @@ export default function Radar() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Ask about activity logs, timelines, or generate reports..."
-                  disabled={chatMutation.isPending}
+                  disabled={isStreaming || chatMutation.isPending}
                   data-testid="input-message"
                 />
                 <Button
                   onClick={handleSend}
-                  disabled={!input.trim() || chatMutation.isPending}
+                  disabled={!input.trim() || isStreaming || chatMutation.isPending}
                   data-testid="button-send"
                 >
                   <Send className="h-4 w-4" />

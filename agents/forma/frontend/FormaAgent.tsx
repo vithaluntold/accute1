@@ -11,6 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import { getUser } from "@/lib/auth";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -86,9 +87,78 @@ export default function FormaAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Initialize WebSocket for streaming
+  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'forma',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      try {
+        // Parse response for form update
+        let formUpdate = null;
+        let responseText = fullResponse;
+        
+        // Try to extract JSON block for formUpdate
+        const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          try {
+            const jsonData = JSON.parse(jsonMatch[1]);
+            if (jsonData.formUpdate) {
+              formUpdate = jsonData.formUpdate;
+            }
+            // Keep the conversational part before the JSON
+            responseText = fullResponse.split('```json')[0].trim();
+          } catch (e) {
+            console.error('Failed to parse formUpdate JSON:', e);
+          }
+        }
+        
+        const assistantMessage: Message = { 
+          role: "assistant", 
+          content: responseText,
+          formUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Update form state if provided
+        if (formUpdate) {
+          setFormState(formUpdate);
+        }
+        
+        // Clear streaming state
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error handling stream complete:', error);
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        setIsLoading(false);
+      }
+    },
+    onError: (error: string) => {
+      console.error('WebSocket error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      setIsLoading(false);
+    }
+  });
 
   // Read marketplace template params from URL
   useEffect(() => {
@@ -235,6 +305,10 @@ export default function FormaAgent() {
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+    
+    // Reset streaming state
+    setStreamingMessage("");
+    streamingResponseRef.current = "";
 
     try {
       // Create session if needed
@@ -245,42 +319,62 @@ export default function FormaAgent() {
         sessionId = newSession.id;
       }
 
-      const response = await fetch("/api/agents/forma/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          message: userInput, 
-          history: messages,
-          currentForm: formState,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
-        }),
-      });
-
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        formUpdate: data.formUpdate
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      if (data.formUpdate) {
-        setFormState(data.formUpdate);
-      }
-
-      // Persist messages to session
-      if (sessionId) {
-        await apiRequest("POST", `/api/agents/forma/sessions/${sessionId}/messages`, {
-          role: "user",
-          content: userInput,
+      // Try WebSocket streaming first
+      if (isConnected) {
+        console.log('[Forma] Using WebSocket streaming');
+        const sent = await sendWebSocketMessage({
+          input: userInput,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
         });
-        await apiRequest("POST", `/api/agents/forma/sessions/${sessionId}/messages`, {
-          role: "assistant",
+        
+        if (!sent) {
+          throw new Error('Failed to send WebSocket message');
+        }
+        
+        // WebSocket callbacks will handle the streaming response
+        // Don't set isLoading=false here - callbacks handle it
+      } else {
+        // Fallback to HTTP for non-streaming
+        console.log('[Forma] WebSocket not connected, falling back to HTTP');
+        const response = await fetch("/api/agents/forma/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ 
+            message: userInput, 
+            history: messages,
+            currentForm: formState,
+            ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
+          }),
+        });
+
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
           content: data.response,
-          metadata: data.formUpdate ? { formUpdate: data.formUpdate } : {},
-        });
+          formUpdate: data.formUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (data.formUpdate) {
+          setFormState(data.formUpdate);
+        }
+
+        // Persist messages to session
+        if (sessionId) {
+          await apiRequest("POST", `/api/agents/forma/sessions/${sessionId}/messages`, {
+            role: "user",
+            content: userInput,
+          });
+          await apiRequest("POST", `/api/agents/forma/sessions/${sessionId}/messages`, {
+            role: "assistant",
+            content: data.response,
+            metadata: data.formUpdate ? { formUpdate: data.formUpdate } : {},
+          });
+        }
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -289,7 +383,8 @@ export default function FormaAgent() {
         content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
       setIsLoading(false);
     }
   };

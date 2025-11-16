@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,10 @@ export default function OmniSpectra() {
     "What are the current bottlenecks?",
   ]);
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -54,6 +59,38 @@ export default function OmniSpectra() {
       }
     }
   }, [llmConfigs, selectedLlmConfig]);
+  
+  // Initialize WebSocket for streaming
+  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'omnispectra',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: fullResponse,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Clear streaming state
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+    },
+    onError: (error: string) => {
+      console.error('[OmniSpectra WebSocket] Error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+    }
+  });
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -93,8 +130,8 @@ export default function OmniSpectra() {
     },
   });
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
 
     const userMessage: Message = {
       role: "user",
@@ -102,13 +139,56 @@ export default function OmniSpectra() {
       timestamp: new Date().toISOString(),
     };
 
+    const userInput = input;
     setMessages((prev) => [...prev, userMessage]);
-    chatMutation.mutate(input);
     setInput("");
+    streamingResponseRef.current = "";
+
+    // Try WebSocket first
+    const wsSuccess = await sendWebSocketMessage({
+      input: userInput,
+      llmConfigId: selectedLlmConfig,
+      contextData: {
+        history: messages.slice(-10),
+        context: {},
+      }
+    });
+
+    // Fallback to HTTP if WebSocket fails
+    if (!wsSuccess) {
+      console.log('[OmniSpectra] WebSocket unavailable, using HTTP fallback');
+      chatMutation.mutate(userInput);
+    }
   };
 
-  const handleSuggestion = (suggestion: string) => {
+  const handleSuggestion = async (suggestion: string) => {
+    if (isStreaming) return;
+    
     setInput(suggestion);
+    const userMessage: Message = {
+      role: "user",
+      content: suggestion,
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    streamingResponseRef.current = "";
+
+    // Try WebSocket first
+    const wsSuccess = await sendWebSocketMessage({
+      input: suggestion,
+      llmConfigId: selectedLlmConfig,
+      contextData: {
+        history: messages.slice(-10),
+        context: {},
+      }
+    });
+
+    // Fallback to HTTP if WebSocket fails
+    if (!wsSuccess) {
+      console.log('[OmniSpectra] WebSocket unavailable, using HTTP fallback');
+      chatMutation.mutate(suggestion);
+    }
   };
 
   return (
@@ -166,7 +246,15 @@ export default function OmniSpectra() {
                   </div>
                 </div>
               ))}
-              {chatMutation.isPending && (
+              {streamingMessage && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg p-3">
+                    <p className="text-sm whitespace-pre-wrap">{streamingMessage}</p>
+                    <p className="text-xs mt-1 opacity-70">Streaming...</p>
+                  </div>
+                </div>
+              )}
+              {chatMutation.isPending && !isStreaming && (
                 <div className="flex justify-start">
                   <div className="bg-muted rounded-lg p-3">
                     <p className="text-sm">Thinking...</p>
@@ -198,12 +286,12 @@ export default function OmniSpectra() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Ask about work status..."
-              disabled={chatMutation.isPending}
+              disabled={isStreaming || chatMutation.isPending}
               data-testid="input-message"
             />
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || chatMutation.isPending}
+              disabled={!input.trim() || isStreaming || chatMutation.isPending}
               data-testid="button-send"
             >
               <Send className="h-4 w-4" />

@@ -5,6 +5,7 @@ interface UseAgentWebSocketOptions {
   onStreamChunk?: (chunk: string) => void;
   onStreamComplete?: (fullResponse: string) => void;
   onError?: (error: string) => void;
+  onClose?: () => void; // Called when WebSocket closes unexpectedly
 }
 
 interface SendMessageOptions {
@@ -21,7 +22,8 @@ export function useAgentWebSocket({
   agentName,
   onStreamChunk,
   onStreamComplete,
-  onError
+  onError,
+  onClose
 }: UseAgentWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -29,6 +31,7 @@ export function useAgentWebSocket({
   const accumulatedResponseRef = useRef('');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const isMountedRef = useRef(true);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -113,28 +116,39 @@ export function useAgentWebSocket({
       setIsStreaming(false);
       wsRef.current = null;
 
-      // Attempt to reconnect with exponential backoff (max 3 attempts)
-      if (connectionAttempts < 3) {
+      // Call onClose callback to clean up any pending state
+      if (onClose) {
+        onClose();
+      }
+
+      // Only reconnect if component is still mounted and not intentionally closed
+      if (isMountedRef.current && connectionAttempts < 3 && event.code !== 1000) {
         const delay = Math.min(1000 * Math.pow(2, connectionAttempts), 5000);
         console.log(`[${agentName} WebSocket] Reconnecting in ${delay}ms (attempt ${connectionAttempts + 1}/3)`);
         
         reconnectTimeoutRef.current = setTimeout(() => {
-          setConnectionAttempts(prev => prev + 1);
-          connect();
+          if (isMountedRef.current) {
+            setConnectionAttempts(prev => prev + 1);
+            connect();
+          }
         }, delay);
       }
     };
-  }, [agentName, onStreamChunk, onStreamComplete, onError, connectionAttempts]);
+  }, [agentName, onStreamChunk, onStreamComplete, onError, onClose, connectionAttempts]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = undefined;
     }
     if (wsRef.current) {
+      // Close without triggering reconnect
+      wsRef.current.onclose = null;
       wsRef.current.close();
       wsRef.current = null;
     }
     setIsConnected(false);
+    setIsStreaming(false);
   }, []);
 
   const sendMessage = useCallback(async (options: SendMessageOptions): Promise<boolean> => {
@@ -178,9 +192,11 @@ export function useAgentWebSocket({
 
   // Connect on mount
   useEffect(() => {
+    isMountedRef.current = true;
     connect();
 
     return () => {
+      isMountedRef.current = false;
       disconnect();
     };
   }, [connect, disconnect]);

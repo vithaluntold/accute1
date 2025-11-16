@@ -8,6 +8,7 @@ import { MessageSquare, Send, Plus, Trash2, Edit2, CheckCircle, Calendar, User, 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -62,8 +63,76 @@ export default function LynkAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize WebSocket for streaming
+  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'lynk',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      // Parse response for task extraction
+      let taskExtraction = null;
+      let responseText = fullResponse;
+      
+      try {
+        const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          const jsonData = JSON.parse(jsonMatch[1]);
+          if (jsonData.taskExtraction) {
+            taskExtraction = jsonData.taskExtraction;
+            responseText = fullResponse.split('```json')[0].trim();
+          }
+        }
+      } catch (e) {
+        console.error('[Lynk] Failed to parse task extraction:', e);
+      }
+      
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: responseText,
+        taskExtraction,
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      if (taskExtraction) {
+        setTaskExtraction(taskExtraction);
+      }
+      
+      // Save messages to session
+      if (currentSessionId) {
+        await apiRequest("POST", `/api/agents/lynk/sessions/${currentSessionId}/messages`, {
+          role: "assistant",
+          content: responseText,
+          metadata: taskExtraction ? { taskExtraction } : {},
+        });
+      }
+      
+      // Clear streaming state
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      setIsLoading(false);
+    },
+    onError: (error: string) => {
+      console.error('[Lynk WebSocket] Error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      setIsLoading(false);
+    }
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -182,13 +251,14 @@ export default function LynkAgent() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
 
     const userMessage: Message = { role: "user", content: input };
     const userInput = input;
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+    streamingResponseRef.current = "";
 
     try {
       let sessionId = currentSessionId;
@@ -198,41 +268,62 @@ export default function LynkAgent() {
         sessionId = newSession.id;
       }
 
-      const response = await fetch("/api/agents/lynk/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          message: userInput, 
-          history: messages,
-          messageContent: userInput.length > 100 ? userInput : undefined,
-          llmConfigId: selectedLlmConfig
-        }),
-      });
-
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        taskExtraction: data.taskExtraction
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      if (data.taskExtraction) {
-        setTaskExtraction(data.taskExtraction);
-      }
-
+      // Save user message to session
       if (sessionId) {
         await apiRequest("POST", `/api/agents/lynk/sessions/${sessionId}/messages`, {
           role: "user",
           content: userInput,
         });
-        await apiRequest("POST", `/api/agents/lynk/sessions/${sessionId}/messages`, {
-          role: "assistant",
-          content: data.response,
-          metadata: data.taskExtraction ? { taskExtraction: data.taskExtraction } : {},
+      }
+
+      // Try WebSocket first
+      const wsSuccess = await sendWebSocketMessage({
+        input: userInput,
+        llmConfigId: selectedLlmConfig,
+        conversationId: sessionId,
+        contextData: {
+          history: messages,
+          messageContent: userInput.length > 100 ? userInput : undefined,
+        }
+      });
+
+      // Fallback to HTTP if WebSocket fails
+      if (!wsSuccess) {
+        console.log('[Lynk] WebSocket unavailable, using HTTP fallback');
+        const response = await fetch("/api/agents/lynk/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ 
+            message: userInput, 
+            history: messages,
+            messageContent: userInput.length > 100 ? userInput : undefined,
+            llmConfigId: selectedLlmConfig
+          }),
         });
+
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
+          content: data.response,
+          taskExtraction: data.taskExtraction
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (data.taskExtraction) {
+          setTaskExtraction(data.taskExtraction);
+        }
+
+        if (sessionId) {
+          await apiRequest("POST", `/api/agents/lynk/sessions/${sessionId}/messages`, {
+            role: "assistant",
+            content: data.response,
+            metadata: data.taskExtraction ? { taskExtraction: data.taskExtraction } : {},
+          });
+        }
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -241,7 +332,6 @@ export default function LynkAgent() {
         content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -439,7 +529,15 @@ export default function LynkAgent() {
                     </div>
                   </div>
                 ))}
-                {isLoading && (
+                {streamingMessage && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted p-3 rounded-lg">
+                      <p className="text-sm whitespace-pre-wrap">{streamingMessage}</p>
+                      <p className="text-xs mt-1 opacity-70">Streaming...</p>
+                    </div>
+                  </div>
+                )}
+                {isLoading && !isStreaming && (
                   <div className="flex justify-start">
                     <div className="bg-muted p-3 rounded-lg">
                       <p className="text-sm">Analyzing...</p>
@@ -457,12 +555,12 @@ export default function LynkAgent() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                   placeholder="Paste client message or describe task..."
-                  disabled={isLoading}
+                  disabled={isLoading || isStreaming}
                   data-testid="input-message"
                 />
                 <Button
                   onClick={sendMessage}
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || isStreaming || !input.trim()}
                   data-testid="button-send"
                 >
                   <Send className="h-4 w-4" />

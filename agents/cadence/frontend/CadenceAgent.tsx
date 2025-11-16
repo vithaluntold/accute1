@@ -11,6 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import { getUser } from "@/lib/auth";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -91,9 +92,119 @@ export default function CadenceAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  const { toast } = useToast();
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
+  const pendingUserInputRef = useRef<string>("");
+  const pendingSessionIdRef = useRef<string | null>(null);
+  const pendingWorkflowUpdateRef = useRef<WorkflowState | null>(null);
+  
+  const { toast} = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Initialize WebSocket for streaming
+  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'cadence',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      try {
+        // Parse response for workflow update
+        let workflowUpdate = null;
+        let responseText = fullResponse;
+        
+        // Try to extract JSON block for workflow update
+        const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          try {
+            const jsonData = JSON.parse(jsonMatch[1]);
+            if (jsonData.workflowUpdate) {
+              workflowUpdate = jsonData.workflowUpdate;
+              pendingWorkflowUpdateRef.current = workflowUpdate;
+            }
+            // Keep the conversational part before the JSON
+            responseText = fullResponse.split('```json')[0].trim();
+          } catch (e) {
+            console.error('Failed to parse workflow JSON:', e);
+          }
+        }
+        
+        const assistantMessage: Message = { 
+          role: "assistant", 
+          content: responseText,
+          workflowUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Update workflow state if provided
+        if (workflowUpdate) {
+          setWorkflowState(workflowUpdate);
+        }
+        
+        // Persist messages to agent session (if session exists)
+        const sessionId = pendingSessionIdRef.current;
+        const userInput = pendingUserInputRef.current;
+        if (sessionId && userInput) {
+          try {
+            await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+              role: "user",
+              content: userInput,
+            });
+            await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+              role: "assistant",
+              content: responseText,
+              metadata: workflowUpdate ? { workflowUpdate } : {},
+            });
+            console.log('[Cadence] Messages persisted to session');
+          } catch (persistError) {
+            console.error('[Cadence] Failed to persist messages to session:', persistError);
+          }
+        }
+        
+        // Clear streaming state and refs
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        pendingUserInputRef.current = "";
+        pendingSessionIdRef.current = null;
+        pendingWorkflowUpdateRef.current = null;
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error handling stream complete:', error);
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        pendingUserInputRef.current = "";
+        pendingSessionIdRef.current = null;
+        pendingWorkflowUpdateRef.current = null;
+        setIsLoading(false);
+      }
+    },
+    onError: (error: string) => {
+      console.error('WebSocket error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      // Clear all streaming state AND pending refs to prevent contamination
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      pendingUserInputRef.current = "";
+      pendingSessionIdRef.current = null;
+      pendingWorkflowUpdateRef.current = null;
+      setIsLoading(false);
+    },
+    onClose: () => {
+      // Clear all pending refs when WebSocket closes unexpectedly (mid-stream disconnect)
+      console.log('[Cadence] WebSocket closed - clearing pending state');
+      pendingUserInputRef.current = "";
+      pendingSessionIdRef.current = null;
+      pendingWorkflowUpdateRef.current = null;
+    }
+  });
 
   // Read marketplace template params from URL
   useEffect(() => {
@@ -240,6 +351,10 @@ export default function CadenceAgent() {
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+    
+    // Reset streaming state
+    setStreamingMessage("");
+    streamingResponseRef.current = "";
 
     try {
       // Create session if needed
@@ -250,43 +365,67 @@ export default function CadenceAgent() {
         sessionId = newSession.id;
       }
 
-      const response = await fetch("/api/agents/cadence/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          message: userInput, 
-          history: messages,
-          currentWorkflow: workflowState,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
-        }),
-      });
-
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        workflowUpdate: data.workflowUpdate
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      // Update workflow state if provided
-      if (data.workflowUpdate) {
-        setWorkflowState(data.workflowUpdate);
-      }
-
-      // Persist messages to session
-      if (sessionId) {
-        await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
-          role: "user",
-          content: userInput,
+      // Try WebSocket streaming first
+      if (isConnected) {
+        console.log('[Cadence] Using WebSocket streaming');
+        
+        // Store session data for post-stream persistence
+        pendingUserInputRef.current = userInput;
+        pendingSessionIdRef.current = sessionId;
+        
+        const sent = await sendWebSocketMessage({
+          input: userInput,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
         });
-        await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
-          role: "assistant",
+        
+        if (!sent) {
+          throw new Error('Failed to send WebSocket message');
+        }
+        
+        // WebSocket onStreamComplete callback will persist messages to agent session
+      } else {
+        // Fallback to HTTP for non-streaming
+        console.log('[Cadence] WebSocket not connected, falling back to HTTP');
+        const response = await fetch("/api/agents/cadence/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ 
+            message: userInput, 
+            history: messages,
+            currentWorkflow: workflowState,
+            ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
+          }),
+        });
+
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
           content: data.response,
-          metadata: data.workflowUpdate ? { workflowUpdate: data.workflowUpdate } : {},
-        });
+          workflowUpdate: data.workflowUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Update workflow state if provided
+        if (data.workflowUpdate) {
+          setWorkflowState(data.workflowUpdate);
+        }
+
+        // Persist messages to session
+        if (sessionId) {
+          await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+            role: "user",
+            content: userInput,
+          });
+          await apiRequest("POST", `/api/agents/cadence/sessions/${sessionId}/messages`, {
+            role: "assistant",
+            content: data.response,
+            metadata: data.workflowUpdate ? { workflowUpdate: data.workflowUpdate } : {},
+          });
+        }
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -295,7 +434,12 @@ export default function CadenceAgent() {
         content: "Sorry, I encountered an error. Please try again."
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      // Clear all streaming state AND pending refs to prevent contamination
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      pendingUserInputRef.current = "";
+      pendingSessionIdRef.current = null;
+      pendingWorkflowUpdateRef.current = null;
       setIsLoading(false);
     }
   };
@@ -564,7 +708,24 @@ export default function CadenceAgent() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {isStreaming && streamingMessage && (
+                <div className="flex gap-3">
+                  <div className="flex items-start">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
+                      <Bot className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="bg-muted p-3 rounded-lg max-w-[80%]">
+                    <div className="text-sm whitespace-pre-wrap">{streamingMessage}</div>
+                    <div className="flex items-center gap-1 mt-2">
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></div>
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{ animationDelay: "150ms" }}></div>
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{ animationDelay: "300ms" }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {isLoading && !isStreaming && (
                 <div className="flex gap-3">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500">
                     <Bot className="h-4 w-4 text-white" />

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -62,8 +63,77 @@ export default function RelayAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  const streamingResponseRef = useRef<string>("");
+  
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize WebSocket for streaming
+  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'relay',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      try {
+        // Parse response for task extraction
+        let taskExtraction = null;
+        let responseText = fullResponse;
+        
+        // Try to extract JSON block for taskExtraction
+        const jsonMatch = fullResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          try {
+            const jsonData = JSON.parse(jsonMatch[1]);
+            if (jsonData.taskExtraction) {
+              taskExtraction = jsonData.taskExtraction;
+            }
+            // Keep the conversational part before the JSON
+            responseText = fullResponse.split('```json')[0].trim();
+          } catch (e) {
+            console.error('Failed to parse taskExtraction JSON:', e);
+          }
+        }
+        
+        const assistantMessage: Message = { 
+          role: "assistant", 
+          content: responseText,
+          taskExtraction
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Update task extraction state if provided
+        if (taskExtraction) {
+          setTaskExtraction(taskExtraction);
+        }
+        
+        // Clear streaming state
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error handling stream complete:', error);
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
+        setIsLoading(false);
+      }
+    },
+    onError: (error: string) => {
+      console.error('WebSocket error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      setIsLoading(false);
+    }
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -189,6 +259,10 @@ export default function RelayAgent() {
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
+    
+    // Reset streaming state
+    setStreamingMessage("");
+    streamingResponseRef.current = "";
 
     try {
       let sessionId = currentSessionId;
@@ -198,30 +272,47 @@ export default function RelayAgent() {
         sessionId = newSession.id;
       }
 
-      const response = await fetch("/api/agents/relay/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ 
-          message: userInput, 
-          history: messages,
-          emailContent: userInput.includes("From:") || userInput.includes("Subject:") ? userInput : undefined,
-          llmConfigId: selectedLlmConfig
-        }),
-      });
+      // Try WebSocket streaming first
+      if (isConnected) {
+        console.log('[Relay] Using WebSocket streaming');
+        const sent = await sendWebSocketMessage({
+          input: userInput,
+          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
+        });
+        
+        if (!sent) {
+          throw new Error('Failed to send WebSocket message');
+        }
+        
+        // WebSocket callbacks will handle the streaming response
+        // Don't set isLoading=false here - callbacks handle it
+      } else {
+        // Fallback to HTTP for non-streaming
+        console.log('[Relay] WebSocket not connected, falling back to HTTP');
+        const response = await fetch("/api/agents/relay/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ 
+            message: userInput, 
+            history: messages,
+            emailContent: userInput.includes("From:") || userInput.includes("Subject:") ? userInput : undefined,
+            llmConfigId: selectedLlmConfig
+          }),
+        });
 
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        taskExtraction: data.taskExtraction
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      if (data.taskExtraction) {
-        setTaskExtraction(data.taskExtraction);
-      }
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
+          content: data.response,
+          taskExtraction: data.taskExtraction
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (data.taskExtraction) {
+          setTaskExtraction(data.taskExtraction);
+        }
 
       if (sessionId) {
         await apiRequest("POST", `/api/agents/relay/sessions/${sessionId}/messages`, {
@@ -234,6 +325,9 @@ export default function RelayAgent() {
           metadata: data.taskExtraction ? { taskExtraction: data.taskExtraction } : {},
         });
       }
+      
+      setIsLoading(false);
+      }
     } catch (error) {
       console.error("Error:", error);
       const errorMessage: Message = {
@@ -241,7 +335,8 @@ export default function RelayAgent() {
         content: "Sorry, I encountered an error. Please configure your AI provider in Settings > LLM Configuration."
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
       setIsLoading(false);
     }
   };

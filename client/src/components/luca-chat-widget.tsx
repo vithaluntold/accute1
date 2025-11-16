@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
 import { 
   Bot, 
   Send, 
@@ -114,18 +115,86 @@ export function LucaChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
-  const streamingContentRef = useRef<string>("");
+  const streamingResponseRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // WebSocket streaming state
+  const [streamingMessage, setStreamingMessage] = useState<string>("");
+  
+  // Initialize WebSocket for streaming with Luca-specific session handling
+  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
+    agentName: 'luca',
+    onStreamChunk: (chunk: string) => {
+      streamingResponseRef.current += chunk;
+      setStreamingMessage(streamingResponseRef.current);
+    },
+    onStreamComplete: async (fullResponse: string) => {
+      const assistantMessage: Message = {
+        id: streamingMessageIdRef.current || Date.now().toString(),
+        role: "assistant",
+        content: fullResponse,
+        timestamp: new Date(),
+        isStreaming: false,
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Save message to session
+      if (currentSessionId) {
+        addMessageMutation.mutate({
+          sessionId: currentSessionId,
+          role: "assistant",
+          content: fullResponse,
+        });
+        
+        // Generate title for new chats
+        setTimeout(async () => {
+          try {
+            const sessionResponse = await fetch(`/api/luca-chat-sessions/${currentSessionId}`, {
+              credentials: 'include'
+            });
+            
+            if (sessionResponse.ok) {
+              const sessionData = await sessionResponse.json();
+              
+              if (sessionData.title === "New Chat") {
+                await apiRequest('POST', `/api/luca-chat-sessions/${currentSessionId}/generate-title`, {});
+                queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+              }
+            }
+          } catch (error) {
+            console.log('[Luca Chat] Could not auto-generate title:', error);
+          }
+        }, 1500);
+        
+        queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+      }
+      
+      // Clear streaming state
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
+    },
+    onError: (error: string) => {
+      console.error('[Luca WebSocket] Error:', error);
+      toast({
+        title: "Connection Error",
+        description: error,
+        variant: "destructive",
+      });
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
+    }
+  });
 
   // Get time-based greeting
   const getGreeting = () => {
@@ -316,152 +385,6 @@ export function LucaChatWidget() {
     }
   };
 
-  const connectWebSocket = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return wsRef.current;
-    }
-
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/ws/ai-stream`);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'stream_start') {
-          const messageId = data.messageId || data.conversationId || Date.now().toString();
-          streamingMessageIdRef.current = messageId;
-          streamingContentRef.current = "";
-          
-          const assistantMessage: Message = {
-            id: messageId,
-            role: "assistant",
-            content: "",
-            timestamp: new Date(),
-            isStreaming: true,
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-        } else if (data.type === 'stream_chunk') {
-          // Handle first chunk - create message if not exists
-          if (!streamingMessageIdRef.current) {
-            const messageId = Date.now().toString();
-            streamingMessageIdRef.current = messageId;
-            streamingContentRef.current = "";
-            
-            const assistantMessage: Message = {
-              id: messageId,
-              role: "assistant",
-              content: "",
-              timestamp: new Date(),
-              isStreaming: true,
-            };
-            setMessages((prev) => [...prev, assistantMessage]);
-          }
-          
-          // Append chunk (backend sends 'chunk' not 'content')
-          const chunkText = data.chunk || data.content || '';
-          streamingContentRef.current += chunkText;
-          
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamingMessageIdRef.current
-                ? { ...msg, content: streamingContentRef.current }
-                : msg
-            )
-          );
-        } else if (data.type === 'stream_end') {
-          if (streamingMessageIdRef.current) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageIdRef.current
-                  ? { ...msg, isStreaming: false }
-                  : msg
-              )
-            );
-            
-            // ✅ FIX: Don't reload all messages - they're already in state and saved by backend
-            // Just generate title and invalidate session list for timestamps
-            if (currentSessionId) {
-              // Generate title for new chats after first message exchange
-              // Wait for messages to be saved, then check and generate title
-              setTimeout(async () => {
-                try {
-                  // Fetch the session to check its current title
-                  const sessionResponse = await fetch(`/api/luca-chat-sessions/${currentSessionId}`, {
-                    credentials: 'include'
-                  });
-                  
-                  if (sessionResponse.ok) {
-                    const sessionData = await sessionResponse.json();
-                    
-                    // Only generate title if it's still "New Chat"
-                    if (sessionData.title === "New Chat") {
-                      console.log('[Luca Chat] Auto-generating title for session:', currentSessionId);
-                      await apiRequest('POST', `/api/luca-chat-sessions/${currentSessionId}/generate-title`, {});
-                      
-                      // Invalidate sessions to show new title
-                      queryClient.invalidateQueries({ 
-                        queryKey: ["/api/luca-chat-sessions"] 
-                      });
-                    }
-                  }
-                } catch (error) {
-                  console.log('[Luca Chat] Could not auto-generate title:', error);
-                  // Silently fail - this is not critical
-                }
-              }, 1500);
-              
-              // Invalidate sessions list to update timestamps
-              queryClient.invalidateQueries({ 
-                queryKey: ["/api/luca-chat-sessions"] 
-              });
-            }
-            
-            streamingMessageIdRef.current = null;
-            streamingContentRef.current = "";
-          }
-          setIsStreaming(false);
-        } else if (data.type === 'error') {
-          toast({
-            title: "Error",
-            description: data.error || data.message || "An error occurred",
-            variant: "destructive",
-          });
-          setIsStreaming(false);
-          streamingMessageIdRef.current = null;
-          streamingContentRef.current = "";
-        }
-      } catch (error) {
-        console.error('[Luca Chat] Error parsing WebSocket message:', error);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('[Luca Chat] WebSocket error:', error);
-      toast({
-        title: "Connection Error",
-        description: "Unable to connect to AI service",
-        variant: "destructive",
-      });
-      setIsStreaming(false);
-    };
-
-    wsRef.current = ws;
-    return ws;
-  }, [toast, currentSessionId, addMessageMutation]);
-
-  useEffect(() => {
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -601,28 +524,59 @@ export function LucaChatWidget() {
     
     setInput("");
     setAttachedFiles([]);
-    setIsStreaming(true);
 
-    const ws = connectWebSocket();
-    
-    if (ws.readyState === WebSocket.CONNECTING) {
-      ws.addEventListener('open', () => {
-        ws.send(JSON.stringify({
-          type: 'execute_agent',
-          agentName: 'luca',
-          input: finalMessage,
-          llmConfigId: selectedLlmConfig,
-          lucaSessionId: sessionId,
-        }));
-      }, { once: true });
-    } else if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'execute_agent',
-        agentName: 'luca',
-        input: finalMessage,
-        llmConfigId: selectedLlmConfig,
-        lucaSessionId: sessionId,
-      }));
+    // Prepare streaming message ID
+    const messageId = Date.now().toString();
+    streamingMessageIdRef.current = messageId;
+    streamingResponseRef.current = "";
+
+    // Try WebSocket first
+    const wsSuccess = await sendWebSocketMessage({
+      input: finalMessage,
+      llmConfigId: selectedLlmConfig,
+      lucaSessionId: sessionId,
+    });
+
+    // Fallback to HTTP if WebSocket fails
+    if (!wsSuccess) {
+      console.log('[Luca] WebSocket unavailable, using HTTP fallback');
+      try {
+        const response = await fetch("/api/agents/luca/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            message: finalMessage,
+            llmConfigId: selectedLlmConfig,
+            lucaSessionId: sessionId,
+          }),
+        });
+
+        const data = await response.json();
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (sessionId) {
+          addMessageMutation.mutate({
+            sessionId,
+            role: "assistant",
+            content: data.response,
+          });
+        }
+      } catch (error) {
+        console.error('[Luca] HTTP fallback failed:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
 
     setIsExpanded(true);
@@ -931,6 +885,30 @@ export function LucaChatWidget() {
                     )}
                   </div>
                 ))}
+                {streamingMessage && (
+                  <div className="flex gap-3 justify-start">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className="bg-gradient-to-br from-[#e5a660]/20 to-[#d76082]/20">
+                        <img 
+                          src={lucaLogoUrl} 
+                          alt="Luca" 
+                          className="h-5 w-5 object-contain"
+                        />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="rounded-2xl px-4 py-2.5 max-w-[80%] bg-muted">
+                      <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {streamingMessage}
+                        </ReactMarkdown>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span className="text-xs text-muted-foreground">Thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </ScrollArea>
