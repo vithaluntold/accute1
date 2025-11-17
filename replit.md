@@ -43,3 +43,35 @@ The project is structured into `client/`, `server/`, and `shared/` directories. 
 - pdf-parse
 - mammoth
 - xlsx
+
+# AI Agent System Testing Progress (Phase 3)
+## Status: 100 Unit Tests Built (38.5% of 260-test target)
+
+### Completed Tests
+1. **Agent Routing & Registry** (40 tests) - `server/__tests__/agents/routing.test.ts`
+   - ⚠️ NEEDS FIX: Tests static registry, not actual API endpoints/middleware
+   
+2. **LLM Configuration** (30 tests) - `server/__tests__/agents/llm-config.test.ts`
+   - ✅ Tests ConfigResolver.resolve() with two-level fallback
+   - ✅ Tests encryption/decryption with AES-256
+   - ✅ Tests caching with 5-minute TTL
+   - ✅ Tests multi-provider support (OpenAI, Anthropic, Azure)
+   
+3. **Session Management** (30 tests) - `server/__tests__/agents/session-management.test.ts`
+   - ✅ FIXED: Now uses AgentSessionService (service layer)
+   - ✅ FIXED: Corrected agent slug `omnispectra` (was `omni-spectra`)
+   - ✅ Tests session CRUD, message management, auto-title generation
+   - ✅ Tests user isolation and authorization
+
+### Next Steps
+- Fix routing tests to use Express test app
+- Build 60 integration tests (WebSocket + LLM API)
+- Build 50 E2E Playwright tests
+- Build 30 psychology profiling tests
+- Build 20 load tests
+
+### Six Sigma Quality Targets
+- <2s agent load time
+- >99.9% WebSocket uptime
+- >95% auto-title accuracy
+- <5s LLM response time (p95)
