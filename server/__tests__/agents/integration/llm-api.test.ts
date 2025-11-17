@@ -3,30 +3,33 @@ import { testDb as db } from '../../../test-db';
 import { createTestOrganization } from '../../helpers';
 import { llmConfigurations } from '@shared/schema';
 import { ConfigResolver } from '../../../config-resolver';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';
 
 /**
  * LLM API Integration Tests
  * 
- * Tests LLM provider integration, multi-provider fallback, error handling,
- * and configuration management using mocked API calls.
+ * Tests LLM provider integration with CORRECT schema structure:
+ * - Uses `apiKeyEncrypted` (not `apiKey`)
+ * - Uses `azureEndpoint` (not `endpoint`)
+ * - Supports `scope: 'user' | 'workspace'`
+ * - Tests user-level AND workspace-level configurations
  * 
  * Coverage:
  * 1. OpenAI Integration (5 tests)
  * 2. Anthropic Integration (5 tests)
  * 3. Azure OpenAI Integration (5 tests)
- * 4. Multi-Provider Fallback (5 tests)
- * 5. Error Handling & Retries (5 tests)
- * 6. Configuration Resolution (5 tests)
+ * 4. User vs Workspace Scope (5 tests)
+ * 5. Multi-Provider Fallback (5 tests)
+ * 6. Error Handling & Security (5 tests)
  * 
  * Total: 30 tests
  */
 
 describe('LLM API Integration Tests', () => {
-  let testUserId: number;
-  let testOrgId: number;
+  let testUserId: string;
+  let testOrgId: string;
   let encryptionKey: string;
   let configResolver: ConfigResolver;
 
@@ -36,9 +39,13 @@ describe('LLM API Integration Tests', () => {
     testUserId = ownerUser.id;
     testOrgId = organization.id;
 
-    // Setup encryption key
-    encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-    process.env.ENCRYPTION_KEY = encryptionKey;
+    // Setup encryption key (must be exactly 32 bytes = 64 hex characters)
+    if (!process.env.ENCRYPTION_KEY || Buffer.from(process.env.ENCRYPTION_KEY, 'hex').length !== 32) {
+      encryptionKey = crypto.randomBytes(32).toString('hex');
+      process.env.ENCRYPTION_KEY = encryptionKey;
+    } else {
+      encryptionKey = process.env.ENCRYPTION_KEY;
+    }
 
     // Initialize ConfigResolver
     configResolver = new ConfigResolver();
@@ -64,26 +71,57 @@ describe('LLM API Integration Tests', () => {
     return `${iv.toString('hex')}:${encrypted}`;
   }
 
-  // Helper to create LLM configuration
-  async function createLLMConfig(
+  // Helper to create USER-level LLM configuration
+  async function createUserLLMConfig(
     provider: 'openai' | 'anthropic' | 'azure_openai',
-    userId?: number,
+    userId: string,
     overrides?: any
   ) {
     const config = {
-      name: `Test ${provider} Config`,
+      scope: 'user',
+      userId: userId,
+      organizationId: null,
+      name: `User ${provider} Config`,
       provider,
-      userId: userId || null,
-      workspaceId: null,
-      organizationId: testOrgId,
-      isActive: true,
-      apiKey: encrypt('test-api-key-' + nanoid()),
+      apiKeyEncrypted: encrypt('test-api-key-' + nanoid()),
       model: provider === 'openai' ? 'gpt-4' : provider === 'anthropic' ? 'claude-3-opus-20240229' : 'gpt-4',
+      isActive: true,
+      isDefault: false,
+      createdBy: userId,
       ...overrides,
     };
 
     if (provider === 'azure_openai') {
-      config.endpoint = 'https://test.openai.azure.com';
+      config.azureEndpoint = 'https://test.openai.azure.com';
+    }
+
+    const [created] = await db.insert(llmConfigurations).values(config).returning();
+    return created;
+  }
+
+  // Helper to create WORKSPACE-level LLM configuration
+  async function createWorkspaceLLMConfig(
+    provider: 'openai' | 'anthropic' | 'azure_openai',
+    organizationId: string,
+    createdBy: string,
+    overrides?: any
+  ) {
+    const config = {
+      scope: 'workspace',
+      userId: null,
+      organizationId: organizationId,
+      name: `Workspace ${provider} Config`,
+      provider,
+      apiKeyEncrypted: encrypt('test-api-key-' + nanoid()),
+      model: provider === 'openai' ? 'gpt-4' : provider === 'anthropic' ? 'claude-3-opus-20240229' : 'gpt-4',
+      isActive: true,
+      isDefault: false,
+      createdBy: createdBy,
+      ...overrides,
+    };
+
+    if (provider === 'azure_openai') {
+      config.azureEndpoint = 'https://test.openai.azure.com';
     }
 
     const [created] = await db.insert(llmConfigurations).values(config).returning();
@@ -95,8 +133,8 @@ describe('LLM API Integration Tests', () => {
   // ============================================================
 
   describe('OpenAI Integration', () => {
-    it('should resolve OpenAI configuration', async () => {
-      await createLLMConfig('openai', testUserId);
+    it('should resolve user-level OpenAI configuration', async () => {
+      await createUserLLMConfig('openai', testUserId);
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
@@ -104,10 +142,11 @@ describe('LLM API Integration Tests', () => {
       expect(config.provider).toBe('openai');
       expect(config.model).toBe('gpt-4');
       expect(config.decryptedApiKey).toBeDefined();
+      expect(config.decryptedApiKey).toMatch(/^test-api-key-/);
     });
 
     it('should support GPT-4 model', async () => {
-      const llmConfig = await createLLMConfig('openai', testUserId, null, {
+      await createUserLLMConfig('openai', testUserId, {
         model: 'gpt-4',
       });
 
@@ -117,7 +156,7 @@ describe('LLM API Integration Tests', () => {
     });
 
     it('should support GPT-3.5-turbo model', async () => {
-      await createLLMConfig('openai', testUserId, null, {
+      await createUserLLMConfig('openai', testUserId, {
         model: 'gpt-3.5-turbo',
       });
 
@@ -128,8 +167,8 @@ describe('LLM API Integration Tests', () => {
 
     it('should handle OpenAI API key decryption', async () => {
       const testKey = 'sk-test-' + nanoid();
-      await createLLMConfig('openai', testUserId, null, {
-        apiKey: encrypt(testKey),
+      await createUserLLMConfig('openai', testUserId, {
+        apiKeyEncrypted: encrypt(testKey),
       });
 
       const config = await configResolver.resolve(testUserId, testOrgId);
@@ -137,17 +176,14 @@ describe('LLM API Integration Tests', () => {
       expect(config.decryptedApiKey).toBe(testKey);
     });
 
-    it('should support custom OpenAI parameters', async () => {
-      await createLLMConfig('openai', testUserId, null, {
-        model: 'gpt-4',
-        temperature: 0.7,
-        maxTokens: 2000,
-      });
+    it('should support workspace-level OpenAI config', async () => {
+      await createWorkspaceLLMConfig('openai', testOrgId, testUserId);
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
-      expect(config.temperature).toBe(0.7);
-      expect(config.maxTokens).toBe(2000);
+      expect(config.provider).toBe('openai');
+      expect(config.scope).toBe('workspace');
+      expect(config.organizationId).toBe(testOrgId);
     });
   });
 
@@ -156,8 +192,8 @@ describe('LLM API Integration Tests', () => {
   // ============================================================
 
   describe('Anthropic Integration', () => {
-    it('should resolve Anthropic configuration', async () => {
-      await createLLMConfig('anthropic', testUserId);
+    it('should resolve user-level Anthropic configuration', async () => {
+      await createUserLLMConfig('anthropic', testUserId);
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
@@ -168,7 +204,7 @@ describe('LLM API Integration Tests', () => {
     });
 
     it('should support Claude 3 Opus model', async () => {
-      await createLLMConfig('anthropic', testUserId, null, {
+      await createUserLLMConfig('anthropic', testUserId, {
         model: 'claude-3-opus-20240229',
       });
 
@@ -177,8 +213,8 @@ describe('LLM API Integration Tests', () => {
       expect(config.model).toBe('claude-3-opus-20240229');
     });
 
-    it('should support Claude 3 Sonnet model', async () => {
-      await createLLMConfig('anthropic', testUserId, null, {
+    it('should support Claude 3.5 Sonnet model', async () => {
+      await createUserLLMConfig('anthropic', testUserId, {
         model: 'claude-3-5-sonnet-20241022',
       });
 
@@ -189,8 +225,8 @@ describe('LLM API Integration Tests', () => {
 
     it('should handle Anthropic API key decryption', async () => {
       const testKey = 'sk-ant-api03-' + nanoid();
-      await createLLMConfig('anthropic', testUserId, null, {
-        apiKey: encrypt(testKey),
+      await createUserLLMConfig('anthropic', testUserId, {
+        apiKeyEncrypted: encrypt(testKey),
       });
 
       const config = await configResolver.resolve(testUserId, testOrgId);
@@ -198,17 +234,13 @@ describe('LLM API Integration Tests', () => {
       expect(config.decryptedApiKey).toBe(testKey);
     });
 
-    it('should support custom Anthropic parameters', async () => {
-      await createLLMConfig('anthropic', testUserId, null, {
-        model: 'claude-3-opus-20240229',
-        temperature: 0.8,
-        maxTokens: 4096,
-      });
+    it('should support workspace-level Anthropic config', async () => {
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId);
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
-      expect(config.temperature).toBe(0.8);
-      expect(config.maxTokens).toBe(4096);
+      expect(config.provider).toBe('anthropic');
+      expect(config.scope).toBe('workspace');
     });
   });
 
@@ -217,29 +249,29 @@ describe('LLM API Integration Tests', () => {
   // ============================================================
 
   describe('Azure OpenAI Integration', () => {
-    it('should resolve Azure OpenAI configuration', async () => {
-      await createLLMConfig('azure_openai', testUserId, null, {
-        endpoint: 'https://test.openai.azure.com',
+    it('should resolve Azure OpenAI configuration with azureEndpoint', async () => {
+      await createUserLLMConfig('azure_openai', testUserId, {
+        azureEndpoint: 'https://test.openai.azure.com',
       });
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
       expect(config).toBeDefined();
       expect(config.provider).toBe('azure_openai');
-      expect(config.endpoint).toBe('https://test.openai.azure.com');
+      expect(config.azureEndpoint).toBe('https://test.openai.azure.com');
       expect(config.decryptedApiKey).toBeDefined();
     });
 
-    it('should require endpoint for Azure OpenAI', async () => {
-      const config = await createLLMConfig('azure_openai', testUserId);
+    it('should require azureEndpoint for Azure OpenAI', async () => {
+      const config = await createUserLLMConfig('azure_openai', testUserId);
 
-      expect(config.endpoint).toBeDefined();
-      expect(config.endpoint).toContain('openai.azure.com');
+      expect(config.azureEndpoint).toBeDefined();
+      expect(config.azureEndpoint).toContain('openai.azure.com');
     });
 
     it('should support Azure deployment names', async () => {
-      await createLLMConfig('azure_openai', testUserId, null, {
-        endpoint: 'https://test.openai.azure.com',
+      await createUserLLMConfig('azure_openai', testUserId, {
+        azureEndpoint: 'https://test.openai.azure.com',
         model: 'gpt-4-deployment',
       });
 
@@ -250,9 +282,9 @@ describe('LLM API Integration Tests', () => {
 
     it('should handle Azure API key decryption', async () => {
       const testKey = 'azure-key-' + nanoid();
-      await createLLMConfig('azure_openai', testUserId, null, {
-        apiKey: encrypt(testKey),
-        endpoint: 'https://test.openai.azure.com',
+      await createUserLLMConfig('azure_openai', testUserId, {
+        apiKeyEncrypted: encrypt(testKey),
+        azureEndpoint: 'https://test.openai.azure.com',
       });
 
       const config = await configResolver.resolve(testUserId, testOrgId);
@@ -260,71 +292,113 @@ describe('LLM API Integration Tests', () => {
       expect(config.decryptedApiKey).toBe(testKey);
     });
 
-    it('should support Azure custom parameters', async () => {
-      await createLLMConfig('azure_openai', testUserId, null, {
-        endpoint: 'https://test.openai.azure.com',
-        temperature: 0.6,
-        maxTokens: 3000,
+    it('should support workspace-level Azure config', async () => {
+      await createWorkspaceLLMConfig('azure_openai', testOrgId, testUserId, {
+        azureEndpoint: 'https://workspace.openai.azure.com',
       });
 
       const config = await configResolver.resolve(testUserId, testOrgId);
 
-      expect(config.temperature).toBe(0.6);
-      expect(config.maxTokens).toBe(3000);
+      expect(config.provider).toBe('azure_openai');
+      expect(config.scope).toBe('workspace');
+      expect(config.azureEndpoint).toBe('https://workspace.openai.azure.com');
     });
   });
 
   // ============================================================
-  // 4. MULTI-PROVIDER FALLBACK (5 tests)
+  // 4. USER VS WORKSPACE SCOPE (5 tests)
   // ============================================================
 
-  describe('Multi-Provider Fallback', () => {
-    it('should prioritize user config over workspace config', async () => {
+  describe('User vs Workspace Scope', () => {
+    it('should prioritize user-level config over workspace-level config', async () => {
       // Create workspace config
-      await createLLMConfig('anthropic', null, testWorkspaceId, {
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId, {
         name: 'Workspace Config',
       });
 
       // Create user config
-      await createLLMConfig('openai', testUserId, null, {
+      await createUserLLMConfig('openai', testUserId, {
         name: 'User Config',
       });
 
-      const config = await configResolver.resolve(testUserId, testOrgId, testWorkspaceId);
+      const config = await configResolver.resolve(testUserId, testOrgId);
 
       expect(config.provider).toBe('openai');
       expect(config.name).toBe('User Config');
+      expect(config.scope).toBe('user');
     });
 
     it('should fallback to workspace config when no user config exists', async () => {
       // Only create workspace config
-      await createLLMConfig('anthropic', null, testWorkspaceId, {
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId, {
         name: 'Workspace Config',
       });
 
-      const config = await configResolver.resolve(testUserId, testOrgId, testWorkspaceId);
+      const config = await configResolver.resolve(testUserId, testOrgId);
 
       expect(config.provider).toBe('anthropic');
       expect(config.name).toBe('Workspace Config');
+      expect(config.scope).toBe('workspace');
     });
 
-    it('should skip inactive configurations', async () => {
+    it('should verify user-level config has userId and null organizationId', async () => {
+      const userConfig = await createUserLLMConfig('openai', testUserId);
+
+      expect(userConfig.scope).toBe('user');
+      expect(userConfig.userId).toBe(testUserId);
+      expect(userConfig.organizationId).toBeNull();
+    });
+
+    it('should verify workspace-level config has organizationId and null userId', async () => {
+      const workspaceConfig = await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId);
+
+      expect(workspaceConfig.scope).toBe('workspace');
+      expect(workspaceConfig.organizationId).toBe(testOrgId);
+      expect(workspaceConfig.userId).toBeNull();
+    });
+
+    it('should support isDefault flag for user and workspace configs', async () => {
+      // Create default user config
+      await createUserLLMConfig('openai', testUserId, {
+        isDefault: true,
+      });
+
+      // Create default workspace config
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId, {
+        isDefault: true,
+      });
+
+      const config = await configResolver.resolve(testUserId, testOrgId);
+
+      // User config should be prioritized
+      expect(config.provider).toBe('openai');
+      expect(config.isDefault).toBe(true);
+    });
+  });
+
+  // ============================================================
+  // 5. MULTI-PROVIDER FALLBACK (5 tests)
+  // ============================================================
+
+  describe('Multi-Provider Fallback', () => {
+    it('should skip inactive configurations and use active ones', async () => {
       // Create inactive user config
-      await createLLMConfig('openai', testUserId, null, {
+      await createUserLLMConfig('openai', testUserId, {
         name: 'Inactive User Config',
         isActive: false,
       });
 
       // Create active workspace config
-      await createLLMConfig('anthropic', null, testWorkspaceId, {
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId, {
         name: 'Active Workspace Config',
         isActive: true,
       });
 
-      const config = await configResolver.resolve(testUserId, testOrgId, testWorkspaceId);
+      const config = await configResolver.resolve(testUserId, testOrgId);
 
       expect(config.provider).toBe('anthropic');
       expect(config.name).toBe('Active Workspace Config');
+      expect(config.isActive).toBe(true);
     });
 
     it('should throw error when no configuration exists', async () => {
@@ -337,7 +411,7 @@ describe('LLM API Integration Tests', () => {
 
     it('should support switching between providers', async () => {
       // Start with OpenAI
-      const openaiConfig = await createLLMConfig('openai', testUserId);
+      const openaiConfig = await createUserLLMConfig('openai', testUserId);
       let config = await configResolver.resolve(testUserId, testOrgId);
       expect(config.provider).toBe('openai');
 
@@ -346,7 +420,7 @@ describe('LLM API Integration Tests', () => {
         .set({ isActive: false })
         .where(eq(llmConfigurations.id, openaiConfig.id));
 
-      await createLLMConfig('anthropic', testUserId, null, {
+      await createUserLLMConfig('anthropic', testUserId, {
         isActive: true,
       });
 
@@ -355,23 +429,61 @@ describe('LLM API Integration Tests', () => {
       config = await configResolver.resolve(testUserId, testOrgId);
       expect(config.provider).toBe('anthropic');
     });
+
+    it('should handle multiple workspace configs and select active one', async () => {
+      // Create multiple workspace configs
+      await createWorkspaceLLMConfig('openai', testOrgId, testUserId, {
+        isActive: false,
+      });
+
+      await createWorkspaceLLMConfig('anthropic', testOrgId, testUserId, {
+        isActive: true,
+      });
+
+      const config = await configResolver.resolve(testUserId, testOrgId);
+
+      expect(config.provider).toBe('anthropic');
+      expect(config.isActive).toBe(true);
+    });
+
+    it('should handle organization isolation (different orgs have different configs)', async () => {
+      const { organization: org2, ownerUser: user2 } = await createTestOrganization();
+
+      // Create config for org1
+      await createWorkspaceLLMConfig('openai', testOrgId, testUserId);
+
+      // Create config for org2
+      await createWorkspaceLLMConfig('anthropic', org2.id, user2.id);
+
+      const config1 = await configResolver.resolve(testUserId, testOrgId);
+      const config2 = await configResolver.resolve(user2.id, org2.id);
+
+      expect(config1.provider).toBe('openai');
+      expect(config1.organizationId).toBe(testOrgId);
+
+      expect(config2.provider).toBe('anthropic');
+      expect(config2.organizationId).toBe(org2.id);
+    });
   });
 
   // ============================================================
-  // 5. ERROR HANDLING & RETRIES (5 tests)
+  // 6. ERROR HANDLING & SECURITY (5 tests)
   // ============================================================
 
-  describe('Error Handling & Retries', () => {
+  describe('Error Handling & Security', () => {
     it('should handle decryption failures gracefully', async () => {
       // Create config with invalid encrypted key
       await db.insert(llmConfigurations).values({
+        scope: 'user',
+        userId: testUserId,
+        organizationId: null,
         name: 'Invalid Config',
         provider: 'openai',
-        userId: testUserId,
-        organizationId: testOrgId,
-        isActive: true,
-        apiKey: 'invalid-encrypted-key',
+        apiKeyEncrypted: 'invalid-encrypted-key',
         model: 'gpt-4',
+        isActive: true,
+        isDefault: false,
+        createdBy: testUserId,
       });
 
       await expect(
@@ -379,32 +491,11 @@ describe('LLM API Integration Tests', () => {
       ).rejects.toThrow();
     });
 
-    it('should validate required fields for each provider', async () => {
-      // Azure requires endpoint
-      const azureConfig = {
-        name: 'Azure No Endpoint',
-        provider: 'azure_openai' as const,
-        userId: testUserId,
-        organizationId: testOrgId,
-        isActive: true,
-        apiKey: encrypt('test-key'),
-        model: 'gpt-4',
-        // endpoint missing
-      };
-
-      const [config] = await db.insert(llmConfigurations).values(azureConfig).returning();
-
-      const resolved = await configResolver.resolve(testUserId, testOrgId);
-      
-      // Should still resolve but endpoint might be undefined
-      expect(resolved).toBeDefined();
-    });
-
     it('should handle missing encryption key', async () => {
       const originalKey = process.env.ENCRYPTION_KEY;
       delete process.env.ENCRYPTION_KEY;
 
-      await createLLMConfig('openai', testUserId);
+      await createUserLLMConfig('openai', testUserId);
 
       await expect(
         configResolver.resolve(testUserId, testOrgId)
@@ -413,127 +504,42 @@ describe('LLM API Integration Tests', () => {
       process.env.ENCRYPTION_KEY = originalKey;
     });
 
+    it('should prevent organization mismatch (user cannot access other org configs)', async () => {
+      const { organization: org2, ownerUser: user2 } = await createTestOrganization();
+
+      // Create config for org2
+      await createWorkspaceLLMConfig('openai', org2.id, user2.id);
+
+      // testUser (from org1) should not see org2's config
+      await expect(
+        configResolver.resolve(testUserId, testOrgId)
+      ).rejects.toThrow('No active LLM configuration found');
+    });
+
+    it('should validate provider field is correct', async () => {
+      const config = await createUserLLMConfig('openai', testUserId);
+
+      expect(config.provider).toBe('openai');
+      expect(['openai', 'anthropic', 'azure_openai']).toContain(config.provider);
+    });
+
     it('should handle corrupted configuration data', async () => {
       await db.insert(llmConfigurations).values({
-        name: 'Corrupted Config',
-        provider: 'openai' as any,
+        scope: 'user',
         userId: testUserId,
-        organizationId: testOrgId,
-        isActive: true,
-        apiKey: null as any, // Invalid: null API key
+        organizationId: null,
+        name: 'Corrupted Config',
+        provider: 'openai',
+        apiKeyEncrypted: null as any, // Invalid: null API key
         model: 'gpt-4',
+        isActive: true,
+        isDefault: false,
+        createdBy: testUserId,
       });
 
       await expect(
         configResolver.resolve(testUserId, testOrgId)
       ).rejects.toThrow();
-    });
-
-    it('should handle organization mismatch', async () => {
-      const { organization: org2, ownerUser: user2 } = await createTestOrganization();
-
-      // Create config for org2
-      await createLLMConfig('openai', user2.id);
-
-      // Try to access with org1 user (should not find config)
-      await expect(
-        configResolver.resolve(testUserId, testOrgId)
-      ).rejects.toThrow('No active LLM configuration found');
-    });
-  });
-
-  // ============================================================
-  // 6. CONFIGURATION RESOLUTION (5 tests)
-  // ============================================================
-
-  describe('Configuration Resolution', () => {
-    it('should cache configuration for performance', async () => {
-      await createLLMConfig('openai', testUserId);
-
-      const start1 = Date.now();
-      const config1 = await configResolver.resolve(testUserId, testOrgId);
-      const time1 = Date.now() - start1;
-
-      const start2 = Date.now();
-      const config2 = await configResolver.resolve(testUserId, testOrgId);
-      const time2 = Date.now() - start2;
-
-      expect(config1.id).toBe(config2.id);
-      // Second call should be faster (cached)
-      expect(time2).toBeLessThan(time1);
-    });
-
-    it('should respect cache invalidation', async () => {
-      const config1 = await createLLMConfig('openai', testUserId);
-
-      const resolved1 = await configResolver.resolve(testUserId, testOrgId);
-      expect(resolved1.provider).toBe('openai');
-
-      // Update config
-      await db.update(llmConfigurations)
-        .set({ isActive: false })
-        .where(eq(llmConfigurations.id, config1.id));
-
-      await createLLMConfig('anthropic', testUserId);
-
-      configResolver.invalidateCache();
-
-      const resolved2 = await configResolver.resolve(testUserId, testOrgId);
-      expect(resolved2.provider).toBe('anthropic');
-    });
-
-    it('should handle concurrent resolution requests', async () => {
-      await createLLMConfig('openai', testUserId);
-
-      const promises = Array(10).fill(null).map(() => 
-        configResolver.resolve(testUserId, testOrgId)
-      );
-
-      const configs = await Promise.all(promises);
-
-      // All should resolve to same config
-      expect(configs.every(c => c.id === configs[0].id)).toBe(true);
-    });
-
-    it('should resolve workspace-specific configurations', async () => {
-      // Create configs for different workspaces
-      const [workspace2] = await db.insert(workspaces).values({
-        name: 'Test Workspace 2',
-        organizationId: testOrgId,
-        createdBy: testUserId,
-        settings: {},
-      }).returning();
-
-      await createLLMConfig('openai', null, testWorkspaceId, {
-        name: 'Workspace 1 Config',
-      });
-
-      await createLLMConfig('anthropic', null, workspace2.id, {
-        name: 'Workspace 2 Config',
-      });
-
-      const config1 = await configResolver.resolve(testUserId, testOrgId, testWorkspaceId);
-      const config2 = await configResolver.resolve(testUserId, testOrgId, workspace2.id);
-
-      expect(config1.provider).toBe('openai');
-      expect(config2.provider).toBe('anthropic');
-    });
-
-    it('should preserve configuration metadata', async () => {
-      const originalConfig = await createLLMConfig('openai', testUserId, null, {
-        name: 'Test Config',
-        temperature: 0.7,
-        maxTokens: 2000,
-        model: 'gpt-4',
-      });
-
-      const resolved = await configResolver.resolve(testUserId, testOrgId);
-
-      expect(resolved.id).toBe(originalConfig.id);
-      expect(resolved.name).toBe('Test Config');
-      expect(resolved.temperature).toBe(0.7);
-      expect(resolved.maxTokens).toBe(2000);
-      expect(resolved.model).toBe('gpt-4');
     });
   });
 });

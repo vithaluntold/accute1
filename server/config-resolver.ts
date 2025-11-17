@@ -203,4 +203,8 @@ class ConfigResolver {
   }
 }
 
+// Export class for testing
+export { ConfigResolver };
+
+// Export singleton instance for production use
 export const configResolver = new ConfigResolver();
