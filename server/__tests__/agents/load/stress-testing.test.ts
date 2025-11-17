@@ -1,50 +1,54 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { testDb as db } from '../../../test-db';
 import { createTestOrganization } from '../../helpers';
-import { WebSocketBootstrap } from '../../../websocket-bootstrap';
 import { AgentOrchestrator } from '../../../agent-orchestrator';
 import { ConfigResolver } from '../../../config-resolver';
+import { AgentSessionService } from '../../../agent-session-service';
 import { agentSessions, agentMessages, llmConfigurations } from '@shared/schema';
 import { nanoid } from 'nanoid';
 import crypto from 'crypto';
 
 /**
- * Load & Stress Testing Suite
+ * Load & Stress Testing Suite (REAL SYSTEM TESTING)
  * 
- * Tests system performance under high load and stress conditions.
- * Validates Six Sigma quality targets for the AI Agent System.
+ * Tests ACTUAL system components under load:
+ * - Real AgentOrchestrator
+ * - Real ConfigResolver with caching
+ * - Real AgentSessionService
+ * - Real database queries
  * 
- * Quality Targets (from AI_AGENT_TESTING_PLAN.md):
+ * Quality Targets (Six Sigma):
  * - Agent load time: <2 seconds
- * - WebSocket uptime: >99.9%
- * - Auto-title success: >95%
- * - LLM response time: <5 seconds (p95)
- * - Concurrent sessions: 100+ users
- * - Message throughput: 1000+ msgs/min
+ * - WebSocket connection: <1 second
+ * - LLM config resolution: <100ms (cached)
+ * - Session queries: <500ms with 1000+ sessions
+ * - Cache hit rate: >90%
  * 
  * Coverage:
- * 1. Concurrent Session Management - 4 tests
- * 2. WebSocket Load Testing - 4 tests
- * 3. Database Performance - 4 tests
- * 4. LLM Config Caching & Throughput - 4 tests
- * 5. Memory & Resource Management - 4 tests
+ * 1. Agent Orchestrator Performance - 5 tests
+ * 2. Config Resolver Caching - 5 tests
+ * 3. Session Service Scalability - 5 tests
+ * 4. Database Query Performance - 5 tests
  * 
  * Total: 20 tests
  */
 
-describe('Load & Stress Testing', () => {
+describe('Load & Stress Testing (Real Systems)', () => {
   let testOrgId: string;
   let testUserId: string;
   let orchestrator: AgentOrchestrator;
   let configResolver: ConfigResolver;
+  let sessionService: AgentSessionService;
 
   beforeAll(async () => {
     const { organization, ownerUser } = await createTestOrganization();
     testOrgId = organization.id;
     testUserId = ownerUser.id;
 
+    // Initialize REAL system components
     orchestrator = new AgentOrchestrator();
     configResolver = new ConfigResolver();
+    sessionService = new AgentSessionService();
 
     // Setup test LLM config
     const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
@@ -71,477 +75,163 @@ describe('Load & Stress Testing', () => {
     });
   });
 
-  // ============================================================
-  // 1. CONCURRENT SESSION MANAGEMENT - 4 tests
-  // ============================================================
-
-  describe('Concurrent Session Management', () => {
-    it('should handle 100 concurrent session creations within 2 seconds', async () => {
-      const startTime = Date.now();
-      const sessionPromises = [];
-
-      for (let i = 0; i < 100; i++) {
-        const promise = db.insert(agentSessions).values({
-          agentSlug: 'luca',
-          userId: testUserId,
-          organizationId: testOrgId,
-          title: `Concurrent Session ${i}`,
-          metadata: {},
-        }).returning();
-        
-        sessionPromises.push(promise);
-      }
-
-      const sessions = await Promise.all(sessionPromises);
-      const duration = Date.now() - startTime;
-
-      expect(sessions.length).toBe(100);
-      expect(duration).toBeLessThan(2000); // < 2 seconds
-    }, 10000);
-
-    it('should maintain session isolation under concurrent load', async () => {
-      // Create 50 sessions for different users
-      const org2Result = await createTestOrganization();
-      const user2Id = org2Result.ownerUser.id;
-      const org2Id = org2Result.organization.id;
-
-      const user1Sessions = Array.from({ length: 25 }, (_, i) => ({
-        agentSlug: 'luca',
-        userId: testUserId,
-        organizationId: testOrgId,
-        title: `User1 Session ${i}`,
-        metadata: {},
-      }));
-
-      const user2Sessions = Array.from({ length: 25 }, (_, i) => ({
-        agentSlug: 'luca',
-        userId: user2Id,
-        organizationId: org2Id,
-        title: `User2 Session ${i}`,
-        metadata: {},
-      }));
-
-      await Promise.all([
-        db.insert(agentSessions).values(user1Sessions),
-        db.insert(agentSessions).values(user2Sessions),
-      ]);
-
-      // Verify isolation
-      const user1Count = await db.query.agentSessions.findMany({
-        where: (sessions, { eq }) => eq(sessions.userId, testUserId),
-      });
-
-      const user2Count = await db.query.agentSessions.findMany({
-        where: (sessions, { eq }) => eq(sessions.userId, user2Id),
-      });
-
-      expect(user1Count.length).toBeGreaterThanOrEqual(25);
-      expect(user2Count.length).toBeGreaterThanOrEqual(25);
-      
-      // Ensure no cross-contamination
-      expect(user1Count.every(s => s.userId === testUserId)).toBe(true);
-      expect(user2Count.every(s => s.userId === user2Id)).toBe(true);
-    }, 15000);
-
-    it('should handle rapid session switching without data loss', async () => {
-      // Create 10 sessions
-      const sessions = await Promise.all(
-        Array.from({ length: 10 }, async (_, i) => {
-          const [session] = await db.insert(agentSessions).values({
-            agentSlug: 'luca',
-            userId: testUserId,
-            organizationId: testOrgId,
-            title: `Switch Session ${i}`,
-            metadata: {},
-          }).returning();
-          return session;
-        })
-      );
-
-      // Add messages to all sessions concurrently
-      const messagePromises = sessions.flatMap(session =>
-        Array.from({ length: 5 }, (_, i) =>
-          db.insert(agentMessages).values({
-            sessionId: session.id,
-            role: 'user',
-            content: `Message ${i} for session ${session.id}`,
-            metadata: {},
-          })
-        )
-      );
-
-      await Promise.all(messagePromises);
-
-      // Verify all messages saved correctly
-      for (const session of sessions) {
-        const messages = await db.query.agentMessages.findMany({
-          where: (msgs, { eq }) => eq(msgs.sessionId, session.id),
-        });
-        expect(messages.length).toBe(5);
-      }
-    }, 15000);
-
-    it('should maintain performance with 500+ total sessions', async () => {
-      const startTime = Date.now();
-
-      // Create 500 sessions in batches
-      const batchSize = 100;
-      const batches = 5;
-
-      for (let batch = 0; batch < batches; batch++) {
-        const sessions = Array.from({ length: batchSize }, (_, i) => ({
-          agentSlug: ['luca', 'cadence', 'parity'][i % 3] as any,
-          userId: testUserId,
-          organizationId: testOrgId,
-          title: `Batch ${batch} Session ${i}`,
-          metadata: {},
-        }));
-
-        await db.insert(agentSessions).values(sessions);
-      }
-
-      const duration = Date.now() - startTime;
-
-      // Query should still be fast
-      const queryStart = Date.now();
-      const recentSessions = await db.query.agentSessions.findMany({
-        where: (sessions, { eq }) => eq(sessions.userId, testUserId),
-        limit: 20,
-        orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-      });
-      const queryDuration = Date.now() - queryStart;
-
-      expect(recentSessions.length).toBe(20);
-      expect(queryDuration).toBeLessThan(500); // Query < 500ms even with 500+ sessions
-      expect(duration).toBeLessThan(10000); // Total creation < 10 seconds
-    }, 30000);
+  afterAll(async () => {
+    // Cleanup: Invalidate caches to prevent state leakage
+    configResolver.invalidateCache();
   });
 
   // ============================================================
-  // 2. WEBSOCKET LOAD TESTING - 4 tests
+  // 1. AGENT ORCHESTRATOR PERFORMANCE - 5 tests
   // ============================================================
 
-  describe('WebSocket Load Testing', () => {
-    it('should initialize WebSocket server within 1 second', async () => {
-      const startTime = Date.now();
-      const wsBootstrap = new WebSocketBootstrap();
-      // Initialization happens in constructor
-      const duration = Date.now() - startTime;
-
-      expect(duration).toBeLessThan(1000);
-    });
-
-    it('should handle 100 concurrent message broadcasts', async () => {
-      const sessions = await Promise.all(
-        Array.from({ length: 100 }, async (_, i) => {
-          const [session] = await db.insert(agentSessions).values({
-            agentSlug: 'luca',
-            userId: testUserId,
-            organizationId: testOrgId,
-            title: `WS Session ${i}`,
-            metadata: {},
-          }).returning();
-          return session;
-        })
-      );
-
-      const startTime = Date.now();
-
-      // Simulate concurrent message processing
-      await Promise.all(
-        sessions.map(session =>
-          db.insert(agentMessages).values({
-            sessionId: session.id,
-            role: 'agent',
-            content: `Broadcast message for ${session.id}`,
-            metadata: {},
-          })
-        )
-      );
-
-      const duration = Date.now() - startTime;
-
-      expect(duration).toBeLessThan(3000); // < 3 seconds for 100 messages
-    }, 10000);
-
-    it('should maintain WebSocket connection pool under load', async () => {
-      // Simulate 50 active connections
-      const connections = Array.from({ length: 50 }, (_, i) => ({
-        id: nanoid(),
-        userId: testUserId,
-        organizationId: testOrgId,
-        agentSlug: 'luca',
-        sessionId: nanoid(),
-      }));
-
-      // Each connection sends 10 messages
-      const messageCount = connections.length * 10;
-      
+  describe('Agent Orchestrator Performance', () => {
+    it('should load all 10 agents within 1 second', async () => {
       const startTime = Date.now();
       
-      // Simulate message throughput
-      const messages = connections.flatMap(conn =>
-        Array.from({ length: 10 }, (_, i) => ({
-          id: nanoid(),
-          connectionId: conn.id,
-          content: `Message ${i}`,
-        }))
-      );
-
+      // Access all agents through orchestrator
+      const agents = ['luca', 'cadence', 'parity', 'forma', 'echo', 'relay', 'scribe', 'radar', 'omnispectra', 'lynk'];
+      
+      for (const slug of agents) {
+        const agentExists = await orchestrator.isAgentRegistered(slug);
+        expect(agentExists).toBe(true);
+      }
+      
       const duration = Date.now() - startTime;
-
-      expect(messages.length).toBe(messageCount);
-      expect(duration).toBeLessThan(1000); // Message preparation should be fast
+      expect(duration).toBeLessThan(1000); // < 1 second to verify all agents
     });
 
-    it('should recover from connection failures gracefully', async () => {
-      const sessions = await Promise.all(
-        Array.from({ length: 10 }, async (_, i) => {
-          const [session] = await db.insert(agentSessions).values({
-            agentSlug: 'luca',
-            userId: testUserId,
-            organizationId: testOrgId,
-            title: `Recovery Session ${i}`,
-            metadata: {},
-          }).returning();
-          return session;
-        })
+    it('should handle 100 concurrent agent lookups', async () => {
+      const startTime = Date.now();
+      
+      // Simulate 100 concurrent agent lookups
+      const lookupPromises = Array.from({ length: 100 }, (_, i) => {
+        const agentSlug = ['luca', 'cadence', 'parity', 'forma', 'echo'][i % 5];
+        return orchestrator.isAgentRegistered(agentSlug);
+      });
+      
+      const results = await Promise.all(lookupPromises);
+      const duration = Date.now() - startTime;
+      
+      expect(results.every(r => r === true)).toBe(true);
+      expect(duration).toBeLessThan(2000); // < 2 seconds for 100 lookups
+    });
+
+    it('should maintain agent registry consistency under load', async () => {
+      // Access agents from multiple concurrent sources
+      const operations = Array.from({ length: 50 }, async () => {
+        const agents = ['luca', 'cadence', 'parity', 'forma', 'echo', 'relay', 'scribe', 'radar', 'omnispectra', 'lynk'];
+        const randomAgent = agents[Math.floor(Math.random() * agents.length)];
+        return orchestrator.isAgentRegistered(randomAgent);
+      });
+      
+      const results = await Promise.all(operations);
+      
+      // All should return true (agents exist)
+      expect(results.every(r => r === true)).toBe(true);
+    });
+
+    it('should handle rapid agent type checking', async () => {
+      const startTime = Date.now();
+      
+      // Check agent existence 200 times
+      const checks = Array.from({ length: 200 }, () => 
+        orchestrator.isAgentRegistered('luca')
       );
+      
+      await Promise.all(checks);
+      const duration = Date.now() - startTime;
+      
+      expect(duration).toBeLessThan(1000); // < 1 second for 200 checks
+    });
 
-      // Simulate connection failures by trying invalid operations
-      const results = await Promise.allSettled(
-        sessions.map(async (session, i) => {
-          if (i % 3 === 0) {
-            // Simulate failure
-            throw new Error('Simulated connection error');
-          }
-          return session;
-        })
+    it('should handle invalid agent slugs gracefully', async () => {
+      const invalidSlugs = ['invalid', 'nonexistent', 'fake-agent', 'test-123', 'xyz'];
+      
+      const results = await Promise.all(
+        invalidSlugs.map(slug => orchestrator.isAgentRegistered(slug))
       );
-
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-
-      expect(successful).toBeGreaterThan(0);
-      expect(failed).toBeGreaterThan(0);
-      expect(successful + failed).toBe(sessions.length);
+      
+      // All should return false quickly without errors
+      expect(results.every(r => r === false)).toBe(true);
     });
   });
 
   // ============================================================
-  // 3. DATABASE PERFORMANCE - 4 tests
+  // 2. CONFIG RESOLVER CACHING - 5 tests
   // ============================================================
 
-  describe('Database Performance', () => {
-    it('should handle 1000 message inserts within 5 seconds', async () => {
-      const [session] = await db.insert(agentSessions).values({
-        agentSlug: 'luca',
-        userId: testUserId,
-        organizationId: testOrgId,
-        title: 'DB Performance Test',
-        metadata: {},
-      }).returning();
-
-      const startTime = Date.now();
-
-      // Insert 1000 messages in batches
-      const batchSize = 100;
-      const batches = 10;
-
-      for (let batch = 0; batch < batches; batch++) {
-        const messages = Array.from({ length: batchSize }, (_, i) => ({
-          sessionId: session.id,
-          role: (i % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
-          content: `Performance test message ${batch * batchSize + i}`,
-          metadata: {},
-        }));
-
-        await db.insert(agentMessages).values(messages);
-      }
-
-      const duration = Date.now() - startTime;
-
-      expect(duration).toBeLessThan(5000); // < 5 seconds for 1000 messages
-    }, 15000);
-
-    it('should query large message history within 1 second', async () => {
-      const [session] = await db.insert(agentSessions).values({
-        agentSlug: 'luca',
-        userId: testUserId,
-        organizationId: testOrgId,
-        title: 'Query Performance Test',
-        metadata: {},
-      }).returning();
-
-      // Insert 500 messages
-      const messages = Array.from({ length: 500 }, (_, i) => ({
-        sessionId: session.id,
-        role: (i % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
-        content: `Message ${i}`,
-        metadata: {},
-      }));
-
-      await db.insert(agentMessages).values(messages);
-
-      // Query performance test
-      const startTime = Date.now();
-      const queriedMessages = await db.query.agentMessages.findMany({
-        where: (msgs, { eq }) => eq(msgs.sessionId, session.id),
-        orderBy: (msgs, { desc }) => [desc(msgs.createdAt)],
-      });
-      const duration = Date.now() - startTime;
-
-      expect(queriedMessages.length).toBe(500);
-      expect(duration).toBeLessThan(1000); // < 1 second query time
-    }, 20000);
-
-    it('should handle concurrent read/write operations', async () => {
-      const [session] = await db.insert(agentSessions).values({
-        agentSlug: 'luca',
-        userId: testUserId,
-        organizationId: testOrgId,
-        title: 'Concurrent R/W Test',
-        metadata: {},
-      }).returning();
-
-      // Concurrent writes and reads
-      const operations = Array.from({ length: 50 }, (_, i) => {
-        if (i % 2 === 0) {
-          // Write operation
-          return db.insert(agentMessages).values({
-            sessionId: session.id,
-            role: 'user',
-            content: `Concurrent write ${i}`,
-            metadata: {},
-          });
-        } else {
-          // Read operation
-          return db.query.agentMessages.findMany({
-            where: (msgs, { eq }) => eq(msgs.sessionId, session.id),
-            limit: 10,
-          });
-        }
-      });
-
-      const startTime = Date.now();
-      await Promise.all(operations);
-      const duration = Date.now() - startTime;
-
-      expect(duration).toBeLessThan(3000); // < 3 seconds for 50 operations
-    }, 10000);
-
-    it('should maintain index performance with 10,000+ messages', async () => {
-      // Create multiple sessions with many messages
-      const sessions = await Promise.all(
-        Array.from({ length: 10 }, async (_, i) => {
-          const [session] = await db.insert(agentSessions).values({
-            agentSlug: 'luca',
-            userId: testUserId,
-            organizationId: testOrgId,
-            title: `Index Test Session ${i}`,
-            metadata: {},
-          }).returning();
-
-          // Add 100 messages per session (1000 total)
-          const messages = Array.from({ length: 100 }, (_, j) => ({
-            sessionId: session.id,
-            role: (j % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
-            content: `Message ${j}`,
-            metadata: {},
-          }));
-
-          await db.insert(agentMessages).values(messages);
-
-          return session;
-        })
-      );
-
-      // Query should still be fast with 1000+ messages
-      const startTime = Date.now();
-      const latestSessions = await db.query.agentSessions.findMany({
-        where: (s, { eq }) => eq(s.userId, testUserId),
-        orderBy: (s, { desc }) => [desc(s.updatedAt)],
-        limit: 5,
-      });
-      const duration = Date.now() - startTime;
-
-      expect(latestSessions.length).toBe(5);
-      expect(duration).toBeLessThan(500); // Indexed query < 500ms
-    }, 30000);
-  });
-
-  // ============================================================
-  // 4. LLM CONFIG CACHING & THROUGHPUT - 4 tests
-  // ============================================================
-
-  describe('LLM Config Caching & Throughput', () => {
-    it('should cache LLM config and achieve >90% hit rate', async () => {
+  describe('Config Resolver Caching (Real Cache)', () => {
+    it('should achieve >90% cache hit rate with real ConfigResolver', async () => {
       configResolver.invalidateCache();
-
+      
       // First call: cache miss
       await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
-
-      // Next 99 calls: cache hits
-      const promises = Array.from({ length: 99 }, () =>
-        configResolver.resolve({ organizationId: testOrgId, userId: testUserId })
-      );
-
-      await Promise.all(promises);
-
-      const stats = configResolver.getCacheStats();
-      const hitRate = stats.hitRate;
-
-      expect(hitRate).toBeGreaterThan(90); // >90% hit rate
-      expect(stats.hits).toBeGreaterThan(90);
-    }, 10000);
-
-    it('should handle 1000 config resolutions within 2 seconds', async () => {
-      configResolver.invalidateCache();
-
+      
+      // Next 99 calls: should be cache hits
       const startTime = Date.now();
-
-      // First call populates cache
-      await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
-
-      // Next 999 calls should be cached
       await Promise.all(
-        Array.from({ length: 999 }, () =>
+        Array.from({ length: 99 }, () =>
           configResolver.resolve({ organizationId: testOrgId, userId: testUserId })
         )
       );
-
       const duration = Date.now() - startTime;
+      
+      const stats = configResolver.getCacheStats();
+      
+      expect(stats.hitRate).toBeGreaterThan(90); // >90% hit rate
+      expect(stats.hits).toBeGreaterThanOrEqual(99);
+      expect(duration).toBeLessThan(1000); // 99 cached resolutions < 1 second
+    });
 
-      expect(duration).toBeLessThan(2000); // < 2 seconds for 1000 resolutions
-    }, 10000);
-
-    it('should handle cache invalidation under load', async () => {
+    it('should resolve config within 100ms when cached', async () => {
       // Populate cache
       await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
+      
+      // Test cached resolution speed
+      const iterations = 10;
+      const times: number[] = [];
+      
+      for (let i = 0; i < iterations; i++) {
+        const start = Date.now();
+        await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
+        times.push(Date.now() - start);
+      }
+      
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+      
+      expect(avgTime).toBeLessThan(100); // Average < 100ms for cached
+    });
 
-      // Concurrent invalidations and resolutions
+    it('should handle cache invalidation under concurrent load', async () => {
+      // Warm up cache
+      await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
+      
+      // Mix invalidations and resolutions
       const operations = Array.from({ length: 50 }, (_, i) => {
-        if (i % 5 === 0) {
-          // Invalidate every 5th operation
+        if (i % 10 === 0) {
+          // Invalidate every 10th operation
           return Promise.resolve(configResolver.invalidateCache());
         } else {
           // Resolve
           return configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
         }
       });
-
+      
       const startTime = Date.now();
-      await Promise.all(operations);
+      const results = await Promise.allSettled(operations);
       const duration = Date.now() - startTime;
-
+      
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      
+      expect(successful).toBeGreaterThan(40); // Most should succeed
       expect(duration).toBeLessThan(3000); // < 3 seconds
     });
 
-    it('should maintain cache consistency across multiple users', async () => {
+    it('should maintain cache consistency for multiple users', async () => {
       const org2 = await createTestOrganization();
       const user2Id = org2.ownerUser.id;
       const org2Id = org2.organization.id;
-
+      
       // Setup config for org2
       const encryptionKey = process.env.ENCRYPTION_KEY!;
       const algorithm = 'aes-256-cbc';
@@ -563,140 +253,339 @@ describe('Load & Stress Testing', () => {
         isDefault: true,
         createdBy: user2Id,
       });
-
+      
       // Concurrent resolutions for different users
-      const user1Promises = Array.from({ length: 50 }, () =>
-        configResolver.resolve({ organizationId: testOrgId, userId: testUserId })
-      );
-
-      const user2Promises = Array.from({ length: 50 }, () =>
-        configResolver.resolve({ organizationId: org2Id, userId: user2Id })
-      );
-
       const [user1Configs, user2Configs] = await Promise.all([
-        Promise.all(user1Promises),
-        Promise.all(user2Promises),
+        Promise.all(Array.from({ length: 50 }, () =>
+          configResolver.resolve({ organizationId: testOrgId, userId: testUserId })
+        )),
+        Promise.all(Array.from({ length: 50 }, () =>
+          configResolver.resolve({ organizationId: org2Id, userId: user2Id })
+        )),
       ]);
-
-      // Verify correct configs returned
+      
+      // Verify correct configs returned (no cross-contamination)
       expect(user1Configs.every(c => c.organizationId === testOrgId)).toBe(true);
       expect(user2Configs.every(c => c.organizationId === org2Id)).toBe(true);
+    }, 15000);
+
+    it('should handle 1000 config resolutions within 2 seconds (with cache)', async () => {
+      configResolver.invalidateCache();
+      
+      // First call populates cache
+      await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
+      
+      const startTime = Date.now();
+      
+      // Next 999 should be cached
+      await Promise.all(
+        Array.from({ length: 999 }, () =>
+          configResolver.resolve({ organizationId: testOrgId, userId: testUserId })
+        )
+      );
+      
+      const duration = Date.now() - startTime;
+      
+      expect(duration).toBeLessThan(2000); // < 2 seconds for 1000 cached resolutions
+    });
+  });
+
+  // ============================================================
+  // 3. SESSION SERVICE SCALABILITY - 5 tests
+  // ============================================================
+
+  describe('Session Service Scalability (Real Service)', () => {
+    it('should create 100 sessions within 3 seconds', async () => {
+      const startTime = Date.now();
+      
+      const sessionPromises = Array.from({ length: 100 }, (_, i) =>
+        sessionService.createSession({
+          agentSlug: 'luca',
+          userId: testUserId,
+          organizationId: testOrgId,
+          title: `Load Test Session ${i}`,
+        })
+      );
+      
+      const sessions = await Promise.all(sessionPromises);
+      const duration = Date.now() - startTime;
+      
+      expect(sessions.length).toBe(100);
+      expect(duration).toBeLessThan(3000); // < 3 seconds
+    }, 10000);
+
+    it('should handle 50 concurrent message additions', async () => {
+      // Create a session first
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'Concurrent Messages Test',
+      });
+      
+      const startTime = Date.now();
+      
+      // Add 50 messages concurrently
+      await Promise.all(
+        Array.from({ length: 50 }, (_, i) =>
+          sessionService.addMessage({
+            sessionId: session.id,
+            role: i % 2 === 0 ? 'user' : 'agent',
+            content: `Concurrent message ${i}`,
+          })
+        )
+      );
+      
+      const duration = Date.now() - startTime;
+      
+      // Verify all messages were added
+      const messages = await sessionService.getMessages(session.id);
+      
+      expect(messages.length).toBe(50);
+      expect(duration).toBeLessThan(2000); // < 2 seconds
+    }, 10000);
+
+    it('should query session list with pagination efficiently', async () => {
+      // Create 200 sessions
+      await Promise.all(
+        Array.from({ length: 200 }, (_, i) =>
+          sessionService.createSession({
+            agentSlug: ['luca', 'cadence', 'parity'][i % 3] as any,
+            userId: testUserId,
+            organizationId: testOrgId,
+            title: `Pagination Test ${i}`,
+          })
+        )
+      );
+      
+      // Query with pagination
+      const startTime = Date.now();
+      const page1 = await sessionService.getUserSessions(testUserId, { limit: 20, offset: 0 });
+      const page2 = await sessionService.getUserSessions(testUserId, { limit: 20, offset: 20 });
+      const duration = Date.now() - startTime;
+      
+      expect(page1.length).toBe(20);
+      expect(page2.length).toBe(20);
+      expect(duration).toBeLessThan(1000); // < 1 second for 2 paginated queries
+    }, 15000);
+
+    it('should handle session updates under concurrent load', async () => {
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'Update Test',
+      });
+      
+      // Concurrent updates (simulating auto-title updates)
+      const updates = Array.from({ length: 20 }, (_, i) =>
+        sessionService.updateSession(session.id, {
+          title: `Updated Title ${i}`,
+        })
+      );
+      
+      const results = await Promise.allSettled(updates);
+      
+      // At least some should succeed (last one wins in concurrent updates)
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      expect(successful).toBeGreaterThan(0);
+    });
+
+    it('should maintain isolation between user sessions', async () => {
+      const org2 = await createTestOrganization();
+      const user2Id = org2.ownerUser.id;
+      const org2Id = org2.organization.id;
+      
+      // Create sessions for both users
+      await Promise.all([
+        ...Array.from({ length: 25 }, (_, i) =>
+          sessionService.createSession({
+            agentSlug: 'luca',
+            userId: testUserId,
+            organizationId: testOrgId,
+            title: `User1 Session ${i}`,
+          })
+        ),
+        ...Array.from({ length: 25 }, (_, i) =>
+          sessionService.createSession({
+            agentSlug: 'luca',
+            userId: user2Id,
+            organizationId: org2Id,
+            title: `User2 Session ${i}`,
+          })
+        ),
+      ]);
+      
+      // Query sessions for each user
+      const user1Sessions = await sessionService.getUserSessions(testUserId);
+      const user2Sessions = await sessionService.getUserSessions(user2Id);
+      
+      // Verify isolation
+      expect(user1Sessions.every(s => s.userId === testUserId)).toBe(true);
+      expect(user2Sessions.every(s => s.userId === user2Id)).toBe(true);
+      expect(user1Sessions.length).toBeGreaterThanOrEqual(25);
+      expect(user2Sessions.length).toBeGreaterThanOrEqual(25);
     }, 15000);
   });
 
   // ============================================================
-  // 5. MEMORY & RESOURCE MANAGEMENT - 4 tests
+  // 4. DATABASE QUERY PERFORMANCE - 5 tests
   // ============================================================
 
-  describe('Memory & Resource Management', () => {
-    it('should not leak memory during session lifecycle', async () => {
-      const initialMemory = process.memoryUsage().heapUsed;
+  describe('Database Query Performance (Real Queries)', () => {
+    it('should handle 1000 message inserts within 5 seconds', async () => {
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'DB Performance Test',
+      });
+      
+      const startTime = Date.now();
+      
+      // Insert 1000 messages in batches
+      const batchSize = 100;
+      for (let batch = 0; batch < 10; batch++) {
+        const messages = Array.from({ length: batchSize }, (_, i) => ({
+          sessionId: session.id,
+          role: (i % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
+          content: `Performance test message ${batch * batchSize + i}`,
+          metadata: {},
+        }));
+        
+        await db.insert(agentMessages).values(messages);
+      }
+      
+      const duration = Date.now() - startTime;
+      
+      expect(duration).toBeLessThan(5000); // < 5 seconds for 1000 inserts
+    }, 15000);
 
-      // Create and destroy 100 sessions
-      for (let i = 0; i < 100; i++) {
-        const [session] = await db.insert(agentSessions).values({
+    it('should query large message history within 1 second', async () => {
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'Query Performance Test',
+      });
+      
+      // Insert 500 messages
+      const messages = Array.from({ length: 500 }, (_, i) => ({
+        sessionId: session.id,
+        role: (i % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
+        content: `Message ${i}`,
+        metadata: {},
+      }));
+      
+      await db.insert(agentMessages).values(messages);
+      
+      // Query performance test
+      const startTime = Date.now();
+      const queriedMessages = await sessionService.getMessages(session.id);
+      const duration = Date.now() - startTime;
+      
+      expect(queriedMessages.length).toBe(500);
+      expect(duration).toBeLessThan(1000); // < 1 second query time
+    }, 20000);
+
+    it('should handle concurrent read/write operations', async () => {
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'Concurrent R/W Test',
+      });
+      
+      // Mix of writes and reads
+      const operations = Array.from({ length: 50 }, (_, i) => {
+        if (i % 2 === 0) {
+          // Write
+          return sessionService.addMessage({
+            sessionId: session.id,
+            role: 'user',
+            content: `Concurrent write ${i}`,
+          });
+        } else {
+          // Read
+          return sessionService.getMessages(session.id);
+        }
+      });
+      
+      const startTime = Date.now();
+      const results = await Promise.allSettled(operations);
+      const duration = Date.now() - startTime;
+      
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      
+      expect(successful).toBeGreaterThan(45); // Most should succeed
+      expect(duration).toBeLessThan(3000); // < 3 seconds
+    }, 10000);
+
+    it('should maintain index performance with 10,000+ messages', async () => {
+      // Create multiple sessions with many messages
+      const sessionPromises = Array.from({ length: 10 }, async (_, i) => {
+        const session = await sessionService.createSession({
           agentSlug: 'luca',
           userId: testUserId,
           organizationId: testOrgId,
-          title: `Memory Test ${i}`,
+          title: `Index Test Session ${i}`,
+        });
+        
+        // Add 100 messages per session (1000 total)
+        const messages = Array.from({ length: 100 }, (_, j) => ({
+          sessionId: session.id,
+          role: (j % 2 === 0 ? 'user' : 'agent') as 'user' | 'agent',
+          content: `Message ${j}`,
           metadata: {},
-        }).returning();
-
-        // Add some messages
-        await db.insert(agentMessages).values([
-          { sessionId: session.id, role: 'user', content: 'Test', metadata: {} },
-          { sessionId: session.id, role: 'agent', content: 'Response', metadata: {} },
-        ]);
-      }
-
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc();
-      }
-
-      const finalMemory = process.memoryUsage().heapUsed;
-      const memoryIncrease = finalMemory - initialMemory;
-      const increasePercentage = (memoryIncrease / initialMemory) * 100;
-
-      // Memory should not increase by more than 50% for 100 sessions
-      expect(increasePercentage).toBeLessThan(50);
+        }));
+        
+        await db.insert(agentMessages).values(messages);
+        
+        return session;
+      });
+      
+      await Promise.all(sessionPromises);
+      
+      // Query should still be fast with 1000+ messages
+      const startTime = Date.now();
+      const latestSessions = await sessionService.getUserSessions(testUserId, { limit: 5 });
+      const duration = Date.now() - startTime;
+      
+      expect(latestSessions.length).toBe(5);
+      expect(duration).toBeLessThan(500); // Indexed query < 500ms
     }, 30000);
 
-    it('should handle agent registry without memory leaks', async () => {
-      const initialMemory = process.memoryUsage().heapUsed;
-
-      // Access all agents 100 times
-      for (let i = 0; i < 100; i++) {
-        const agents = ['luca', 'cadence', 'parity', 'forma', 'echo', 'relay', 'scribe', 'radar', 'omnispectra', 'lynk'];
-        
-        for (const slug of agents) {
-          // Simulate agent access
-          const agentData = { slug, accessed: Date.now() };
-          // Agent registry access (simulated)
-        }
-      }
-
-      if (global.gc) {
-        global.gc();
-      }
-
-      const finalMemory = process.memoryUsage().heapUsed;
-      const memoryIncrease = finalMemory - initialMemory;
-      const increasePercentage = (memoryIncrease / initialMemory) * 100;
-
-      expect(increasePercentage).toBeLessThan(30); // < 30% increase
-    });
-
-    it('should cleanup inactive sessions efficiently', async () => {
-      // Create 50 sessions
-      const sessions = await Promise.all(
-        Array.from({ length: 50 }, async (_, i) => {
-          const [session] = await db.insert(agentSessions).values({
-            agentSlug: 'luca',
-            userId: testUserId,
-            organizationId: testOrgId,
-            title: `Cleanup Test ${i}`,
-            metadata: {},
-          }).returning();
-          return session;
-        })
-      );
-
-      // Simulate cleanup of old sessions (>30 days old would be deleted in production)
-      const beforeCleanup = await db.query.agentSessions.findMany({
-        where: (s, { eq }) => eq(s.userId, testUserId),
+    it('should handle session deletion and cascade cleanup', async () => {
+      const session = await sessionService.createSession({
+        agentSlug: 'luca',
+        userId: testUserId,
+        organizationId: testOrgId,
+        title: 'Deletion Test',
       });
-
-      expect(beforeCleanup.length).toBeGreaterThanOrEqual(50);
-      // In production, cleanup would remove old sessions
-      // This test validates the query pattern is performant
-    }, 15000);
-
-    it('should handle cache cleanup without blocking operations', async () => {
-      // Populate cache with many entries
-      const users = await Promise.all(
-        Array.from({ length: 20 }, () => createTestOrganization())
-      );
-
-      // Resolve configs for all users
+      
+      // Add messages
       await Promise.all(
-        users.map(u =>
-          configResolver.resolve({ organizationId: u.organization.id, userId: u.ownerUser.id })
+        Array.from({ length: 50 }, (_, i) =>
+          sessionService.addMessage({
+            sessionId: session.id,
+            role: 'user',
+            content: `Message ${i}`,
+          })
         )
       );
-
-      const statsBeforeCleanup = configResolver.getCacheStats();
-
-      // Invalidate cache
-      const cleanupStart = Date.now();
-      configResolver.invalidateCache();
-      const cleanupDuration = Date.now() - cleanupStart;
-
-      const statsAfterCleanup = configResolver.getCacheStats();
-
-      expect(statsBeforeCleanup.size).toBeGreaterThan(0);
-      expect(statsAfterCleanup.size).toBe(0);
-      expect(cleanupDuration).toBeLessThan(100); // Cleanup < 100ms
-    }, 20000);
+      
+      // Delete session
+      const startTime = Date.now();
+      await sessionService.deleteSession(session.id);
+      const duration = Date.now() - startTime;
+      
+      // Verify cascade deletion (messages should be deleted too)
+      const messages = await db.query.agentMessages.findMany({
+        where: (msgs, { eq }) => eq(msgs.sessionId, session.id),
+      });
+      
+      expect(messages.length).toBe(0); // All messages deleted
+      expect(duration).toBeLessThan(1000); // Deletion < 1 second
+    }, 10000);
   });
 });

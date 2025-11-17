@@ -32,12 +32,14 @@ test.describe('E2E Agent Conversations', () => {
   let testUserId: string;
 
   test.beforeAll(async () => {
-    // Create test organization and user
-    const { organization, ownerUser } = await createTestOrganization();
+    // Create test organization and user with known password
+    const { organization, ownerUser } = await createTestOrganization({
+      ownerPassword: 'SecurePass123!', // Use default password from helper
+    });
     testOrgId = organization.id;
     testUserId = ownerUser.id;
     testEmail = ownerUser.email;
-    testPassword = 'TestPassword123!';
+    testPassword = 'SecurePass123!';
 
     // Setup mock LLM configuration for testing
     const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
@@ -82,10 +84,31 @@ test.describe('E2E Agent Conversations', () => {
 
   // Helper to send message and wait for response
   async function sendMessage(page: Page, message: string) {
+    // Count existing agent messages before sending
+    const beforeCount = await page.locator('[data-testid*="message-agent"]').count();
+    
     await page.fill('[data-testid="input-message"]', message);
     await page.click('[data-testid="button-send"]');
-    // Wait for agent response (with streaming)
-    await page.waitForSelector('[data-testid*="message-agent"]', { timeout: 10000 });
+    
+    // Wait for NEW agent response (count should increase)
+    await page.waitForFunction(
+      (prevCount) => {
+        const currentCount = document.querySelectorAll('[data-testid*="message-agent"]').length;
+        return currentCount > prevCount;
+      },
+      beforeCount,
+      { timeout: 10000 }
+    );
+  }
+
+  // Helper to get the latest agent response
+  async function getLatestAgentResponse(page: Page): Promise<string> {
+    const messages = await page.locator('[data-testid*="message-agent"]').all();
+    if (messages.length === 0) {
+      throw new Error('No agent messages found');
+    }
+    const latestMessage = messages[messages.length - 1];
+    return (await latestMessage.textContent()) || '';
   }
 
   // ============================================================
@@ -100,9 +123,9 @@ test.describe('E2E Agent Conversations', () => {
       await sendMessage(page, 'What are the tax implications of S-Corp vs LLC?');
 
       // Luca should ask clarifying questions (new personality trait)
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('?'); // Should contain questions
-      expect(response?.length).toBeGreaterThan(50); // Substantive response
+      expect(response.length).toBeGreaterThan(50); // Substantive response
     });
 
     test('should provide IRS-specific guidance', async ({ page }) => {
@@ -111,7 +134,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What is the 2024 standard deduction for married filing jointly?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
       expect(response).not.toContain('outside my scope'); // Tax questions are allowed
     });
@@ -122,7 +145,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Can you draft a contract for my business?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Forma'); // Should redirect to Forma
     });
 
@@ -166,7 +189,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Create a workflow to auto-assign new clients to team members');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('workflow');
     });
 
@@ -176,7 +199,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What can I automate for client onboarding?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -186,7 +209,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Calculate my quarterly tax estimate');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Luca'); // Should redirect to Luca
     });
 
@@ -196,7 +219,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me workflow templates');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -224,7 +247,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What forms do I need for W-2 filing?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('form');
     });
 
@@ -234,7 +257,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me client intake forms');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -244,7 +267,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Automate my client onboarding');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Cadence'); // Should redirect
     });
 
@@ -254,7 +277,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Customize the client intake form');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -281,7 +304,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Draft a client engagement letter');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('letter' || 'document' || 'legal');
     });
 
@@ -291,7 +314,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me contract templates');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -301,7 +324,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Calculate depreciation for my rental');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Luca'); // Should redirect
     });
 
@@ -311,7 +334,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Review my NDA template');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -339,7 +362,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Send a message to the tax team');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -349,7 +372,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me client update message templates');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -359,7 +382,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Draft a contract');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Forma'); // Should redirect
     });
 
@@ -369,7 +392,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Notify all team members about the deadline');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -396,7 +419,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me unread messages');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -406,7 +429,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'How can I organize my inbox better?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -416,7 +439,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Write an email to my client');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Scribe'); // Should redirect
     });
 
@@ -426,7 +449,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Filter messages from urgent clients');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -454,7 +477,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Write a professional email to a new client');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('email' || 'subject' || 'Dear');
     });
 
@@ -464,7 +487,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me email templates');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -474,7 +497,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What is the corporate tax rate?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Luca'); // Should redirect
     });
 
@@ -484,7 +507,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Make this email more formal');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -511,7 +534,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What is the current system status?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -521,7 +544,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me all active projects');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -531,7 +554,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Create a new workflow');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Cadence'); // Should redirect
     });
 
@@ -541,7 +564,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Alert me when client deadlines are approaching');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -569,7 +592,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Show me client activity analytics');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -579,7 +602,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Generate a monthly activity report');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -589,7 +612,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Create a client intake form');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Parity'); // Should redirect
     });
 
@@ -599,7 +622,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Track billable hours by client');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -626,7 +649,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Connect QuickBooks to Accute');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('integration' || 'QuickBooks' || 'connect');
     });
 
@@ -636,7 +659,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'What integrations are available?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
@@ -646,7 +669,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'Should I file as an S-Corp?');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toContain('Luca'); // Should redirect
     });
 
@@ -656,7 +679,7 @@ test.describe('E2E Agent Conversations', () => {
 
       await sendMessage(page, 'My Stripe integration is not syncing');
 
-      const response = await page.textContent('[data-testid*="message-agent"]');
+      const response = await getLatestAgentResponse(page);
       expect(response).toBeTruthy();
     });
 
