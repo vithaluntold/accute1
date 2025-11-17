@@ -215,4 +215,8 @@ class WebSocketBootstrap {
   }
 }
 
+// Export class for testing
+export { WebSocketBootstrap };
+
+// Export singleton instance for production use
 export const wsBootstrap = new WebSocketBootstrap();
