@@ -3208,6 +3208,24 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
+  // PHASE 1: Permission categorization endpoint
+  app.get("/api/permissions/categories", requireAuth, async (req: AuthRequest, res: Response) => {
+    try {
+      const { PERMISSION_CATEGORIES, PERMISSION_DEPENDENCIES, PERMISSION_METADATA, ROLE_TEMPLATES } = 
+        await import('../shared/permission-categories');
+      
+      res.json({
+        categories: PERMISSION_CATEGORIES,
+        dependencies: PERMISSION_DEPENDENCIES,
+        metadata: PERMISSION_METADATA,
+        templates: ROLE_TEMPLATES
+      });
+    } catch (error: any) {
+      console.error("Failed to fetch permission categories:", error);
+      res.status(500).json({ error: "Failed to fetch permission categories" });
+    }
+  });
+
   app.post("/api/roles", requireAuth, requirePermission("roles.create"), async (req: AuthRequest, res: Response) => {
     try {
       const role = await storage.createRole({

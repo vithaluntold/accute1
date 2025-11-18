@@ -150,19 +150,22 @@ export async function initializeSystem(app: Express) {
   try {
     console.log("🔧 Initializing system...");
 
-    // Check if system roles exist
+    // Check if system roles exist (PHASE 1: Now 5 roles including Owner)
     const existingRoles = await db.select().from(schema.roles).where(eq(schema.roles.isSystemRole, true));
     
     // Always run to ensure new permissions are added
-    if (existingRoles.length >= 4) {
-      console.log("✓ System roles exist, checking permissions...");
+    if (existingRoles.length >= 5) {
+      console.log("✓ System roles exist (including Owner), checking permissions...");
       // Continue to add any missing permissions
+    } else if (existingRoles.length >= 4) {
+      console.log("✓ System roles exist, adding Owner role...");
     }
 
     console.log("📝 Creating system roles and permissions...");
 
-    // Get or create system roles
+    // Get or create system roles (PHASE 1: Added Owner role)
     const getSuperAdmin = await db.select().from(schema.roles).where(eq(schema.roles.name, "Super Admin"));
+    const getOwner = await db.select().from(schema.roles).where(eq(schema.roles.name, "Owner"));
     const getAdmin = await db.select().from(schema.roles).where(eq(schema.roles.name, "Admin"));
     const getEmployee = await db.select().from(schema.roles).where(eq(schema.roles.name, "Employee"));
     const getClient = await db.select().from(schema.roles).where(eq(schema.roles.name, "Client"));
@@ -172,6 +175,13 @@ export async function initializeSystem(app: Express) {
         name: "Super Admin",
         description: "Full system access with organization management",
         isSystemRole: true,
+      }).returning().then(r => r[0]).catch(() => null),
+
+      owner: getOwner.length > 0 ? getOwner[0] : await db.insert(schema.roles).values({
+        name: "Owner",
+        description: "Organization owner with billing and full control",
+        isSystemRole: true,
+        scope: "tenant",
       }).returning().then(r => r[0]).catch(() => null),
 
       admin: getAdmin.length > 0 ? getAdmin[0] : await db.insert(schema.roles).values({
@@ -427,10 +437,16 @@ export async function initializeSystem(app: Express) {
       { name: "inbox.manage", resource: "inbox", action: "manage", description: "Manage inbox filters and settings" },
       { name: "inbox.archive", resource: "inbox", action: "archive", description: "Archive conversations" },
       
-      // P2: Subscriptions
+      // P2: Subscriptions (Owner-level permissions)
       { name: "subscriptions.view", resource: "subscriptions", action: "view", description: "View subscription plans" },
       { name: "subscriptions.manage", resource: "subscriptions", action: "manage", description: "Manage organization subscription" },
       { name: "subscriptions.billing", resource: "subscriptions", action: "billing", description: "Access billing details" },
+      
+      // PHASE 1: Owner-specific permissions (billing, org transfer, org deletion)
+      { name: "billing.view", resource: "billing", action: "view", description: "View billing history and invoices" },
+      { name: "billing.update", resource: "billing", action: "update", description: "Update payment methods" },
+      { name: "organization.transfer", resource: "organizations", action: "transfer", description: "Transfer organization ownership" },
+      { name: "organization.delete", resource: "organizations", action: "delete", description: "Delete organization permanently" },
       
       // P2: Invoice Advanced
       { name: "invoices.send", resource: "invoices", action: "send", description: "Send invoices to clients" },
@@ -527,10 +543,24 @@ export async function initializeSystem(app: Express) {
       await bulkAssignPermissions(roles.superAdmin.id, createdPermissions, "Super Admin");
     }
 
+    // PHASE 1: Owner gets all Admin permissions + Owner-specific permissions (billing, org transfer, subscriptions)
+    if (roles.owner) {
+      const ownerPermissions = createdPermissions.filter(p => 
+        // Exclude only organizations.view and organizations.edit (Super Admin only)
+        // But INCLUDE organization.transfer and organization.delete (Owner-specific)
+        !(p.name === "organizations.view" || p.name === "organizations.edit")
+      );
+      await bulkAssignPermissions(roles.owner.id, ownerPermissions, "Owner");
+    }
+
     if (roles.admin) {
       const adminPermissions = createdPermissions.filter(p => 
-        // Exclude only organization management permissions
-        !p.name.startsWith("organizations.")
+        // Exclude organization management permissions AND Owner-specific permissions
+        !p.name.startsWith("organizations.") &&
+        !p.name.startsWith("billing.") &&
+        !p.name.startsWith("subscriptions.") &&
+        p.name !== "organization.transfer" &&
+        p.name !== "organization.delete"
       );
       await bulkAssignPermissions(roles.admin.id, adminPermissions, "Admin");
     }
