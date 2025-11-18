@@ -24,7 +24,8 @@ export type FeatureIdentifier =
   | 'client_portal'
   | 'team_collaboration'
   | 'time_tracking'
-  | 'resource_management';
+  | 'resource_management'
+  | 'personality_assessment';
 
 /**
  * Resource limit identifiers

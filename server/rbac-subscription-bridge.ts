@@ -133,6 +133,15 @@ const FEATURE_PERMISSION_MAP: Record<FeatureIdentifier, string[]> = {
     'skills.create',
     'skills.update',
     'skills.delete'
+  ],
+  
+  // Personality assessment requires AI psychology profiling permissions
+  personality_assessment: [
+    'personality-profiling:view',
+    'personality-profiling:analyze',
+    'personality-profiling:batch-analyze',
+    'personality-profiling:consent',
+    'personality-profiling:export'
   ]
 };
 

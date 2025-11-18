@@ -17,6 +17,7 @@ import { z } from "zod";
 import { createPersonalityProfilingService } from "./service-factory";
 import { createMLAnalysisQueueService } from "./service-factory";
 import { requireAuth } from "./auth";
+import { requireFeature } from "./feature-gating";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { users, personalityProfiles, performanceScores, mlAnalysisRuns } from "@shared/schema";
@@ -44,13 +45,14 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * POST /api/personality-profiling/batch-analysis
    * Trigger batch personality analysis for multiple users
    * 
-   * Requires: Admin role
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
    * Body: { userIds: string[] }
    * Returns: Analysis run record with tracking ID
    */
   app.post(
     "/api/personality-profiling/batch-analysis",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         // Role check: Only admins can trigger batch analysis
@@ -120,12 +122,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/runs
    * Get all analysis runs for the organization
    * 
-   * Requires: Admin role
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
    * Returns: List of analysis runs with progress metrics
    */
   app.get(
     "/api/personality-profiling/runs",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         // Role check: Only admins can view runs
@@ -178,12 +181,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/runs/:runId
    * Get analysis run status and progress
    * 
-   * Requires: Admin role
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
    * Returns: Run details with progress metrics
    */
   app.get(
     "/api/personality-profiling/runs/:runId",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         const { runId } = req.params;
@@ -231,12 +235,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/runs/:runId/jobs
    * Get individual jobs for an analysis run
    * 
-   * Requires: Admin role
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
    * Returns: Array of job records with status
    */
   app.get(
     "/api/personality-profiling/runs/:runId/jobs",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         const { runId } = req.params;
@@ -288,12 +293,14 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/profiles/:userId
    * Get personality profile for a user
    * 
-   * Requires: Auth (users can view their own, admins can view any)
+   * Requires: Auth + Enterprise subscription (personality_assessment feature)
+   * Note: Users can view their own, admins can view any
    * Returns: Complete personality profile with traits
    */
   app.get(
     "/api/personality-profiling/profiles/:userId",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         const { userId } = req.params;
@@ -355,12 +362,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/profiles/me
    * Get current user's personality profile
    * 
-   * Requires: Auth
+   * Requires: Auth + Enterprise subscription (personality_assessment feature)
    * Returns: Complete personality profile with traits for the authenticated user
    */
   app.get(
     "/api/personality-profiling/profiles/me",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         const userId = req.user!.id;
@@ -404,12 +412,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/consent
    * Get current user's consent status
    * 
-   * Requires: Auth
+   * Requires: Auth + Enterprise subscription (personality_assessment feature)
    * Returns: Consent status for personality profiling
    */
   app.get(
     "/api/personality-profiling/consent",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         const userId = req.user!.id;
@@ -439,13 +448,14 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * POST /api/personality-profiling/consent
    * Update current user's consent for personality profiling
    * 
-   * Requires: Auth
+   * Requires: Auth + Enterprise subscription (personality_assessment feature)
    * Body: { hasConsented: boolean }
    * Returns: Updated consent status
    */
   app.post(
     "/api/personality-profiling/consent",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         // Validate request body
@@ -483,12 +493,13 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * GET /api/personality-profiling/queue/stats
    * Get queue statistics (admin only)
    * 
-   * Requires: Admin role
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
    * Returns: Queue metrics (pending, processing, completed, failed)
    */
   app.get(
     "/api/personality-profiling/queue/stats",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: Request, res: Response) => {
       try {
         // Role check: Only admins can view queue stats
@@ -514,11 +525,14 @@ export function registerPersonalityProfilingRoutes(app: Express) {
   /**
    * GET /api/personality-profiling/performance-correlations
    * Get correlations between personality traits and performance metrics
-   * Admin only - shows organization-wide insights
+   * 
+   * Requires: Admin role + Enterprise subscription (personality_assessment feature)
+   * Returns: Organization-wide personality-performance correlation insights
    */
   app.get(
     "/api/personality-profiling/performance-correlations",
     requireAuth,
+    requireFeature('personality_assessment'),
     async (req: AuthRequest, res: Response) => {
       try {
         // Role check: Only admins can view correlations
