@@ -36,7 +36,7 @@ const batchAnalysisSchema = z.object({
  * Consent update schema
  */
 const consentUpdateSchema = z.object({
-  consented: z.boolean(),
+  hasConsented: z.boolean(),
 });
 
 export function registerPersonalityProfilingRoutes(app: Express) {
@@ -415,7 +415,7 @@ export function registerPersonalityProfilingRoutes(app: Express) {
         const userId = req.user!.id;
         const organizationId = req.user!.organizationId!;
 
-        const consented = await profilingService.getConsent(
+        const hasConsented = await profilingService.getConsent(
           userId,
           organizationId
         );
@@ -423,7 +423,7 @@ export function registerPersonalityProfilingRoutes(app: Express) {
         return res.json({
           userId,
           organizationId,
-          consented,
+          hasConsented,
         });
       } catch (error: any) {
         console.error("Error fetching consent status:", error);
@@ -440,7 +440,7 @@ export function registerPersonalityProfilingRoutes(app: Express) {
    * Update current user's consent for personality profiling
    * 
    * Requires: Auth
-   * Body: { consented: boolean }
+   * Body: { hasConsented: boolean }
    * Returns: Updated consent status
    */
   app.post(
@@ -457,17 +457,17 @@ export function registerPersonalityProfilingRoutes(app: Express) {
           });
         }
 
-        const { consented } = parseResult.data;
+        const { hasConsented } = parseResult.data;
         const userId = req.user!.id;
         const organizationId = req.user!.organizationId!;
 
-        await profilingService.updateConsent(userId, organizationId, consented);
+        await profilingService.updateConsent(userId, organizationId, hasConsented);
 
         return res.json({
-          message: `Personality profiling consent ${consented ? "granted" : "revoked"}`,
+          message: `Personality profiling consent ${hasConsented ? "granted" : "revoked"}`,
           userId,
           organizationId,
-          consented,
+          hasConsented,
         });
       } catch (error: any) {
         console.error("Error updating consent:", error);
