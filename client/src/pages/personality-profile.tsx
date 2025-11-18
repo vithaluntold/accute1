@@ -21,11 +21,14 @@ import {
   EyeOff,
   Info,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useFeatureAccess } from "@/hooks/use-subscription";
+import { Link } from "wouter";
 
 type PersonalityProfile = {
   userId: string;
@@ -73,15 +76,19 @@ export default function PersonalityProfile() {
   const { toast } = useToast();
   const [showRawScores, setShowRawScores] = useState(false);
 
-  // Fetch user's consent status
+  // Check if organization has access to personality assessment feature
+  const { hasAccess: hasPersonalityAssessment, isLoading: isCheckingAccess } = useFeatureAccess('personality_assessment');
+
+  // Fetch user's consent status (only if they have access to the feature)
   const { data: consent } = useQuery<ConsentStatus>({
     queryKey: ["/api/personality-profiling/consent"],
+    enabled: hasPersonalityAssessment,
   });
 
   // Fetch user's personality profile
   const { data: profile, isLoading } = useQuery<PersonalityProfile>({
     queryKey: ["/api/personality-profiling/profiles/me"],
-    enabled: consent?.hasConsented === true,
+    enabled: hasPersonalityAssessment && consent?.hasConsented === true,
   });
 
   // Update consent mutation
@@ -187,7 +194,65 @@ export default function PersonalityProfile() {
     return score >= 0.5 ? frameworkDescs[trait].high : frameworkDescs[trait].low;
   };
 
-  if (!consent) {
+  // Show upgrade message if user doesn't have access to personality assessment
+  if (!isCheckingAccess && !hasPersonalityAssessment) {
+    return (
+      <div className="container mx-auto py-6 max-w-3xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="w-6 h-6" />
+              Personality Assessment - Enterprise Feature
+            </CardTitle>
+            <CardDescription>
+              Unlock advanced AI personality profiling for your organization
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Alert>
+              <Info className="w-4 h-4" />
+              <AlertDescription>
+                <strong>Enterprise Feature:</strong> AI Personality Assessment requires an Enterprise subscription.
+                Upgrade to unlock multi-framework personality analysis for your team.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold">Included with Enterprise:</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Brain className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                  <span><strong>5 Psychology Frameworks:</strong> Big Five, DISC, MBTI, Emotional Intelligence, Cultural Dimensions</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <TrendingUp className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                  <span><strong>Performance Correlations:</strong> See how personality traits correlate with team performance</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Shield className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                  <span><strong>Privacy-First:</strong> GDPR-compliant with no raw message storage</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Zap className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
+                  <span><strong>ML Model Fusion:</strong> 95%+ token cost reduction with hybrid analysis</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-4 border-t">
+              <Button asChild data-testid="button-upgrade">
+                <Link href="/admin/billing">
+                  Upgrade to Enterprise
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isCheckingAccess || !consent) {
     return (
       <div className="container mx-auto py-6">
         <Card>
