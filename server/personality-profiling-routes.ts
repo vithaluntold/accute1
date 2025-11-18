@@ -12,13 +12,15 @@
  */
 
 import type { Express, Request, Response } from "express";
+import type { AuthRequest } from "./auth";
 import { z } from "zod";
 import { createPersonalityProfilingService } from "./service-factory";
 import { createMLAnalysisQueueService } from "./service-factory";
 import { requireAuth } from "./auth";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { inArray } from "drizzle-orm";
+import * as schema from "@shared/schema";
+import { users, personalityProfiles, performanceScores, mlAnalysisRuns } from "@shared/schema";
+import { inArray, eq, and, desc } from "drizzle-orm";
 
 const profilingService = createPersonalityProfilingService();
 const queueService = createMLAnalysisQueueService();
@@ -108,6 +110,64 @@ export function registerPersonalityProfilingRoutes(app: Express) {
         console.error("Error triggering batch analysis:", error);
         return res.status(500).json({
           message: "Failed to trigger batch analysis",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/personality-profiling/runs
+   * Get all analysis runs for the organization
+   * 
+   * Requires: Admin role
+   * Returns: List of analysis runs with progress metrics
+   */
+  app.get(
+    "/api/personality-profiling/runs",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        // Role check: Only admins can view runs
+        if (req.user!.role !== "super_admin" && req.user!.role !== "admin") {
+          return res.status(403).json({
+            message: "Only admins can view analysis runs",
+          });
+        }
+
+        const organizationId = req.user!.organizationId!;
+
+        // Fetch all runs for this organization
+        const runs = await db
+          .select()
+          .from(mlAnalysisRuns)
+          .where(eq(mlAnalysisRuns.organizationId, organizationId))
+          .orderBy(desc(mlAnalysisRuns.createdAt))
+          .limit(50); // Limit to last 50 runs
+
+        return res.json({
+          runs: runs.map((run) => ({
+            id: run.id,
+            status: run.status,
+            runType: run.runType,
+            totalUsers: run.totalUsers,
+            usersProcessed: run.usersProcessed,
+            failedUsers: run.failedUsers,
+            conversationsAnalyzed: run.conversationsAnalyzed,
+            tokensConsumed: run.tokensConsumed,
+            processingTimeSeconds: run.processingTimeSeconds,
+            createdAt: run.createdAt,
+            updatedAt: run.updatedAt,
+            progress: run.totalUsers > 0
+              ? Math.round((run.usersProcessed / run.totalUsers) * 100)
+              : 0,
+          })),
+          totalRuns: runs.length,
+        });
+      } catch (error: any) {
+        console.error("Error fetching analysis runs:", error);
+        return res.status(500).json({
+          message: "Failed to fetch analysis runs",
           error: error.message,
         });
       }
@@ -283,6 +343,55 @@ export function registerPersonalityProfilingRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error("Error fetching personality profile:", error);
+        return res.status(500).json({
+          message: "Failed to fetch personality profile",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/personality-profiling/profiles/me
+   * Get current user's personality profile
+   * 
+   * Requires: Auth
+   * Returns: Complete personality profile with traits for the authenticated user
+   */
+  app.get(
+    "/api/personality-profiling/profiles/me",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.user!.id;
+        const organizationId = req.user!.organizationId!;
+
+        // Get profile
+        const profile = await profilingService.getProfile(userId, organizationId);
+
+        if (!profile) {
+          return res.status(404).json({
+            message: "Personality profile not found. Analysis may not have been run yet, or consent may not be granted.",
+          });
+        }
+
+        // Get traits
+        const traits = await profilingService.getTraits(profile.id);
+
+        return res.json({
+          userId: profile.userId,
+          bigFiveTraits: profile.bigFiveTraits,
+          discProfile: profile.discProfile,
+          mbtiType: profile.mbtiType,
+          emotionalIntelligence: profile.emotionalIntelligence,
+          hofstedeFactors: profile.hofstedeFactors,
+          culturalContext: profile.culturalContext,
+          confidenceScore: profile.overallConfidence / 100,
+          lastAnalyzedAt: profile.updatedAt,
+          conversationsAnalyzed: profile.conversationsAnalyzed,
+        });
+      } catch (error: any) {
+        console.error("Error fetching current user's personality profile:", error);
         return res.status(500).json({
           message: "Failed to fetch personality profile",
           error: error.message,
