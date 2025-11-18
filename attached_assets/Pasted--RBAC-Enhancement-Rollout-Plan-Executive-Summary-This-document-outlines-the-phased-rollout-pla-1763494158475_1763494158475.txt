@@ -1,0 +1,1339 @@
+# RBAC Enhancement Rollout Plan
+
+## Executive Summary
+
+This document outlines the phased rollout plan for enhancing the Role-Based Access Control (RBAC) system in AgentFlow. The plan addresses current gaps in permission management, Owner/Admin separation, and client portal architecture while maintaining zero downtime and backward compatibility.
+
+**Timeline:** 6 weeks (adjustable)  
+**Risk Level:** Medium (with proper testing and feature flags)  
+**Breaking Changes:** Minimal (existing Admins lose billing access in Phase 3)
+
+---
+
+## Current State Analysis
+
+### Existing Role Structure
+```
+✅ Super Admin (Platform-wide, organizationId = NULL)
+✅ Admin (Tenant-scoped, almost full control)
+✅ Employee (Tenant-scoped, limited permissions)
+✅ Client (Tenant-scoped, portal access only)
+```
+
+### Identified Problems
+
+#### Problem #1: No Owner vs Admin Distinction
+- **Issue:** Admin has almost Super Admin powers (billing, subscription management, org deletion)
+- **Impact:** No clear ownership model, risky permission grants
+- **Solution:** Create Owner role with billing/transfer rights, restrict Admin
+
+#### Problem #2: Admin Cannot Effectively Define Custom Roles
+- **Issue:** While technically possible, UI lacks guidance (no templates, categories, or dependencies)
+- **Impact:** Admins struggle to create meaningful custom roles
+- **Solution:** Add role templates, permission categorization, and dependency indicators
+
+#### Problem #3: Client Portal Not Separated
+- **Issue:** Clients use same UI as internal users, just with hidden features
+- **Security Risk:** One permission leak exposes firm data
+- **UX Problem:** Clients see disabled/grayed-out features causing confusion
+- **Solution:** Separate client portal routes with dedicated UI
+
+#### Problem #4: Subscription Gating Opacity
+- **Issue:** Permissions blocked by subscription show same error as RBAC denial
+- **Impact:** Users don't understand why they can't access features
+- **Solution:** Clear error messages with upsell prompts
+
+#### Problem #5: No Role Hierarchy
+- **Issue:** Flat role structure requires manual permission duplication
+- **Impact:** Difficult to maintain consistent permission sets
+- **Solution:** Implement role inheritance (Owner > Admin > Manager > Employee)
+
+---
+
+## Phase-by-Phase Rollout
+
+### PHASE 0: Analysis & Planning ✅ COMPLETE
+- [x] Audit current RBAC implementation
+- [x] Identify gaps and security issues
+- [x] Define requirements for Owner vs Admin separation
+- [x] Decide on client portal architecture
+- [x] Document rollout plan
+
+---
+
+### PHASE 1: Foundation (Week 1) - No Breaking Changes
+
+**Objective:** Add Owner role and permission categorization without affecting existing users
+
+#### 1.1 Create Owner Role
+
+**Database Migration:**
+```sql
+-- migrations/XXXX_add_owner_role.sql
+
+-- Create Owner role
+INSERT INTO roles (name, description, is_system_role, scope, created_at, updated_at)
+VALUES ('Owner', 'Organization owner with billing and full control', true, 'tenant', NOW(), NOW())
+ON CONFLICT (name) DO NOTHING;
+
+-- Add Owner-specific permissions
+INSERT INTO permissions (name, resource, action, description)
+VALUES 
+  ('organization.transfer', 'organizations', 'transfer', 'Transfer organization ownership'),
+  ('organization.delete', 'organizations', 'delete', 'Delete organization permanently'),
+  ('subscriptions.manage', 'subscriptions', 'manage', 'Manage subscription plan'),
+  ('billing.view', 'billing', 'view', 'View billing history and invoices'),
+  ('billing.update', 'billing', 'update', 'Update payment methods')
+ON CONFLICT (name) DO NOTHING;
+
+-- Assign all Admin permissions + Owner permissions to Owner role
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 
+  (SELECT id FROM roles WHERE name = 'Owner'),
+  p.id
+FROM permissions p
+WHERE p.id IN (
+  -- All Admin permissions
+  SELECT permission_id FROM role_permissions WHERE role_id = (SELECT id FROM roles WHERE name = 'Admin')
+  UNION
+  -- Owner-specific permissions
+  SELECT id FROM permissions WHERE name IN (
+    'organization.transfer', 'organization.delete', 'subscriptions.manage', 
+    'billing.view', 'billing.update'
+  )
+)
+ON CONFLICT DO NOTHING;
+```
+
+**Code Changes:**
+- `server/init.ts` (line ~210): Add Owner role creation
+- `server/init.ts` (line ~400): Assign Owner permissions
+- Add Owner-specific permission definitions
+
+**Testing Checklist:**
+- [ ] Run migration on test database
+- [ ] Create test Owner user via API
+- [ ] Verify Owner has all Admin permissions + billing permissions
+- [ ] Ensure existing Admin users unaffected
+- [ ] Test Owner can access billing endpoints
+- [ ] Test Owner can transfer organization ownership
+
+**Rollback Plan:** 
+```sql
+DELETE FROM role_permissions WHERE role_id = (SELECT id FROM roles WHERE name = 'Owner');
+DELETE FROM roles WHERE name = 'Owner';
+DELETE FROM permissions WHERE name IN ('organization.transfer', 'organization.delete', 'billing.view', 'billing.update');
+```
+
+---
+
+#### 1.2 Permission Categorization (Backend)
+
+**New File:** `shared/permission-categories.ts`
+```typescript
+export const PERMISSION_CATEGORIES = {
+  "User Management": {
+    icon: "Users",
+    description: "Manage team members, roles, and access",
+    permissions: ["users.*", "roles.*", "teams.*"]
+  },
+  "Workflows & Automation": {
+    icon: "GitBranch",
+    description: "Create and manage workflows, pipelines, and automations",
+    permissions: ["workflows.*", "pipelines.*", "automation.*"]
+  },
+  "AI Agents": {
+    icon: "Bot",
+    description: "Install and configure AI agents",
+    permissions: ["ai_agents.*", "roundtable.*"]
+  },
+  "Documents & Files": {
+    icon: "FileText",
+    description: "Manage documents, folders, and signatures",
+    permissions: ["documents.*", "folders.*", "signatures.*"]
+  },
+  "Financial Management": {
+    icon: "DollarSign",
+    description: "Handle invoices, payments, and billing",
+    permissions: ["invoices.*", "payments.*", "billing.*"]
+  },
+  "Client Portal": {
+    icon: "Users2",
+    description: "Client-facing features and access",
+    permissions: ["client_portal.*", "action_center.*"]
+  },
+  "Analytics & Reporting": {
+    icon: "BarChart",
+    description: "View reports and analytics",
+    permissions: ["analytics.*", "reports.*", "workload.*"]
+  },
+  "Settings & Configuration": {
+    icon: "Settings",
+    description: "Organization settings and integrations",
+    permissions: ["settings.*", "llm_configs.*", "payment_gateways.*", "email.*"]
+  }
+};
+
+export const PERMISSION_DEPENDENCIES = {
+  "users.edit": ["users.view"],
+  "users.delete": ["users.view", "users.edit"],
+  "workflows.edit": ["workflows.view"],
+  "workflows.delete": ["workflows.view"],
+  "roles.edit": ["roles.view"],
+  "roles.delete": ["roles.view"],
+  // ... add more dependencies
+};
+
+export const PERMISSION_METADATA = {
+  "subscriptions.manage": {
+    requiredRole: "Owner",
+    dangerous: true,
+    description: "Allows changing subscription plans and billing"
+  },
+  "organization.delete": {
+    requiredRole: "Owner",
+    dangerous: true,
+    description: "Permanently deletes organization and all data"
+  },
+  // ... add metadata for critical permissions
+};
+```
+
+**API Endpoint:** `server/routes.ts`
+```typescript
+app.get("/api/permissions/categories", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { PERMISSION_CATEGORIES, PERMISSION_DEPENDENCIES, PERMISSION_METADATA } = 
+      await import('../shared/permission-categories');
+    
+    res.json({
+      categories: PERMISSION_CATEGORIES,
+      dependencies: PERMISSION_DEPENDENCIES,
+      metadata: PERMISSION_METADATA
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch permission categories" });
+  }
+});
+```
+
+**Testing Checklist:**
+- [ ] `/api/permissions/categories` endpoint returns categorized data
+- [ ] All existing permissions are categorized
+- [ ] Dependencies are accurate
+- [ ] Frontend can consume categories without breaking
+
+---
+
+### PHASE 2: Admin Experience (Week 2) - UI Improvements
+
+**Objective:** Enhance role management UI with categories, templates, and preview functionality
+
+#### 2.1 Enhanced Role Management UI
+
+**Refactor:** `client/src/pages/roles.tsx`
+
+**New Components:**
+- `client/src/components/permission-category-group.tsx` - Collapsible permission groups
+- `client/src/components/role-template-selector.tsx` - Pre-built role templates
+- `client/src/components/permission-dependency-indicator.tsx` - Shows required permissions
+- `client/src/components/role-preview-modal.tsx` - Preview role before assigning
+
+**Role Templates:** `shared/role-templates.ts`
+```typescript
+export const ROLE_TEMPLATES = {
+  "Senior Accountant": {
+    description: "Full access to workflows, clients, documents, and reports",
+    icon: "Calculator",
+    permissions: [
+      "workflows.view", "workflows.create", "workflows.edit", "workflows.execute",
+      "clients.view", "clients.create", "clients.edit",
+      "documents.view", "documents.upload", "documents.share",
+      "reports.view", "analytics.view",
+      "invoices.view", "invoices.create",
+      "time_tracking.view", "time_tracking.create"
+    ]
+  },
+  "Tax Specialist": {
+    description: "Tax-focused workflows and client data access",
+    icon: "FileText",
+    permissions: [
+      "workflows.view", "workflows.execute",
+      "clients.view", "clients.edit",
+      "documents.view", "documents.upload", "documents.download",
+      "forms.view", "forms.submit"
+    ]
+  },
+  "Bookkeeper": {
+    description: "Invoice and payment management only",
+    icon: "Receipt",
+    permissions: [
+      "invoices.view", "invoices.create", "invoices.update",
+      "payments.view", "payments.create",
+      "clients.view",
+      "reports.view"
+    ]
+  },
+  "Junior Staff": {
+    description: "Limited access for entry-level employees",
+    icon: "User",
+    permissions: [
+      "workflows.view", "workflows.execute",
+      "documents.view", "documents.upload",
+      "time_tracking.create", "time_tracking.view",
+      "tasks.view", "tasks.update"
+    ]
+  },
+  "Practice Manager": {
+    description: "Team oversight and resource management",
+    icon: "UserCog",
+    permissions: [
+      "workflows.view", "workflows.create", "workflows.edit",
+      "users.view", "teams.view", "teams.update",
+      "workload.view", "workload.assign",
+      "reports.view", "analytics.view",
+      "clients.view", "clients.edit"
+    ]
+  }
+};
+```
+
+**UI Features:**
+1. **Permission Categories (Collapsible):**
+   - Group permissions by category (User Management, Workflows, etc.)
+   - Show icon and description per category
+   - Expand/collapse for better UX
+
+2. **Permission Search:**
+   - Real-time search filter
+   - Highlight matching permissions
+   - Search by name or description
+
+3. **Dependency Indicators:**
+   - Auto-select required permissions (grayed out, locked)
+   - Show warning when removing a permission that others depend on
+   - Visual indicators (arrows, badges)
+
+4. **Subscription Blocks:**
+   - Show "Requires Professional Plan" badge on gated permissions
+   - Link to upgrade page
+   - Clear explanation why permission is unavailable
+
+5. **Role Preview:**
+   - "Preview as Role" button
+   - Shows sidebar navigation as that role would see
+   - Lists accessible pages and features
+   - Helps validate role before assignment
+
+**Testing Checklist:**
+- [ ] Admin can create role from template
+- [ ] Permission dependencies auto-check correctly
+- [ ] Search filters permissions accurately
+- [ ] Subscription-blocked permissions show upgrade prompt
+- [ ] Role preview accurately reflects permissions
+- [ ] Categories are intuitive and complete
+
+---
+
+### PHASE 3: Owner/Admin Separation (Week 3) - Careful Migration
+
+**⚠️ WARNING: This phase includes breaking changes for existing Admin users**
+
+**Objective:** Separate Owner and Admin roles, migrate existing administrators appropriately
+
+#### 3.1 Restrict Admin Permissions
+
+**Code Changes:** `server/init.ts` (line ~400)
+```typescript
+if (roles.admin) {
+  const adminPermissions = createdPermissions.filter(p => 
+    // Exclude organization and subscription management
+    !p.name.startsWith("organization.") &&
+    !p.name.startsWith("subscriptions.") &&
+    !p.name.startsWith("billing.")
+  );
+  await bulkAssignPermissions(roles.admin.id, adminPermissions, "Admin");
+}
+```
+
+**Impact:**
+- Existing Admin users will lose access to:
+  - Subscription management
+  - Billing pages
+  - Organization transfer
+  - Organization deletion
+
+#### 3.2 Admin-to-Owner Migration Script
+
+**Script:** `scripts/migrate-admins-to-owners.ts`
+```typescript
+import { db } from '../server/db';
+import { users, organizations, roles } from '../shared/schema';
+import { eq, and, asc } from 'drizzle-orm';
+
+async function migrateAdminsToOwners() {
+  console.log('🔄 Starting Admin → Owner migration...\n');
+  
+  // Get Owner and Admin role IDs
+  const ownerRole = await db.select().from(roles).where(eq(roles.name, 'Owner')).limit(1);
+  const adminRole = await db.select().from(roles).where(eq(roles.name, 'Admin')).limit(1);
+  
+  if (!ownerRole.length || !adminRole.length) {
+    throw new Error('Owner or Admin role not found. Run Phase 1 migration first.');
+  }
+  
+  const OWNER_ROLE_ID = ownerRole[0].id;
+  const ADMIN_ROLE_ID = adminRole[0].id;
+  
+  // Get all organizations
+  const allOrgs = await db.select().from(organizations);
+  console.log(`📊 Found ${allOrgs.length} organizations to process\n`);
+  
+  let promoted = 0;
+  let skipped = 0;
+  
+  for (const org of allOrgs) {
+    console.log(`\n🏢 Processing: ${org.name} (${org.id})`);
+    
+    // Check if Owner already exists for this org
+    const existingOwner = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.organizationId, org.id),
+        eq(users.roleId, OWNER_ROLE_ID)
+      ))
+      .limit(1);
+    
+    if (existingOwner.length > 0) {
+      console.log(`   ✓ Owner already exists: ${existingOwner[0].email}`);
+      skipped++;
+      continue;
+    }
+    
+    // Find oldest Admin (assumed to be org creator)
+    const firstAdmin = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.organizationId, org.id),
+        eq(users.roleId, ADMIN_ROLE_ID)
+      ))
+      .orderBy(asc(users.createdAt))
+      .limit(1);
+    
+    if (firstAdmin.length === 0) {
+      console.log(`   ⚠️  No Admins found, skipping`);
+      skipped++;
+      continue;
+    }
+    
+    // Promote to Owner
+    await db
+      .update(users)
+      .set({ 
+        roleId: OWNER_ROLE_ID,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, firstAdmin[0].id));
+    
+    console.log(`   ✅ Promoted to Owner: ${firstAdmin[0].email}`);
+    promoted++;
+  }
+  
+  console.log(`\n📈 Migration Summary:`);
+  console.log(`   ✅ Promoted: ${promoted} users`);
+  console.log(`   ⏭️  Skipped: ${skipped} organizations`);
+  console.log(`\n✨ Migration complete!`);
+}
+
+// Run migration
+migrateAdminsToOwners()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error('❌ Migration failed:', error);
+    process.exit(1);
+  });
+```
+
+**Migration Strategy:**
+1. **Identify candidates:** For each organization, find the oldest Admin (by `createdAt`)
+2. **Promote to Owner:** Change their `roleId` from Admin → Owner
+3. **Leave others as Admin:** All other Admins remain Admin with reduced permissions
+4. **Manual review:** Generate list of promoted users for review
+
+**Pre-Migration Checklist:**
+- [ ] Backup production database
+- [ ] Test migration script on staging environment
+- [ ] Verify script on copy of production data
+- [ ] Notify all Admin users of upcoming changes
+- [ ] Document rollback procedure
+
+**Post-Migration Checklist:**
+- [ ] Verify one Owner per organization
+- [ ] Verify other Admins still have appropriate permissions
+- [ ] Check for any broken features
+- [ ] Monitor error logs for permission denials
+
+**Rollback Plan:**
+```sql
+-- Revert all Owner users back to Admin
+UPDATE users 
+SET role_id = (SELECT id FROM roles WHERE name = 'Admin')
+WHERE role_id = (SELECT id FROM roles WHERE name = 'Owner')
+  AND organization_id IS NOT NULL;
+```
+
+#### 3.3 Owner Dashboard
+
+**New Page:** `client/src/pages/owner-settings.tsx`
+
+**Features:**
+1. **Billing Management:**
+   - Current subscription plan
+   - Payment methods
+   - Billing history
+   - Stripe customer portal link
+
+2. **Organization Transfer:**
+   - Select new owner from Admin list
+   - Confirmation dialog with warning
+   - Transfer button (Owner → Admin, New Admin → Owner)
+
+3. **Danger Zone:**
+   - Delete organization (with multi-step confirmation)
+   - Export all data before deletion
+   - 30-day grace period option
+
+**Sidebar Addition:** Only visible to Owner role
+```typescript
+{
+  title: "Organization",
+  icon: Building2,
+  items: [
+    { title: "Overview", url: "/organization", icon: Info },
+    { title: "Billing", url: "/organization/billing", icon: CreditCard },
+    { title: "Transfer Ownership", url: "/organization/transfer", icon: UserCog },
+    { title: "Danger Zone", url: "/organization/danger", icon: AlertTriangle },
+  ],
+  requiredPermission: "billing.view"
+}
+```
+
+**Testing Checklist:**
+- [ ] Only Owners see "Organization" section in sidebar
+- [ ] Admins get 403 error when accessing Owner pages
+- [ ] Owner can view billing history
+- [ ] Owner can transfer ownership successfully
+- [ ] Delete organization shows confirmation dialogs
+
+---
+
+### PHASE 4: Client Portal Separation (Week 4-5) - Major Refactor
+
+**Objective:** Separate client portal from firm portal with dedicated routes and UI
+
+#### 4.1 Architecture Decision
+
+**Option A: Route-Based Separation (Recommended for Phase 1)**
+```
+/app/*          → Firm portal (Owner, Admin, Manager, Employee)
+/portal/*       → Client portal (Client role only)
+/auth/*         → Shared authentication
+```
+
+**Pros:**
+- Low implementation effort
+- Single deployment
+- Shared backend and database
+- Easy to maintain
+
+**Cons:**
+- Same domain (potential security concern)
+- Harder to white-label per organization
+- Code splitting requires careful configuration
+
+**Option B: Subdomain Separation (Future Enhancement)**
+```
+app.yourcompany.com      → Firm portal
+clients.yourcompany.com  → Client portal
+```
+
+**Pros:**
+- Clear security boundary
+- Independent deployments
+- Easy white-labeling
+- Better performance (separate CDN)
+
+**Cons:**
+- Higher implementation effort
+- Requires DNS configuration
+- More complex deployment
+
+**Recommendation:** Start with Option A, migrate to Option B in Phase 5+
+
+---
+
+#### 4.2 Route Restructuring
+
+**Update:** `client/src/App.tsx`
+
+**Before:**
+```typescript
+<Routes>
+  <Route path="/" element={<Navigate to="/dashboard" />} />
+  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+  <Route path="/workflows" element={<ProtectedRoute><Workflows /></ProtectedRoute>} />
+  // ... all routes mixed together
+</Routes>
+```
+
+**After:**
+```typescript
+<Routes>
+  {/* Authentication Routes (Public) */}
+  <Route path="/auth/login" element={<Login />} />
+  <Route path="/auth/register" element={<Register />} />
+  <Route path="/auth/verify" element={<VerifyEmail />} />
+  
+  {/* Role-Based Routing */}
+  <Route path="/" element={<RoleBasedRedirect />} />
+  
+  {/* Firm Portal (Owner, Admin, Manager, Employee) */}
+  <Route path="/app/*" element={
+    <ProtectedRoute allowedRoles={['Owner', 'Admin', 'Manager', 'Employee']}>
+      <FirmPortalLayout />
+    </ProtectedRoute>
+  }>
+    <Route index element={<Navigate to="/app/dashboard" />} />
+    <Route path="dashboard" element={<Dashboard />} />
+    <Route path="workflows" element={<Workflows />} />
+    <Route path="clients" element={<Clients />} />
+    <Route path="team" element={<Team />} />
+    <Route path="analytics" element={<Analytics />} />
+    {/* ... all firm features */}
+  </Route>
+  
+  {/* Client Portal (Client role only) */}
+  <Route path="/portal/*" element={
+    <ProtectedRoute allowedRoles={['Client']}>
+      <ClientPortalLayout />
+    </ProtectedRoute>
+  }>
+    <Route index element={<Navigate to="/portal/dashboard" />} />
+    <Route path="dashboard" element={<ClientDashboard />} />
+    <Route path="documents" element={<ClientDocuments />} />
+    <Route path="forms" element={<ClientForms />} />
+    <Route path="payments" element={<ClientPayments />} />
+    <Route path="messages" element={<ClientMessages />} />
+    {/* ... client-only features */}
+  </Route>
+</Routes>
+```
+
+**New Component:** `client/src/components/role-based-redirect.tsx`
+```typescript
+import { useUser } from '@/hooks/use-user';
+import { Navigate } from 'react-router-dom';
+
+export function RoleBasedRedirect() {
+  const { user } = useUser();
+  
+  if (!user) {
+    return <Navigate to="/auth/login" />;
+  }
+  
+  // Redirect based on role
+  if (user.roleName === 'Client') {
+    return <Navigate to="/portal/dashboard" />;
+  }
+  
+  return <Navigate to="/app/dashboard" />;
+}
+```
+
+**Testing Checklist:**
+- [ ] Client role redirects to `/portal/*` on login
+- [ ] Non-client roles redirect to `/app/*` on login
+- [ ] Clients cannot access `/app/*` routes (403 error)
+- [ ] Internal users cannot access `/portal/*` routes
+- [ ] Direct URL navigation is properly blocked
+
+---
+
+#### 4.3 Client Portal UI Components
+
+**New Layout:** `client/src/layouts/ClientPortalLayout.tsx`
+
+**Simplified Sidebar (Clients only see):**
+```typescript
+const clientSidebarItems = [
+  { title: "Dashboard", url: "/portal/dashboard", icon: Home },
+  { title: "Documents", url: "/portal/documents", icon: FileText },
+  { title: "Forms", url: "/portal/forms", icon: FileInput },
+  { title: "Payments", url: "/portal/payments", icon: CreditCard },
+  { title: "Messages", url: "/portal/messages", icon: MessageSquare },
+  { title: "Profile", url: "/portal/profile", icon: User },
+];
+```
+
+**Client Portal Pages:**
+
+1. **`client/src/pages/portal/client-dashboard.tsx`**
+   - Action center (pending tasks)
+   - Recent documents
+   - Payment status
+   - Unread messages
+
+2. **`client/src/pages/portal/client-documents.tsx`**
+   - View shared documents
+   - Download documents
+   - Upload requested documents
+   - Document history
+
+3. **`client/src/pages/portal/client-forms.tsx`**
+   - View assigned forms
+   - Fill and submit forms
+   - Form submission history
+
+4. **`client/src/pages/portal/client-payments.tsx`**
+   - View invoices
+   - Make payments (Stripe integration)
+   - Payment history
+   - Download receipts
+
+5. **`client/src/pages/portal/client-messages.tsx`**
+   - Chat with firm
+   - View message history
+   - File attachments
+
+**Design Differences:**
+- **Simpler UI:** Fewer options, clearer CTAs
+- **Task-oriented:** Focus on "What do I need to do?"
+- **Less jargon:** Use client-friendly language
+- **Mobile-first:** Clients often on mobile devices
+
+**Testing Checklist:**
+- [ ] Client portal loads without firm-specific components
+- [ ] All client portal pages are functional
+- [ ] Clients can upload documents
+- [ ] Clients can submit forms
+- [ ] Clients can make payments
+- [ ] Clients can message firm
+- [ ] Mobile responsive design works
+
+---
+
+#### 4.4 Backend Route Guards
+
+**Update:** `server/routes.ts`
+
+**Add role-based guards for client-only endpoints:**
+```typescript
+// Client portal endpoints (Client role only)
+app.get("/api/portal/dashboard", requireAuth, requireRole("Client"), async (req, res) => {
+  // Return client-specific dashboard data
+});
+
+app.get("/api/portal/documents", requireAuth, requireRole("Client"), async (req, res) => {
+  // Return documents shared with this client
+});
+
+// Firm portal endpoints (Block Client role)
+app.get("/api/analytics", requireAuth, blockRole("Client"), async (req, res) => {
+  // Analytics not available to clients
+});
+```
+
+**New Middleware:** `server/auth.ts`
+```typescript
+export function requireRole(...allowedRoles: string[]) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const userRole = await storage.getRole(req.user.roleId);
+    if (!userRole || !allowedRoles.includes(userRole.name)) {
+      return res.status(403).json({ 
+        error: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
+      });
+    }
+    
+    next();
+  };
+}
+
+export function blockRole(...blockedRoles: string[]) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const userRole = await storage.getRole(req.user.roleId);
+    if (userRole && blockedRoles.includes(userRole.name)) {
+      return res.status(403).json({ 
+        error: "This feature is not available for your role" 
+      });
+    }
+    
+    next();
+  };
+}
+```
+
+---
+
+### PHASE 5: Advanced Features (Week 6+) - Enhancements
+
+**Objective:** Add role hierarchy, dynamic permission gating, and audit logging
+
+#### 5.1 Role Hierarchy & Inheritance
+
+**Database Schema Change:** Add `parent_role_id` to roles table
+```sql
+ALTER TABLE roles ADD COLUMN parent_role_id VARCHAR REFERENCES roles(id);
+
+-- Set up hierarchy
+UPDATE roles SET parent_role_id = (SELECT id FROM roles WHERE name = 'Admin') WHERE name = 'Manager';
+UPDATE roles SET parent_role_id = (SELECT id FROM roles WHERE name = 'Manager') WHERE name = 'Employee';
+UPDATE roles SET parent_role_id = (SELECT id FROM roles WHERE name = 'Employee') WHERE name = 'Client';
+```
+
+**Permission Resolution Logic:**
+```typescript
+async function getEffectivePermissionsWithHierarchy(roleId: string): Promise<Permission[]> {
+  const permissions = new Set<Permission>();
+  let currentRoleId: string | null = roleId;
+  
+  // Walk up the hierarchy
+  while (currentRoleId) {
+    const rolePermissions = await storage.getPermissionsByRole(currentRoleId);
+    rolePermissions.forEach(p => permissions.add(p));
+    
+    const role = await storage.getRole(currentRoleId);
+    currentRoleId = role?.parentRoleId || null;
+  }
+  
+  return Array.from(permissions);
+}
+```
+
+**Benefits:**
+- Create Manager role that inherits Employee + adds team management
+- Simplify permission management
+- Ensure consistent permission sets
+
+---
+
+#### 5.2 Dynamic Permission Gating with Clear Errors
+
+**Enhanced Permission Check:**
+```typescript
+type PermissionDenialReason = 
+  | { type: 'not_authenticated' }
+  | { type: 'role_lacks_permission', requiredPermission: string }
+  | { type: 'subscription_required', requiredFeature: string, requiredPlan: string }
+  | { type: 'organization_limit_reached', limit: number, current: number };
+
+async function checkPermissionWithReason(
+  userId: string,
+  permission: string
+): Promise<{ allowed: boolean; reason?: PermissionDenialReason }> {
+  // ... detailed checking logic
+}
+```
+
+**Frontend Error Display:**
+```typescript
+if (error.reason?.type === 'subscription_required') {
+  return (
+    <Alert variant="warning">
+      <AlertTitle>Upgrade Required</AlertTitle>
+      <AlertDescription>
+        This feature requires {error.reason.requiredPlan} plan.
+        <Button onClick={() => navigate('/organization/billing')}>
+          Upgrade Now
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+```
+
+---
+
+#### 5.3 RBAC Audit Logging
+
+**Log all role and permission changes:**
+```typescript
+// server/routes.ts
+app.post("/api/roles/:roleId/permissions/:permissionId", 
+  requireAuth, 
+  requirePermission("roles.edit"), 
+  async (req: AuthRequest, res: Response) => {
+    // ... assign permission
+    
+    // Audit log
+    await logActivity(
+      req.userId,
+      req.user!.organizationId,
+      "assign_permission",
+      "role",
+      roleId,
+      {
+        permissionId,
+        permissionName: permission.name,
+        assignedBy: req.user!.email
+      },
+      req
+    );
+  }
+);
+```
+
+**Audit Log Viewer for Owners:**
+- View all role changes
+- See who modified permissions when
+- Filter by user, role, or date
+- Export audit logs (compliance requirement)
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Foundation (Week 1)
+- [ ] Create Owner role migration
+- [ ] Add Owner-specific permissions
+- [ ] Create `shared/permission-categories.ts`
+- [ ] Add `/api/permissions/categories` endpoint
+- [ ] Test Owner role creation
+- [ ] Test categorization API
+- [ ] Document Phase 1 completion
+
+### Phase 2: Admin UI (Week 2)
+- [ ] Refactor `client/src/pages/roles.tsx`
+- [ ] Create `PermissionCategoryGroup` component
+- [ ] Create `RoleTemplateSelector` component
+- [ ] Add permission search functionality
+- [ ] Add role preview modal
+- [ ] Test role creation with templates
+- [ ] Test permission dependencies
+- [ ] Document Phase 2 completion
+
+### Phase 3: Migration (Week 3)
+- [ ] Review and test migration script
+- [ ] Backup production database
+- [ ] Notify all Admin users
+- [ ] Run migration script on staging
+- [ ] Review promoted users list
+- [ ] Run migration on production
+- [ ] Create Owner dashboard page
+- [ ] Test billing access
+- [ ] Test ownership transfer
+- [ ] Monitor for permission errors
+- [ ] Document Phase 3 completion
+
+### Phase 4: Client Portal (Week 4-5)
+- [ ] Restructure `App.tsx` routing
+- [ ] Create `RoleBasedRedirect` component
+- [ ] Create `ClientPortalLayout`
+- [ ] Create client dashboard page
+- [ ] Create client documents page
+- [ ] Create client forms page
+- [ ] Create client payments page
+- [ ] Create client messages page
+- [ ] Add backend role guards
+- [ ] Test client portal isolation
+- [ ] Test firm portal access control
+- [ ] Mobile responsive testing
+- [ ] Document Phase 4 completion
+
+### Phase 5: Advanced (Week 6+)
+- [ ] Add role hierarchy to database
+- [ ] Implement permission inheritance
+- [ ] Add detailed permission denial reasons
+- [ ] Create permission error components
+- [ ] Implement RBAC audit logging
+- [ ] Create audit log viewer
+- [ ] Test role hierarchy
+- [ ] Test error messaging
+- [ ] Document Phase 5 completion
+
+---
+
+## Rollback Plans
+
+### Phase 1 Rollback
+```sql
+DELETE FROM role_permissions WHERE role_id = (SELECT id FROM roles WHERE name = 'Owner');
+DELETE FROM roles WHERE name = 'Owner';
+DELETE FROM permissions WHERE name IN ('organization.transfer', 'organization.delete', 'billing.view', 'billing.update');
+```
+
+### Phase 3 Rollback
+```sql
+-- Revert all Owners back to Admin
+UPDATE users 
+SET role_id = (SELECT id FROM roles WHERE name = 'Admin')
+WHERE role_id = (SELECT id FROM roles WHERE name = 'Owner')
+  AND organization_id IS NOT NULL;
+
+-- Restore Admin permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 
+  (SELECT id FROM roles WHERE name = 'Admin'),
+  p.id
+FROM permissions p
+WHERE p.name IN ('subscriptions.manage', 'billing.view', 'billing.update')
+ON CONFLICT DO NOTHING;
+```
+
+### Phase 4 Rollback
+- Revert frontend routing changes via Git
+- Remove client portal pages
+- Remove role-based guards
+
+---
+
+## Feature Flags
+
+**Environment Variables:**
+```bash
+# .env
+ENABLE_OWNER_ROLE=true
+ENABLE_ROLE_TEMPLATES=true
+ENABLE_CLIENT_PORTAL=true
+ENABLE_ROLE_HIERARCHY=false
+ENABLE_RBAC_AUDIT_LOGGING=true
+```
+
+**Usage in Code:**
+```typescript
+if (process.env.ENABLE_OWNER_ROLE === 'true') {
+  // Show Owner-specific features
+}
+```
+
+---
+
+## Monitoring & Alerts
+
+**Key Metrics to Track:**
+1. **Permission Denial Rate:** Track 403 errors per endpoint
+2. **Role Assignment Errors:** Failed role assignments
+3. **Subscription Gating Hits:** How often users hit paywalls
+4. **Client Portal Usage:** Active clients, feature adoption
+5. **Owner Actions:** Billing changes, ownership transfers
+
+**Alerts to Set Up:**
+- Spike in 403 errors (permission misconfiguration)
+- Failed role assignments (database issues)
+- Owner role deletion (security incident)
+- Multiple ownership transfers (suspicious activity)
+
+---
+
+## Success Criteria
+
+### Phase 1
+- ✅ Owner role exists in database
+- ✅ Owner has all Admin permissions + billing
+- ✅ Existing Admins unaffected
+- ✅ Permission categories API works
+
+### Phase 2
+- ✅ Admins can create roles from templates
+- ✅ Permission dependencies auto-select
+- ✅ Role preview shows accurate permissions
+- ✅ UI is intuitive (user testing feedback)
+
+### Phase 3
+- ✅ One Owner per organization
+- ✅ Admins lost billing access (expected)
+- ✅ No data loss
+- ✅ Owner dashboard functional
+- ✅ Zero unplanned downtime
+
+### Phase 4
+- ✅ Clients land on `/portal/*`
+- ✅ Internal users land on `/app/*`
+- ✅ No cross-contamination
+- ✅ Client portal feature-complete
+- ✅ Mobile responsive
+
+### Phase 5
+- ✅ Role hierarchy works
+- ✅ Clear error messages
+- ✅ Audit logs complete
+- ✅ Performance not degraded
+
+---
+
+## Risk Mitigation
+
+### Risk: Accidental Permission Deletion
+**Mitigation:** 
+- Make system roles read-only
+- Require confirmation for permission removal
+- Audit logging
+
+### Risk: Migration Failures
+**Mitigation:**
+- Test on staging environment
+- Dry-run mode for migration script
+- Database backups before migration
+
+### Risk: Client Portal Access Issues
+**Mitigation:**
+- Feature flag for gradual rollout
+- Comprehensive testing
+- Fallback to old UI
+
+### Risk: Performance Degradation
+**Mitigation:**
+- Cache permission checks
+- Optimize database queries
+- Load testing before production
+
+---
+
+## Communication Plan
+
+### Stakeholders to Notify
+1. **Admin Users:** 2 weeks before Phase 3
+2. **All Users:** 1 week before Phase 4
+3. **Clients:** 3 days before Phase 4
+4. **Support Team:** Before each phase
+
+### Email Templates
+
+**Phase 3 Notification (Admins):**
+```
+Subject: Important: Role Changes Coming to AgentFlow
+
+Hi [Admin Name],
+
+We're enhancing our role management system. Starting [Date], we're introducing an "Owner" role to better separate billing and organizational management.
+
+What changes for you:
+- If you created your organization, you'll automatically become an Owner
+- If not, you'll remain an Admin with the same permissions (except billing)
+- Billing and subscription management will be Owner-only
+
+No action required. Questions? Reply to this email.
+
+Thanks,
+AgentFlow Team
+```
+
+**Phase 4 Notification (Clients):**
+```
+Subject: Welcome to Your New Client Portal
+
+Hi [Client Name],
+
+We've built a dedicated portal just for you! Starting [Date], you'll access a streamlined experience designed for clients.
+
+What's new:
+- Cleaner, simpler interface
+- Faster access to documents and forms
+- Mobile-friendly design
+- Same features, better experience
+
+Your login credentials remain the same.
+
+Best regards,
+[Your Firm Name]
+```
+
+---
+
+## Post-Launch Review
+
+**After Each Phase:**
+1. **Metrics Review:** Check success criteria
+2. **Error Analysis:** Review logs for issues
+3. **User Feedback:** Collect feedback from Admins/Clients
+4. **Performance Check:** Database query times, API latency
+5. **Documentation Update:** Update this document with learnings
+
+**Final Review (After Phase 5):**
+- Comprehensive metrics report
+- User satisfaction survey
+- Technical debt assessment
+- Plan for future enhancements
+
+---
+
+## Future Enhancements (Post-Launch)
+
+### Phase 6: Subdomain Client Portal
+- Migrate client portal to `clients.yourcompany.com`
+- White-label per organization
+- Independent deployment pipeline
+
+### Phase 7: Permission Marketplace
+- Allow admins to share custom roles
+- Community role templates
+- Pre-built industry-specific roles (Accounting, Legal, etc.)
+
+### Phase 8: AI-Powered Role Suggestions
+- Analyze user behavior
+- Suggest optimal permissions for new roles
+- Detect over-privileged users
+
+### Phase 9: Just-In-Time Access
+- Temporary permission elevation
+- Time-limited access grants
+- Approval workflows for sensitive permissions
+
+---
+
+## Appendix
+
+### A. Permission Naming Convention
+```
+<resource>.<action>
+
+Examples:
+- users.view
+- workflows.create
+- documents.delete
+- organization.transfer
+```
+
+### B. Role Scope Definitions
+- **platform:** Super Admin only (organizationId = NULL)
+- **tenant:** Organization-scoped roles (Owner, Admin, Manager, Employee, Client)
+- **custom:** User-defined roles
+
+### C. Database Schema Changes Summary
+
+**Phase 1:**
+- Add Owner role to `roles` table
+- Add 5 new permissions to `permissions` table
+- Add Owner permission assignments to `role_permissions` table
+
+**Phase 3:**
+- Update Admin permissions in `role_permissions` (remove billing)
+
+**Phase 5:**
+- Add `parent_role_id` column to `roles` table
+
+### D. API Endpoints Summary
+
+**New Endpoints:**
+- `GET /api/permissions/categories` - Get categorized permissions
+- `GET /api/roles/templates` - Get role templates
+- `POST /api/roles/:roleId/preview` - Preview role permissions
+- `GET /api/organization/billing` - Owner billing dashboard (Owner only)
+- `POST /api/organization/transfer` - Transfer ownership (Owner only)
+- `GET /api/portal/*` - Client portal endpoints (Client only)
+
+**Modified Endpoints:**
+- `POST /api/roles` - Now supports template selection
+- `GET /api/roles/:id/permissions` - Returns categorized permissions
+
+---
+
+## Contact & Support
+
+**Questions about this plan?**
+- Technical: [tech-lead-email]
+- Product: [product-manager-email]
+- Emergency: [on-call-rotation]
+
+**Documentation:**
+- [Link to Technical Spec]
+- [Link to API Documentation]
+- [Link to Testing Procedures]
+
+---
+
+## Phase 4 Implementation Status ✅ COMPLETE
+
+**Completed:** November 18, 2024  
+**Implementation:** Client Portal Separation
+
+### What Was Implemented
+
+#### 1. Login Flow Updates (login.tsx)
+- ✅ Added client-specific redirect logic to `onSuccess` callback
+- ✅ Updated `handleMFASuccess` to redirect clients to `/client-portal/dashboard`
+- ✅ Three-way routing: Super Admin → /admin/dashboard, Client → /client-portal/dashboard, Others → /dashboard
+
+#### 2. New Components Created
+
+**PortalLayout Component** (`client/src/components/portal-layout.tsx`)
+- Dedicated layout for client portal with simplified UI
+- Security check: Redirects non-clients to /dashboard
+- Simplified header with Shield icon and "Client Portal" label
+- Uses ClientPortalSidebar instead of AppSidebar
+- Includes NotificationBell and user info display
+- Bundle size: 4.23 kB (gzipped)
+
+**ClientPortalSidebar Component** (`client/src/components/client-portal-sidebar.tsx`)
+- Client-specific sidebar with minimal navigation (7 items vs 60+ in firm app)
+- Menu Structure:
+  * My Portal: Dashboard, Action Center (2 items)
+  * Documents & Tasks: My Documents, My Tasks, My Forms, Signatures (4 items)
+  * Communication: Messages (1 item)
+- Logo shows "Accute Client Portal" with subtitle
+- User avatar dropdown with Settings and Logout
+- Clean, minimal design focused on client needs
+
+#### 3. Router Updates (App.tsx)
+- ✅ Imported PortalLayout component (line 165)
+- ✅ Updated all 7 client portal routes to use PortalLayout instead of AppLayout:
+  * /client-portal/dashboard → ClientPortalDashboard
+  * /client-portal/documents → ClientMyDocuments
+  * /client-portal/tasks → ClientMyTasks
+  * /client-portal/forms → ClientMyForms
+  * /client-portal/signatures → ClientMySignatures
+  * /client-portal/messages → ClientPortalMessages
+  * /client-portal/action-center → ActionCenter
+
+### Architecture Decisions
+
+**Route Strategy:** Used existing `/client-portal/*` routes (not `/portal/*` as originally planned)
+- Maintains backward compatibility with existing portal pages
+- All client pages already existed and functional
+- RoleGuard protection with `allowedRoles={["Client"]}` already in place
+
+**UI Separation:**
+- Client portal now has completely separate layout and navigation
+- Simplified 7-item menu vs 60+ items in firm application
+- Dedicated PortalLayout prevents clients from seeing firm UI structure
+- Visual distinction through simplified header and client-focused branding
+
+### Security Enhancements
+- ✅ Login automatically routes clients to isolated portal
+- ✅ PortalLayout checks user role and redirects non-clients to /dashboard
+- ✅ RoleGuard continues to protect all client portal routes
+- ✅ Clients cannot navigate to firm routes (/dashboard, /workflows, /ai-agents, etc.)
+
+### Build Verification
+- ✅ Client build successful (vite build completed)
+- ✅ No TypeScript compilation errors
+- ✅ PortalLayout bundle: 4.23 kB gzipped
+- ✅ All lazy imports functioning correctly
+
+### Testing Status
+- ⏳ **Pending:** End-to-end testing of client login flow
+- ⏳ **Pending:** Verify client sees only ClientPortalSidebar with 7 menu items
+- ⏳ **Pending:** Confirm firm users cannot access client portal routes
+- ⏳ **Pending:** Validate client cannot access firm routes
+
+### Next Steps
+1. Test client login end-to-end (login as Client role)
+2. Verify isolated client portal experience
+3. Test route protection (clients blocked from /dashboard, firm users blocked from /client-portal)
+4. Document user experience changes
+5. Proceed to Phase 5: Role Hierarchy & Advanced Features
+
+---
+
+**Document Version:** 1.0  
+**Last Updated:** 18 November 2025  
+**Next Review:** After Phase 1 completion
