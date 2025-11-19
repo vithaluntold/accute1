@@ -120,10 +120,10 @@ import {
   organizationCreationRateLimiter,
   userCreationRateLimiter,
 } from "./rate-limit";
-// WebSocket servers for user-to-user real-time communication
+// Lazy WebSocket loader for user-to-user real-time communication
+import { setupLazyWebSocketLoader, cleanupLazyWebSockets } from "./websocket-lazy-loader";
+// Roundtable WebSocket (will be migrated to SSE)
 import { setupRoundtableWebSocket } from "./roundtable-websocket";
-import { setupTeamChatWebSocket } from "./team-chat-websocket";
-import { setupLiveChatWebSocket } from "./live-chat-websocket";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -299,12 +299,10 @@ app.use((req, res, next) => {
     // Initialize WebSocket servers for user-to-user real-time communication
     console.log('🔧 Initializing WebSocket servers...');
     try {
-      setupTeamChatWebSocket(server);
-      console.log('✅ Team Chat WebSocket server initialized');
+      // Lazy-load Team Chat and Live Chat (initialize on first connection)
+      setupLazyWebSocketLoader(server);
       
-      setupLiveChatWebSocket(server);
-      console.log('✅ Live Chat WebSocket server initialized');
-      
+      // Roundtable still uses WebSocket (will be migrated to SSE)
       setupRoundtableWebSocket(server);
       console.log('✅ Roundtable WebSocket server initialized');
     } catch (wsError) {

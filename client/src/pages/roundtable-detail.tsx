@@ -1,6 +1,6 @@
 import { useParams } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { useRoundtableWebSocket } from '@/hooks/useRoundtableWebSocket';
+import { useRoundtableSSE } from '@/hooks/use-roundtable-sse';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,21 +51,38 @@ export default function RoundtableDetail() {
     enabled: !!id,
   });
 
-  // WebSocket connection
+  // SSE connection for real-time updates
   const {
     isConnected,
     isReconnecting,
-    error: wsError,
+    error: sseError,
     participants: liveParticipants,
     messages: liveMessages,
     privateMessages,
-    currentPresentation,
     typingParticipants,
     sendMessage,
     sendPrivateMessage,
     startTyping,
     stopTyping,
-  } = useRoundtableWebSocket(id || null);
+  } = useRoundtableSSE({
+    sessionId: id || null,
+    onNewMessage: () => {
+      // Message received, auto-scroll handled by useEffect
+    },
+    onAgentResponse: () => {
+      toast({
+        title: 'Agent Response',
+        description: 'An agent has responded',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Connection Error',
+        description: error,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Merge initial data with live data
   const allMessages = [...(sessionData?.messages || []), ...liveMessages];
