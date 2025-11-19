@@ -120,11 +120,10 @@ import {
   organizationCreationRateLimiter,
   userCreationRateLimiter,
 } from "./rate-limit";
-// DISABLED: WebSockets now lazy-load with chat sessions, not at server startup
-// import { setupWebSocket } from "./websocket";
-// import { setupRoundtableWebSocket } from "./roundtable-websocket";
-// import { setupTeamChatWebSocket } from "./team-chat-websocket";
-// import { setupLiveChatWebSocket } from "./live-chat-websocket";
+// WebSocket servers for user-to-user real-time communication
+import { setupRoundtableWebSocket } from "./roundtable-websocket";
+import { setupTeamChatWebSocket } from "./team-chat-websocket";
+import { setupLiveChatWebSocket } from "./live-chat-websocket";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -297,30 +296,20 @@ app.use((req, res, next) => {
       });
     });
     
-    // Initialize WebSocket server EAGERLY (not lazy)
-    console.log('🔧 Initializing WebSocket Bootstrap...');
+    // Initialize WebSocket servers for user-to-user real-time communication
+    console.log('🔧 Initializing WebSocket servers...');
     try {
-      const { wsBootstrap } = await import('./websocket-bootstrap');
-      wsBootstrap.initialize(server);
+      setupTeamChatWebSocket(server);
+      console.log('✅ Team Chat WebSocket server initialized');
+      
+      setupLiveChatWebSocket(server);
+      console.log('✅ Live Chat WebSocket server initialized');
+      
+      setupRoundtableWebSocket(server);
+      console.log('✅ Roundtable WebSocket server initialized');
     } catch (wsError) {
-      console.error('❌ WebSocket Bootstrap initialization failed:', wsError);
+      console.error('❌ WebSocket server initialization failed:', wsError);
       console.warn('⚠️  Continuing without WebSocket support');
-    }
-    
-    // Initialize Agent Orchestrator
-    console.log('🔧 Initializing Agent Orchestrator...');
-    try {
-      const { orchestrator } = await import('./agent-orchestrator');
-      const { AGENT_REGISTRY } = await import('@shared/agent-registry');
-      
-      for (const agentMetadata of AGENT_REGISTRY) {
-        orchestrator.registerAgent(agentMetadata);
-      }
-      
-      console.log(`✅ Agent Orchestrator initialized with ${AGENT_REGISTRY.length} agents`);
-    } catch (orchError) {
-      console.error('❌ Agent Orchestrator initialization failed:', orchError);
-      console.warn('⚠️  Continuing with limited agent functionality');
     }
     
     // CRITICAL: Initialize system FIRST to ensure agents are ready
