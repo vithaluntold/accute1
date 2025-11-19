@@ -11,7 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentTodoList, type TodoItem } from "@/components/agent-todo-list";
 import { getUser } from "@/lib/auth";
-import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
 import {
   ResizablePanelGroup,
   ResizablePanel,

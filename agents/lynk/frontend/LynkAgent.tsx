@@ -8,7 +8,7 @@ import { MessageSquare, Send, Plus, Trash2, Edit2, CheckCircle, Calendar, User, 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {

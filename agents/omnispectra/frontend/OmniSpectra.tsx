@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
 import {
   Select,
   SelectContent,

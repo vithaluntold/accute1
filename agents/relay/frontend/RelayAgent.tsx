@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
 import {
   ResizablePanelGroup,
   ResizablePanel,
