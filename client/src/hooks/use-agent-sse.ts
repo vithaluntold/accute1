@@ -2,15 +2,16 @@ import { useCallback, useRef, useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface UseAgentSSEOptions {
-  agentSlug: string;
-  sessionId: string;
-  onStreamChunk?: (chunk: string) => void;
-  onStreamComplete?: (fullResponse: string) => void;
+  onStreamStart?: () => void;
+  onChunk?: (chunk: string) => void;
+  onComplete?: (fullResponse: string) => void;
   onError?: (error: string) => void;
 }
 
 interface SendMessageOptions {
+  agentSlug: string;
   message: string;
+  sessionId: string; // Required for security and audit trail
   llmConfigId?: string;
   contextType?: string;
   contextId?: string;
@@ -22,10 +23,9 @@ interface SendMessageOptions {
  * Replaces WebSocket with Server-Sent Events for better compatibility
  */
 export function useAgentSSE({
-  agentSlug,
-  sessionId,
-  onStreamChunk,
-  onStreamComplete,
+  onStreamStart,
+  onChunk,
+  onComplete,
   onError,
 }: UseAgentSSEOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,8 +47,8 @@ export function useAgentSSE({
   /**
    * Send a message and start streaming response
    */
-  const sendMessage = useCallback(async (options: SendMessageOptions): Promise<boolean> => {
-    const { message, llmConfigId, contextType, contextId, contextData } = options;
+  const sendMessage = useCallback(async (options: SendMessageOptions): Promise<void> => {
+    const { agentSlug, message, sessionId, llmConfigId, contextType, contextId, contextData } = options;
 
     // Close any existing connection
     closeConnection();
@@ -57,20 +57,27 @@ export function useAgentSSE({
       setIsStreaming(true);
       accumulatedResponseRef.current = '';
 
+      // Notify stream start
+      if (onStreamStart) {
+        onStreamStart();
+      }
+
       // Step 1: Initialize stream via POST
       console.log(`[SSE ${agentSlug}] Initializing stream...`);
-      const { streamId } = await apiRequest<{ streamId: string; status: string }>('/api/ai-agent/stream', {
-        method: 'POST',
-        body: JSON.stringify({
-          agentSlug,
-          message,
-          sessionId,
-          llmConfigId,
-          contextType,
-          contextId,
-          contextData,
-        }),
+      const data = await apiRequest('POST', '/api/ai-agent/stream', {
+        agentSlug,
+        message,
+        sessionId,
+        llmConfigId,
+        contextType,
+        contextId,
+        contextData,
       });
+      
+      const streamId = data.streamId;
+      if (!streamId) {
+        throw new Error('Stream initialization failed: no streamId returned');
+      }
 
       currentStreamIdRef.current = streamId;
       console.log(`[SSE ${agentSlug}] Stream initialized: ${streamId}`);
@@ -87,33 +94,33 @@ export function useAgentSSE({
 
           switch (data.type) {
             case 'connected':
-              console.log(`[SSE ${agentSlug}] Connected to stream ${streamId}`);
+              console.log(`[SSE] Connected to stream ${streamId}`);
               break;
 
             case 'stream_start':
-              console.log(`[SSE ${agentSlug}] Stream started`);
+              console.log(`[SSE] Stream started`);
               accumulatedResponseRef.current = '';
               break;
 
             case 'stream_chunk':
               const chunk = data.chunk || '';
               accumulatedResponseRef.current += chunk;
-              if (onStreamChunk) {
-                onStreamChunk(chunk);
+              if (onChunk) {
+                onChunk(chunk);
               }
               break;
 
             case 'stream_end':
-              console.log(`[SSE ${agentSlug}] Stream completed, length: ${accumulatedResponseRef.current.length}`);
+              console.log(`[SSE] Stream completed, length: ${accumulatedResponseRef.current.length}`);
               setIsStreaming(false);
-              if (onStreamComplete) {
-                onStreamComplete(accumulatedResponseRef.current);
+              if (onComplete) {
+                onComplete(accumulatedResponseRef.current);
               }
               closeConnection();
               break;
 
             case 'error':
-              console.error(`[SSE ${agentSlug}] Stream error:`, data.error);
+              console.error('[SSE] Stream error:', data.error);
               setIsStreaming(false);
               if (onError) {
                 onError(data.error || 'Stream error');
@@ -122,16 +129,16 @@ export function useAgentSSE({
               break;
 
             default:
-              console.log(`[SSE ${agentSlug}] Unknown message type:`, data.type);
+              console.log('[SSE] Unknown message type:', data.type);
           }
         } catch (error) {
-          console.error(`[SSE ${agentSlug}] Failed to parse SSE message:`, error);
+          console.error('[SSE] Failed to parse SSE message:', error);
         }
       });
 
       // Handle errors
       eventSource.addEventListener('error', (event) => {
-        console.error(`[SSE ${agentSlug}] EventSource error:`, event);
+        console.error('[SSE] EventSource error:', event);
         setIsStreaming(false);
         
         // Only report error if we haven't already completed
@@ -144,37 +151,36 @@ export function useAgentSSE({
         closeConnection();
       });
 
-      return true;
     } catch (error: any) {
-      console.error(`[SSE ${agentSlug}] Failed to send message:`, error);
+      console.error('[SSE] Failed to send message:', error);
       setIsStreaming(false);
       if (onError) {
         onError(error.message || 'Failed to send message');
       }
-      return false;
+      throw error;
     }
-  }, [agentSlug, sessionId, onStreamChunk, onStreamComplete, onError, closeConnection]);
+  }, [onStreamStart, onChunk, onComplete, onError, closeConnection]);
 
   /**
    * Cancel the current stream
    */
   const cancelStream = useCallback(async () => {
     if (!currentStreamIdRef.current) {
+      closeConnection();
+      setIsStreaming(false);
       return;
     }
 
     try {
-      await apiRequest(`/api/ai-agent/stream/${currentStreamIdRef.current}/cancel`, {
-        method: 'POST',
-      });
-      console.log(`[SSE ${agentSlug}] Stream cancelled`);
+      await apiRequest('POST', `/api/ai-agent/stream/${currentStreamIdRef.current}/cancel`, {});
+      console.log('[SSE] Stream cancelled');
     } catch (error) {
-      console.error(`[SSE ${agentSlug}] Failed to cancel stream:`, error);
+      console.error('[SSE] Failed to cancel stream:', error);
     } finally {
       closeConnection();
       setIsStreaming(false);
     }
-  }, [agentSlug, closeConnection]);
+  }, [closeConnection]);
 
   return {
     isStreaming,

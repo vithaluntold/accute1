@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
@@ -29,6 +29,8 @@ import { Bot, Send, Sparkles, User, Loader2, Settings2, FileText, Download } fro
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AITransparencyIndicator, AIReasoning, type AITransparencyData } from "@/components/ai-transparency-indicator";
 import { ProcessingIndicator } from "@/components/ui-psychology/ProcessingIndicator";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
+import { getAgentSlug } from "@/lib/agent-utils";
 
 interface Message {
   id: string;
@@ -58,13 +60,115 @@ export function AIAgentChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [reasoningOpenMap, setReasoningOpenMap] = useState<Record<string, boolean>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>("");
   const { toast } = useToast();
+  
+  // Use SSE hook for agent streaming
+  const { sendMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      // Create a new assistant message placeholder
+      const messageId = Date.now().toString();
+      streamingMessageIdRef.current = messageId;
+      streamingContentRef.current = "";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: messageId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+          isStreaming: true,
+        },
+      ]);
+    },
+    onChunk: (chunk: string) => {
+      // Append chunk to the streaming message
+      if (streamingMessageIdRef.current) {
+        streamingContentRef.current += chunk;
+        setMessages((prev) => 
+          prev.map((msg) =>
+            msg.id === streamingMessageIdRef.current
+              ? { ...msg, content: streamingContentRef.current }
+              : msg
+          )
+        );
+      }
+    },
+    onComplete: (fullResponse: string) => {
+      // Mark streaming as complete
+      if (streamingMessageIdRef.current) {
+        const finalContent = fullResponse;
+        
+        // Generate AI transparency data (mock for now - will be from backend later)
+        const generateTransparencyData = (): AITransparencyData => {
+          const wordCount = finalContent.split(/\s+/).length;
+          const hasNumbers = /\d/.test(finalContent);
+          const hasStructure = finalContent.includes('\n') || finalContent.includes('•') || finalContent.includes('-');
+          
+          let confidence = 85; // Base confidence
+          if (wordCount > 100) confidence += 5;
+          if (hasNumbers) confidence += 3;
+          if (hasStructure) confidence += 2;
+          confidence = Math.min(95, confidence);
+          
+          return {
+            confidence,
+            reasoning: `Response analyzed for ${wordCount} words of context. ${hasNumbers ? 'Contains data-driven insights. ' : ''}${hasStructure ? 'Uses structured formatting. ' : ''}Note: This is an estimated confidence score. Real AI transparency will be available when backend integration is complete.`,
+            modelUsed: selectedLlmConfig ? llmConfigs.find(c => c.id === selectedLlmConfig)?.model || "AI Model" : "AI Model",
+            isEstimated: true,
+          };
+        };
+        
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === streamingMessageIdRef.current
+              ? { 
+                  ...msg, 
+                  isStreaming: false, 
+                  content: finalContent,
+                  transparency: generateTransparencyData()
+                }
+              : msg
+          )
+        );
+        
+        // Call onResponse callback
+        if (onResponse && finalContent) {
+          onResponse(finalContent);
+        }
+      }
+      streamingMessageIdRef.current = null;
+      streamingContentRef.current = "";
+    },
+    onError: (error: string) => {
+      // Display error in the streaming message
+      if (streamingMessageIdRef.current) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === streamingMessageIdRef.current
+              ? { 
+                  ...msg, 
+                  content: `❌ Error: ${error}`,
+                  isStreaming: false 
+                }
+              : msg
+          )
+        );
+      } else {
+        toast({
+          title: "Error",
+          description: error,
+          variant: "destructive",
+        });
+      }
+      streamingMessageIdRef.current = null;
+      streamingContentRef.current = "";
+    },
+  });
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -107,156 +211,41 @@ export function AIAgentChat({
     },
   });
 
-  // WebSocket connection management
-  const connectWebSocket = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return wsRef.current;
-    }
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/ws/ai-stream`);
-
-    ws.onopen = () => {
-      console.log('[AI Chat] WebSocket connected successfully');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        console.log('[AI Chat] Received message:', event.data.substring(0, 100));
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'connected') {
-          console.log('[AI Chat] WebSocket authenticated, userId:', data.userId);
-        } else if (data.type === 'stream_start') {
-          // Create a new assistant message placeholder
-          const messageId = Date.now().toString();
-          streamingMessageIdRef.current = messageId;
-          streamingContentRef.current = "";
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: messageId,
-              role: "assistant",
-              content: "",
-              timestamp: new Date(),
-              isStreaming: true,
-            },
-          ]);
-        } else if (data.type === 'stream_chunk') {
-          // Append chunk to the streaming message
-          if (streamingMessageIdRef.current) {
-            streamingContentRef.current += data.chunk;
-            setMessages((prev) => 
-              prev.map((msg) =>
-                msg.id === streamingMessageIdRef.current
-                  ? { ...msg, content: streamingContentRef.current }
-                  : msg
-              )
-            );
-          }
-        } else if (data.type === 'stream_end') {
-          // Mark streaming as complete
-          if (streamingMessageIdRef.current) {
-            const finalContent = streamingContentRef.current;
-            
-            // Generate AI transparency data (mock for now - will be from backend later)
-            const generateTransparencyData = (): AITransparencyData => {
-              const wordCount = finalContent.split(/\s+/).length;
-              const hasNumbers = /\d/.test(finalContent);
-              const hasStructure = finalContent.includes('\n') || finalContent.includes('•') || finalContent.includes('-');
-              
-              let confidence = 85; // Base confidence
-              if (wordCount > 100) confidence += 5; // Longer responses may be more detailed
-              if (hasNumbers) confidence += 3; // Data-driven responses
-              if (hasStructure) confidence += 2; // Structured output
-              confidence = Math.min(95, confidence); // Cap at 95%
-              
-              return {
-                confidence,
-                reasoning: `Response analyzed for ${wordCount} words of context. ${hasNumbers ? 'Contains data-driven insights. ' : ''}${hasStructure ? 'Uses structured formatting. ' : ''}Note: This is an estimated confidence score. Real AI transparency will be available when backend integration is complete.`,
-                modelUsed: selectedLlmConfig ? llmConfigs.find(c => c.id === selectedLlmConfig)?.model || "AI Model" : "AI Model",
-                isEstimated: true, // TODO: Remove when backend provides real transparency data
-              };
-            };
-            
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageIdRef.current
-                  ? { 
-                      ...msg, 
-                      isStreaming: false, 
-                      content: finalContent,
-                      transparency: generateTransparencyData()
-                    }
-                  : msg
-              )
-            );
-            // Call onResponse with the complete content from ref (not stale closure)
-            if (onResponse && finalContent) {
-              onResponse(finalContent);
-            }
-          }
-          streamingMessageIdRef.current = null;
-          streamingContentRef.current = "";
-          setIsStreaming(false);
-        } else if (data.type === 'error') {
-          // Display error in the streaming message
-          if (streamingMessageIdRef.current) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === streamingMessageIdRef.current
-                  ? { 
-                      ...msg, 
-                      content: `❌ Error: ${data.error || 'Failed to get AI response'}`,
-                      isStreaming: false 
-                    }
-                  : msg
-              )
-            );
-          } else {
-            toast({
-              title: "Error",
-              description: data.error || "Failed to get AI response",
-              variant: "destructive",
-            });
-          }
-          setIsStreaming(false);
-          streamingMessageIdRef.current = null;
-          streamingContentRef.current = "";
+  // Create session when dialog opens
+  useEffect(() => {
+    const createSession = async () => {
+      if (open && !sessionId) {
+        try {
+          const response = await apiRequest('POST', '/api/ai-agent/sessions', {
+            agentSlug: getAgentSlug(agentName),
+            title: `${agentName} Chat`,
+          });
+          setSessionId(response.id);
+        } catch (error) {
+          console.error('[AI Chat] Failed to create session:', error);
+          toast({
+            title: "Error",
+            description: "Failed to initialize chat session",
+            variant: "destructive",
+          });
         }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('[AI Chat] WebSocket error:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to AI streaming service",
-        variant: "destructive",
-      });
-      setIsStreaming(false);
-    };
+    createSession();
+  }, [open, sessionId, agentName, toast]);
 
-    ws.onclose = (event) => {
-      console.log('[AI Chat] WebSocket disconnected - Code:', event.code, 'Reason:', event.reason || 'No reason provided');
-      wsRef.current = null;
-      setIsStreaming(false);
-    };
-
-    wsRef.current = ws;
-    return ws;
-  }, [toast, onResponse, messages]);
-
-  // Cleanup WebSocket on unmount or when dialog closes
+  // Cleanup stream and reset session when dialog closes
   useEffect(() => {
-    if (!open && wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (!open) {
+      cancelStream();
+      // Reset session state for clean reopening
+      setSessionId(null);
+      setMessages([]);
+      streamingMessageIdRef.current = null;
+      streamingContentRef.current = "";
     }
-  }, [open]);
+  }, [open, cancelStream]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -264,16 +253,12 @@ export function AIAgentChat({
     }
   }, [messages]);
 
-  const handleSend = () => {
-    console.log('[AI Chat] handleSend called - input:', input.trim().substring(0, 50), 'isStreaming:', isStreaming);
-    
+  const handleSend = async () => {
     if (!input.trim() || isStreaming) {
-      console.log('[AI Chat] Early return - empty input or already streaming');
       return;
     }
 
     if (!selectedLlmConfig) {
-      console.log('[AI Chat] No LLM config selected');
       toast({
         title: "Configuration Required",
         description: "Please configure an LLM provider in Settings first",
@@ -282,51 +267,52 @@ export function AIAgentChat({
       return;
     }
 
-    console.log('[AI Chat] Creating user message and connecting WebSocket');
+    if (!sessionId) {
+      toast({
+        title: "Session Not Ready",
+        description: "Please wait for chat session to initialize",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Add user message to UI
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
       content: input.trim(),
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
-    setIsStreaming(true);
 
-    // Connect and send via WebSocket
-    console.log('[AI Chat] Calling connectWebSocket()...');
-    const ws = connectWebSocket();
-    console.log('[AI Chat] WebSocket readyState:', ws.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
-    
-    // Wait for connection to open if not already open
-    if (ws.readyState === WebSocket.CONNECTING) {
-      ws.addEventListener('open', () => {
-        ws.send(JSON.stringify({
-          type: 'execute_agent',
-          agentName,
-          input: input.trim(),
-          llmConfigId: selectedLlmConfig,
-          contextData,
-        }));
-      }, { once: true });
-    } else if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'execute_agent',
-        agentName,
-        input: input.trim(),
+    const messageText = input.trim();
+    setInput("");
+
+    // Send message via SSE hook
+    try {
+      await sendMessage({
+        agentSlug: getAgentSlug(agentName),
+        message: messageText,
+        sessionId,
         llmConfigId: selectedLlmConfig,
+        contextType: contextData ? 'custom' : undefined,
+        contextId: contextData?.id,
         contextData,
-      }));
-    } else {
+      });
+    } catch (error) {
+      // Remove streaming placeholder on error
+      if (streamingMessageIdRef.current) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageIdRef.current));
+        streamingMessageIdRef.current = null;
+        streamingContentRef.current = "";
+      }
+      
       toast({
-        title: "Connection Error",
-        description: "Unable to connect to AI service",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
         variant: "destructive",
       });
-      setIsStreaming(false);
     }
-
-    setInput("");
   };
 
   const getAgentDescription = () => {

@@ -15,7 +15,7 @@ const router = Router();
 const streamInitSchema = z.object({
   agentSlug: z.string(),
   message: z.string(),
-  sessionId: z.string(),
+  sessionId: z.string(), // Required for security and audit trail
   llmConfigId: z.string().optional(),
   contextType: z.string().optional(),
   contextId: z.string().optional(),

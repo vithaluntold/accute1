@@ -34,7 +34,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { useAgentWebSocket } from "@/hooks/use-agent-websocket";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
+import { getAgentSlug } from "@/lib/agent-utils";
 import { 
   Bot, 
   Send, 
@@ -126,17 +127,21 @@ export function LucaChatWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   
-  // Initialize WebSocket for streaming with Luca-specific session handling
-  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'luca',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming with Luca-specific session handling
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       const assistantMessage: Message = {
         id: streamingMessageIdRef.current || Date.now().toString(),
         role: "assistant",
@@ -147,13 +152,12 @@ export function LucaChatWidget() {
       
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Save message to session
+      // Note: Assistant message is persisted by SSE backend (no frontend duplication)
+      
+      // Invalidate queries to refresh session data from server
       if (currentSessionId) {
-        addMessageMutation.mutate({
-          sessionId: currentSessionId,
-          role: "assistant",
-          content: fullResponse,
-        });
+        queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions", currentSessionId] });
         
         // Generate title for new chats
         setTimeout(async () => {
@@ -174,8 +178,6 @@ export function LucaChatWidget() {
             console.log('[Luca Chat] Could not auto-generate title:', error);
           }
         }, 1500);
-        
-        queryClient.invalidateQueries({ queryKey: ["/api/luca-chat-sessions"] });
       }
       
       // Clear streaming state
@@ -184,7 +186,7 @@ export function LucaChatWidget() {
       streamingMessageIdRef.current = null;
     },
     onError: (error: string) => {
-      console.error('[Luca WebSocket] Error:', error);
+      console.error('[Luca SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -494,6 +496,7 @@ export function LucaChatWidget() {
     if (!sessionId) {
       const newSession = await createSessionMutation.mutateAsync("New Chat");
       sessionId = newSession.id;
+      setCurrentSessionId(sessionId); // Update state for assistant message persistence
     }
 
     let finalMessage = textToSend;
@@ -514,13 +517,7 @@ export function LucaChatWidget() {
 
     setMessages((prev) => [...prev, userMessage]);
     
-    if (sessionId) {
-      addMessageMutation.mutate({
-        sessionId,
-        role: "user",
-        content: finalMessage,
-      });
-    }
+    // Note: User message is persisted by SSE backend, no need for frontend duplication
     
     setInput("");
     setAttachedFiles([]);
@@ -530,53 +527,39 @@ export function LucaChatWidget() {
     streamingMessageIdRef.current = messageId;
     streamingResponseRef.current = "";
 
-    // Try WebSocket first
-    const wsSuccess = await sendWebSocketMessage({
-      input: finalMessage,
-      llmConfigId: selectedLlmConfig,
-      lucaSessionId: sessionId,
-    });
+    // Validate session before sending
+    if (!sessionId) {
+      toast({
+        title: "Session Error",
+        description: "Failed to create chat session. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Fallback to HTTP if WebSocket fails
-    if (!wsSuccess) {
-      console.log('[Luca] WebSocket unavailable, using HTTP fallback');
-      try {
-        const response = await fetch("/api/agents/luca/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            message: finalMessage,
-            llmConfigId: selectedLlmConfig,
-            lucaSessionId: sessionId,
-          }),
-        });
-
-        const data = await response.json();
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: data.response,
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
-        
-        if (sessionId) {
-          addMessageMutation.mutate({
-            sessionId,
-            role: "assistant",
-            content: data.response,
-          });
-        }
-      } catch (error) {
-        console.error('[Luca] HTTP fallback failed:', error);
-        toast({
-          title: "Error",
-          description: "Failed to send message. Please try again.",
-          variant: "destructive",
-        });
-      }
+    // Send via SSE
+    try {
+      await sendSSEMessage({
+        agentSlug: getAgentSlug('luca'),
+        message: finalMessage,
+        sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextType: 'luca_session',
+        contextId: sessionId,
+      });
+    } catch (error) {
+      console.error('[Luca] SSE failed:', error);
+      
+      // Clean up streaming state on error
+      setStreamingMessage("");
+      streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
+      
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
     }
 
     setIsExpanded(true);
