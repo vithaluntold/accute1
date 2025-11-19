@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAgentSSE } from "@/hooks/use-agent-sse";
+import { apiRequest } from "@/lib/queryClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -45,10 +46,12 @@ export default function Radar() {
   const [input, setInput] = useState("");
   const [selectedResource, setSelectedResource] = useState<{type: string, id: string} | null>(null);
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
+  const streamingMessageIdRef = useRef<string | null>(null);
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -66,14 +69,33 @@ export default function Radar() {
     }
   }, [llmConfigs, selectedLlmConfig]);
   
-  // Initialize WebSocket for streaming
-  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'radar',
-    onStreamChunk: (chunk: string) => {
+  // Create new session mutation
+  const createSessionMutation = useMutation({
+    mutationFn: async (title: string = "New Chat") => {
+      const payload: any = { title };
+      if (selectedLlmConfig) {
+        payload.llmConfigId = selectedLlmConfig;
+      }
+      const response = await apiRequest("POST", "/api/agents/radar/sessions", payload);
+      return await response.json();
+    },
+    onSuccess: (newSession) => {
+      setCurrentSessionId(newSession.sessionId);
+    },
+  });
+
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       const assistantMessage: Message = {
         role: "assistant",
         content: fullResponse,
@@ -85,9 +107,10 @@ export default function Radar() {
       // Clear streaming state
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
     },
     onError: (error: string) => {
-      console.error('[Radar WebSocket] Error:', error);
+      console.error('[Radar SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -95,6 +118,7 @@ export default function Radar() {
       });
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
     }
   });
 
@@ -137,6 +161,15 @@ export default function Radar() {
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const userMessage: Message = {
       role: "user",
       content: input,
@@ -148,26 +181,44 @@ export default function Radar() {
     setInput("");
     streamingResponseRef.current = "";
 
-    // Try WebSocket first
-    const wsSuccess = await sendWebSocketMessage({
-      input: userInput,
-      llmConfigId: selectedLlmConfig,
-      contextData: {
-        history: messages.slice(-10),
-        assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
-        projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
-      }
-    });
+    // Create session if it doesn't exist
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      const newSession = await createSessionMutation.mutateAsync("New Chat");
+      sessionId = newSession.sessionId;
+      setCurrentSessionId(sessionId);
+    }
 
-    // Fallback to HTTP if WebSocket fails
-    if (!wsSuccess) {
-      console.log('[Radar] WebSocket unavailable, using HTTP fallback');
+    // Use SSE for streaming
+    try {
+      await sendSSEMessage({
+        agentSlug: 'radar',
+        message: userInput,
+        sessionId: sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextData: {
+          history: messages.slice(-10),
+          assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
+          projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
+        }
+      });
+    } catch (error) {
+      console.error('[Radar] SSE streaming failed, using HTTP fallback:', error);
       chatMutation.mutate(userInput);
     }
   };
 
   const handleQuickQuery = async (query: string) => {
     if (isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Add user message immediately
     const userMessage: Message = {
@@ -178,20 +229,29 @@ export default function Radar() {
     setMessages((prev) => [...prev, userMessage]);
     streamingResponseRef.current = "";
     
-    // Try WebSocket first
-    const wsSuccess = await sendWebSocketMessage({
-      input: query,
-      llmConfigId: selectedLlmConfig,
-      contextData: {
-        history: messages.slice(-10),
-        assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
-        projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
-      }
-    });
-
-    // Fallback to HTTP if WebSocket fails
-    if (!wsSuccess) {
-      console.log('[Radar] WebSocket unavailable, using HTTP fallback');
+    // Create session if it doesn't exist
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      const newSession = await createSessionMutation.mutateAsync("New Chat");
+      sessionId = newSession.sessionId;
+      setCurrentSessionId(sessionId);
+    }
+    
+    // Use SSE for streaming
+    try {
+      await sendSSEMessage({
+        agentSlug: 'radar',
+        message: query,
+        sessionId: sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextData: {
+          history: messages.slice(-10),
+          assignmentId: selectedResource?.type === 'assignment' ? selectedResource.id : undefined,
+          projectId: selectedResource?.type === 'project' ? selectedResource.id : undefined,
+        }
+      });
+    } catch (error) {
+      console.error('[Radar] SSE streaming failed, using HTTP fallback:', error);
       chatMutation.mutate(query);
     }
   };

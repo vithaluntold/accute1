@@ -48,6 +48,7 @@ interface GeneratedDocument {
 
 interface AgentSession {
   id: string;
+  sessionId: string;
   name: string;
   agentSlug: string;
   userId: string;
@@ -88,23 +89,29 @@ export default function ParityAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
+  const streamingMessageIdRef = useRef<string | null>(null);
   
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   
-  // Initialize WebSocket for streaming
-  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'parity',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+      setIsLoading(true);
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       try {
         // Parse response for document update
         let document = null;
@@ -141,16 +148,18 @@ export default function ParityAgent() {
         // Clear streaming state
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       } catch (error) {
         console.error('Error handling stream complete:', error);
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       }
     },
     onError: (error: string) => {
-      console.error('WebSocket error:', error);
+      console.error('[Parity SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -158,6 +167,7 @@ export default function ParityAgent() {
       });
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
       setIsLoading(false);
     }
   });
@@ -214,7 +224,7 @@ export default function ParityAgent() {
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/parity/sessions"] });
-      setCurrentSessionId(newSession.id);
+      setCurrentSessionId(newSession.sessionId);
       setMessages([{
         role: "assistant",
         content: "Hi! I'm Parity, your intelligent document generator. What document would you like to create?"
@@ -228,14 +238,14 @@ export default function ParityAgent() {
     const response = await apiRequest("POST", "/api/agents/parity/sessions", { name });
     const newSession = await response.json();
     queryClient.invalidateQueries({ queryKey: ["/api/agents/parity/sessions"] });
-    setCurrentSessionId(newSession.id);
+    setCurrentSessionId(newSession.sessionId);
     return newSession;
   };
 
   // Update session
   const updateSessionMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const response = await apiRequest("PATCH", `/api/agents/parity/sessions/${id}`, { name });
+    mutationFn: async ({ sessionId, name }: { sessionId: string; name: string }) => {
+      const response = await apiRequest("PATCH", `/api/agents/parity/sessions/${sessionId}`, { name });
       return await response.json();
     },
     onSuccess: () => {
@@ -247,13 +257,13 @@ export default function ParityAgent() {
 
   // Delete session
   const deleteSessionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/agents/parity/sessions/${id}`, {});
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest("DELETE", `/api/agents/parity/sessions/${sessionId}`, {});
       return await response.json();
     },
-    onSuccess: (_data, deletedId) => {
+    onSuccess: (_data, deletedSessionId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/parity/sessions"] });
-      if (currentSessionId === deletedId) {
+      if (currentSessionId === deletedSessionId) {
         setCurrentSessionId(null);
         setMessages([{
           role: "assistant",
@@ -304,13 +314,21 @@ export default function ParityAgent() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = { role: "user", content: input };
     const userInput = input; // Save before clearing
     setMessages(prev => [...prev, userMessage]);
     setInput("");
-    setIsLoading(true);
     
     // Reset streaming state
     setStreamingMessage("");
@@ -322,26 +340,27 @@ export default function ParityAgent() {
       if (!sessionId) {
         const sessionName = `Document Session ${new Date().toLocaleDateString()}`;
         const newSession = await createSessionSilently(sessionName);
-        sessionId = newSession.id;
+        sessionId = newSession.sessionId;
       }
 
-      // Try WebSocket streaming first
-      if (isConnected) {
-        console.log('[Parity] Using WebSocket streaming');
-        const sent = await sendWebSocketMessage({
-          input: userInput,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
-        });
-        
-        if (!sent) {
-          throw new Error('Failed to send WebSocket message');
+      // Use SSE for streaming
+      console.log('[Parity] Using SSE streaming with sessionId:', sessionId);
+      await sendSSEMessage({
+        agentSlug: 'parity',
+        message: userInput,
+        sessionId: sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextData: {
+          history: messages,
+          currentDocument: currentDocument,
         }
-        
-        // WebSocket callbacks will handle the streaming response
-        // Don't set isLoading=false here - callbacks handle it
-      } else {
+      });
+    } catch (error) {
+      console.error('[Parity] SSE streaming failed, using HTTP fallback:', error);
+      setIsLoading(true);
+      
+      try {
         // Fallback to HTTP for non-streaming
-        console.log('[Parity] WebSocket not connected, falling back to HTTP');
         const response = await fetch("/api/agents/parity/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -350,7 +369,7 @@ export default function ParityAgent() {
             message: userInput, 
             history: messages,
             currentDocument: currentDocument,
-            ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
+            llmConfigId: selectedLlmConfig
           }),
         });
 
@@ -381,31 +400,18 @@ export default function ParityAgent() {
           setCurrentDocument(data.document);
         }
 
-        // Persist messages to session
-        if (sessionId) {
-          await apiRequest("POST", `/api/agents/parity/sessions/${sessionId}/messages`, {
-            role: "user",
-            content: userInput,
-          });
-          await apiRequest("POST", `/api/agents/parity/sessions/${sessionId}/messages`, {
-            role: "assistant",
-            content: data.response || "No response received",
-            metadata: data.document ? { document: data.document } : {},
-          });
-        }
-        
+        setIsLoading(false);
+      } catch (httpError) {
+        console.error("HTTP fallback error:", httpError);
+        const errorMessage: Message = {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please ensure you have configured your AI provider credentials in Settings > LLM Configuration."
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setStreamingMessage("");
+        streamingResponseRef.current = "";
         setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error:", error);
-      const errorMessage: Message = {
-        role: "assistant",
-        content: "Sorry, I encountered an error. Please ensure you have configured your AI provider credentials in Settings > LLM Configuration."
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setStreamingMessage("");
-      streamingResponseRef.current = "";
-      setIsLoading(false);
     }
   };
 
@@ -612,21 +618,21 @@ export default function ParityAgent() {
                   <div className="p-2 space-y-1">
                     {sessions.map((session) => (
                       <div
-                        key={session.id}
+                        key={session.sessionId}
                         className={`group p-2 rounded-md cursor-pointer hover-elevate ${
-                          currentSessionId === session.id ? "bg-accent" : ""
+                          currentSessionId === session.sessionId ? "bg-accent" : ""
                         }`}
-                        onClick={() => setCurrentSessionId(session.id)}
-                        data-testid={`session-${session.id}`}
+                        onClick={() => setCurrentSessionId(session.sessionId)}
+                        data-testid={`session-${session.sessionId}`}
                       >
-                        {editingSessionId === session.id ? (
+                        {editingSessionId === session.sessionId ? (
                           <div className="flex items-center gap-1">
                             <Input
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                                  updateSessionMutation.mutate({ sessionId: session.sessionId, name: editingTitle });
                                 } else if (e.key === "Escape") {
                                   setEditingSessionId(null);
                                 }
@@ -638,7 +644,7 @@ export default function ParityAgent() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
-                            <span className="text-xs truncate flex-1">{session.name}</span>
+                            <span className="text-xs truncate flex-1">{session.title || session.name || "Untitled"}</span>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
                               <Button
                                 size="icon"
@@ -646,8 +652,8 @@ export default function ParityAgent() {
                                 className="h-6 w-6"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingSessionId(session.id);
-                                  setEditingTitle(session.name);
+                                  setEditingSessionId(session.sessionId);
+                                  setEditingTitle(session.title || session.name || "");
                                 }}
                                 data-testid="button-edit-session"
                               >
@@ -660,7 +666,7 @@ export default function ParityAgent() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (confirm("Delete this session?")) {
-                                    deleteSessionMutation.mutate(session.id);
+                                    deleteSessionMutation.mutate(session.sessionId);
                                   }
                                 }}
                                 data-testid="button-delete-session"
@@ -774,7 +780,21 @@ export default function ParityAgent() {
                 </div>
               ))}
               
-              {isLoading && (
+              {streamingMessage && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex items-start">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                  <div className="rounded-lg px-4 py-2.5 bg-muted max-w-[80%]">
+                    <p className="text-sm whitespace-pre-wrap">{streamingMessage}</p>
+                    <p className="text-xs mt-2 text-muted-foreground">Streaming...</p>
+                  </div>
+                </div>
+              )}
+              
+              {isLoading && !streamingMessage && (
                 <div className="flex gap-3 justify-start">
                   <div className="flex items-start">
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex-shrink-0">
@@ -811,7 +831,7 @@ export default function ParityAgent() {
               />
               <Button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
+                disabled={isLoading || isStreaming}
                 variant="outline"
                 size="icon"
                 title="Upload document to analyze"
@@ -823,13 +843,13 @@ export default function ParityAgent() {
                 placeholder="Describe the document you need..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
-                disabled={isLoading}
+                onKeyDown={(e) => e.key === "Enter" && !isLoading && !isStreaming && sendMessage()}
+                disabled={isLoading || isStreaming}
                 data-testid="input-parity-message"
               />
               <Button 
                 onClick={sendMessage} 
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || isStreaming || !input.trim()}
                 size="icon"
                 data-testid="button-send-message"
               >

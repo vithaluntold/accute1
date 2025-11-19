@@ -55,7 +55,9 @@ interface Step {
 
 interface AgentSession {
   id: string;
-  name: string;
+  sessionId: string; // Unique session identifier for SSE streaming
+  name?: string;
+  title?: string;
   agentSlug: string;
   userId: string;
   organizationId: string;
@@ -92,7 +94,7 @@ export default function CadenceAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
   const pendingUserInputRef = useRef<string>("");
@@ -103,14 +105,17 @@ export default function CadenceAgent() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Initialize WebSocket for streaming
-  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'cadence',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming } = useAgentSSE({
+    onStreamStart: () => {
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       try {
         // Parse response for workflow update
         let workflowUpdate = null;
@@ -183,7 +188,7 @@ export default function CadenceAgent() {
       }
     },
     onError: (error: string) => {
-      console.error('WebSocket error:', error);
+      console.error('[Cadence SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -196,13 +201,6 @@ export default function CadenceAgent() {
       pendingSessionIdRef.current = null;
       pendingWorkflowUpdateRef.current = null;
       setIsLoading(false);
-    },
-    onClose: () => {
-      // Clear all pending refs when WebSocket closes unexpectedly (mid-stream disconnect)
-      console.log('[Cadence] WebSocket closed - clearing pending state');
-      pendingUserInputRef.current = "";
-      pendingSessionIdRef.current = null;
-      pendingWorkflowUpdateRef.current = null;
     }
   });
 
@@ -248,13 +246,13 @@ export default function CadenceAgent() {
 
   // Create new session (explicit creation via UI button)
   const createSessionMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", "/api/agents/cadence/sessions", { name });
+    mutationFn: async (title: string) => {
+      const response = await apiRequest("POST", "/api/agents/cadence/sessions", { title });
       return await response.json();
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
-      setCurrentSessionId(newSession.id);
+      setCurrentSessionId(newSession.sessionId); // Use sessionId field for SSE streaming
       setMessages([{
         role: "assistant",
         content: "Hi! I'm Cadence, your workflow builder. What workflow would you like to create?"
@@ -264,18 +262,18 @@ export default function CadenceAgent() {
   });
 
   // Create session implicitly (for sendMessage without resetting messages)
-  const createSessionSilently = async (name: string) => {
-    const response = await apiRequest("POST", "/api/agents/cadence/sessions", { name });
+  const createSessionSilently = async (title: string) => {
+    const response = await apiRequest("POST", "/api/agents/cadence/sessions", { title });
     const newSession = await response.json();
     queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
-    setCurrentSessionId(newSession.id);
+    setCurrentSessionId(newSession.sessionId); // Use sessionId field for SSE streaming
     return newSession;
   };
 
   // Update session
   const updateSessionMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const response = await apiRequest("PATCH", `/api/agents/cadence/sessions/${id}`, { name });
+    mutationFn: async ({ sessionId, title }: { sessionId: string; title: string }) => {
+      const response = await apiRequest("PATCH", `/api/agents/cadence/sessions/${sessionId}`, { title });
       return await response.json();
     },
     onSuccess: () => {
@@ -287,13 +285,13 @@ export default function CadenceAgent() {
 
   // Delete session
   const deleteSessionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/agents/cadence/sessions/${id}`, {});
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest("DELETE", `/api/agents/cadence/sessions/${sessionId}`, {});
       return await response.json();
     },
-    onSuccess: (_data, deletedId) => {
+    onSuccess: (_data, deletedSessionId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/cadence/sessions"] });
-      if (currentSessionId === deletedId) {
+      if (currentSessionId === deletedSessionId) {
         setCurrentSessionId(null);
         setMessages([{
           role: "assistant",
@@ -344,7 +342,16 @@ export default function CadenceAgent() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = { role: "user", content: input };
     const userInput = input; // Save before clearing
@@ -360,32 +367,30 @@ export default function CadenceAgent() {
       // Create session if needed
       let sessionId = currentSessionId;
       if (!sessionId) {
-        const sessionName = `Workflow Session ${new Date().toLocaleDateString()}`;
-        const newSession = await createSessionSilently(sessionName);
-        sessionId = newSession.id;
+        const sessionTitle = `Workflow Session ${new Date().toLocaleDateString()}`;
+        const newSession = await createSessionSilently(sessionTitle);
+        sessionId = newSession.sessionId; // Use sessionId field for SSE streaming
       }
 
-      // Try WebSocket streaming first
-      if (isConnected) {
-        console.log('[Cadence] Using WebSocket streaming');
-        
-        // Store session data for post-stream persistence
-        pendingUserInputRef.current = userInput;
-        pendingSessionIdRef.current = sessionId;
-        
-        const sent = await sendWebSocketMessage({
-          input: userInput,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
+      // Store session data for post-stream persistence
+      pendingUserInputRef.current = userInput;
+      pendingSessionIdRef.current = sessionId;
+
+      // Use SSE for streaming with real database session ID
+      try {
+        await sendSSEMessage({
+          agentSlug: 'cadence',
+          message: userInput,
+          sessionId: sessionId,
+          llmConfigId: selectedLlmConfig,
+          contextData: {
+            history: messages,
+            currentWorkflow: workflowState,
+          }
         });
-        
-        if (!sent) {
-          throw new Error('Failed to send WebSocket message');
-        }
-        
-        // WebSocket onStreamComplete callback will persist messages to agent session
-      } else {
+      } catch (error) {
+        console.error('[Cadence] SSE streaming failed, using HTTP fallback:', error);
         // Fallback to HTTP for non-streaming
-        console.log('[Cadence] WebSocket not connected, falling back to HTTP');
         const response = await fetch("/api/agents/cadence/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -394,7 +399,7 @@ export default function CadenceAgent() {
             message: userInput, 
             history: messages,
             currentWorkflow: workflowState,
-            ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig })
+            llmConfigId: selectedLlmConfig
           }),
         });
 
@@ -557,21 +562,21 @@ export default function CadenceAgent() {
                   <div className="p-2 space-y-1">
                     {sessions.map((session) => (
                       <div
-                        key={session.id}
+                        key={session.sessionId}
                         className={`group p-2 rounded-md cursor-pointer hover-elevate ${
-                          currentSessionId === session.id ? "bg-accent" : ""
+                          currentSessionId === session.sessionId ? "bg-accent" : ""
                         }`}
-                        onClick={() => setCurrentSessionId(session.id)}
-                        data-testid={`session-${session.id}`}
+                        onClick={() => setCurrentSessionId(session.sessionId)}
+                        data-testid={`session-${session.sessionId}`}
                       >
-                        {editingSessionId === session.id ? (
+                        {editingSessionId === session.sessionId ? (
                           <div className="flex items-center gap-1">
                             <Input
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                                  updateSessionMutation.mutate({ sessionId: session.sessionId, title: editingTitle });
                                 } else if (e.key === "Escape") {
                                   setEditingSessionId(null);
                                 }
@@ -583,7 +588,7 @@ export default function CadenceAgent() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between">
-                            <span className="text-xs truncate flex-1">{session.name}</span>
+                            <span className="text-xs truncate flex-1">{session.title || session.name || "Untitled"}</span>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
                               <Button
                                 size="icon"
@@ -591,8 +596,8 @@ export default function CadenceAgent() {
                                 className="h-6 w-6"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingSessionId(session.id);
-                                  setEditingTitle(session.name);
+                                  setEditingSessionId(session.sessionId);
+                                  setEditingTitle(session.title || session.name || "");
                                 }}
                                 data-testid="button-edit-session"
                               >
@@ -605,7 +610,7 @@ export default function CadenceAgent() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (confirm("Delete this session?")) {
-                                    deleteSessionMutation.mutate(session.id);
+                                    deleteSessionMutation.mutate(session.sessionId);
                                   }
                                 }}
                                 data-testid="button-delete-session"

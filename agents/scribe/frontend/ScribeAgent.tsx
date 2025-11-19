@@ -35,6 +35,7 @@ interface EmailTemplate {
 
 interface AgentSession {
   id: string;
+  sessionId: string;
   name: string;
   agentSlug: string;
   userId: string;
@@ -61,9 +62,10 @@ export default function ScribeAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
+  const streamingMessageIdRef = useRef<string | null>(null);
   
   // Marketplace template state
   const [marketplaceTemplateId, setMarketplaceTemplateId] = useState<string | null>(null);
@@ -76,14 +78,19 @@ export default function ScribeAgent() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Initialize WebSocket for streaming
-  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'scribe',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+      setIsLoading(true);
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       try {
         // Parse response for template update
         let templateUpdate = null;
@@ -120,16 +127,18 @@ export default function ScribeAgent() {
         // Clear streaming state
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       } catch (error) {
         console.error('Error handling stream complete:', error);
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       }
     },
     onError: (error: string) => {
-      console.error('WebSocket error:', error);
+      console.error('[Scribe SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -137,6 +146,7 @@ export default function ScribeAgent() {
       });
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
       setIsLoading(false);
     }
   });
@@ -185,7 +195,7 @@ export default function ScribeAgent() {
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/scribe/sessions"] });
-      setCurrentSessionId(newSession.id);
+      setCurrentSessionId(newSession.sessionId);
       setMessages([{
         role: "assistant",
         content: "Hi! I'm Scribe. What email template would you like to create?"
@@ -194,18 +204,10 @@ export default function ScribeAgent() {
     },
   });
 
-  const createSessionSilently = async (name: string) => {
-    const response = await apiRequest("POST", "/api/agents/scribe/sessions", { name });
-    const newSession = await response.json();
-    queryClient.invalidateQueries({ queryKey: ["/api/agents/scribe/sessions"] });
-    setCurrentSessionId(newSession.id);
-    return newSession;
-  };
-
   // Update session
   const updateSessionMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const response = await apiRequest("PATCH", `/api/agents/scribe/sessions/${id}`, { name });
+    mutationFn: async ({ sessionId, name }: { sessionId: string; name: string }) => {
+      const response = await apiRequest("PATCH", `/api/agents/scribe/sessions/${sessionId}`, { name });
       return await response.json();
     },
     onSuccess: () => {
@@ -217,13 +219,13 @@ export default function ScribeAgent() {
 
   // Delete session
   const deleteSessionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/agents/scribe/sessions/${id}`, {});
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest("DELETE", `/api/agents/scribe/sessions/${sessionId}`, {});
       return await response.json();
     },
-    onSuccess: (_data, deletedId) => {
+    onSuccess: (_data, deletedSessionId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/scribe/sessions"] });
-      if (currentSessionId === deletedId) {
+      if (currentSessionId === deletedSessionId) {
         setCurrentSessionId(null);
         setMessages([{
           role: "assistant",
@@ -272,13 +274,21 @@ export default function ScribeAgent() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = { role: "user", content: input };
     const userInput = input;
     setMessages(prev => [...prev, userMessage]);
     setInput("");
-    setIsLoading(true);
     
     // Reset streaming state
     setStreamingMessage("");
@@ -287,66 +297,67 @@ export default function ScribeAgent() {
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
-        const sessionName = `Email Template ${new Date().toLocaleDateString()}`;
-        const newSession = await createSessionSilently(sessionName);
-        sessionId = newSession.id;
+        const newSession = await createSessionMutation.mutateAsync("New Chat");
+        sessionId = newSession.sessionId;
+        setCurrentSessionId(sessionId);
       }
 
-      // Try WebSocket streaming first
-      if (isConnected) {
-        console.log('[Scribe] Using WebSocket streaming');
-        const sent = await sendWebSocketMessage({
-          input: userInput,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
+      // Use SSE for streaming
+      console.log('[Scribe] Using SSE streaming with sessionId:', sessionId);
+      try {
+        await sendSSEMessage({
+          agentSlug: 'scribe',
+          message: userInput,
+          sessionId: sessionId,
+          llmConfigId: selectedLlmConfig,
+          contextData: {
+            history: messages,
+            currentTemplate,
+          }
         });
-        
-        if (!sent) {
-          throw new Error('Failed to send WebSocket message');
-        }
-        
-        // WebSocket callbacks will handle the streaming response
-        // Don't set isLoading=false here - callbacks handle it
-      } else {
+      } catch (sseError) {
         // Fallback to HTTP for non-streaming
-        console.log('[Scribe] WebSocket not connected, falling back to HTTP');
+        console.error('[Scribe] SSE streaming failed, falling back to HTTP:', sseError);
+        setIsLoading(true);
+        
         const response = await fetch("/api/agents/scribe/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ 
-          message: userInput, 
-          history: messages,
-          currentTemplate,
-          llmConfigId: selectedLlmConfig
-        }),
-      });
-
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        templateUpdate: data.templateUpdate
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      if (data.templateUpdate) {
-        setCurrentTemplate(data.templateUpdate);
-      }
-
-      if (sessionId) {
-        await apiRequest("POST", `/api/agents/scribe/sessions/${sessionId}/messages`, {
-          role: "user",
-          content: userInput,
+            message: userInput, 
+            history: messages,
+            currentTemplate,
+            llmConfigId: selectedLlmConfig
+          }),
         });
-        await apiRequest("POST", `/api/agents/scribe/sessions/${sessionId}/messages`, {
-          role: "assistant",
+
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
           content: data.response,
-          metadata: data.templateUpdate ? { templateUpdate: data.templateUpdate } : {},
-        });
-      }
-      
-      setIsLoading(false);
+          templateUpdate: data.templateUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (data.templateUpdate) {
+          setCurrentTemplate(data.templateUpdate);
+        }
+
+        if (sessionId) {
+          await apiRequest("POST", `/api/agents/scribe/sessions/${sessionId}/messages`, {
+            role: "user",
+            content: userInput,
+          });
+          await apiRequest("POST", `/api/agents/scribe/sessions/${sessionId}/messages`, {
+            role: "assistant",
+            content: data.response,
+            metadata: data.templateUpdate ? { templateUpdate: data.templateUpdate } : {},
+          });
+        }
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -459,20 +470,20 @@ export default function ScribeAgent() {
               <div className="p-2 space-y-1">
                 {sessions.map((session) => (
                   <div
-                    key={session.id}
+                    key={session.sessionId}
                     className={`group p-2 rounded-md cursor-pointer hover-elevate ${
-                      currentSessionId === session.id ? "bg-accent" : ""
+                      currentSessionId === session.sessionId ? "bg-accent" : ""
                     }`}
-                    onClick={() => setCurrentSessionId(session.id)}
-                    data-testid={`session-${session.id}`}
+                    onClick={() => setCurrentSessionId(session.sessionId)}
+                    data-testid={`session-${session.sessionId}`}
                   >
-                    {editingSessionId === session.id ? (
+                    {editingSessionId === session.sessionId ? (
                       <Input
                         value={editingTitle}
                         onChange={(e) => setEditingTitle(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                            updateSessionMutation.mutate({ sessionId: session.sessionId, name: editingTitle });
                           } else if (e.key === "Escape") {
                             setEditingSessionId(null);
                           }
@@ -491,10 +502,10 @@ export default function ScribeAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingSessionId(session.id);
+                              setEditingSessionId(session.sessionId);
                               setEditingTitle(session.name);
                             }}
-                            data-testid={`button-edit-session-${session.id}`}
+                            data-testid={`button-edit-session-${session.sessionId}`}
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
@@ -504,9 +515,9 @@ export default function ScribeAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteSessionMutation.mutate(session.id);
+                              deleteSessionMutation.mutate(session.sessionId);
                             }}
-                            data-testid={`button-delete-session-${session.id}`}
+                            data-testid={`button-delete-session-${session.sessionId}`}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -587,6 +598,21 @@ export default function ScribeAgent() {
                     </div>
                   </div>
                 ))}
+                {streamingMessage && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg p-3 max-w-[80%]">
+                      <div className="text-sm whitespace-pre-wrap">{streamingMessage}</div>
+                      <p className="text-xs mt-2 opacity-70">Streaming...</p>
+                    </div>
+                  </div>
+                )}
+                {isLoading && !isStreaming && !streamingMessage && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg p-3">
+                      <p className="text-sm">Building your email template...</p>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
@@ -598,12 +624,12 @@ export default function ScribeAgent() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                   placeholder="Describe the email template you need..."
-                  disabled={isLoading}
+                  disabled={isLoading || isStreaming}
                   data-testid="input-message"
                 />
                 <Button 
                   onClick={sendMessage} 
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || isStreaming || !input.trim()}
                   data-testid="button-send"
                 >
                   <Send className="h-4 w-4" />

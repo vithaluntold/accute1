@@ -34,6 +34,7 @@ interface MessageTemplate {
 
 interface AgentSession {
   id: string;
+  sessionId: string;
   name: string;
   agentSlug: string;
   userId: string;
@@ -60,9 +61,10 @@ export default function EchoAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
+  const streamingMessageIdRef = useRef<string | null>(null);
   
   // Marketplace template state
   const [marketplaceTemplateId, setMarketplaceTemplateId] = useState<string | null>(null);
@@ -75,14 +77,18 @@ export default function EchoAgent() {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Initialize WebSocket for streaming
-  const { isConnected, sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'echo',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       try {
         // Parse response for template update
         let templateUpdate = null;
@@ -119,16 +125,18 @@ export default function EchoAgent() {
         // Clear streaming state
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       } catch (error) {
         console.error('Error handling stream complete:', error);
         setStreamingMessage("");
         streamingResponseRef.current = "";
+        streamingMessageIdRef.current = null;
         setIsLoading(false);
       }
     },
     onError: (error: string) => {
-      console.error('WebSocket error:', error);
+      console.error('[Echo SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -136,6 +144,7 @@ export default function EchoAgent() {
       });
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
       setIsLoading(false);
     }
   });
@@ -178,13 +187,13 @@ export default function EchoAgent() {
 
   // Create new session
   const createSessionMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", "/api/agents/echo/sessions", { name });
+    mutationFn: async (title: string) => {
+      const response = await apiRequest("POST", "/api/agents/echo/sessions", { title });
       return await response.json();
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/echo/sessions"] });
-      setCurrentSessionId(newSession.id);
+      setCurrentSessionId(newSession.sessionId);
       setMessages([{
         role: "assistant",
         content: "Hi! I'm Echo. What message template would you like to create?"
@@ -193,11 +202,11 @@ export default function EchoAgent() {
     },
   });
 
-  const createSessionSilently = async (name: string) => {
-    const response = await apiRequest("POST", "/api/agents/echo/sessions", { name });
+  const createSessionSilently = async (title: string) => {
+    const response = await apiRequest("POST", "/api/agents/echo/sessions", { title });
     const newSession = await response.json();
     queryClient.invalidateQueries({ queryKey: ["/api/agents/echo/sessions"] });
-    setCurrentSessionId(newSession.id);
+    setCurrentSessionId(newSession.sessionId);
     return newSession;
   };
 
@@ -271,7 +280,16 @@ export default function EchoAgent() {
   };
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const userMessage: Message = { role: "user", content: input };
     const userInput = input;
@@ -286,66 +304,64 @@ export default function EchoAgent() {
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
-        const sessionName = `Message Template ${new Date().toLocaleDateString()}`;
-        const newSession = await createSessionSilently(sessionName);
-        sessionId = newSession.id;
+        const sessionTitle = `Message Template ${new Date().toLocaleDateString()}`;
+        const newSession = await createSessionSilently(sessionTitle);
+        sessionId = newSession.sessionId;
       }
 
-      // Try WebSocket streaming first
-      if (isConnected) {
-        console.log('[Echo] Using WebSocket streaming');
-        const sent = await sendWebSocketMessage({
-          input: userInput,
-          ...(selectedLlmConfig && { llmConfigId: selectedLlmConfig }),
+      // Use SSE for streaming
+      try {
+        await sendSSEMessage({
+          agentSlug: 'echo',
+          message: userInput,
+          sessionId: sessionId,
+          llmConfigId: selectedLlmConfig,
+          contextData: {
+            history: messages,
+            currentTemplate,
+          }
         });
-        
-        if (!sent) {
-          throw new Error('Failed to send WebSocket message');
-        }
-        
-        // WebSocket callbacks will handle the streaming response
-        // Don't set isLoading=false here - callbacks handle it
-      } else {
+      } catch (error) {
+        console.error('[Echo] SSE streaming failed, using HTTP fallback:', error);
         // Fallback to HTTP for non-streaming
-        console.log('[Echo] WebSocket not connected, falling back to HTTP');
         const response = await fetch("/api/agents/echo/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ 
             message: userInput, 
-          history: messages,
-          currentTemplate,
-          llmConfigId: selectedLlmConfig
-        }),
-      });
-
-      const data = await response.json();
-      const assistantMessage: Message = { 
-        role: "assistant", 
-        content: data.response,
-        templateUpdate: data.templateUpdate
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      if (data.templateUpdate) {
-        setCurrentTemplate(data.templateUpdate);
-      }
-
-      if (sessionId) {
-        await apiRequest("POST", `/api/agents/echo/sessions/${sessionId}/messages`, {
-          role: "user",
-          content: userInput,
+            history: messages,
+            currentTemplate,
+            llmConfigId: selectedLlmConfig
+          }),
         });
-        await apiRequest("POST", `/api/agents/echo/sessions/${sessionId}/messages`, {
-          role: "assistant",
+
+        const data = await response.json();
+        const assistantMessage: Message = { 
+          role: "assistant", 
           content: data.response,
-          metadata: data.templateUpdate ? { templateUpdate: data.templateUpdate } : {},
-        });
-      }
-      
-      setIsLoading(false);
+          templateUpdate: data.templateUpdate
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        if (data.templateUpdate) {
+          setCurrentTemplate(data.templateUpdate);
+        }
+
+        if (sessionId) {
+          await apiRequest("POST", `/api/agents/echo/sessions/${sessionId}/messages`, {
+            role: "user",
+            content: userInput,
+          });
+          await apiRequest("POST", `/api/agents/echo/sessions/${sessionId}/messages`, {
+            role: "assistant",
+            content: data.response,
+            metadata: data.templateUpdate ? { templateUpdate: data.templateUpdate } : {},
+          });
+        }
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error:", error);
@@ -458,20 +474,20 @@ export default function EchoAgent() {
               <div className="p-2 space-y-1">
                 {sessions.map((session) => (
                   <div
-                    key={session.id}
+                    key={session.sessionId}
                     className={`group p-2 rounded-md cursor-pointer hover-elevate ${
-                      currentSessionId === session.id ? "bg-accent" : ""
+                      currentSessionId === session.sessionId ? "bg-accent" : ""
                     }`}
-                    onClick={() => setCurrentSessionId(session.id)}
-                    data-testid={`session-${session.id}`}
+                    onClick={() => setCurrentSessionId(session.sessionId)}
+                    data-testid={`session-${session.sessionId}`}
                   >
-                    {editingSessionId === session.id ? (
+                    {editingSessionId === session.sessionId ? (
                       <Input
                         value={editingTitle}
                         onChange={(e) => setEditingTitle(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                            updateSessionMutation.mutate({ id: session.sessionId, name: editingTitle });
                           } else if (e.key === "Escape") {
                             setEditingSessionId(null);
                           }
@@ -490,10 +506,10 @@ export default function EchoAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingSessionId(session.id);
+                              setEditingSessionId(session.sessionId);
                               setEditingTitle(session.name);
                             }}
-                            data-testid={`button-edit-session-${session.id}`}
+                            data-testid={`button-edit-session-${session.sessionId}`}
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
@@ -503,9 +519,9 @@ export default function EchoAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteSessionMutation.mutate(session.id);
+                              deleteSessionMutation.mutate(session.sessionId);
                             }}
-                            data-testid={`button-delete-session-${session.id}`}
+                            data-testid={`button-delete-session-${session.sessionId}`}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -586,6 +602,21 @@ export default function EchoAgent() {
                     </div>
                   </div>
                 ))}
+                {streamingMessage && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg p-3 max-w-[80%]">
+                      <div className="text-sm whitespace-pre-wrap">{streamingMessage}</div>
+                      <p className="text-xs mt-2 opacity-70">Streaming...</p>
+                    </div>
+                  </div>
+                )}
+                {isLoading && !isStreaming && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg p-3">
+                      <p className="text-sm">Building your template...</p>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
@@ -597,12 +628,12 @@ export default function EchoAgent() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                   placeholder="Describe the message template you need..."
-                  disabled={isLoading}
+                  disabled={isStreaming || isLoading}
                   data-testid="input-message"
                 />
                 <Button 
                   onClick={sendMessage} 
-                  disabled={isLoading || !input.trim()}
+                  disabled={isStreaming || isLoading || !input.trim()}
                   data-testid="button-send"
                 >
                   <Send className="h-4 w-4" />

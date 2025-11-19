@@ -37,7 +37,9 @@ interface TaskExtraction {
 
 interface AgentSession {
   id: string;
-  name: string;
+  sessionId: string; // Unique session identifier for SSE
+  name?: string;
+  title?: string;
   agentSlug: string;
   userId: string;
   organizationId: string;
@@ -63,21 +65,24 @@ export default function LynkAgent() {
   // LLM configuration state
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
   
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Initialize WebSocket for streaming
-  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'lynk',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming } = useAgentSSE({
+    onStreamStart: () => {
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       // Parse response for task extraction
       let taskExtraction = null;
       let responseText = fullResponse;
@@ -122,7 +127,7 @@ export default function LynkAgent() {
       setIsLoading(false);
     },
     onError: (error: string) => {
-      console.error('[Lynk WebSocket] Error:', error);
+      console.error('[Lynk SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -158,13 +163,13 @@ export default function LynkAgent() {
 
   // Create new session
   const createSessionMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const response = await apiRequest("POST", "/api/agents/lynk/sessions", { name });
+    mutationFn: async (title: string) => {
+      const response = await apiRequest("POST", "/api/agents/lynk/sessions", { title });
       return await response.json();
     },
     onSuccess: (newSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/lynk/sessions"] });
-      setCurrentSessionId(newSession.id);
+      setCurrentSessionId(newSession.sessionId); // Use sessionId field, not id
       setMessages([{
         role: "assistant",
         content: "Hi! I'm Lynk. Share a client message or describe a task to get started."
@@ -173,11 +178,11 @@ export default function LynkAgent() {
     },
   });
 
-  const createSessionSilently = async (name: string) => {
-    const response = await apiRequest("POST", "/api/agents/lynk/sessions", { name });
+  const createSessionSilently = async (title: string) => {
+    const response = await apiRequest("POST", "/api/agents/lynk/sessions", { title });
     const newSession = await response.json();
     queryClient.invalidateQueries({ queryKey: ["/api/agents/lynk/sessions"] });
-    setCurrentSessionId(newSession.id);
+    setCurrentSessionId(newSession.sessionId); // Use sessionId field, not id
     return newSession;
   };
 
@@ -196,13 +201,13 @@ export default function LynkAgent() {
 
   // Delete session
   const deleteSessionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/agents/lynk/sessions/${id}`, {});
+    mutationFn: async (sessionId: string) => {
+      const response = await apiRequest("DELETE", `/api/agents/lynk/sessions/${sessionId}`, {});
       return await response.json();
     },
-    onSuccess: (_data, deletedId) => {
+    onSuccess: (_data, deletedSessionId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agents/lynk/sessions"] });
-      if (currentSessionId === deletedId) {
+      if (currentSessionId === deletedSessionId) {
         setCurrentSessionId(null);
         setMessages([{
           role: "assistant",
@@ -263,9 +268,9 @@ export default function LynkAgent() {
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
-        const sessionName = `Message Session ${new Date().toLocaleDateString()}`;
-        const newSession = await createSessionSilently(sessionName);
-        sessionId = newSession.id;
+        const sessionTitle = `Message Session ${new Date().toLocaleDateString()}`;
+        const newSession = await createSessionSilently(sessionTitle);
+        sessionId = newSession.sessionId; // Use sessionId field, not id
       }
 
       // Save user message to session
@@ -276,20 +281,21 @@ export default function LynkAgent() {
         });
       }
 
-      // Try WebSocket first
-      const wsSuccess = await sendWebSocketMessage({
-        input: userInput,
-        llmConfigId: selectedLlmConfig,
-        conversationId: sessionId,
-        contextData: {
-          history: messages,
-          messageContent: userInput.length > 100 ? userInput : undefined,
-        }
-      });
-
-      // Fallback to HTTP if WebSocket fails
-      if (!wsSuccess) {
-        console.log('[Lynk] WebSocket unavailable, using HTTP fallback');
+      // Use SSE for streaming with real database sessionId
+      try {
+        await sendSSEMessage({
+          agentSlug: 'lynk',
+          message: userInput,
+          sessionId: sessionId, // Real database sessionId
+          llmConfigId: selectedLlmConfig,
+          contextData: {
+            history: messages,
+            messageContent: userInput.length > 100 ? userInput : undefined,
+          }
+        });
+      } catch (sseError) {
+        // Fallback to HTTP if SSE fails
+        console.log('[Lynk] SSE unavailable, using HTTP fallback');
         const response = await fetch("/api/agents/lynk/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -407,20 +413,20 @@ export default function LynkAgent() {
               <div className="p-2 space-y-1">
                 {sessions.map((session) => (
                   <div
-                    key={session.id}
+                    key={session.sessionId}
                     className={`group p-2 rounded-md cursor-pointer hover-elevate ${
-                      currentSessionId === session.id ? "bg-accent" : ""
+                      currentSessionId === session.sessionId ? "bg-accent" : ""
                     }`}
-                    onClick={() => setCurrentSessionId(session.id)}
-                    data-testid={`session-${session.id}`}
+                    onClick={() => setCurrentSessionId(session.sessionId)}
+                    data-testid={`session-${session.sessionId}`}
                   >
-                    {editingSessionId === session.id ? (
+                    {editingSessionId === session.sessionId ? (
                       <Input
                         value={editingTitle}
                         onChange={(e) => setEditingTitle(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            updateSessionMutation.mutate({ id: session.id, name: editingTitle });
+                            updateSessionMutation.mutate({ id: session.sessionId, name: editingTitle });
                           } else if (e.key === "Escape") {
                             setEditingSessionId(null);
                           }
@@ -431,7 +437,7 @@ export default function LynkAgent() {
                       />
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs truncate flex-1">{session.name}</span>
+                        <span className="text-xs truncate flex-1">{session.title || session.name || "Untitled"}</span>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
                           <Button
                             size="icon"
@@ -439,10 +445,10 @@ export default function LynkAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingSessionId(session.id);
-                              setEditingTitle(session.name);
+                              setEditingSessionId(session.sessionId);
+                              setEditingTitle(session.title || session.name || "");
                             }}
-                            data-testid={`button-edit-session-${session.id}`}
+                            data-testid={`button-edit-session-${session.sessionId}`}
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
@@ -452,9 +458,9 @@ export default function LynkAgent() {
                             className="h-6 w-6"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteSessionMutation.mutate(session.id);
+                              deleteSessionMutation.mutate(session.sessionId);
                             }}
-                            data-testid={`button-delete-session-${session.id}`}
+                            data-testid={`button-delete-session-${session.sessionId}`}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>

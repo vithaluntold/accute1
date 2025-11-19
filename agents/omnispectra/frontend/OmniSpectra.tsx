@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAgentSSE } from "@/hooks/use-agent-sse";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Select,
   SelectContent,
@@ -39,10 +40,12 @@ export default function OmniSpectra() {
     "What are the current bottlenecks?",
   ]);
   const [selectedLlmConfig, setSelectedLlmConfig] = useState<string>("");
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
-  // WebSocket streaming state
+  // SSE streaming state
   const [streamingMessage, setStreamingMessage] = useState<string>("");
   const streamingResponseRef = useRef<string>("");
+  const streamingMessageIdRef = useRef<string | null>(null);
 
   // Fetch available LLM configurations
   const { data: llmConfigs = [] } = useQuery<any[]>({
@@ -60,14 +63,18 @@ export default function OmniSpectra() {
     }
   }, [llmConfigs, selectedLlmConfig]);
   
-  // Initialize WebSocket for streaming
-  const { sendMessage: sendWebSocketMessage, isStreaming } = useAgentWebSocket({
-    agentName: 'omnispectra',
-    onStreamChunk: (chunk: string) => {
+  // Initialize SSE for streaming
+  const { sendMessage: sendSSEMessage, isStreaming, cancelStream } = useAgentSSE({
+    onStreamStart: () => {
+      streamingMessageIdRef.current = Date.now().toString();
+      streamingResponseRef.current = "";
+      setStreamingMessage("");
+    },
+    onChunk: (chunk: string) => {
       streamingResponseRef.current += chunk;
       setStreamingMessage(streamingResponseRef.current);
     },
-    onStreamComplete: async (fullResponse: string) => {
+    onComplete: async (fullResponse: string) => {
       const assistantMessage: Message = {
         role: "assistant",
         content: fullResponse,
@@ -79,9 +86,10 @@ export default function OmniSpectra() {
       // Clear streaming state
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
     },
     onError: (error: string) => {
-      console.error('[OmniSpectra WebSocket] Error:', error);
+      console.error('[OmniSpectra SSE] Error:', error);
       toast({
         title: "Connection Error",
         description: error,
@@ -89,6 +97,7 @@ export default function OmniSpectra() {
       });
       setStreamingMessage("");
       streamingResponseRef.current = "";
+      streamingMessageIdRef.current = null;
     }
   });
 
@@ -130,8 +139,40 @@ export default function OmniSpectra() {
     },
   });
 
+  // Create session mutation - creates a real database session for SSE streaming
+  const createSessionMutation = useMutation({
+    mutationFn: async (title: string = "New Chat") => {
+      const response = await apiRequest("POST", "/api/agents/omnispectra/sessions", { title });
+      return await response.json();
+    },
+    onError: () => {
+      toast({
+        title: "Session Error",
+        description: "Failed to create chat session. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create session if it doesn't exist
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      const newSession = await createSessionMutation.mutateAsync("New Chat");
+      sessionId = newSession.sessionId; // Use sessionId field, not id
+      setCurrentSessionId(sessionId);
+    }
 
     const userMessage: Message = {
       role: "user",
@@ -144,49 +185,67 @@ export default function OmniSpectra() {
     setInput("");
     streamingResponseRef.current = "";
 
-    // Try WebSocket first
-    const wsSuccess = await sendWebSocketMessage({
-      input: userInput,
-      llmConfigId: selectedLlmConfig,
-      contextData: {
-        history: messages.slice(-10),
-        context: {},
-      }
-    });
-
-    // Fallback to HTTP if WebSocket fails
-    if (!wsSuccess) {
-      console.log('[OmniSpectra] WebSocket unavailable, using HTTP fallback');
+    // Use SSE for streaming with real session ID
+    try {
+      await sendSSEMessage({
+        agentSlug: 'omnispectra',
+        message: userInput,
+        sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextData: {
+          history: messages.slice(-10),
+          context: {},
+        }
+      });
+    } catch (error) {
+      console.error('[OmniSpectra] SSE streaming failed, using HTTP fallback:', error);
       chatMutation.mutate(userInput);
     }
   };
 
   const handleSuggestion = async (suggestion: string) => {
     if (isStreaming) return;
+
+    if (!selectedLlmConfig) {
+      toast({
+        title: "Configuration Required",
+        description: "Please select an LLM configuration first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create session if it doesn't exist
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      const newSession = await createSessionMutation.mutateAsync("New Chat");
+      sessionId = newSession.sessionId; // Use sessionId field, not id
+      setCurrentSessionId(sessionId);
+    }
     
-    setInput(suggestion);
+    // Add user message immediately
     const userMessage: Message = {
       role: "user",
       content: suggestion,
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
     streamingResponseRef.current = "";
-
-    // Try WebSocket first
-    const wsSuccess = await sendWebSocketMessage({
-      input: suggestion,
-      llmConfigId: selectedLlmConfig,
-      contextData: {
-        history: messages.slice(-10),
-        context: {},
-      }
-    });
-
-    // Fallback to HTTP if WebSocket fails
-    if (!wsSuccess) {
-      console.log('[OmniSpectra] WebSocket unavailable, using HTTP fallback');
+    
+    // Use SSE for streaming with real session ID
+    try {
+      await sendSSEMessage({
+        agentSlug: 'omnispectra',
+        message: suggestion,
+        sessionId,
+        llmConfigId: selectedLlmConfig,
+        contextData: {
+          history: messages.slice(-10),
+          context: {},
+        }
+      });
+    } catch (error) {
+      console.error('[OmniSpectra] SSE streaming failed, using HTTP fallback:', error);
       chatMutation.mutate(suggestion);
     }
   };
