@@ -32,7 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Bell, User, Building2, ChevronDown, Settings as SettingsIcon, HelpCircle } from "lucide-react";
-import { FinACEverseFooter } from "@/components/finaceverse-footer";
+import { TekkacelFooter } from "@/components/tekkacel-footer";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { LucaChatWidget } from "@/components/luca-chat-widget";
@@ -425,7 +425,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </main>
         </div>
-        <FinACEverseFooter />
+        <TekkacelFooter />
         {isMobile && <MobileBottomNav />}
         <PWAInstallPrompt />
       </div>
