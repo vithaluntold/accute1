@@ -14,6 +14,7 @@ import { registerPricingRoutes } from "./pricing-routes";
 import { registerSubscriptionRoutes } from "./subscription-routes";
 import { registerPerformanceMetricsRoutes } from "./performance-metrics-routes";
 import { registerPersonalityProfilingRoutes } from "./personality-profiling-routes";
+import { registerSSEAgentRoutes } from "./sse-agent-routes";
 import { eq, sql, and, desc } from "drizzle-orm";
 import {
   hashPassword,
@@ -21491,6 +21492,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ==================== PERSONALITY PROFILING ROUTES ====================
   registerPersonalityProfilingRoutes(app);
+
+  // ==================== SSE AGENT STREAM ROUTES ====================
+  registerSSEAgentRoutes(app);
 
   // NOTE: AI Agent routes are now registered in server/index.ts AFTER system initialization
   // This ensures agents are fully initialized before routes are registered
