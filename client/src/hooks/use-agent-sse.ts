@@ -82,9 +82,9 @@ export function useAgentSSE({
       currentStreamIdRef.current = streamId;
       console.log(`[SSE ${agentSlug}] Stream initialized: ${streamId}`);
 
-      // Step 2: Connect to SSE endpoint
+      // Step 2: Connect to SSE endpoint with credentials
       const sseUrl = `/api/ai-agent/stream/${streamId}`;
-      const eventSource = new EventSource(sseUrl);
+      const eventSource = new EventSource(sseUrl, { withCredentials: true });
       eventSourceRef.current = eventSource;
 
       // Handle incoming messages
