@@ -23,7 +23,25 @@ The frontend uses React 18, TypeScript, Vite, Tailwind CSS, and shadcn/ui. The b
 Accute provides a multi-tenant architecture with four-tier RBAC and a Client Portal. Key features include an AI Client Onboarding System, conversational AI agents with auto-title generation, a unified workflows system, an AI Agent Marketplace, secure LLM Configuration Management, AI Psychology Assessment & Performance Monitoring, PKI Digital Signatures, Secure Document Management, a Template Marketplace, Projects Management, an AI Agent Foundry, and comprehensive collaboration tools.
 
 ## System Design Choices
-The project is organized into `client/`, `server/`, and `shared/` directories, emphasizing security, multi-tenancy, and robust authentication/encryption. The Automation Engine supports various action types. AI agents are dynamically routed and lazy-loaded. A centralized `ConfigResolver` manages LLM configurations with caching, decryption, and fallback. A `FileParserService` handles diverse document types. WebSocket management is eagerly initialized via `WebSocket Bootstrap` and `Agent Orchestrator`. The server initialization prioritizes health checks, system setup, agent route registration, and then Vite middleware. The core is a 5-component system: Agent Orchestrator, Shared Agent Registry, ConfigResolver, AgentSessionService, and WebSocket Bootstrap, ensuring a scalable agent ecosystem. Auto-title generation occurs after the first message exchange using an LLM. Unified session routes support all 10 agents.
+The project is organized into `client/`, `server/`, and `shared/` directories, emphasizing security, multi-tenancy, and robust authentication/encryption. The Automation Engine supports various action types. AI agents are dynamically routed and lazy-loaded. A centralized `ConfigResolver` manages LLM configurations with caching, decryption, and fallback. A `FileParserService` handles diverse document types. The server initialization prioritizes health checks, system setup, agent route registration, and then Vite middleware. Auto-title generation occurs after the first message exchange using an LLM. Unified session routes support all 10 agents.
+
+### Real-Time Communication Architecture
+**SSE (Server-Sent Events)** - User-to-AI Streaming:
+- AI Agent Chat (all 10 agents) uses SSE for streaming responses
+- Luca Chat Widget uses SSE for onboarding/help
+- Endpoints: `/api/ai-agent/stream` (POST to create, GET to receive)
+- Tables: `agent_sessions`, `luca_chat_sessions`, `agent_session_messages`
+- Backend is single source of truth (persists all messages)
+- Security: Mandatory sessionId, strict ownership validation, 10s timeout
+- Files: `server/sse-agent-routes.ts`, `client/src/hooks/use-agent-sse.ts`
+
+**WebSocket** - User-to-User Real-Time:
+- Team Chat (`/ws/team-chat`) - Internal team messaging - Tables: `team_chat_messages`
+- Live Chat (`/ws/live-chat`) - Client support - Tables: `live_chat_conversations`, `live_chat_messages`
+- Roundtable (`/ws/roundtable`) - Multi-agent collaboration - Tables: `roundtable_sessions`, `roundtable_messages`
+- Security: Cookie/JWT auth, heartbeat monitoring, connection limits
+
+**Key Insight**: No table overlap between SSE and WebSocket systems. Each uses distinct tables for distinct purposes.
 
 # External Dependencies
 - PostgreSQL (Neon)
