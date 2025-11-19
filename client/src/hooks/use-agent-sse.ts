@@ -64,7 +64,7 @@ export function useAgentSSE({
 
       // Step 1: Initialize stream via POST
       console.log(`[SSE ${agentSlug}] Initializing stream...`);
-      const data = await apiRequest('POST', '/api/ai-agent/stream', {
+      const response = await apiRequest('POST', '/api/ai-agent/stream', {
         agentSlug,
         message,
         sessionId,
@@ -74,6 +74,7 @@ export function useAgentSSE({
         contextData,
       });
       
+      const data = await response.json();
       const streamId = data.streamId;
       if (!streamId) {
         throw new Error('Stream initialization failed: no streamId returned');
