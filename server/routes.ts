@@ -9201,12 +9201,12 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const unreadOnly = req.query.unreadOnly === 'true';
 
       const result = await db.select()
-        .from(notifications)
+        .from(schema.notifications)
         .where(and(
-          eq(notifications.userId, req.user!.id),
-          unreadOnly ? eq(notifications.isRead, false) : sql`true`
+          eq(schema.notifications.userId, req.user!.id),
+          unreadOnly ? eq(schema.notifications.isRead, false) : sql`true`
         ))
-        .orderBy(sql`${notifications.createdAt} DESC`)
+        .orderBy(sql`${schema.notifications.createdAt} DESC`)
         .limit(limit)
         .offset(offset);
 
@@ -9221,10 +9221,10 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   app.get("/api/notifications/unread-count", requireAuth, requirePermission("notifications.view"), async (req: AuthRequest, res: Response) => {
     try {
       const result = await db.select({ count: sql<number>`count(*)` })
-        .from(notifications)
+        .from(schema.notifications)
         .where(and(
-          eq(notifications.userId, req.user!.id),
-          eq(notifications.isRead, false)
+          eq(schema.notifications.userId, req.user!.id),
+          eq(schema.notifications.isRead, false)
         ));
 
       res.json({ count: result[0]?.count || 0 });
@@ -9239,20 +9239,20 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     try {
       // Verify notification belongs to user
       const notification = await db.select()
-        .from(notifications)
-        .where(eq(notifications.id, req.params.id))
+        .from(schema.notifications)
+        .where(eq(schema.notifications.id, req.params.id))
         .limit(1);
 
       if (!notification.length || notification[0].userId !== req.user!.id) {
         return res.status(404).json({ error: "Notification not found" });
       }
 
-      await db.update(notifications)
+      await db.update(schema.notifications)
         .set({ 
           isRead: true,
           readAt: sql`now()`
         })
-        .where(eq(notifications.id, req.params.id));
+        .where(eq(schema.notifications.id, req.params.id));
 
       res.json({ success: true });
     } catch (error: any) {
@@ -9264,14 +9264,14 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
   // Mark all notifications as read
   app.post("/api/notifications/mark-all-read", requireAuth, requirePermission("notifications.read"), async (req: AuthRequest, res: Response) => {
     try {
-      await db.update(notifications)
+      await db.update(schema.notifications)
         .set({ 
           isRead: true,
           readAt: sql`now()`
         })
         .where(and(
-          eq(notifications.userId, req.user!.id),
-          eq(notifications.isRead, false)
+          eq(schema.notifications.userId, req.user!.id),
+          eq(schema.notifications.isRead, false)
         ));
 
       res.json({ success: true });
