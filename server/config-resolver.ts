@@ -169,7 +169,10 @@ class ConfigResolver {
       const config = await db.query.llmConfigurations.findFirst({
         where: and(
           eq(llmConfigurations.id, llmConfigId),
-          eq(llmConfigurations.organizationId, organizationId),
+          or(
+            eq(llmConfigurations.organizationId, organizationId),
+            isNull(llmConfigurations.organizationId) // Allow system-wide configs
+          ),
           eq(llmConfigurations.isActive, true)
         ),
       });
