@@ -11,6 +11,7 @@ import {
   type RoundtableParticipant,
 } from "@shared/schema";
 import { z } from "zod";
+import { getAgentBySlug } from "@shared/agent-registry";
 
 /**
  * SSE Roundtable Routes
@@ -246,8 +247,7 @@ export function registerSSERoundtableRoutes(app: Express) {
         return res.status(400).json({ error: 'Agent already in session' });
       }
 
-      // Get agent info
-      const { getAgentBySlug } = await import('./agents-static.js');
+      // Get agent info from registry
       const agent = getAgentBySlug(agentSlug);
       
       if (!agent) {

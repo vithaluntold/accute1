@@ -6,6 +6,7 @@ import { storage } from './storage';
 import { getLLMConfig } from './middleware/agent-llm-middleware';
 import { createStaticAgentInstance } from './agent-static-factory';
 import { agentSupportsStreaming } from './agent-loader';
+import { getAgentBySlug } from '@shared/agent-registry';
 
 const router = Router();
 
@@ -63,8 +64,7 @@ router.post('/stream', requireAuth, async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized: organization mismatch' });
     }
     
-    // Validate agent exists in Agent Foundry
-    const { getAgentBySlug } = await import('./agents-static.js');
+    // Validate agent exists in Agent Registry
     const agentMetadata = getAgentBySlug(agentSlug);
     if (!agentMetadata) {
       return res.status(404).json({ error: 'Agent not found' });
