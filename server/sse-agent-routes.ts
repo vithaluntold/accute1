@@ -39,7 +39,14 @@ router.post('/stream', requireAuth, async (req: AuthRequest, res: Response) => {
     console.log(`[SSE Stream] Initializing stream ${streamId} for agent ${agentSlug} (user: ${user.id})`);
     
     // Validate session belongs to user AND organization
-    const session = await storage.getAgentSession(user.organizationId || undefined, sessionId);
+    // LUCA SPECIAL CASE: Luca uses luca_chat_sessions table instead of agent_sessions
+    let session: any;
+    if (agentSlug === 'luca') {
+      session = await storage.getLucaChatSession(sessionId);
+    } else {
+      session = await storage.getAgentSession(user.organizationId || undefined, sessionId);
+    }
+    
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -63,12 +70,22 @@ router.post('/stream', requireAuth, async (req: AuthRequest, res: Response) => {
     }
     
     // Save message to session immediately
-    const userMessage = await storage.createAgentSessionMessage({
-      sessionId,
-      sender: 'user',
-      content: message,
-      timestamp: new Date(),
-    });
+    // LUCA SPECIAL CASE: Luca uses luca_chat_messages table
+    if (agentSlug === 'luca') {
+      await storage.createLucaChatMessage({
+        sessionId,
+        role: 'user',
+        content: message,
+        metadata: {},
+      });
+    } else {
+      await storage.createAgentSessionMessage({
+        sessionId,
+        sender: 'user',
+        content: message,
+        timestamp: new Date(),
+      });
+    }
     
     // Create stream metadata for authorization
     streamRegistry.createMetadata({
@@ -311,13 +328,23 @@ async function processAgentStream(
     }
     
     // Save agent response to session
+    // LUCA SPECIAL CASE: Luca uses luca_chat_messages table
     if (fullResponse) {
-      await storage.createAgentSessionMessage({
-        sessionId,
-        sender: 'agent',
-        content: fullResponse,
-        timestamp: new Date(),
-      });
+      if (agentSlug === 'luca') {
+        await storage.createLucaChatMessage({
+          sessionId,
+          role: 'assistant',
+          content: fullResponse,
+          metadata: {},
+        });
+      } else {
+        await storage.createAgentSessionMessage({
+          sessionId,
+          sender: 'agent',
+          content: fullResponse,
+          timestamp: new Date(),
+        });
+      }
     }
     
     // Send completion

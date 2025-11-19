@@ -29,13 +29,19 @@ This document outlines the complete architecture of real-time communication syst
 #### Data Tables Used:
 | Table | Purpose | Schema |
 |-------|---------|--------|
-| `agent_sessions` | Stores agent conversation sessions | id, agent_slug, session_id, user_id, organization_id, title, metadata, created_at, updated_at |
-| `luca_chat_sessions` | Stores Luca-specific sessions | id, user_id, organization_id, title, llm_config_id, is_active, is_pinned, is_archived, last_message_at, created_at |
-| `agent_session_messages` | Stores all AI agent messages (shared) | id, session_id, role, content, created_at |
+| `agent_sessions` | Stores agent conversation sessions (9 agents) | id, agent_slug, session_id, user_id, organization_id, title, metadata, created_at, updated_at |
+| `luca_chat_sessions` | Stores Luca-specific sessions (special case) | id, user_id, organization_id, title, llm_config_id, is_active, is_pinned, is_archived, last_message_at, created_at |
+| `agent_session_messages` | Stores messages for 9 agents (NOT Luca) | id, session_id, role, content, created_at |
+| `luca_chat_messages` | Stores Luca-specific messages (special case) | id, session_id, role, content, metadata, created_at |
 | `roundtable_sessions` | Roundtable sessions | id, organization_id, creator_id, title, description, status, activePresentationDeliverableId, activePresentationParticipantId, metadata, created_at, updated_at |
 | `roundtable_participants` | Session participants | id, session_id, participant_type, user_id, agent_slug, status, joined_at, left_at |
 | `roundtable_messages` | Session messages | id, session_id, channel_type, recipient_participant_id, sender_participant_id, sender_agent_slug, content, metadata, created_at |
 | `roundtable_deliverables` | Work products | id, session_id, creator_participant_id, creator_agent_slug, deliverable_type, deliverable_id, title, status, presented_at, created_at |
+
+**⚠️ LUCA SPECIAL CASE**: Luca uses dedicated tables (`luca_chat_sessions`, `luca_chat_messages`) instead of the shared `agent_sessions` and `agent_session_messages` tables. The SSE agent routes (`server/sse-agent-routes.ts`) include special handling to:
+- Query `luca_chat_sessions` instead of `agent_sessions` when `agentSlug === 'luca'`
+- Save messages to `luca_chat_messages` instead of `agent_session_messages`
+- This maintains backward compatibility with Luca's existing chat widget implementation
 
 #### SSE Architecture (AI Agent Chat):
 ```
