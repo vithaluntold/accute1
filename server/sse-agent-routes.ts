@@ -226,10 +226,12 @@ async function processAgentStream(
 ): Promise<void> {
   const { agentSlug, message, sessionId, llmConfigId, contextType, contextId, contextData, userId, organizationId } = params;
   
+  // Declare stream at function scope so it's accessible in catch block
+  let stream: SSEStream | undefined;
+  
   try {
     // CRITICAL: Wait for client to establish SSE connection before executing agent
     // This prevents resource-intensive agent execution when client never connects
-    let stream: SSEStream | undefined;
     let attempts = 0;
     const maxAttempts = 100; // Wait up to 10 seconds
     
@@ -262,7 +264,7 @@ async function processAgentStream(
     
     // Get LLM config
     const llmConfig = llmConfigId
-      ? await getLLMConfig(llmConfigId, organizationId)
+      ? await getLLMConfig({ configId: llmConfigId, organizationId, userId })
       : await storage.getDefaultLLMConfigForOrganization(organizationId);
     
     if (!llmConfig) {
