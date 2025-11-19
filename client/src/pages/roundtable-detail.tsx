@@ -60,10 +60,13 @@ export default function RoundtableDetail() {
     messages: liveMessages,
     privateMessages,
     typingParticipants,
+    currentPresentation,
     sendMessage,
     sendPrivateMessage,
     startTyping,
     stopTyping,
+    presentDeliverable,
+    endPresentation,
   } = useRoundtableSSE({
     sessionId: id || null,
     onNewMessage: () => {

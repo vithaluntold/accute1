@@ -4159,6 +4159,10 @@ export const roundtableSessions = pgTable("roundtable_sessions", {
   // LLM configuration for the session
   llmConfigId: varchar("llm_config_id").references(() => llmConfigurations.id),
   
+  // Active presentation tracking (SSE migration)
+  activePresentationDeliverableId: varchar("active_presentation_deliverable_id"),
+  activePresentationPresenterParticipantId: varchar("active_presentation_presenter_participant_id"),
+  
   // Timestamps
   startedAt: timestamp("started_at").notNull().defaultNow(),
   endedAt: timestamp("ended_at"),

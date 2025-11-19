@@ -66,8 +66,7 @@ interface BroadcastMessage {
  */
 export function setupTeamChatWebSocket(httpServer: Server): WebSocketServer {
   const wss = new WebSocketServer({ 
-    server: httpServer,
-    path: '/ws/team-chat',
+    noServer: true, // Lazy loading - upgrade handled externally
     maxPayload: 1024 * 1024 // 1MB max payload
   });
 

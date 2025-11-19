@@ -353,6 +353,24 @@ export function registerSSERoundtableRoutes(app: Express) {
       const currentParticipants = await storage.getRoundtableParticipants(sessionId);
       res.write(`event: roster_update\ndata: ${JSON.stringify({ participants: currentParticipants })}\n\n`);
 
+      // Hydrate active presentation for reconnecting clients
+      const session = await storage.getRoundtableSession(sessionId);
+      if (session?.activePresentationDeliverableId) {
+        const deliverable = await storage.getRoundtableDeliverable(session.activePresentationDeliverableId);
+        const presenterParticipant = currentParticipants.find(p => 
+          p.id === session.activePresentationPresenterParticipantId
+        );
+        
+        if (deliverable && presenterParticipant) {
+          console.log(`[Roundtable SSE] Hydrating active presentation for user ${userId}`);
+          res.write(`event: deliverable_presentation\ndata: ${JSON.stringify({
+            deliverable,
+            presenterParticipantId: presenterParticipant.id,
+            presenterName: presenterParticipant.displayName,
+          })}\n\n`);
+        }
+      }
+
       // Broadcast user joined
       broadcastToSession(sessionId, 'participant_joined', { 
         participant: userParticipant,
@@ -423,6 +441,25 @@ export function registerSSERoundtableRoutes(app: Express) {
         return res.status(404).json({ error: 'Deliverable not found' });
       }
 
+      // Get session to check for existing presentation
+      const session = await storage.getRoundtableSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      // Prevent concurrent presentations
+      if (session.activePresentationDeliverableId) {
+        return res.status(409).json({ 
+          error: 'Another presentation is already active. Please end it first.',
+        });
+      }
+
+      // Persist presentation state
+      await storage.updateRoundtableSession(sessionId, {
+        activePresentationDeliverableId: deliverableId,
+        activePresentationPresenterParticipantId: userParticipant.id,
+      });
+
       // Broadcast presentation started
       broadcastToSession(sessionId, 'deliverable_presentation', {
         deliverable,
@@ -444,15 +481,37 @@ export function registerSSERoundtableRoutes(app: Express) {
     try {
       const { sessionId } = req.params;
 
+      // Get session
+      const session = await storage.getRoundtableSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
       // Verify user is participant
       const participants = await storage.getRoundtableParticipants(sessionId);
-      const isParticipant = participants.some(p => 
+      const userParticipant = participants.find(p => 
         p.participantType === 'user' && p.participantId === req.user!.id
       );
 
-      if (!isParticipant) {
+      if (!userParticipant) {
         return res.status(403).json({ error: 'Not a participant in this session' });
       }
+
+      // Authorization: Only presenter or session owner can end presentation
+      const isPresenter = session.activePresentationPresenterParticipantId === userParticipant.id;
+      const isSessionOwner = session.userId === req.user!.id;
+
+      if (!isPresenter && !isSessionOwner) {
+        return res.status(403).json({ 
+          error: 'Only the presenter or session owner can end the presentation',
+        });
+      }
+
+      // Clear presentation state
+      await storage.updateRoundtableSession(sessionId, {
+        activePresentationDeliverableId: null as any,
+        activePresentationPresenterParticipantId: null as any,
+      });
 
       // Broadcast presentation ended
       broadcastToSession(sessionId, 'presentation_ended', {});

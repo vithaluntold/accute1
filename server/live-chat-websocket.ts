@@ -75,8 +75,7 @@ interface LiveChatBroadcastMessage {
  */
 export function setupLiveChatWebSocket(httpServer: Server): WebSocketServer {
   const wss = new WebSocketServer({
-    server: httpServer,
-    path: '/ws/live-chat',
+    noServer: true, // Lazy loading - upgrade handled externally
     maxPayload: 5 * 1024 * 1024 // 5MB max payload for file attachments
   });
 

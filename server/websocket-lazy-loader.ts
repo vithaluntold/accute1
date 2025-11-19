@@ -42,32 +42,42 @@ export function setupLazyWebSocketLoader(httpServer: Server): void {
   console.log('🔧 Setting up lazy WebSocket loader...');
   
   httpServer.on('upgrade', (request: IncomingMessage, socket: Socket, head: Buffer) => {
-    const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
-    
-    // Check if this is a lazy-loaded WebSocket endpoint
-    const lazyServer = lazyServers.get(pathname);
-    
-    if (lazyServer) {
-      // Initialize server if not already initialized
-      if (!lazyServer.wss) {
-        console.log(`🔌 First connection to ${pathname} - initializing WebSocket server...`);
-        try {
-          lazyServer.wss = lazyServer.initializer(httpServer);
-          console.log(`✅ ${pathname} WebSocket server initialized (lazy)`);
-        } catch (error) {
-          console.error(`❌ Failed to initialize ${pathname} WebSocket server:`, error);
-          socket.destroy();
-          return;
-        }
-      }
+    try {
+      // Defensive: ensure we have a valid URL to parse
+      const host = request.headers.host || 'localhost';
+      const url = request.url || '/';
+      const pathname = new URL(url, `http://${host}`).pathname;
       
-      // Forward the upgrade to the WebSocket server
-      lazyServer.wss.handleUpgrade(request, socket, head, (ws) => {
-        lazyServer.wss!.emit('connection', ws, request);
-      });
+      console.log(`[Lazy WS] Upgrade request for ${pathname}`);
+      
+      // Check if this is a lazy-loaded WebSocket endpoint
+      const lazyServer = lazyServers.get(pathname);
+      
+      if (lazyServer) {
+        // Initialize server if not already initialized
+        if (!lazyServer.wss) {
+          console.log(`🔌 First connection to ${pathname} - initializing WebSocket server...`);
+          try {
+            lazyServer.wss = lazyServer.initializer(httpServer);
+            console.log(`✅ ${pathname} WebSocket server initialized (lazy)`);
+          } catch (error) {
+            console.error(`❌ Failed to initialize ${pathname} WebSocket server:`, error);
+            socket.destroy();
+            return;
+          }
+        }
+        
+        // Forward the upgrade to the WebSocket server
+        lazyServer.wss.handleUpgrade(request, socket, head, (ws) => {
+          lazyServer.wss!.emit('connection', ws, request);
+        });
+      }
+      // Note: Other upgrade requests (e.g., future features) will pass through
+      // and can be handled by other listeners or default behavior
+    } catch (error) {
+      console.error('[Lazy WS] Upgrade error:', error);
+      socket.destroy();
     }
-    // Note: Other upgrade requests (e.g., future features) will pass through
-    // and can be handled by other listeners or default behavior
   });
   
   console.log('✅ Lazy WebSocket loader ready');

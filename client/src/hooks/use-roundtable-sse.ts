@@ -35,6 +35,11 @@ export function useRoundtableSSE({
   const [privateMessages, setPrivateMessages] = useState<RoundtableMessage[]>([]);
   const [typingParticipants, setTypingParticipants] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [currentPresentation, setCurrentPresentation] = useState<{
+    deliverable: any;
+    presenterParticipantId: string;
+    presenterName: string;
+  } | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -191,6 +196,21 @@ export function useRoundtableSSE({
         queryClient.invalidateQueries({ queryKey: [`/api/roundtable/sessions/${sessionId}`] });
       });
 
+      // Handle deliverable_presentation event
+      eventSource.addEventListener('deliverable_presentation', (event) => {
+        const data = JSON.parse(event.data);
+        setCurrentPresentation({
+          deliverable: data.deliverable,
+          presenterParticipantId: data.presenterParticipantId,
+          presenterName: data.presenterName,
+        });
+      });
+
+      // Handle presentation_ended event
+      eventSource.addEventListener('presentation_ended', (event) => {
+        setCurrentPresentation(null);
+      });
+
     } catch (err) {
       console.error('[Roundtable SSE] Connection failed:', err);
       const errorMsg = 'Failed to establish connection';
@@ -276,6 +296,44 @@ export function useRoundtableSSE({
     }
   }, [sessionId]);
 
+  /**
+   * Start deliverable presentation
+   */
+  const presentDeliverable = useCallback(async (deliverableId: string) => {
+    if (!sessionId) return;
+
+    try {
+      await apiRequest('POST', `/api/roundtable/sessions/${sessionId}/presentations/start`, {
+        deliverableId,
+      });
+    } catch (err: any) {
+      console.error('[Roundtable SSE] Start presentation error:', err);
+      const errorMsg = err.message || 'Failed to start presentation';
+      setError(errorMsg);
+      if (onError) {
+        onError(errorMsg);
+      }
+    }
+  }, [sessionId, onError]);
+
+  /**
+   * End deliverable presentation
+   */
+  const endPresentation = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      await apiRequest('POST', `/api/roundtable/sessions/${sessionId}/presentations/stop`, {});
+    } catch (err: any) {
+      console.error('[Roundtable SSE] End presentation error:', err);
+      const errorMsg = err.message || 'Failed to end presentation';
+      setError(errorMsg);
+      if (onError) {
+        onError(errorMsg);
+      }
+    }
+  }, [sessionId, onError]);
+
   // Connect on mount and when sessionId changes
   useEffect(() => {
     if (sessionId) {
@@ -295,9 +353,12 @@ export function useRoundtableSSE({
     messages,
     privateMessages,
     typingParticipants,
+    currentPresentation,
     sendMessage,
     sendPrivateMessage,
     startTyping,
     stopTyping,
+    presentDeliverable,
+    endPresentation,
   };
 }
