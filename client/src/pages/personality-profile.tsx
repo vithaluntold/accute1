@@ -21,14 +21,14 @@ import {
   EyeOff,
   Info,
   CheckCircle2,
-  Lock,
+  Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { useFeatureAccess } from "@/hooks/use-subscription";
-import { Link } from "wouter";
+import { FeatureGate } from "@/components/feature-gate";
+import { useLocation } from "wouter";
 
 type PersonalityProfile = {
   userId: string;
@@ -72,23 +72,21 @@ type ConsentStatus = {
   consentedAt: string | null;
 };
 
-export default function PersonalityProfile() {
+// Separate component for the actual personality profile content
+// This ensures queries only run when user has access
+function PersonalityProfileContent() {
   const { toast } = useToast();
   const [showRawScores, setShowRawScores] = useState(false);
 
-  // Check if organization has access to personality assessment feature
-  const { hasAccess: hasPersonalityAssessment, isLoading: isCheckingAccess } = useFeatureAccess('personality_assessment');
-
-  // Fetch user's consent status (only if they have access to the feature)
+  // Fetch user's consent status
   const { data: consent } = useQuery<ConsentStatus>({
     queryKey: ["/api/personality-profiling/consent"],
-    enabled: hasPersonalityAssessment,
   });
 
   // Fetch user's personality profile
   const { data: profile, isLoading } = useQuery<PersonalityProfile>({
     queryKey: ["/api/personality-profiling/profiles/me"],
-    enabled: hasPersonalityAssessment && consent?.hasConsented === true,
+    enabled: consent?.hasConsented === true,
   });
 
   // Update consent mutation
@@ -194,65 +192,7 @@ export default function PersonalityProfile() {
     return score >= 0.5 ? frameworkDescs[trait].high : frameworkDescs[trait].low;
   };
 
-  // Show upgrade message if user doesn't have access to personality assessment
-  if (!isCheckingAccess && !hasPersonalityAssessment) {
-    return (
-      <div className="container mx-auto py-6 max-w-3xl">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="w-6 h-6" />
-              Personality Assessment - Enterprise Feature
-            </CardTitle>
-            <CardDescription>
-              Unlock advanced AI personality profiling for your organization
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Alert>
-              <Info className="w-4 h-4" />
-              <AlertDescription>
-                <strong>Enterprise Feature:</strong> AI Personality Assessment requires an Enterprise subscription.
-                Upgrade to unlock multi-framework personality analysis for your team.
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-4">
-              <h3 className="font-semibold">Included with Enterprise:</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <Brain className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                  <span><strong>5 Psychology Frameworks:</strong> Big Five, DISC, MBTI, Emotional Intelligence, Cultural Dimensions</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <TrendingUp className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                  <span><strong>Performance Correlations:</strong> See how personality traits correlate with team performance</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Shield className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                  <span><strong>Privacy-First:</strong> GDPR-compliant with no raw message storage</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Zap className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                  <span><strong>ML Model Fusion:</strong> 95%+ token cost reduction with hybrid analysis</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="pt-4 border-t">
-              <Button asChild data-testid="button-upgrade">
-                <Link href="/admin/billing">
-                  Upgrade to Enterprise
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (isCheckingAccess || !consent) {
+  if (!consent) {
     return (
       <div className="container mx-auto py-6">
         <Card>
@@ -596,5 +536,96 @@ export default function PersonalityProfile() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Custom upgrade prompt for personality assessment feature
+function PersonalityAssessmentUpgradePrompt() {
+  const [, navigate] = useLocation();
+
+  return (
+    <div className="container mx-auto py-6 max-w-3xl">
+      <Card className="border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="w-6 h-6 text-primary" />
+            AI Personality Assessment - Enterprise Feature
+          </CardTitle>
+          <CardDescription>
+            Unlock advanced multi-framework personality profiling for your organization
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+            <Info className="w-4 h-4 text-primary" />
+            <AlertDescription>
+              <strong>Enterprise Feature:</strong> AI Personality Assessment requires an Enterprise subscription.
+              Upgrade to unlock comprehensive personality analysis for your team.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-4">
+            <h3 className="font-semibold">What you'll get with Enterprise:</h3>
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <li className="flex items-start gap-3">
+                <Brain className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
+                <div>
+                  <strong className="text-foreground">5 Psychology Frameworks:</strong> Big Five, DISC, MBTI, 
+                  Emotional Intelligence, and Cultural Dimensions analysis
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <TrendingUp className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
+                <div>
+                  <strong className="text-foreground">Performance Correlations:</strong> See how personality traits 
+                  correlate with team performance metrics
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Shield className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
+                <div>
+                  <strong className="text-foreground">Privacy-First Architecture:</strong> GDPR-compliant with 
+                  zero raw message storage, only aggregated metrics
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <Zap className="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" />
+                <div>
+                  <strong className="text-foreground">ML Model Fusion:</strong> 95%+ token cost reduction through 
+                  hybrid Tier 1/Tier 2 analysis
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div className="pt-4 border-t space-y-3">
+            <Button 
+              onClick={() => navigate('/admin/billing')}
+              className="w-full"
+              data-testid="button-upgrade-enterprise"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Upgrade to Enterprise
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Contact your organization administrator to upgrade your subscription
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Main component with feature gate
+export default function PersonalityProfile() {
+  return (
+    <FeatureGate 
+      feature="personality_assessment" 
+      fallback={<PersonalityAssessmentUpgradePrompt />}
+      showUpgradePrompt={false}
+    >
+      <PersonalityProfileContent />
+    </FeatureGate>
   );
 }
