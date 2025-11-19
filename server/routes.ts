@@ -6,7 +6,6 @@ import fs from "fs";
 import { z, ZodError } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
-import { setupWebSocket } from "./websocket";
 import { validatePasswordComplexity } from "./security";
 import { organizationCreationRateLimiter, userCreationRateLimiter, billingRateLimiter, checkAccountLockout, recordFailedLogin } from "./rate-limit";
 import * as schema from "@shared/schema";
@@ -21514,8 +21513,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Setup lazy WebSocket initialization - will initialize on first upgrade request
-  setupWebSocket(httpServer);
+  // WebSocket servers (Team Chat, Live Chat, Roundtable) are initialized in server/index.ts
+  // AI Agent chat uses SSE (Server-Sent Events) instead of WebSocket
   
   return httpServer;
 }
