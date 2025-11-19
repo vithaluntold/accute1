@@ -63,8 +63,9 @@ router.post('/stream', requireAuth, async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized: organization mismatch' });
     }
     
-    // Validate agent access
-    const agentMetadata = await storage.getAgentBySlug(agentSlug);
+    // Validate agent exists in Agent Foundry
+    const { getAgentBySlug } = await import('./agents-static.js');
+    const agentMetadata = getAgentBySlug(agentSlug);
     if (!agentMetadata) {
       return res.status(404).json({ error: 'Agent not found' });
     }
