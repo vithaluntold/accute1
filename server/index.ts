@@ -122,8 +122,6 @@ import {
 } from "./rate-limit";
 // Lazy WebSocket loader for user-to-user real-time communication
 import { setupLazyWebSocketLoader, cleanupLazyWebSockets } from "./websocket-lazy-loader";
-// Roundtable WebSocket (will be migrated to SSE)
-import { setupRoundtableWebSocket } from "./roundtable-websocket";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -297,14 +295,11 @@ app.use((req, res, next) => {
     });
     
     // Initialize WebSocket servers for user-to-user real-time communication
+    // Team Chat and Live Chat use lazy loading (initialize on first connection)
+    // Roundtable uses SSE (Server-Sent Events) for real-time collaboration
     console.log('🔧 Initializing WebSocket servers...');
     try {
-      // Lazy-load Team Chat and Live Chat (initialize on first connection)
       setupLazyWebSocketLoader(server);
-      
-      // Roundtable still uses WebSocket (will be migrated to SSE)
-      setupRoundtableWebSocket(server);
-      console.log('✅ Roundtable WebSocket server initialized');
     } catch (wsError) {
       console.error('❌ WebSocket server initialization failed:', wsError);
       console.warn('⚠️  Continuing without WebSocket support');
