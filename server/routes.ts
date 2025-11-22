@@ -15,6 +15,7 @@ import { registerPerformanceMetricsRoutes } from "./performance-metrics-routes";
 import { registerPersonalityProfilingRoutes } from "./personality-profiling-routes";
 import { registerSSEAgentRoutes } from "./sse-agent-routes";
 import { registerSSERoundtableRoutes } from "./sse-roundtable-routes";
+import { registerUnifiedPaymentRoutes } from "./unified-payment-routes";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   hashPassword,
@@ -20556,8 +20557,8 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // Register subscription & feature gating routes
   registerSubscriptionRoutes(app);
 
-  // Register Cashfree payment routes
-  // app.use("/api/cashfree", cashfreeRoutes); // Commented out - module doesn't exist
+  // Register unified payment gateway routes (supports Razorpay, Stripe, Cashfree)
+  registerUnifiedPaymentRoutes(app);
 
   // ==================== FORECASTING SYSTEM ====================
   
