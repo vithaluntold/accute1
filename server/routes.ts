@@ -33,6 +33,7 @@ import {
   validateSuperAdminKey,
   validateInvitationToken,
 } from "./auth";
+import { enforceOrganizationScope, requireOrganization, validateEntityOrganization } from "./middleware/enforce-organization-scope";
 import { safeDecrypt } from "./encryption-service";
 import {
   insertUserSchema,
@@ -110,6 +111,14 @@ const ALLOWED_EXTENSIONS = [
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
   '.txt', '.csv', '.png', '.jpg', '.jpeg', '.gif', '.webp'
 ];
+
+// ==================== SECURITY MIDDLEWARE COMPOSITION ====================
+// Composed middleware for authenticated routes with organization scope enforcement
+// This provides defense-in-depth by combining:
+// 1. requireAuth: Validates JWT and populates req.user
+// 2. enforceOrganizationScope: Validates organization membership and injects org context
+// Use this instead of bare requireAuth on all multi-tenant routes
+export const requireAuthWithOrg = [requireAuth, enforceOrganizationScope];
 
 const upload = multer({
   storage: multer.diskStorage({
