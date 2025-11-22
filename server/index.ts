@@ -1,4 +1,4 @@
-import 'dotenv/config';
+// Replit provides environment variables automatically - no dotenv needed
 
 // Helper: Validate ENCRYPTION_KEY has proper byte entropy
 function validateEncryptionKey(key: string): boolean {
@@ -127,7 +127,6 @@ process.on('unhandledRejection', (reason, promise) => {
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import cors from "cors";
 import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, log } from "./vite";
 import { initializeSystem } from "./init";
@@ -152,31 +151,6 @@ const app = express();
 app.set("env", process.env.NODE_ENV || "development");
 
 app.use(cookieParser());
-
-// CORS Configuration - Allow accute.io and blueprint deployment
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5000',
-  'https://accute.io',
-  'https://www.accute.io',
-  'https://blueprint-v90c.onrender.com'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
 
 declare module 'http' {
   interface IncomingMessage {
