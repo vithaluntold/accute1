@@ -601,6 +601,7 @@ export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
   
   // Webhook verification
   webhookSecret: text("webhook_secret"), // Encrypted
+  webhookToken: text("webhook_token").notNull().unique().default(sql`encode(gen_random_bytes(32), 'hex')`), // Unique, unguessable token for webhook URL (prevents cross-tenant attacks)
   
   // Usage tracking
   lastUsedAt: timestamp("last_used_at"),
@@ -614,6 +615,7 @@ export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
   orgIdx: index("payment_gateway_configs_org_idx").on(table.organizationId),
   gatewayIdx: index("payment_gateway_configs_gateway_idx").on(table.gateway),
   defaultIdx: index("payment_gateway_configs_default_idx").on(table.isDefault),
+  webhookTokenIdx: unique("payment_gateway_configs_webhook_token_idx").on(table.webhookToken),
 }));
 
 // Service Plans - Fiverr-style service offerings that admins create for clients
@@ -2826,18 +2828,42 @@ export const payments = pgTable("payments", {
   subscriptionInvoiceId: varchar("subscription_invoice_id").references(() => subscriptionInvoices.id),
   clientId: varchar("client_id").references(() => clients.id),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("INR"), // INR, USD, EUR, etc.
   method: text("method").notNull(), // upi, credit_card, debit_card, netbanking, card, ach, check, cash, other
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  
+  // Unified gateway fields (multi-gateway support)
+  gateway: text("gateway"), // razorpay, stripe, cashfree, payu, payoneer
+  internalOrderId: text("internal_order_id"), // Our internal order ID sent to gateway (for Six Sigma traceability)
+  gatewayOrderId: text("gateway_order_id"), // Gateway-native order/intent ID
+  gatewayPaymentId: text("gateway_payment_id"), // Gateway-native payment ID
+  gatewayConfigId: varchar("gateway_config_id").references(() => paymentGatewayConfigs.id),
+  errorCode: text("error_code"), // Standardized error code if payment fails
+  errorMessage: text("error_message"), // User-friendly error message
+  
+  // Legacy gateway-specific fields (for backward compatibility)
   stripePaymentId: text("stripe_payment_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   razorpayPaymentId: text("razorpay_payment_id"),
   razorpayOrderId: text("razorpay_order_id"),
+  
+  // Payment metadata
+  customerName: text("customer_name"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  
   transactionDate: timestamp("transaction_date").notNull(),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  orgIdx: index("payments_org_idx").on(table.organizationId),
+  gatewayOrderIdx: index("payments_gateway_order_idx").on(table.gateway, table.gatewayOrderId),
+  internalOrderIdx: index("payments_internal_order_idx").on(table.internalOrderId),
+  statusIdx: index("payments_status_idx").on(table.status),
+}));
 
 // Saved Payment Methods for Auto-Sweep
 export const paymentMethods = pgTable("payment_methods", {

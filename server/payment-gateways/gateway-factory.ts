@@ -11,23 +11,114 @@ type GatewayType = 'razorpay' | 'stripe' | 'cashfree' | 'payu' | 'payoneer';
 
 export class PaymentGatewayFactory {
   private static instances: Map<string, BasePaymentGateway> = new Map();
+  private static orgInstancesMap: Map<string, Set<string>> = new Map();
+  
+  static {
+    this.instances.clear();
+    this.orgInstancesMap.clear();
+    console.log('[PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)');
+  }
 
   static async getGateway(
     organizationId: string,
     gatewayType?: GatewayType
-  ): Promise<BasePaymentGateway> {
-    const config = await this.getGatewayConfig(organizationId, gatewayType);
+  ): Promise<{ gateway: BasePaymentGateway; config: any }> {
+    const fullConfig = await this.getFullGatewayConfig(organizationId, gatewayType);
+    const gatewayConfig = await this.decryptConfig(fullConfig);
     
-    const cacheKey = `${organizationId}-${config.gateway}`;
+    const cacheKey = `${organizationId}-${fullConfig.id}`;
     
     if (this.instances.has(cacheKey)) {
-      return this.instances.get(cacheKey)!;
+      return {
+        gateway: this.instances.get(cacheKey)!,
+        config: fullConfig,
+      };
     }
 
-    const gateway = this.createGatewayInstance(config);
+    const gateway = this.createGatewayInstance(gatewayConfig);
     this.instances.set(cacheKey, gateway);
     
-    return gateway;
+    if (!this.orgInstancesMap.has(organizationId)) {
+      this.orgInstancesMap.set(organizationId, new Set());
+    }
+    this.orgInstancesMap.get(organizationId)!.add(cacheKey);
+    
+    return {
+      gateway,
+      config: fullConfig,
+    };
+  }
+
+  private static async getFullGatewayConfig(
+    organizationId: string,
+    gatewayType?: GatewayType
+  ) {
+    let query = db
+      .select()
+      .from(paymentGatewayConfigs)
+      .where(eq(paymentGatewayConfigs.organizationId, organizationId));
+
+    if (gatewayType) {
+      query = query.where(
+        and(
+          eq(paymentGatewayConfigs.organizationId, organizationId),
+          eq(paymentGatewayConfigs.gateway, gatewayType),
+          eq(paymentGatewayConfigs.isActive, true)
+        )
+      ) as any;
+    } else {
+      query = query.where(
+        and(
+          eq(paymentGatewayConfigs.organizationId, organizationId),
+          eq(paymentGatewayConfigs.isDefault, true),
+          eq(paymentGatewayConfigs.isActive, true)
+        )
+      ) as any;
+    }
+
+    const [config] = await query;
+
+    if (!config) {
+      const fallbackGateway = await this.getFallbackGateway();
+      if (fallbackGateway) {
+        return {
+          id: 'fallback',
+          organizationId,
+          gateway: fallbackGateway.gateway,
+          apiKey: fallbackGateway.apiKey,
+          apiSecret: fallbackGateway.apiSecret,
+          webhookSecret: fallbackGateway.webhookSecret,
+          publicKey: fallbackGateway.publicKey,
+          environment: fallbackGateway.environment,
+          isActive: true,
+          isDefault: true,
+        };
+      }
+      
+      throw new Error(
+        gatewayType
+          ? `Payment gateway '${gatewayType}' not configured for organization`
+          : 'No default payment gateway configured for organization'
+      );
+    }
+
+    return config;
+  }
+
+  private static async decryptConfig(config: any): Promise<PaymentGatewayConfig> {
+    const apiKey = config.apiKey ? safeDecrypt(config.apiKey) : '';
+    const apiSecret = config.apiSecret ? safeDecrypt(config.apiSecret) : '';
+    const webhookSecret = config.webhookSecret ? safeDecrypt(config.webhookSecret) : undefined;
+    const publicKey = config.publicKey ? safeDecrypt(config.publicKey) : undefined;
+
+    return {
+      gateway: config.gateway,
+      apiKey,
+      apiSecret,
+      webhookSecret,
+      publicKey,
+      environment: config.environment as 'sandbox' | 'production',
+    };
   }
 
   static async getGatewayConfig(
@@ -131,16 +222,36 @@ export class PaymentGatewayFactory {
     }
   }
 
-  static clearCache(organizationId?: string): void {
-    if (organizationId) {
+  static clearCache(organizationId?: string, configId?: string): void {
+    if (organizationId && configId) {
+      this.instances.delete(`${organizationId}-${configId}`);
+    } else if (organizationId) {
+      const keysToDelete: string[] = [];
       for (const key of this.instances.keys()) {
         if (key.startsWith(`${organizationId}-`)) {
-          this.instances.delete(key);
+          keysToDelete.push(key);
         }
       }
+      keysToDelete.forEach(key => this.instances.delete(key));
     } else {
       this.instances.clear();
     }
+  }
+
+  static async clearCacheForOrganization(organizationId: string): Promise<void> {
+    const orgKeys = this.orgInstancesMap.get(organizationId);
+    if (orgKeys) {
+      orgKeys.forEach(key => this.instances.delete(key));
+      this.orgInstancesMap.delete(organizationId);
+    }
+    
+    const keysToDelete: string[] = [];
+    for (const key of this.instances.keys()) {
+      if (key.startsWith(`${organizationId}-`)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => this.instances.delete(key));
   }
 
   static getSupportedGateways(): Array<{

@@ -3,9 +3,31 @@ import { z } from 'zod';
 import { PaymentGatewayFactory } from './payment-gateways';
 import { requireAuthWithOrg } from './routes';
 import { db } from './db';
-import { paymentGatewayConfigs, subscriptionInvoices, invoices } from '@shared/schema';
+import { paymentGatewayConfigs, payments } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { encrypt } from './auth';
+
+// Sanitized error codes
+enum PaymentErrorCode {
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  GATEWAY_CONFIG_NOT_FOUND = 'GATEWAY_CONFIG_NOT_FOUND',
+  ORDER_CREATION_FAILED = 'ORDER_CREATION_FAILED',
+  ORDER_NOT_FOUND = 'ORDER_NOT_FOUND',
+  PAYMENT_VERIFICATION_FAILED = 'PAYMENT_VERIFICATION_FAILED',
+  REFUND_FAILED = 'REFUND_FAILED',
+  WEBHOOK_INVALID_SIGNATURE = 'WEBHOOK_INVALID_SIGNATURE',
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+}
+
+function sanitizeError(error: any, code: PaymentErrorCode, defaultMessage: string) {
+  console.error(`[Payment Error] ${code}:`, error);
+  
+  return {
+    error: code,
+    message: defaultMessage,
+    ...(process.env.NODE_ENV === 'development' && { debug: error.message }),
+  };
+}
 
 const createOrderSchema = z.object({
   amount: z.number().positive(),
@@ -44,24 +66,28 @@ export function registerUnifiedPaymentRoutes(app: Express) {
       const validation = createOrderSchema.safeParse(req.body);
       
       if (!validation.success) {
-        return res.status(400).json({
-          error: 'Invalid request',
-          details: validation.error.errors,
-        });
+        return res.status(400).json(
+          sanitizeError(
+            validation.error,
+            PaymentErrorCode.VALIDATION_ERROR,
+            'Invalid payment request data'
+          )
+        );
       }
 
       const data = validation.data;
       const organizationId = (req as any).organizationId;
+      const userId = (req as any).user?.id;
 
-      const gateway = await PaymentGatewayFactory.getGateway(
+      const { gateway: gatewayInstance, config: gatewayConfig } = await PaymentGatewayFactory.getGateway(
         organizationId,
         data.gateway as any
       );
 
-      const orderId = `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const internalOrderId = `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const order = await gateway.createOrder({
-        orderId,
+      const gatewayOrder = await gatewayInstance.createOrder({
+        orderId: internalOrderId,
         amount: data.amount,
         currency: data.currency,
         description: data.description,
@@ -69,53 +95,112 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         metadata: data.metadata,
       });
 
+      const [storedPayment] = await db
+        .insert(payments)
+        .values({
+          organizationId,
+          amount: data.amount,
+          currency: data.currency,
+          method: 'gateway_payment',
+          status: 'pending',
+          gateway: gatewayConfig.gateway,
+          internalOrderId,
+          gatewayOrderId: gatewayOrder.gatewayOrderId,
+          gatewayConfigId: gatewayConfig.id,
+          customerName: data.customer.name,
+          customerEmail: data.customer.email,
+          customerPhone: data.customer.phone,
+          metadata: data.metadata || {},
+          transactionDate: new Date(),
+          createdBy: userId,
+        })
+        .returning();
+
       res.json({
         success: true,
-        gateway: gateway.gatewayName,
+        gateway: gatewayInstance.gatewayName,
         order: {
-          orderId,
-          gatewayOrderId: order.gatewayOrderId,
-          sessionId: order.sessionId,
-          paymentUrl: order.paymentUrl,
-          amount: order.amount,
-          currency: order.currency,
-          status: order.status,
+          orderId: storedPayment.id,
+          gatewayOrderId: gatewayOrder.gatewayOrderId,
+          sessionId: gatewayOrder.sessionId,
+          paymentUrl: gatewayOrder.paymentUrl,
+          amount: gatewayOrder.amount,
+          currency: gatewayOrder.currency,
+          status: gatewayOrder.status,
         },
-        checkoutScript: gateway.getCheckoutScript(),
+        checkoutScript: gatewayInstance.getCheckoutScript(),
       });
     } catch (error: any) {
-      console.error('Payment order creation error:', error);
-      res.status(500).json({
-        error: 'Failed to create payment order',
-        message: error.message,
-      });
+      res.status(500).json(
+        sanitizeError(
+          error,
+          PaymentErrorCode.ORDER_CREATION_FAILED,
+          'Unable to create payment order. Please try again.'
+        )
+      );
     }
   });
 
   app.get('/api/payment/status/:orderId', requireAuthWithOrg, async (req, res) => {
     try {
       const { orderId } = req.params;
-      const { gateway: gatewayType } = req.query;
       const organizationId = (req as any).organizationId;
 
-      const gateway = await PaymentGatewayFactory.getGateway(
+      const [payment] = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.id, orderId),
+            eq(payments.organizationId, organizationId)
+          )
+        );
+
+      if (!payment || !payment.gatewayOrderId) {
+        return res.status(404).json(
+          sanitizeError(
+            new Error('Payment not found'),
+            PaymentErrorCode.ORDER_NOT_FOUND,
+            'Payment order not found'
+          )
+        );
+      }
+
+      const { gateway: gatewayInstance } = await PaymentGatewayFactory.getGateway(
         organizationId,
-        gatewayType as any
+        payment.gateway as any
       );
 
-      const status = await gateway.getPaymentStatus(orderId);
+      const status = await gatewayInstance.getPaymentStatus(payment.gatewayOrderId);
+
+      if (status.status !== payment.status) {
+        await db
+          .update(payments)
+          .set({
+            status: status.status,
+            gatewayPaymentId: status.paymentId || payment.gatewayPaymentId,
+            updatedAt: new Date(),
+          })
+          .where(eq(payments.id, orderId));
+      }
 
       res.json({
         success: true,
-        gateway: gateway.gatewayName,
-        payment: status,
+        gateway: gatewayInstance.gatewayName,
+        payment: {
+          ...status,
+          orderId,
+          gatewayOrderId: payment.gatewayOrderId,
+        },
       });
     } catch (error: any) {
-      console.error('Payment status fetch error:', error);
-      res.status(500).json({
-        error: 'Failed to fetch payment status',
-        message: error.message,
-      });
+      res.status(500).json(
+        sanitizeError(
+          error,
+          PaymentErrorCode.PAYMENT_VERIFICATION_FAILED,
+          'Unable to fetch payment status'
+        )
+      );
     }
   });
 
@@ -124,80 +209,212 @@ export function registerUnifiedPaymentRoutes(app: Express) {
       const validation = refundSchema.safeParse(req.body);
       
       if (!validation.success) {
-        return res.status(400).json({
-          error: 'Invalid request',
-          details: validation.error.errors,
-        });
+        return res.status(400).json(
+          sanitizeError(
+            validation.error,
+            PaymentErrorCode.VALIDATION_ERROR,
+            'Invalid refund request data'
+          )
+        );
       }
 
       const data = validation.data;
-      const { gateway: gatewayType } = req.query;
       const organizationId = (req as any).organizationId;
 
-      const gateway = await PaymentGatewayFactory.getGateway(
+      const [payment] = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.id, data.paymentId),
+            eq(payments.organizationId, organizationId)
+          )
+        );
+
+      if (!payment || !payment.gatewayPaymentId) {
+        return res.status(404).json(
+          sanitizeError(
+            new Error('Payment not found'),
+            PaymentErrorCode.ORDER_NOT_FOUND,
+            'Payment not found for refund'
+          )
+        );
+      }
+
+      const { gateway: gatewayInstance } = await PaymentGatewayFactory.getGateway(
         organizationId,
-        gatewayType as any
+        payment.gateway as any
       );
 
-      const refund = await gateway.refundPayment(data);
+      const refund = await gatewayInstance.refundPayment({
+        paymentId: payment.gatewayPaymentId,
+        amount: data.amount,
+        reason: data.reason,
+        notes: data.notes,
+      });
+
+      await db
+        .update(payments)
+        .set({
+          status: 'refunded',
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, data.paymentId));
 
       res.json({
         success: true,
-        gateway: gateway.gatewayName,
+        gateway: gatewayInstance.gatewayName,
         refund,
       });
     } catch (error: any) {
-      console.error('Payment refund error:', error);
-      res.status(500).json({
-        error: 'Failed to process refund',
-        message: error.message,
-      });
+      res.status(500).json(
+        sanitizeError(
+          error,
+          PaymentErrorCode.REFUND_FAILED,
+          'Unable to process refund'
+        )
+      );
     }
   });
 
-  app.post('/api/payment/webhook/:gateway', async (req, res) => {
+  app.post('/api/payment/webhook/:webhookToken', async (req, res) => {
     try {
-      const { gateway: gatewayType } = req.params;
+      const { webhookToken } = req.params;
       const signature = req.headers['x-razorpay-signature'] || 
                        req.headers['stripe-signature'] || 
                        req.headers['x-webhook-signature'] as string;
       const timestamp = req.headers['x-webhook-timestamp'] as string;
 
       if (!signature) {
-        return res.status(400).json({ error: 'Missing webhook signature' });
+        return res.status(400).json(
+          sanitizeError(
+            new Error('Missing signature'),
+            PaymentErrorCode.WEBHOOK_INVALID_SIGNATURE,
+            'Webhook signature missing'
+          )
+        );
+      }
+
+      if (!webhookToken) {
+        return res.status(400).json(
+          sanitizeError(
+            new Error('Missing webhook token'),
+            PaymentErrorCode.VALIDATION_ERROR,
+            'Webhook token required'
+          )
+        );
       }
 
       const payload = typeof req.body === 'string' 
         ? req.body 
         : JSON.stringify(req.body);
 
-      const organizationId = (req as any).organizationId;
+      const [gatewayConfig] = await db
+        .select()
+        .from(paymentGatewayConfigs)
+        .where(
+          and(
+            eq(paymentGatewayConfigs.webhookToken, webhookToken),
+            eq(paymentGatewayConfigs.isActive, true)
+          )
+        )
+        .limit(1);
 
-      const gateway = await PaymentGatewayFactory.getGateway(
-        organizationId,
-        gatewayType as any
+      if (!gatewayConfig) {
+        console.warn(
+          `[Webhook Security] Invalid webhook token attempted: ${webhookToken.substring(0, 8)}...`
+        );
+        return res.status(404).json(
+          sanitizeError(
+            new Error('Gateway config not found'),
+            PaymentErrorCode.GATEWAY_CONFIG_NOT_FOUND,
+            'Invalid webhook configuration'
+          )
+        );
+      }
+
+      const { gateway: gatewayInstance } = await PaymentGatewayFactory.getGateway(
+        gatewayConfig.organizationId,
+        gatewayConfig.gateway as any
       );
 
-      const verification = gateway.verifyWebhookSignature(
+      const verification = gatewayInstance.verifyWebhookSignature(
         signature,
         payload,
         timestamp
       );
 
       if (!verification.isValid) {
-        return res.status(401).json({ error: 'Invalid webhook signature' });
+        console.warn(
+          `[Webhook Security] Invalid signature for ${gatewayConfig.gateway} webhook token ${webhookToken.substring(0, 8)}...`
+        );
+        return res.status(401).json(
+          sanitizeError(
+            new Error('Invalid signature'),
+            PaymentErrorCode.WEBHOOK_INVALID_SIGNATURE,
+            'Invalid webhook signature - signature verification failed'
+          )
+        );
+      }
+
+      if (verification.event?.type.includes('payment')) {
+        const gatewayOrderId = verification.event.data.orderId || 
+                               verification.event.data.order_id;
+        const internalOrderId = verification.event.data.internalOrderId ||
+                                verification.event.data.notes?.internalOrderId;
+        
+        if (gatewayOrderId || internalOrderId) {
+          const conditions: any[] = [
+            eq(payments.gatewayConfigId, gatewayConfig.id)
+          ];
+          
+          if (gatewayOrderId) {
+            conditions.push(eq(payments.gatewayOrderId, gatewayOrderId));
+          }
+          
+          if (internalOrderId) {
+            conditions.push(eq(payments.internalOrderId, internalOrderId));
+          }
+          
+          const [payment] = await db
+            .select()
+            .from(payments)
+            .where(and(...conditions))
+            .limit(1);
+
+          if (payment) {
+            const newStatus = verification.event.type.includes('success') || 
+                             verification.event.type.includes('paid') ||
+                             verification.event.type.includes('captured')
+              ? 'completed'
+              : verification.event.type.includes('fail')
+              ? 'failed'
+              : payment.status;
+
+            await db
+              .update(payments)
+              .set({
+                status: newStatus,
+                gatewayPaymentId: verification.event.data.paymentId || payment.gatewayPaymentId,
+                updatedAt: new Date(),
+              })
+              .where(eq(payments.id, payment.id));
+          }
+        }
       }
 
       res.status(200).json({
         success: true,
-        event: verification.event,
+        event: verification.event?.type,
       });
     } catch (error: any) {
-      console.error('Webhook processing error:', error);
-      res.status(500).json({
-        error: 'Failed to process webhook',
-        message: error.message,
-      });
+      res.status(500).json(
+        sanitizeError(
+          error,
+          PaymentErrorCode.INTERNAL_ERROR,
+          'Webhook processing failed'
+        )
+      );
     }
   });
 
@@ -280,7 +497,7 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         })
         .returning();
 
-      PaymentGatewayFactory.clearCache(organizationId);
+      await PaymentGatewayFactory.clearCacheForOrganization(organizationId);
 
       res.json({
         success: true,
@@ -338,7 +555,7 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         .where(eq(paymentGatewayConfigs.id, id))
         .returning();
 
-      PaymentGatewayFactory.clearCache(organizationId);
+      await PaymentGatewayFactory.clearCacheForOrganization(organizationId);
 
       res.json({
         success: true,
@@ -382,7 +599,7 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         .delete(paymentGatewayConfigs)
         .where(eq(paymentGatewayConfigs.id, id));
 
-      PaymentGatewayFactory.clearCache(organizationId);
+      await PaymentGatewayFactory.clearCacheForOrganization(organizationId);
 
       res.json({ success: true });
     } catch (error: any) {

@@ -243,9 +243,7 @@ const { error } = await stripe.redirectToCheckout({
 
 **Webhook Endpoints:**
 ```
-POST /api/payments/unified/webhooks/razorpay
-POST /api/payments/unified/webhooks/stripe
-POST /api/payments/unified/webhooks/cashfree
+POST /api/payment/webhook/{webhookToken}
 ```
 
 **Setup in Gateway Dashboard:**
@@ -253,13 +251,65 @@ POST /api/payments/unified/webhooks/cashfree
 2. **Stripe**: Dashboard → Developers → Webhooks → Add endpoint
 3. **Cashfree**: Dashboard → Developers → Webhook
 
-**Webhook URL Format:**
+**Webhook URL Format (Token-Based):**
 ```
-https://your-domain.com/api/payments/unified/webhooks/{gateway}
+https://your-domain.com/api/payment/webhook/{webhookToken}
 ```
 
-**Signature Verification:**
-All webhooks are automatically verified using the `webhookSecret` from gateway configuration. Invalid signatures are rejected with 400 Bad Request.
+**Example:**
+```
+https://accute.example.com/api/payment/webhook/a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+```
+
+**🔒 PRODUCTION-GRADE SECURITY MODEL:**
+
+Each webhook URL uses a unique, cryptographically random 64-character token that is:
+- Generated automatically when creating gateway configuration
+- Unguessable (256 bits of entropy from `gen_random_bytes(32)`)
+- Independent of organization ID or config ID
+- Automatically rotated when credentials are updated
+
+**Authentication Mechanism:**
+1. Webhook token in URL is looked up in database (constant-time comparison)
+2. If token exists and config is active, load the gateway configuration
+3. HMAC signature verified using the `webhookSecret` from that specific config
+4. Payment records matched using BOTH `internalOrderId` AND `gatewayOrderId`
+5. All operations scoped to the `gatewayConfigId` for complete tenant isolation
+
+**Why Token-Based URLs Are Required (Six Sigma Security):**
+
+❌ **VULNERABILITY 1 - Organization ID in URL**: Attacker configures their own gateway to send webhooks to victim's URL
+❌ **VULNERABILITY 2 - Config ID in URL**: Attacker enumerates/guesses UUIDs or uses leaked config IDs
+❌ **RESULT**: Cross-tenant webhook poisoning, fake payment records, revenue fraud
+
+✅ **MITIGATION - Random Webhook Token**:
+   - 64-character hex token (32 random bytes = 256 bits entropy)
+   - Cannot be guessed, enumerated, or derived from public information
+   - Token lookup is constant-time to prevent timing attacks
+   - Invalid tokens logged for security monitoring
+   - Each config has its own unique token independent of all other identifiers
+
+**Defense-in-Depth Layers (Six Sigma Quality):**
+1. **Unguessable token in URL** - 2^256 possible values, cryptographically secure
+2. **Config lookup by token** - Validates token exists and config is active
+3. **HMAC signature verification** - Cryptographic authentication using webhookSecret
+4. **Dual payment matching** - Uses BOTH internalOrderId (our ID) AND gatewayOrderId (gateway ID)
+5. **Config scoping** - All queries filtered by gatewayConfigId to prevent cross-config pollution
+6. **Organization isolation** - Config belongs to specific org, impossible to cross-pollute
+7. **Security logging** - Invalid tokens, signatures, and attempts logged for monitoring
+
+**Six Sigma Traceability:**
+- `internalOrderId`: Our generated ID sent to gateway (e.g., `ORD_1701234567_abc123`)
+- `gatewayOrderId`: Gateway's native order ID (e.g., Razorpay `order_xyz`, Stripe `pi_abc`)
+- `payments.id`: Database primary key UUID
+- Webhooks matched by ANY of these IDs for 100% reconciliation reliability
+
+**Credential Rotation:**
+When updating webhook secrets in gateway configuration:
+1. All cached gateway instances for that organization are flushed immediately
+2. New webhook token generated automatically
+3. Update gateway dashboard with new webhook URL
+4. No server restart required - credential rotation is instant
 
 ---
 
