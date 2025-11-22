@@ -369,6 +369,44 @@ async function sendSMSVerification(
  * @param app Express application
  */
 export async function registerRoutesOnly(app: Express): Promise<void> {
+  // ==================== GLOBAL ORGANIZATION SCOPE ENFORCEMENT ====================
+  // Defense-in-depth: Enforce organization scope on ALL authenticated API routes
+  // This middleware works in conjunction with database RLS for complete multi-tenant isolation
+  // CRITICAL: Applied AFTER authentication routes but enforces org scope on ALL subsequent routes
+  
+  // List of unauthenticated routes that should bypass organization enforcement
+  const unauthenticatedRoutes = [
+    '/api/health',
+    '/api/diagnostics',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/register-with-code',
+    '/api/auth/verify-email',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/auth/check-email',
+    '/api/invitations/accept',
+    '/api/portal/login',
+    '/api/sso/login',
+    '/api/sso/callback',
+  ];
+  
+  // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
+  app.use('/api/*', (req, res, next) => {
+    // Skip unauthenticated routes
+    if (unauthenticatedRoutes.some(route => req.path.startsWith(route))) {
+      return next();
+    }
+    
+    // For all other routes, chain authentication + organization enforcement
+    // This ensures requireAuth runs FIRST, then enforceOrganizationScope
+    return requireAuth(req, res, (err) => {
+      if (err) return next(err);
+      // Now req.user is populated, apply organization scope
+      return enforceOrganizationScope(req, res, next);
+    });
+  });
+  
   // Helper function to format user response with roleName
   async function formatUserResponse(user: any) {
     if (!user) return null;
@@ -3380,7 +3418,7 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
 
   // ==================== Workflow Routes ====================
   
-  app.get("/api/workflows", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+  app.get("/api/workflows", ...requireAuthWithOrg, requirePermission("workflows.view"), async (req: Request, res: Response) => {
     try {
       // Super admin (platform-scoped) can see all workflows
       if (!req.user!.organizationId) {
@@ -3412,7 +3450,7 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
-  app.post("/api/workflows", requireAuth, requirePermission("workflows.create"), async (req: Request, res: Response) => {
+  app.post("/api/workflows", ...requireAuthWithOrg, requirePermission("workflows.create"), async (req: Request, res: Response) => {
     try {
       const workflow = await storage.createWorkflow({
         ...req.body,
@@ -5872,7 +5910,7 @@ Title:`;
 
   // ==================== Document Routes ====================
   
-  app.get("/api/documents", requireAuth, requirePermission("documents.view"), async (req: Request, res: Response) => {
+  app.get("/api/documents", ...requireAuthWithOrg, requirePermission("documents.view"), async (req: Request, res: Response) => {
     try {
       const role = await storage.getRole(req.user!.roleId);
       let documents;
@@ -5891,7 +5929,7 @@ Title:`;
     }
   });
 
-  app.post("/api/documents", requireAuth, requirePermission("documents.upload"), upload.single('file'), async (req: Request, res: Response) => {
+  app.post("/api/documents", ...requireAuthWithOrg, requirePermission("documents.upload"), upload.single('file'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -6339,7 +6377,7 @@ Title:`;
 
   // ==================== Client Routes ====================
   
-  app.get("/api/clients", requireAuth, requirePermission("clients.view"), async (req: Request, res: Response) => {
+  app.get("/api/clients", ...requireAuthWithOrg, requirePermission("clients.view"), async (req: Request, res: Response) => {
     try {
       const clients = await storage.getClientsByOrganization(req.user!.organizationId!);
       res.json(clients);
@@ -6348,7 +6386,7 @@ Title:`;
     }
   });
 
-  app.post("/api/clients", requireAuth, requirePermission("clients.create"), async (req: Request, res: Response) => {
+  app.post("/api/clients", ...requireAuthWithOrg, requirePermission("clients.create"), async (req: Request, res: Response) => {
     try {
       const validated = insertClientSchema.parse(req.body);
       const client = await storage.createClient({
