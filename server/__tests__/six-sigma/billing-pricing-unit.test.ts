@@ -5,9 +5,9 @@
  */
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { testDb as db } from '../test-db';
+import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
-import { clearDatabase } from './helpers';
+import { clearDatabase } from '../helpers';
 
 describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
   let aiPlanId: string;
@@ -50,7 +50,7 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
     const finalPrice = basePrice * parseFloat(trRegion.priceMultiplier);
     
     expect(finalPrice).toBeCloseTo(9.20, 2);
-    expect(inRegion.priceMultiplier).toBe('0.400');
+    expect(trRegion.priceMultiplier).toBe('0.400');
     expect(trRegion.currency).toBe('TRY');
   });
 

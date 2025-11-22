@@ -6,12 +6,12 @@
 
 import { describe, test, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import app from '../test-app';
-import { testDb as db } from '../test-db';
+import app from '../../test-app';
+import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { createTestOrganization, createTestUser, loginUser, clearDatabase, clearRoleCache } from './helpers';
-import { resetRateLimiters } from '../rate-limit';
+import { createTestOrganization, createTestUser, loginUser, clearDatabase, clearRoleCache } from '../helpers';
+import { resetRateLimiters } from '../../rate-limit';
 
 describe('Six Sigma Billing - Trial to Paid Conversion', () => {
   let authToken: string;

@@ -25,15 +25,20 @@ if (process.env.NODE_ENV !== 'test') {
 
 console.log('🧪 Test database configured (same as dev, with cleanup)');
 
-// ONE-TIME SETUP: Seed roles/permissions before ALL tests
+// ONE-TIME SETUP: Seed roles/permissions/billing data before ALL tests
 beforeAll(async () => {
   try {
     // Import ensureRolesExist to seed roles/permissions once
     const { ensureRolesExist } = await import('./helpers');
     await ensureRolesExist();
     console.log('✅ Test roles and permissions seeded');
+    
+    // Import and seed billing data (subscription plans + pricing regions)
+    const { seedBillingData } = await import('../seed-billing');
+    await seedBillingData();
+    console.log('✅ Test billing data seeded (plans + regions)');
   } catch (error) {
-    console.error('❌ Error seeding roles/permissions:', error);
+    console.error('❌ Error seeding test data:', error);
     throw error;
   }
 });

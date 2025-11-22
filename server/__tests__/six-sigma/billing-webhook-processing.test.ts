@@ -6,10 +6,10 @@
  */
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { testDb as db } from '../test-db';
+import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { clearDatabase } from './helpers';
+import { clearDatabase } from '../helpers';
 
 describe('Six Sigma Billing - Webhook Event Processing', () => {
   beforeEach(async () => {
