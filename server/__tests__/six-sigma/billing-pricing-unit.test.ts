@@ -8,6 +8,7 @@ import { describe, test, expect, beforeEach } from 'vitest';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { clearDatabase } from '../helpers';
+import { PLAN_PRICES, REGION_MULTIPLIERS } from './billing-test-constants';
 
 describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
   let aiPlanId: string;
@@ -54,73 +55,73 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
     expect(trRegion.currency).toBe('TRY');
   });
 
-  test('TC-PRICE-004: Brazil (0.45x) - PPP discount $10.35', async () => {
-    const brRegion = regions.find(r => r.code === 'BR')!;
-    const basePrice = 23;
-    const finalPrice = basePrice * parseFloat(brRegion.priceMultiplier);
+  test('TC-PRICE-004: UAE/GCC (1.0x) - Premium pricing $23', async () => {
+    const aeRegion = regions.find(r => r.code === 'AE')!;
+    const basePrice = PLAN_PRICES.AI.monthly;
+    const finalPrice = basePrice * parseFloat(aeRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(10.35, 2);
-    expect(brRegion.priceMultiplier).toBe('0.450');
-    expect(brRegion.currency).toBe('BRL');
+    expect(finalPrice).toBe(23);
+    expect(aeRegion.priceMultiplier).toBe('1.000');
+    expect(aeRegion.currency).toBe('AED');
   });
 
-  test('TC-PRICE-005: Mexico (0.55x) - PPP discount $12.65', async () => {
-    const mxRegion = regions.find(r => r.code === 'MX')!;
-    const basePrice = 23;
-    const finalPrice = basePrice * parseFloat(mxRegion.priceMultiplier);
+  test('TC-PRICE-005: Rest of World (0.70x) - Global discount $16.10', async () => {
+    const globalRegion = regions.find(r => r.code === 'GLOBAL')!;
+    const basePrice = PLAN_PRICES.AI.monthly;
+    const finalPrice = basePrice * parseFloat(globalRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(12.65, 2);
-    expect(mxRegion.priceMultiplier).toBe('0.550');
-    expect(mxRegion.currency).toBe('MXN');
+    expect(finalPrice).toBeCloseTo(16.10, 2);
+    expect(globalRegion.priceMultiplier).toBe('0.700');
+    expect(globalRegion.currency).toBe('USD');
   });
 
-  test('TC-PRICE-006: EU (0.85x) - PPP discount $19.55', async () => {
+  test('TC-PRICE-006: EU (0.93x) - Currency adjustment €21.39', async () => {
     const euRegion = regions.find(r => r.code === 'EU')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(euRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(19.55, 2);
-    expect(euRegion.priceMultiplier).toBe('0.850');
+    expect(finalPrice).toBeCloseTo(21.39, 2);
+    expect(euRegion.priceMultiplier).toBe('0.930');
     expect(euRegion.currency).toBe('EUR');
   });
 
-  test('TC-PRICE-007: UK (0.90x) - PPP discount $20.70', async () => {
+  test('TC-PRICE-007: UK (0.79x) - Currency adjustment £18.17', async () => {
     const gbRegion = regions.find(r => r.code === 'GB')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(gbRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(20.70, 2);
-    expect(gbRegion.priceMultiplier).toBe('0.900');
+    expect(finalPrice).toBeCloseTo(18.17, 2);
+    expect(gbRegion.priceMultiplier).toBe('0.790');
     expect(gbRegion.currency).toBe('GBP');
   });
 
-  test('TC-PRICE-008: Canada (0.80x) - PPP discount $18.40', async () => {
+  test('TC-PRICE-008: Canada (1.39x) - Currency adjustment C$31.97', async () => {
     const caRegion = regions.find(r => r.code === 'CA')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(caRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(18.40, 2);
-    expect(caRegion.priceMultiplier).toBe('0.800');
+    expect(finalPrice).toBeCloseTo(31.97, 2);
+    expect(caRegion.priceMultiplier).toBe('1.390');
     expect(caRegion.currency).toBe('CAD');
   });
 
-  test('TC-PRICE-009: Australia (0.85x) - PPP discount $19.55', async () => {
+  test('TC-PRICE-009: Australia (1.52x) - Currency adjustment A$34.96', async () => {
     const auRegion = regions.find(r => r.code === 'AU')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(auRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(19.55, 2);
-    expect(auRegion.priceMultiplier).toBe('0.850');
+    expect(finalPrice).toBeCloseTo(34.96, 2);
+    expect(auRegion.priceMultiplier).toBe('1.520');
     expect(auRegion.currency).toBe('AUD');
   });
 
-  test('TC-PRICE-010: Singapore (0.90x) - PPP discount $20.70', async () => {
+  test('TC-PRICE-010: Singapore (1.35x) - Currency adjustment S$31.05', async () => {
     const sgRegion = regions.find(r => r.code === 'SG')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(sgRegion.priceMultiplier);
     
-    expect(finalPrice).toBeCloseTo(20.70, 2);
-    expect(sgRegion.priceMultiplier).toBe('0.900');
+    expect(finalPrice).toBeCloseTo(31.05, 2);
+    expect(sgRegion.priceMultiplier).toBe('1.350');
     expect(sgRegion.currency).toBe('SGD');
   });
 });
@@ -171,7 +172,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
     const volumeDiscount = 7; // 10+ seats = 7% discount
     
     const total = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
-    expect(total).toBeCloseTo(216.37, 2); // $23 + 9*$23*0.93
+    expect(total).toBeCloseTo(215.51, 2); // $23 + 9*$23*0.93
   });
 
   test('TC-PRICE-014: 25 seats - Tier 3 discount (10%)', async () => {
@@ -182,7 +183,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
     const volumeDiscount = 10; // 25+ seats = 10% discount
     
     const total = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
-    expect(total).toBeCloseTo(520.20, 2); // $23 + 24*$23*0.90
+    expect(total).toBeCloseTo(519.80, 2); // $23 + 24*$23*0.90
   });
 
   test('TC-PRICE-015: 50 seats - Tier 4 discount (12%)', async () => {
@@ -193,7 +194,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
     const volumeDiscount = 12; // 50+ seats = 12% discount
     
     const total = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
-    expect(total).toBeCloseTo(1017.08, 2); // $23 + 49*$23*0.88
+    expect(total).toBeCloseTo(1014.76, 2); // $23 + 49*$23*0.88
   });
 
   test('TC-PRICE-016: 100 seats - Tier 5 discount (15%)', async () => {
@@ -204,7 +205,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
     const volumeDiscount = 15; // 100+ seats = 15% discount
     
     const total = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
-    expect(total).toBeCloseTo(1959.55, 2); // $23 + 99*$23*0.85
+    expect(total).toBeCloseTo(1958.45, 2); // $23 + 99*$23*0.85
   });
 });
 
@@ -348,8 +349,8 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
     const afterVolumeDiscount = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
     const final = afterVolumeDiscount * (1 - couponDiscount / 100);
     
-    expect(afterVolumeDiscount).toBeCloseTo(216.37, 2);
-    expect(final).toBeCloseTo(162.28, 2);
+    expect(afterVolumeDiscount).toBeCloseTo(215.51, 2);
+    expect(final).toBeCloseTo(161.63, 2);
   });
 
   test('TC-PRICE-027: Fixed amount coupon + PPP multiplier', async () => {
@@ -376,7 +377,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
     
     expect(afterBillingDiscount).toBeCloseTo(18.69, 2);
     expect(final).toBeCloseTo(16.82, 2);
-    expect(yearlyTotal).toBeCloseTo(201.84, 2);
+    expect(yearlyTotal).toBeCloseTo(201.85, 2);
   });
 
   test('TC-PRICE-029: All discounts combined (PPP + Volume + Yearly + Coupon)', async () => {
@@ -459,7 +460,7 @@ describe('Six Sigma Billing - Edge Cases & Validation', () => {
     const total = basePrice + (additionalSeats * basePrice * (1 - volumeDiscount / 100));
     
     expect(total).toBeGreaterThan(0);
-    expect(total).toBeCloseTo(195566.55, 2);
+    expect(total).toBeCloseTo(195503.45, 2);
   });
 
   test('TC-PRICE-036: Null PPP multiplier - Default to 1.0x', async () => {
@@ -585,11 +586,11 @@ describe('Six Sigma Billing - Multi-Plan Pricing Consistency', () => {
     expect(aiPlan.basePriceMonthly).toBe('23.00');
   });
 
-  test('TC-PRICE-047: Edge plan monthly price = $49', async () => {
+  test('TC-PRICE-047: Edge plan monthly price = $38', async () => {
     const plans = await db.select().from(schema.subscriptionPlans);
     const edgePlan = plans.find(p => p.id === edgePlanId)!;
     
-    expect(edgePlan.basePriceMonthly).toBe('49.00');
+    expect(edgePlan.basePriceMonthly).toBe('38.00');
   });
 
   test('TC-PRICE-048: AI plan is 2.56x more expensive than Core', async () => {
@@ -640,7 +641,7 @@ describe('Six Sigma Billing - Seat Addition Scenarios', () => {
     const billableSeats = newTotal - includedSeats;
     const monthlyPrice = basePrice + (billableSeats * basePrice * (1 - volumeDiscount / 100));
     
-    expect(monthlyPrice).toBeCloseTo(322.02, 2);
+    expect(monthlyPrice).toBeCloseTo(322.46, 2);
   });
 
   test('TC-PRICE-053: Add 100 seats to 1-seat plan (max volume discount)', async () => {
@@ -652,7 +653,7 @@ describe('Six Sigma Billing - Seat Addition Scenarios', () => {
     
     const monthlyPrice = basePrice + (billableSeats * basePrice * (1 - volumeDiscount / 100));
     
-    expect(monthlyPrice).toBeCloseTo(1982.50, 2);
+    expect(monthlyPrice).toBeCloseTo(1978.00, 2);
   });
 });
 
