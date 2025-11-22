@@ -10,8 +10,9 @@ import app from '../../test-app';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { createTestOrganization, createTestUser, loginUser, clearDatabase, clearRoleCache } from '../helpers';
 import { resetRateLimiters } from '../../rate-limit';
+import { createTestOrganization, createTestUser, loginUser, clearRoleCache, clearMutableTestData } from '../helpers';
+import { PLAN_PRICES, REGION_MULTIPLIERS } from './billing-test-constants';
 
 describe('Six Sigma Billing - Stripe Integration', () => {
   let authToken: string;
@@ -19,7 +20,7 @@ describe('Six Sigma Billing - Stripe Integration', () => {
   let stripeConfigId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -267,7 +268,7 @@ describe('Six Sigma Billing - Razorpay Integration', () => {
   let razorpayConfigId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -516,7 +517,7 @@ describe('Six Sigma Billing - Gateway Failover', () => {
   let organizationId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -634,7 +635,7 @@ describe('Six Sigma Billing - Idempotency', () => {
   let organizationId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -806,7 +807,7 @@ describe('Six Sigma Billing - Failed Payment Handling', () => {
   let organizationId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -924,7 +925,7 @@ describe('Six Sigma Billing - Refund Edge Cases', () => {
   let organizationId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 

@@ -10,7 +10,6 @@ import app from '../../test-app';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { createTestOrganization, loginUser, clearDatabase, clearRoleCache } from '../helpers';
 import { resetRateLimiters } from '../../rate-limit';
 
 describe('Six Sigma Billing - Concurrent Subscription Operations', () => {
@@ -18,7 +17,7 @@ describe('Six Sigma Billing - Concurrent Subscription Operations', () => {
   let organizationIds: string[] = [];
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -188,7 +187,7 @@ describe('Six Sigma Billing - Bulk Operations', () => {
   let organizationId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -361,7 +360,7 @@ describe('Six Sigma Billing - Bulk Operations', () => {
 
 describe('Six Sigma Billing - Performance Benchmarks', () => {
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
   });

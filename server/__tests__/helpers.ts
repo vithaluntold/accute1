@@ -704,8 +704,46 @@ export async function loginUser(email: string, password: string, organizationId?
 }
 
 /**
+ * Clear ONLY mutable test data from database
+ * Preserves reference data: roles, permissions, subscription plans, pricing regions
+ * Use this for billing tests to maintain reference data seeded in setup.ts
+ */
+export async function clearMutableTestData() {
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('clearMutableTestData can only be called in test environment!');
+  }
+  
+  // Clear only mutable tables (organizations, users, subscriptions, payments, webhooks)
+  // Preserve reference tables (roles, permissions, subscriptionPlans, pricingRegions)
+  const safeDelete = async (table: any, tableName: string) => {
+    try {
+      await db.delete(table);
+    } catch (error: any) {
+      if (!error?.message?.includes('does not exist')) {
+        console.error(`Error clearing table ${tableName}:`, error);
+        throw error;
+      }
+    }
+  };
+  
+  // Clear in correct order to avoid foreign key violations
+  // Billing tables that reference organizations
+  await safeDelete(schema.subscriptionEvents, 'subscriptionEvents');
+  await safeDelete(schema.subscriptionInvoices, 'subscriptionInvoices');
+  await safeDelete(schema.couponRedemptions, 'couponRedemptions');
+  await safeDelete(schema.platformSubscriptions, 'platformSubscriptions');
+  
+  // User/org tables
+  await safeDelete(schema.users, 'users');
+  await safeDelete(schema.organizations, 'organizations');
+  
+  // NOTE: Preserves reference data: roles, permissions, subscriptionPlans, pricingRegions
+}
+
+/**
  * Clear all test data from database
  * CRITICAL: Only use in NODE_ENV=test
+ * WARNING: This clears reference data too - use clearMutableTestData() for billing tests
  */
 export async function clearDatabase() {
   if (process.env.NODE_ENV !== 'test') {

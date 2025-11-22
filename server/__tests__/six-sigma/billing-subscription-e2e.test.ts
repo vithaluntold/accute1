@@ -10,7 +10,6 @@ import app from '../../test-app';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { createTestOrganization, createTestUser, loginUser, clearDatabase, clearRoleCache } from '../helpers';
 import { resetRateLimiters } from '../../rate-limit';
 
 describe('Six Sigma Billing - Trial to Paid Conversion', () => {
@@ -20,7 +19,7 @@ describe('Six Sigma Billing - Trial to Paid Conversion', () => {
   let usRegionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -137,7 +136,7 @@ describe('Six Sigma Billing - Plan Upgrades', () => {
   let subscriptionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -289,7 +288,7 @@ describe('Six Sigma Billing - Plan Downgrades', () => {
   let subscriptionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -436,7 +435,7 @@ describe('Six Sigma Billing - Seat Management', () => {
   let subscriptionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -554,7 +553,7 @@ describe('Six Sigma Billing - Billing Cycle Changes', () => {
   let subscriptionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 
@@ -689,7 +688,7 @@ describe('Six Sigma Billing - Subscription Renewal', () => {
   let subscriptionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     resetRateLimiters();
     clearRoleCache();
 

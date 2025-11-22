@@ -9,11 +9,10 @@ import { describe, test, expect, beforeEach } from 'vitest';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
 import { eq } from 'drizzle-orm';
-import { clearDatabase } from '../helpers';
 
 describe('Six Sigma Billing - Webhook Event Processing', () => {
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
   });
 
   test('TC-WEBHOOK-001: payment.succeeded event updates subscription status', async () => {
@@ -387,7 +386,7 @@ describe('Six Sigma Billing - Webhook Event Processing', () => {
 
 describe('Six Sigma Billing - Webhook Reliability', () => {
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
   });
 
   test('TC-WEBHOOK-010: Event deduplication prevents double processing', async () => {

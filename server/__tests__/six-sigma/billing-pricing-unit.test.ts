@@ -7,7 +7,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { testDb as db } from '../../test-db';
 import * as schema from '@shared/schema';
-import { clearDatabase } from '../helpers';
 import { PLAN_PRICES, REGION_MULTIPLIERS } from './billing-test-constants';
 
 describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
@@ -15,7 +14,9 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
   let regions: typeof schema.pricingRegions.$inferSelect[];
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
+    // NOTE: Don't call clearDatabase() - billing plans/regions are reference data seeded in setup.ts
+    // They should persist across all tests and don't change during test execution
     
     const plans = await db.select().from(schema.subscriptionPlans);
     const aiPlan = plans.find(p => p.slug === 'ai');
@@ -27,7 +28,7 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
 
   test('TC-PRICE-001: USA (1.0x) - Full price $23', async () => {
     const usRegion = regions.find(r => r.code === 'US')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(usRegion.priceMultiplier);
     
     expect(finalPrice).toBe(23);
@@ -37,7 +38,7 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
 
   test('TC-PRICE-002: India (0.35x) - PPP discount $8.05', async () => {
     const inRegion = regions.find(r => r.code === 'IN')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(inRegion.priceMultiplier);
     
     expect(finalPrice).toBeCloseTo(8.05, 2);
@@ -47,7 +48,7 @@ describe('Six Sigma Billing - PPP Multiplier Pricing (10 regions)', () => {
 
   test('TC-PRICE-003: Turkey (0.40x) - PPP discount $9.20', async () => {
     const trRegion = regions.find(r => r.code === 'TR')!;
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const finalPrice = basePrice * parseFloat(trRegion.priceMultiplier);
     
     expect(finalPrice).toBeCloseTo(9.20, 2);
@@ -131,7 +132,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   let regionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     
     const plans = await db.select().from(schema.subscriptionPlans);
     const aiPlan = plans.find(p => p.slug === 'ai');
@@ -145,7 +146,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-011: 1 seat - No volume discount (0%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 1;
     const volumeDiscount = 0;
     
@@ -154,7 +155,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-012: 5 seats - Tier 1 discount (5%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 5;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -165,7 +166,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-013: 10 seats - Tier 2 discount (7%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 10;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -176,7 +177,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-014: 25 seats - Tier 3 discount (10%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 25;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -187,7 +188,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-015: 50 seats - Tier 4 discount (12%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 50;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -198,7 +199,7 @@ describe('Six Sigma Billing - Volume Discount Tiers', () => {
   });
 
   test('TC-PRICE-016: 100 seats - Tier 5 discount (15%)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 100;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -214,7 +215,7 @@ describe('Six Sigma Billing - Billing Cycle Discounts', () => {
   let regionId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     
     const plans = await db.select().from(schema.subscriptionPlans);
     const aiPlan = plans.find(p => p.slug === 'ai');
@@ -228,7 +229,7 @@ describe('Six Sigma Billing - Billing Cycle Discounts', () => {
   });
 
   test('TC-PRICE-017: Monthly billing - No discount', async () => {
-    const monthlyPrice = 23;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
     const billingCycleDiscount = 0;
     
     const finalPrice = monthlyPrice * (1 - billingCycleDiscount / 100);
@@ -236,7 +237,7 @@ describe('Six Sigma Billing - Billing Cycle Discounts', () => {
   });
 
   test('TC-PRICE-018: Yearly billing - 11% discount', async () => {
-    const monthlyPrice = 23;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
     const yearlyBase = 21; // $21/mo when billed yearly
     const billingCycleDiscount = 11;
     
@@ -248,7 +249,7 @@ describe('Six Sigma Billing - Billing Cycle Discounts', () => {
   });
 
   test('TC-PRICE-019: 3-year billing - 20% discount', async () => {
-    const monthlyPrice = 23;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
     const threeYearBase = 18; // $18/mo when billed 3-year
     const billingCycleDiscount = 20;
     
@@ -338,7 +339,7 @@ describe('Six Sigma Billing - Proration Calculations', () => {
 
 describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   test('TC-PRICE-026: Percentage coupon + Volume discount', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 10;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -354,7 +355,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   });
 
   test('TC-PRICE-027: Fixed amount coupon + PPP multiplier', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const pppMultiplier = 0.35; // India
     const couponAmount = 5; // $5 off
     
@@ -366,7 +367,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   });
 
   test('TC-PRICE-028: Percentage coupon + Yearly discount', async () => {
-    const monthlyPrice = 23;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
     const yearlyBase = 21;
     const billingCycleDiscount = 11;
     const couponDiscount = 10; // 10% coupon
@@ -381,7 +382,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   });
 
   test('TC-PRICE-029: All discounts combined (PPP + Volume + Yearly + Coupon)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 25;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -403,7 +404,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   });
 
   test('TC-PRICE-030: Coupon with minimum purchase requirement', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 1;
     const total = basePrice * seats;
     const couponMinimum = 50;
@@ -417,7 +418,7 @@ describe('Six Sigma Billing - Coupon Stacking & Combinations', () => {
   });
 
   test('TC-PRICE-031: Coupon exceeds total price - Floor at $0', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const pppMultiplier = 0.35; // India $8.05
     const couponAmount = 10; // $10 off (more than price)
     
@@ -451,7 +452,7 @@ describe('Six Sigma Billing - Edge Cases & Validation', () => {
   });
 
   test('TC-PRICE-035: Extremely large seat count (10,000)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const seats = 10000;
     const includedSeats = 1;
     const additionalSeats = seats - includedSeats;
@@ -464,7 +465,7 @@ describe('Six Sigma Billing - Edge Cases & Validation', () => {
   });
 
   test('TC-PRICE-036: Null PPP multiplier - Default to 1.0x', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const pppMultiplier = null;
     const effectiveMultiplier = pppMultiplier ?? 1.0;
     
@@ -556,7 +557,7 @@ describe('Six Sigma Billing - Multi-Plan Pricing Consistency', () => {
   let edgePlanId: string;
 
   beforeEach(async () => {
-    await clearDatabase();
+    await clearMutableTestData();
     
     const plans = await db.select().from(schema.subscriptionPlans);
     const corePlan = plans.find(p => p.slug === 'core');
@@ -610,8 +611,8 @@ describe('Six Sigma Billing - Multi-Plan Pricing Consistency', () => {
   });
 
   test('TC-PRICE-050: Yearly pricing saves 11% on AI plan', async () => {
-    const monthlyPrice = 23;
-    const yearlyPrice = 21;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
+    const yearlyPrice = PLAN_PRICES.AI.yearly;
     const savings = ((monthlyPrice - yearlyPrice) / monthlyPrice) * 100;
     
     expect(savings).toBeCloseTo(8.7, 1);
@@ -621,7 +622,7 @@ describe('Six Sigma Billing - Multi-Plan Pricing Consistency', () => {
 
 describe('Six Sigma Billing - Seat Addition Scenarios', () => {
   test('TC-PRICE-051: Add 1 seat to 1-seat plan', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const currentSeats = 1;
     const additionalSeats = 1;
     const newTotal = currentSeats + additionalSeats;
@@ -631,7 +632,7 @@ describe('Six Sigma Billing - Seat Addition Scenarios', () => {
   });
 
   test('TC-PRICE-052: Add 10 seats to 5-seat plan (crosses volume tier)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const currentSeats = 5;
     const additionalSeats = 10;
     const newTotal = currentSeats + additionalSeats; // 15 seats
@@ -645,7 +646,7 @@ describe('Six Sigma Billing - Seat Addition Scenarios', () => {
   });
 
   test('TC-PRICE-053: Add 100 seats to 1-seat plan (max volume discount)', async () => {
-    const basePrice = 23;
+    const basePrice = PLAN_PRICES.AI.monthly;
     const newTotal = 101;
     const volumeDiscount = 15; // 100+ seats
     const includedSeats = 1;
@@ -659,8 +660,8 @@ describe('Six Sigma Billing - Seat Addition Scenarios', () => {
 
 describe('Six Sigma Billing - Annual Commitment Savings', () => {
   test('TC-PRICE-054: 1-year commitment - 11% savings', async () => {
-    const monthlyPrice = 23;
-    const yearlyPrice = 21;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
+    const yearlyPrice = PLAN_PRICES.AI.yearly;
     const monthsInYear = 12;
     
     const monthlyTotal = monthlyPrice * monthsInYear; // $276
@@ -674,7 +675,7 @@ describe('Six Sigma Billing - Annual Commitment Savings', () => {
   });
 
   test('TC-PRICE-055: 3-year commitment - 20% savings', async () => {
-    const monthlyPrice = 23;
+    const monthlyPrice = PLAN_PRICES.AI.monthly;
     const threeYearBase = 18;
     const threeYearDiscount = 20;
     const monthsIn3Years = 36;
