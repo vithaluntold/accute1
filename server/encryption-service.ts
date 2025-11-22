@@ -48,6 +48,19 @@ class EncryptionService {
   }
 
   /**
+   * Reset singleton instance and re-initialize with current ENCRYPTION_KEY
+   * ⚠️ TEST ONLY - Simulates server restart with new encryption key
+   * DO NOT USE IN PRODUCTION
+   */
+  public static resetInstance(): void {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('resetInstance() can only be called in test environment');
+    }
+    EncryptionService.instance = new EncryptionService();
+    console.debug('🔄 Encryption service reset (test mode)');
+  }
+
+  /**
    * Initialize encryption key with proper validation
    * @private
    */
@@ -307,11 +320,22 @@ class EncryptionService {
           console.info('✅ Successfully decrypted using legacy AES-256-CBC format');
           return legacyDecrypted;
         } catch (legacyError: any) {
-          console.error('❌ Both GCM and CBC decryption failed, returning original value', {
+          // CRITICAL SECURITY FIX: Fail loudly instead of returning ciphertext as plaintext
+          console.error('🚨 CRITICAL: Failed to decrypt credential with both GCM and CBC', {
             gcmError: error.message,
-            cbcError: legacyError.message
+            cbcError: legacyError.message,
+            possibleCauses: ['Encryption key changed', 'Data corruption', 'Data tampering'],
+            action: 'Throwing error to prevent silent failures'
           });
-          return value; // Return original if both fail
+          
+          // TODO: Alert monitoring system (PagerDuty, Slack, etc.)
+          // alertOps({ severity: 'critical', message: 'Encryption decryption failure', context: { gcmError, cbcError } });
+          
+          throw new Error(
+            'Failed to decrypt credential: ENCRYPTION_KEY may have changed. ' +
+            'Please verify ENCRYPTION_KEY configuration and run credential re-encryption if needed. ' +
+            `GCM error: ${error.message}. CBC error: ${legacyError.message}`
+          );
         }
       }
     }
@@ -323,20 +347,28 @@ class EncryptionService {
         console.info('✅ Successfully decrypted legacy AES-256-CBC credential');
         return legacyDecrypted;
       } catch (error: any) {
-        console.warn('⚠️ Failed to decrypt legacy CBC credential', {
+        // CRITICAL SECURITY FIX: Fail loudly for encrypted-looking data that won't decrypt
+        console.error('🚨 CRITICAL: Failed to decrypt legacy CBC credential', {
           errorMessage: error.message,
-          action: 'Treating as plaintext'
+          possibleCauses: ['Encryption key changed', 'Data corruption'],
+          action: 'Throwing error to prevent silent failures'
         });
+        
+        throw new Error(
+          'Failed to decrypt legacy CBC credential: ENCRYPTION_KEY may have changed. ' +
+          `Error: ${error.message}`
+        );
       }
     }
 
-    // Log plaintext detection for monitoring
+    // If value doesn't match any encrypted format, treat as plaintext (backward compatibility)
+    // This allows transition period where some credentials are still unencrypted
     console.debug('📊 SECURITY METRICS: Plaintext credential detected', {
       format: `${parts.length} parts`,
       recommendation: 'Consider encrypting for enhanced security'
     });
 
-    // Return as plaintext
+    // Return as plaintext (for values that were never encrypted)
     return value;
   }
 
@@ -479,6 +511,9 @@ export const encrypt = (text: string): string => encryptionService.encrypt(text)
 export const decrypt = (encryptedText: string): string => encryptionService.decrypt(encryptedText);
 export const safeDecrypt = (value: string | null | undefined): string | null => 
   encryptionService.safeDecrypt(value);
+
+// Test-only function to simulate server restart with new encryption key
+export const resetEncryptionService = (): void => EncryptionService.resetInstance();
 
 // Legacy compatibility function
 export const safeDecryptRazorpay = safeDecrypt;

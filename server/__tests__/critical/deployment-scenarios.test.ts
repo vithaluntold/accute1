@@ -20,7 +20,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { testDb as db } from '../../test-db';
-import { encrypt, decrypt } from '../../encryption-service';
+import { encrypt, decrypt, resetEncryptionService } from '../../encryption-service';
 import { llmConfigurations, clients, users, organizations } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { createTestOrganization, createUser } from '../helpers';
@@ -89,11 +89,15 @@ describe('P0 Deployment Scenarios - Six Sigma Critical', () => {
       const KEY_V2 = 'new-encryption-key-after-deployment-yyyyyyy';
       process.env.ENCRYPTION_KEY = KEY_V2;
       
+      // Simulate server restart (re-initialize encryption service with new key)
+      resetEncryptionService();
+      
       // CRITICAL TEST: Attempt to decrypt old credentials with new key
       // This MUST fail (and should alert monitoring)
+      // After our fix, safeDecrypt now throws instead of returning garbage
       expect(() => {
         decrypt(config.apiKeyEncrypted);
-      }).toThrow(/decrypt|invalid|failed/i);
+      }).toThrow(/decrypt|invalid|failed|ENCRYPTION_KEY|changed/i);
       
       // In production, this would trigger:
       // - LLM API calls to fail with "invalid API key"
@@ -125,6 +129,9 @@ describe('P0 Deployment Scenarios - Six Sigma Critical', () => {
       // Simulate server restart with different key
       const KEY_V2 = 'key-v2-32-characters-long-yyyyyyyyyyyyyy';
       process.env.ENCRYPTION_KEY = KEY_V2;
+      
+      // Simulate server restart (re-initialize encryption service with new key)
+      resetEncryptionService();
       
       // On startup, system should validate all encrypted credentials
       const configs = await db.query.llmConfigurations.findMany({
@@ -223,7 +230,8 @@ describe('P0 Deployment Scenarios - Six Sigma Critical', () => {
     it('should BLOCK cross-org client access at database level', async () => {
       // Create client in Org 1
       const [org1Client] = await db.insert(clients).values({
-        name: 'Org 1 Client',
+        companyName: 'Org 1 Client Company',
+        contactName: 'John Doe',
         email: 'client1@org1.com',
         organizationId: org1Id,
         createdBy: org1UserId,
@@ -231,7 +239,8 @@ describe('P0 Deployment Scenarios - Six Sigma Critical', () => {
       
       // Create client in Org 2
       const [org2Client] = await db.insert(clients).values({
-        name: 'Org 2 Client',
+        companyName: 'Org 2 Client Company',
+        contactName: 'Jane Smith',
         email: 'client2@org2.com',
         organizationId: org2Id,
         createdBy: org2UserId,
