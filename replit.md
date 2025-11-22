@@ -2,6 +2,16 @@
 Accute is an AI-native platform designed for accounting firms to automate workflows, enhance operational efficiency, and ensure robust compliance. It features multi-agent orchestration, an extensive template library, support for multiple AI providers, and a dedicated AI agent marketplace. The platform aims to revolutionize accounting practices with advanced AI capabilities, targeting significant global market share.
 
 ## Recent Security Implementation (November 22, 2025)
+
+### Critical Production Bug Fix - Encryption Service (DEPLOYED)
+**safeDecrypt Silent Failure Vulnerability**
+- 🐛 **Bug Found**: safeDecrypt returned ciphertext as plaintext when decryption failed
+- ✅ **Fixed**: Now throws loud error with actionable message
+- 🔍 **Found By**: Intelligent test methodology (encryption key rotation scenario)
+- 📝 **Documentation**: CRITICAL_BUG_FOUND_SAFEdecrypt.md
+- **Impact**: Prevents silent credential corruption on ENCRYPTION_KEY changes
+- **Status**: Production-ready, deployed
+
 **Row Level Security (RLS) - PRODUCTION READY**
 - ✅ 87 tables with RLS enabled (100% multi-tenant coverage)
 - ✅ 347 comprehensive policies (SELECT/INSERT/UPDATE/DELETE per table)
