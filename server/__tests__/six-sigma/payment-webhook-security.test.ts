@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../index';
+import app, { initPromise } from '../../test-app';
 import { db } from '../../db';
 import { paymentGatewayConfigs, webhookEvents, payments, organizations, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
@@ -26,6 +26,9 @@ describe('SIX SIGMA: Payment Webhook Security', () => {
   const createdIds: { table: string; id: string }[] = [];
 
   beforeEach(async () => {
+    // Wait for app initialization
+    await initPromise;
+    
     // Create isolated test organization
     testOrgId = `test_org_${crypto.randomUUID()}`;
     const [org] = await db.insert(organizations).values({
