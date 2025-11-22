@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 // Helper: Validate ENCRYPTION_KEY has proper byte entropy
 function validateEncryptionKey(key: string): boolean {
   // Accept base64 encoded 32+ bytes (44+ chars for 32 bytes in base64)
@@ -109,9 +111,23 @@ function validateEnvironment() {
 // Run validation before any imports that might use these variables
 validateEnvironment();
 
+// Add global error handlers for better crash diagnostics
+process.on('uncaughtException', (error) => {
+  console.error('💥 UNCAUGHT EXCEPTION:', error);
+  console.error('Error stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 UNHANDLED PROMISE REJECTION at:', promise);
+  console.error('Reason:', reason);
+  process.exit(1);
+});
+
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
+import cors from "cors";
 import { registerRoutes, setInitializationStatus } from "./routes";
 import { setupVite, log } from "./vite";
 import { initializeSystem } from "./init";
@@ -136,6 +152,31 @@ const app = express();
 app.set("env", process.env.NODE_ENV || "development");
 
 app.use(cookieParser());
+
+// CORS Configuration - Allow accute.io and blueprint deployment
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'https://accute.io',
+  'https://www.accute.io',
+  'https://blueprint-v90c.onrender.com'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 
 declare module 'http' {
   interface IncomingMessage {
@@ -308,6 +349,11 @@ app.use((req, res, next) => {
     // CRITICAL: Initialize system FIRST to ensure agents are ready
     // This blocks until AI agents and LLM configs are initialized
     console.log('🔧 Starting system initialization...');
+    console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET (length: ' + process.env.DATABASE_URL.length + ')' : 'NOT SET'}`);
+    console.log(`   ENCRYPTION_KEY: ${process.env.ENCRYPTION_KEY ? 'SET (length: ' + process.env.ENCRYPTION_KEY.length + ')' : 'NOT SET'}`);
+    console.log(`   AZURE_OPENAI_API_KEY: ${process.env.AZURE_OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
+    
     try {
       await initializeSystem(app);
       console.log('✅ System initialized successfully');

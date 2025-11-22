@@ -1,4 +1,4 @@
-import { decrypt } from './crypto-utils';
+import { safeDecrypt } from './encryption-service';
 import { db } from './db';
 import { llmConfigurations, type LlmConfiguration } from '@shared/schema';
 import { and, eq, or, isNull } from 'drizzle-orm';
@@ -12,6 +12,7 @@ interface ResolveOptions {
   organizationId?: string;
   userId?: string;
   configId?: string;
+  workspaceId?: string; // Current workspace context
 }
 
 class ConfigResolver {
@@ -21,17 +22,30 @@ class ConfigResolver {
   private misses: number = 0;
   
   /**
-   * Resolve LLM configuration with caching and fallback logic
+   * Resolve LLM configuration with caching and workspace→organization fallback
    * Throws error if no configuration found
    */
   async resolve(options: ResolveOptions): Promise<LlmConfiguration> {
-    const { organizationId, userId, configId } = options;
+    const { organizationId, userId, configId, workspaceId } = options;
     
-    if (!organizationId) {
-      throw new Error('Organization access required to use AI agents');
+    // DEBUG: Log incoming parameters
+    console.log(`[ConfigResolver] resolve() called with:`, {
+      organizationId,
+      userId,
+      configId,
+      workspaceId
+    });
+    
+    // Use workspace context if available, fallback to organizationId
+    const effectiveOrgId = workspaceId || organizationId;
+    
+    console.log(`[ConfigResolver] effectiveOrgId:`, effectiveOrgId);
+    
+    if (!effectiveOrgId) {
+      throw new Error('Workspace or organization access required to use AI agents');
     }
     
-    const cacheKey = this.getCacheKey(organizationId, userId, configId);
+    const cacheKey = this.getCacheKey(effectiveOrgId, userId, configId);
     const cached = this.getCached(cacheKey);
     
     if (cached) {
@@ -43,16 +57,26 @@ class ConfigResolver {
     this.misses++;
     console.log(`[ConfigResolver] Cache MISS: ${cacheKey} (hit rate: ${this.getHitRate()}%)`);
     
-    const config = await this.fetchConfig(organizationId, userId, configId);
+    const config = await this.fetchConfigWithFallback(effectiveOrgId, organizationId, userId, configId);
     if (!config) {
-      console.log(`[ConfigResolver] No config found for user ${userId}, org ${organizationId}`);
+      console.log(`[ConfigResolver] No config found for workspace ${workspaceId}, org ${organizationId}, user ${userId}`);
       throw new Error('No active LLM configuration found. Please configure an AI provider in Workspace Settings or your User Settings.');
     }
     
     // Decrypt API key
     let decryptedKey: string;
     try {
-      decryptedKey = decrypt(config.apiKeyEncrypted);
+      // Validate that we have an encrypted API key
+      if (!config.apiKeyEncrypted || typeof config.apiKeyEncrypted !== 'string') {
+        throw new Error(`LLM configuration ${config.id} has no encrypted API key. Please reconfigure this AI provider.`);
+      }
+      
+      decryptedKey = safeDecrypt(config.apiKeyEncrypted);
+      
+      // Validate the decrypted key is not empty
+      if (!decryptedKey || decryptedKey.trim().length === 0) {
+        throw new Error(`LLM configuration ${config.id} has an empty API key after decryption.`);
+      }
     } catch (error) {
       console.error(`[ConfigResolver] Failed to decrypt API key for config ${config.id}:`, error);
       throw new Error('Failed to decrypt LLM credentials. Please contact your administrator.');
@@ -159,18 +183,20 @@ class ConfigResolver {
     });
   }
   
-  private async fetchConfig(
-    organizationId: string,
+  private async fetchConfigWithFallback(
+    workspaceId: string,
+    organizationId?: string,
     userId?: string,
     llmConfigId?: string
   ): Promise<LlmConfiguration | null> {
-    // If specific config ID requested, fetch it
+    // If specific config ID requested, fetch it directly
     if (llmConfigId) {
       const config = await db.query.llmConfigurations.findFirst({
         where: and(
           eq(llmConfigurations.id, llmConfigId),
           or(
-            eq(llmConfigurations.organizationId, organizationId),
+            eq(llmConfigurations.organizationId, workspaceId),
+            organizationId ? eq(llmConfigurations.organizationId, organizationId) : undefined,
             isNull(llmConfigurations.organizationId) // Allow system-wide configs
           ),
           eq(llmConfigurations.isActive, true)
@@ -178,14 +204,47 @@ class ConfigResolver {
       });
       
       if (!config) {
-        throw new Error('LLM configuration not found or is inactive');
+        console.log(`[ConfigResolver] Config ${llmConfigId} not found, trying fallback to any active config`);
+      } else if (!this.isValidEncryptedApiKey(config.apiKeyEncrypted)) {
+        console.error(`[ConfigResolver] Config ${config.id} has invalid encrypted API key, trying fallback to any active config`);
+      } else {
+        return config;
       }
-      
-      return config;
     }
     
-    // Fetch default workspace or user config
-    const configs = await db.query.llmConfigurations.findMany({
+    // Fetch with workspace → organization fallback
+    // 1. Try workspace-level configs first
+    let configs = await this.fetchConfigsForOrganization(workspaceId, userId);
+    
+    // 2. If no workspace configs and we have a different organization, try organization-level
+    if (configs.length === 0 && organizationId && organizationId !== workspaceId) {
+      console.log(`[ConfigResolver] No workspace configs found, trying organization fallback`);
+      configs = await this.fetchConfigsForOrganization(organizationId, userId);
+    }
+    
+    // Filter out configs with invalid encrypted API keys and pick the first valid one
+    const validConfigs = configs.filter(config => {
+      if (!this.isValidEncryptedApiKey(config.apiKeyEncrypted)) {
+        console.warn(`[ConfigResolver] Skipping config ${config.id} with invalid encrypted API key`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (validConfigs.length > 0) {
+      console.log(`[ConfigResolver] Using valid config: ${validConfigs[0].id}`);
+      return validConfigs[0];
+    }
+    
+    console.error(`[ConfigResolver] No valid LLM configs found for workspace ${workspaceId}`);
+    return null;
+  }
+  
+  private async fetchConfigsForOrganization(
+    organizationId: string,
+    userId?: string
+  ): Promise<LlmConfiguration[]> {
+    return await db.query.llmConfigurations.findMany({
       where: and(
         eq(llmConfigurations.organizationId, organizationId),
         eq(llmConfigurations.isActive, true),
@@ -201,8 +260,33 @@ class ConfigResolver {
         desc(llmConfigurations.userId),
       ],
     });
+  }
+  
+  /**
+   * Validate that an encrypted API key is properly formatted
+   */
+  private isValidEncryptedApiKey(encryptedApiKey: string | null | undefined): boolean {
+    if (!encryptedApiKey || typeof encryptedApiKey !== 'string') {
+      return false;
+    }
     
-    return configs[0] || null;
+    // Check if it has the expected format: iv:encrypted:authTag
+    const parts = encryptedApiKey.split(':');
+    if (parts.length !== 3) {
+      return false;
+    }
+    
+    // Check if all parts are hex strings with reasonable lengths
+    const [iv, encrypted, authTag] = parts;
+    const hexPattern = /^[0-9a-fA-F]+$/;
+    
+    // IV should be 32 hex chars (16 bytes), authTag should be 32 hex chars (16 bytes)
+    // Encrypted part should be at least some reasonable length
+    return (
+      hexPattern.test(iv) && iv.length === 32 &&
+      hexPattern.test(encrypted) && encrypted.length > 0 &&
+      hexPattern.test(authTag) && authTag.length === 32
+    );
   }
 }
 
