@@ -137,7 +137,7 @@ export default function Register() {
 
   const superAdminMutation = useMutation({
     mutationFn: async (data: SuperAdminForm) => {
-      const res = await apiRequest("POST", "/api/super-admin/register", data);
+      const res = await apiRequest("POST", "/api/super-admin/register", data, { authenticated: false });
       return res.json();
     },
     onSuccess: (data) => {
@@ -159,7 +159,7 @@ export default function Register() {
 
   const adminMutation = useMutation({
     mutationFn: async (data: AdminForm) => {
-      const res = await apiRequest("POST", "/api/auth/register-admin", data);
+      const res = await apiRequest("POST", "/api/auth/register-admin", data, { authenticated: false });
       return res.json();
     },
     onSuccess: (data) => {
@@ -181,7 +181,7 @@ export default function Register() {
 
   const inviteMutation = useMutation({
     mutationFn: async (data: InviteForm) => {
-      const res = await apiRequest("POST", "/api/auth/register-invite", data);
+      const res = await apiRequest("POST", "/api/auth/register-invite", data, { authenticated: false });
       return res.json();
     },
     onSuccess: (data) => {

@@ -23,12 +23,13 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function getAuthHeaders(): HeadersInit {
+function getAuthHeaders(authenticated: boolean): HeadersInit {
   const token = getToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
-  if (token) {
+  
+  if (authenticated && token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
@@ -38,10 +39,13 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: { authenticated?: boolean },
 ): Promise<Response> {
+  const authenticated = options?.authenticated ?? true;
+  
   const res = await fetch(url, {
     method,
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(authenticated),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -53,12 +57,14 @@ export async function apiRequest(
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
+  authenticated?: boolean;
 }) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+  ({ on401: unauthorizedBehavior, authenticated = true }) =>
   async ({ queryKey }) => {
     const token = getToken();
     const headers: HeadersInit = {};
-    if (token) {
+    
+    if (authenticated && token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
