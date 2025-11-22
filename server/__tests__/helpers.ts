@@ -36,8 +36,9 @@ export async function getRoleId(roleName: 'owner' | 'admin' | 'manager' | 'staff
  * Get or create roles for testing (creates test roles with permissions)
  * IDEMPOTENT: Safe to call multiple times, handles existing roles/permissions
  * THREAD-SAFE: Uses promise to prevent concurrent execution
+ * EXPORTED: Used by setup.ts to seed roles before all tests
  */
-async function ensureRolesExist(): Promise<Map<string, string>> {
+export async function ensureRolesExist(): Promise<Map<string, string>> {
   // Return cached result if available
   if (roleCache) {
     return roleCache;

@@ -5,10 +5,13 @@ import {
   sessions,
   clients,
   agentSessions,
-  agentMessages
+  agentMessages,
+  roles,
+  permissions,
+  rolePermissions
 } from '@shared/schema';
 import { sql } from 'drizzle-orm';
-import { beforeEach, afterAll } from 'vitest';
+import { beforeEach, afterAll, beforeAll } from 'vitest';
 import { clearRoleCache } from './helpers';
 import { clearRateLimitMap } from '../auth';
 
@@ -20,7 +23,20 @@ if (process.env.NODE_ENV !== 'test') {
   );
 }
 
-console.log('✅ Test environment verified - using development database with test cleanup');
+console.log('🧪 Test database configured (same as dev, with cleanup)');
+
+// ONE-TIME SETUP: Seed roles/permissions before ALL tests
+beforeAll(async () => {
+  try {
+    // Import ensureRolesExist to seed roles/permissions once
+    const { ensureRolesExist } = await import('./helpers');
+    await ensureRolesExist();
+    console.log('✅ Test roles and permissions seeded');
+  } catch (error) {
+    console.error('❌ Error seeding roles/permissions:', error);
+    throw error;
+  }
+});
 
 // Clean up database before each test
 beforeEach(async () => {
@@ -30,8 +46,9 @@ beforeEach(async () => {
       throw new Error('Cannot clean database outside of test environment!');
     }
 
-    // Delete in REVERSE dependency order to respect foreign key constraints
-    // Use CASCADE to automatically handle dependencies
+    // CRITICAL FIX: Do NOT truncate roles/permissions/role_permissions
+    // These are static system data that should persist across tests
+    // Only truncate dynamic test data
     await db.execute(sql`
       TRUNCATE TABLE 
         users,
@@ -43,13 +60,14 @@ beforeEach(async () => {
       CASCADE
     `);
     
-    // Clear role cache so ensureRolesExist() re-checks the database
+    // Clear role cache so tests can re-fetch if needed
     clearRoleCache();
     
     // Clear rate limit map to prevent test interference
     clearRateLimitMap();
     
-    console.log('🧹 Test database cleaned');
+    // Log cleanup (reduce noise)
+    // console.log('🧹 Test data cleaned');
   } catch (error) {
     console.error('❌ Error cleaning test database:', error);
     throw error;
