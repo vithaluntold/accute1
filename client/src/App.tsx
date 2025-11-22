@@ -108,6 +108,7 @@ const PlatformSettingsPage = lazy(() => import("@/pages/admin/platform-settings"
 const AllUsersPage = lazy(() => import("@/pages/admin/users"));
 const KycVerificationPage = lazy(() => import("@/pages/admin/kyc-verification"));
 const PricingManagementPage = lazy(() => import("@/pages/admin/pricing-management"));
+const PaymentGatewayConfigPage = lazy(() => import("@/pages/admin/payment-gateway-config"));
 const SubscriptionSelectPage = lazy(() => import("@/pages/subscription-select"));
 const AdminTicketsPage = lazy(() => import("@/pages/admin/tickets"));
 const MarketplaceCreatePage = lazy(() => import("@/pages/admin/marketplace-create"));
@@ -627,6 +628,15 @@ function Router() {
               <PlatformSettingsPage />
             </AppLayout>
           </RoleGuard>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payment-gateways">
+        <ProtectedRoute>
+          <OrganizationRoute>
+            <AppLayout>
+              <PaymentGatewayConfigPage />
+            </AppLayout>
+          </OrganizationRoute>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/users">
