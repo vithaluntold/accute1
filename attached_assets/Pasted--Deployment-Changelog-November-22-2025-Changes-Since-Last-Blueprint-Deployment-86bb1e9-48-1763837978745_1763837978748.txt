@@ -1,0 +1,337 @@
+# Deployment Changelog - November 22, 2025
+
+## Changes Since Last Blueprint Deployment (86bb1e9 → 48ddbd8)
+
+### Summary
+5 commits with **37,230 insertions** and **1,415 deletions** across **36 files**. Major focus on fixing LLM configuration corruption, agent behavior improvements, and deployment infrastructure.
+
+---
+
+## 🔴 CRITICAL FIXES
+
+### 1. LLM Configuration Decryption Bug (Commit: 48ddbd8)
+**Problem:** Users seeing "Please check your LLM configuration" on every deployment
+
+**Root Cause:**
+- Azure OpenAI health check was using `cryptoUtils.safeDecryptRazorpay()` 
+- But LLM configs are encrypted with `encryption-service.ts`
+- Different key derivation methods:
+  - `crypto-utils.ts`: SHA-256 hash
+  - `encryption-service.ts`: scrypt with salt
+- Same `ENCRYPTION_KEY` produced DIFFERENT derived keys → decryption failed
+
+**Files Changed:**
+- `server/routes.ts`:
+  - Added import: `import { safeDecrypt } from './encryption-service'`
+  - Fixed line 3919 (OpenAI): `safeDecrypt(config.apiKeyEncrypted)`
+  - Fixed line 3927 (Anthropic): `safeDecrypt(config.apiKeyEncrypted)`
+  - Fixed line 3945 (Azure): `safeDecrypt(config.apiKeyEncrypted)`
+
+**Impact:**
+- ✅ LLM configurations now decrypt correctly on every deployment
+- ✅ No more "Please check your LLM configuration" errors
+- ✅ AI agents work immediately without reconfiguration
+
+**Documentation:**
+- Added `LLM_CONFIGURATION_CORRUPTION_ANALYSIS.md` (424 lines) - comprehensive diagnostic guide
+
+---
+
+### 2. ENCRYPTION_KEY Stability Infrastructure (Commit: fe547bf)
+**Problem:** ENCRYPTION_KEY changes between deployments break ALL stored credentials
+
+**Changes Made:**
+
+**Database (`server/db.ts`):**
+- Increased connection timeout: 10s → 30s (for cloud databases)
+- Added SSL support for production: `ssl: { rejectUnauthorized: false }`
+- Added database pool error handlers
+- Added detailed logging for connection initialization
+
+**Server Stability (`server/index.ts`):**
+- Changed `process.exit(1)` to conditional (only in development)
+- Production errors no longer kill server immediately
+- Added memory monitoring: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+- Added initialization timeout protection (5 minutes)
+- Enhanced error logging with stack traces and error details
+
+**Documentation:**
+- Added `ENCRYPTION_KEY_WARNING.md` (216 lines):
+  - Why key must never change
+  - How to generate and store securely
+  - Recovery procedures if key lost
+  - Diagnostic steps and troubleshooting
+  
+- Updated `RENDER_DEPLOYMENT.md` (234 lines):
+  - Emphasized ENCRYPTION_KEY stability
+  - Explained auto-configuration of LLM providers
+  - Step-by-step deployment guide
+  - Troubleshooting section
+
+**Impact:**
+- ⚠️ Critical warning: ENCRYPTION_KEY must be stable across deployments
+- ✅ Better error recovery in production
+- ✅ Clearer deployment documentation
+
+---
+
+## 🤖 AGENT BEHAVIOR IMPROVEMENTS
+
+### 3. Cadence & Forma - Immediate Generation (Commit: 257bc8b)
+**Problem:** Agents asking clarifying questions instead of generating output immediately
+
+**Cadence (Workflow Builder) - `agents/cadence/backend/index.ts`:**
+- **Before:** "Help users create and optimize workflows through natural conversation"
+- **After:** "Your PRIMARY JOB is to immediately create detailed, structured workflows when users request them"
+
+Changes (lines 243-340):
+```typescript
+// Old behavior:
+User: "Create a client onboarding workflow"
+Cadence: "To create the perfect workflow, could you tell me..."
+
+// New behavior:
+User: "Create a simple client onboarding workflow with 3 stages"
+Cadence: [Immediately generates complete workflow with 3 stages, 6-9 recommendations, timeline]
+```
+
+**System Prompt Updates:**
+- Added rule: "DO NOT ask clarifying questions unless request is completely unclear"
+- Added comprehensive 3-stage client onboarding example:
+  - Stage 1: Initial Contact & Information Gathering
+  - Stage 2: Onboarding & Setup
+  - Stage 3: Confirmation & Project Kickoff
+- Each stage includes: duration, reasoning, 2-3 specific recommendations
+
+**Forma (Form Builder) - `agents/forma/backend/handler.ts`:**
+- **Before:** "Ask clarifying questions about the form they need"
+- **After:** "For CLEAR requests: Generate complete form immediately"
+- Only asks "1-2 targeted clarifying questions" for VAGUE requests
+
+**Files Changed:**
+- `agents/cadence/backend/handler.ts` (303 insertions, improved HTTP fallback)
+- `agents/cadence/backend/index.ts` (83 insertions, main SSE logic)
+- `agents/forma/backend/handler.ts` (10 insertions)
+
+**Impact:**
+- ✅ Cadence generates workflows immediately for clear requests
+- ✅ Forma generates forms immediately for clear requests
+- ✅ Advisory agents (Luca, Parity) correctly retain question-asking behavior
+- ✅ Better user experience - less back-and-forth
+
+---
+
+## 🚀 DEPLOYMENT INFRASTRUCTURE
+
+### 4. Render Deployment Configuration (Commits: 726de7a, 76f6337)
+
+**Added `render.yaml`:**
+```yaml
+services:
+  - type: web
+    name: agentflow
+    runtime: node
+    plan: starter  # 4GB RAM
+    buildCommand: npm install && npm run build && node build-agents.mjs
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+```
+
+**Environment Variables Guide:**
+- Critical: DATABASE_URL, JWT_SECRET, SESSION_SECRET, ENCRYPTION_KEY
+- LLM Providers: OPENAI_API_KEY, AZURE_OPENAI_*, ANTHROPIC_API_KEY
+- Auto-configuration: System creates default LLM config from env vars
+
+**Impact:**
+- ✅ Standardized Render deployment
+- ✅ Health check endpoint configured
+- ✅ 4GB RAM (Starter tier) for better performance
+- ✅ Auto-deploy on push to main
+
+---
+
+## 📄 NEW DOCUMENTATION FILES
+
+1. **LLM_CONFIGURATION_CORRUPTION_ANALYSIS.md** (424 lines)
+   - Root cause analysis of decryption failures
+   - Diagnostic steps and test scripts
+   - Prevention checklist
+   - Migration procedures
+
+2. **ENCRYPTION_KEY_WARNING.md** (216 lines)
+   - Why ENCRYPTION_KEY must never change
+   - Security best practices
+   - Recovery procedures
+   - Monitoring recommendations
+
+3. **RENDER_DEPLOYMENT.md** (234 lines)
+   - Complete deployment guide
+   - Environment variable setup
+   - Troubleshooting common issues
+   - Post-deployment verification
+
+4. **AGENT_ISSUES_RESOLVED.md** (586 lines)
+   - Historical agent behavior fixes
+   - Testing results
+   - Implementation details
+
+5. **QUICK_REFERENCE.md** (193 lines)
+   - Quick debugging guide
+   - Common issues and fixes
+
+---
+
+## 🔧 TECHNICAL IMPROVEMENTS
+
+### Database & Authentication
+
+**server/auth.ts:**
+- Enhanced encryption validation
+- Better error messages for MFA issues
+- Improved session management
+
+**server/db.ts:**
+- Connection timeout: 10s → 30s
+- Added SSL for production
+- Pool management improvements
+- Error handling enhancements
+
+**shared/schema.ts:**
+- Schema refinements
+- Better type definitions
+
+### Routes & API
+
+**server/routes.ts (1,183 changes):**
+- Fixed LLM decryption service mismatch
+- Added `safeDecrypt` import from encryption-service
+- Improved error handling
+- Better logging throughout
+
+**server/types/express.d.ts (new):**
+- Enhanced Express type definitions
+- Better TypeScript support
+
+---
+
+## 📊 FILE STATISTICS
+
+### Major Additions:
+- **New Documentation:** 7 files (2,784 lines total)
+- **New Migrations:** Database schema snapshot (26,054 lines)
+- **New Components:** LLMConfigIndicator, TemplateUsageTutorial, TemplateVariablePreview
+- **New Test Scripts:** test-agents-live.mjs, test-azure-openai.mjs
+
+### Major Changes:
+- `server/routes.ts`: 1,183 changes (critical LLM fix)
+- `agents/cadence/backend/handler.ts`: 303 changes (agent behavior)
+- `migrations/`: Complete schema snapshot added
+- `package-lock.json`: 2,523 changes (dependency updates)
+
+### Total Impact:
+```
+36 files changed
+37,230 insertions (+)
+1,415 deletions (-)
+Net: +35,815 lines
+```
+
+---
+
+## 🎯 DEPLOYMENT PRIORITIES
+
+### High Priority (Deploy Immediately):
+1. ✅ **Commit 48ddbd8** - LLM decryption fix (critical bug)
+2. ✅ **Commit fe547bf** - Encryption stability + production error handling
+3. ✅ **Commit 257bc8b** - Agent behavior improvements
+
+### Medium Priority:
+4. **Commit 76f6337** - Render config updates
+5. **Commit 726de7a** - Health check configuration
+
+---
+
+## ✅ VERIFICATION CHECKLIST
+
+After deploying to Blueprint:
+
+### Immediate Tests:
+- [ ] Health check responds: `https://your-app.com/api/health`
+- [ ] LLM config decrypts correctly (no "Please check your LLM configuration" errors)
+- [ ] Cadence generates workflows immediately when asked
+- [ ] Forma generates forms immediately for clear requests
+- [ ] All agents respond without errors
+
+### Environment Verification:
+- [ ] ENCRYPTION_KEY is stable (same value as before)
+- [ ] DATABASE_URL connects successfully
+- [ ] At least one LLM provider key is set (OPENAI_API_KEY, AZURE_*, or ANTHROPIC_API_KEY)
+
+### Database Verification:
+- [ ] Connection timeout works (30s)
+- [ ] SSL connection established in production
+- [ ] LLM configurations exist in database
+- [ ] Decryption succeeds for stored API keys
+
+### Agent Testing:
+- [ ] Test Cadence: "Create a simple client onboarding workflow with 3 stages"
+  - Should generate immediate preview with 3 stages
+  - Should NOT ask clarifying questions
+- [ ] Test Forma: "Create a client intake form"
+  - Should generate immediate form with 10+ fields
+  - Should NOT ask "What fields do you need?"
+- [ ] Test Luca: Ask a tax question
+  - SHOULD ask clarifying questions (correct behavior)
+
+---
+
+## 🚨 KNOWN ISSUES (Not Fixed Yet)
+
+### TypeScript Errors (307 remaining):
+- Schema mismatches in routes.ts
+- Not blocking - pre-existing issues
+- Related to Zod validation and Drizzle ORM types
+- Does not affect runtime functionality
+
+### Future Improvements Needed:
+- Resolve TypeScript schema validation errors
+- Add migration script for ENCRYPTION_KEY rotation
+- Implement automated LLM config testing
+- Add health check monitoring alerts
+
+---
+
+## 📝 NOTES FOR NEXT DEPLOYMENT
+
+1. **Always verify ENCRYPTION_KEY** before deploying
+2. **Test LLM configs** immediately after deployment
+3. **Monitor logs** for decryption errors
+4. **Check agent behavior** - should generate immediately for builder agents
+5. **Verify database connections** - should not timeout
+
+---
+
+## 🔗 RELATED DOCUMENTATION
+
+- [ENCRYPTION_KEY_WARNING.md](./ENCRYPTION_KEY_WARNING.md) - Encryption stability guide
+- [LLM_CONFIGURATION_CORRUPTION_ANALYSIS.md](./LLM_CONFIGURATION_CORRUPTION_ANALYSIS.md) - Diagnostic guide
+- [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) - Deployment procedures
+- [AGENT_ISSUES_RESOLVED.md](./AGENT_ISSUES_RESOLVED.md) - Agent fix history
+
+---
+
+## 📅 Deployment Timeline
+
+- **Changes Made:** November 21-22, 2025
+- **Commits:** 257bc8b → 726de7a → 76f6337 → fe547bf → 48ddbd8
+- **Pushed to Blueprint:** November 22, 2025
+- **Ready for Deployment:** ✅ YES
+- **Recommended Commit:** **48ddbd8** (includes all fixes)
+
+---
+
+**Generated:** November 22, 2025  
+**Last Blueprint Commit:** 86bb1e9  
+**Current HEAD:** 48ddbd8  
+**Status:** Ready for Production Deployment
