@@ -602,6 +602,8 @@ export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
   // Webhook verification
   webhookSecret: text("webhook_secret"), // Encrypted
   webhookToken: text("webhook_token").notNull().unique().default(sql`encode(gen_random_bytes(32), 'hex')`), // Unique, unguessable token for webhook URL (prevents cross-tenant attacks)
+  webhookRequestCount: integer("webhook_request_count").notNull().default(0), // Track webhook usage for rate limiting and monitoring
+  lastWebhookAt: timestamp("last_webhook_at"), // Last successful webhook received
   
   // Usage tracking
   lastUsedAt: timestamp("last_used_at"),
@@ -616,6 +618,19 @@ export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
   gatewayIdx: index("payment_gateway_configs_gateway_idx").on(table.gateway),
   defaultIdx: index("payment_gateway_configs_default_idx").on(table.isDefault),
   webhookTokenIdx: unique("payment_gateway_configs_webhook_token_idx").on(table.webhookToken),
+}));
+
+// Webhook Events - Deduplication tracking for processed webhooks (prevents replay attacks)
+export const webhookEvents = pgTable("webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gatewayConfigId: varchar("gateway_config_id").notNull().references(() => paymentGatewayConfigs.id, { onDelete: "cascade" }),
+  eventId: text("event_id").notNull(), // Gateway-specific event ID or hash of payload+timestamp
+  eventType: text("event_type").notNull(), // payment.success, payment.failed, etc.
+  processedAt: timestamp("processed_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // Auto-cleanup old events (e.g., after 1 hour)
+}, (table) => ({
+  configEventIdx: unique("webhook_events_config_event_idx").on(table.gatewayConfigId, table.eventId),
+  expiresIdx: index("webhook_events_expires_idx").on(table.expiresAt),
 }));
 
 // Service Plans - Fiverr-style service offerings that admins create for clients

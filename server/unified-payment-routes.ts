@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { PaymentGatewayFactory } from './payment-gateways';
 import { requireAuthWithOrg } from './routes';
 import { db } from './db';
-import { paymentGatewayConfigs, payments } from '@shared/schema';
+import { paymentGatewayConfigs, payments, webhookEvents } from '@shared/schema';
+import crypto from 'crypto';
 import { eq, and } from 'drizzle-orm';
 import { encrypt } from './auth';
 
@@ -284,6 +285,19 @@ export function registerUnifiedPaymentRoutes(app: Express) {
                        req.headers['stripe-signature'] || 
                        req.headers['x-webhook-signature'] as string;
       const timestamp = req.headers['x-webhook-timestamp'] as string;
+      
+      if (!timestamp) {
+        console.warn(
+          `[Webhook Security] Missing timestamp header - rejecting webhook (token: ${webhookToken.substring(0, 8)}...)`
+        );
+        return res.status(400).json(
+          sanitizeError(
+            new Error('Missing timestamp'),
+            PaymentErrorCode.VALIDATION_ERROR,
+            'Webhook timestamp required for replay protection'
+          )
+        );
+      }
 
       if (!signature) {
         return res.status(400).json(
@@ -338,6 +352,23 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         gatewayConfig.gateway as any
       );
 
+      const webhookTimestamp = parseInt(timestamp, 10);
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const timeDiff = Math.abs(currentTimestamp - webhookTimestamp);
+      
+      if (timeDiff > 300) {
+        console.warn(
+          `[Webhook Security] Replay attack detected - timestamp too old/future for ${gatewayConfig.gateway} webhook token ${webhookToken.substring(0, 8)}...`
+        );
+        return res.status(401).json(
+          sanitizeError(
+            new Error('Webhook timestamp invalid'),
+            PaymentErrorCode.WEBHOOK_INVALID_SIGNATURE,
+            'Webhook timestamp outside acceptable window (possible replay attack)'
+          )
+        );
+      }
+      
       const verification = gatewayInstance.verifyWebhookSignature(
         signature,
         payload,
@@ -357,57 +388,106 @@ export function registerUnifiedPaymentRoutes(app: Express) {
         );
       }
 
+      const eventId = verification.event?.id || 
+                     verification.event?.data?.id ||
+                     crypto.createHash('sha256').update(payload + timestamp).digest('hex');
+      
+      try {
+        await db.insert(webhookEvents).values({
+          gatewayConfigId: gatewayConfig.id,
+          eventId,
+          eventType: verification.event?.type || 'unknown',
+          expiresAt: new Date(Date.now() + 3600000), // 1 hour expiry
+        });
+      } catch (error: any) {
+        if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+          console.warn(
+            `[Webhook Security] Duplicate event rejected (concurrent request) - event ${eventId}`
+          );
+          return res.status(200).json({
+            success: true,
+            message: 'Event already processed',
+          });
+        }
+        throw error;
+      }
+      
       if (verification.event?.type.includes('payment')) {
         const gatewayOrderId = verification.event.data.orderId || 
                                verification.event.data.order_id;
         const internalOrderId = verification.event.data.internalOrderId ||
                                 verification.event.data.notes?.internalOrderId;
         
-        if (gatewayOrderId || internalOrderId) {
-          const conditions: any[] = [
-            eq(payments.gatewayConfigId, gatewayConfig.id)
-          ];
-          
-          if (gatewayOrderId) {
-            conditions.push(eq(payments.gatewayOrderId, gatewayOrderId));
-          }
-          
-          if (internalOrderId) {
-            conditions.push(eq(payments.internalOrderId, internalOrderId));
-          }
-          
-          const [payment] = await db
+        let payment = null;
+        
+        if (gatewayOrderId) {
+          [payment] = await db
             .select()
             .from(payments)
-            .where(and(...conditions))
+            .where(
+              and(
+                eq(payments.gatewayConfigId, gatewayConfig.id),
+                eq(payments.gatewayOrderId, gatewayOrderId)
+              )
+            )
             .limit(1);
+        }
+        
+        if (!payment && internalOrderId) {
+          [payment] = await db
+            .select()
+            .from(payments)
+            .where(
+              and(
+                eq(payments.gatewayConfigId, gatewayConfig.id),
+                eq(payments.internalOrderId, internalOrderId)
+              )
+            )
+            .limit(1);
+        }
+        
+        if (payment) {
+          const newStatus = verification.event.type.includes('success') || 
+                           verification.event.type.includes('paid') ||
+                           verification.event.type.includes('captured')
+            ? 'completed'
+            : verification.event.type.includes('fail')
+            ? 'failed'
+            : payment.status;
 
-          if (payment) {
-            const newStatus = verification.event.type.includes('success') || 
-                             verification.event.type.includes('paid') ||
-                             verification.event.type.includes('captured')
-              ? 'completed'
-              : verification.event.type.includes('fail')
-              ? 'failed'
-              : payment.status;
-
-            await db
-              .update(payments)
-              .set({
-                status: newStatus,
-                gatewayPaymentId: verification.event.data.paymentId || payment.gatewayPaymentId,
-                updatedAt: new Date(),
-              })
-              .where(eq(payments.id, payment.id));
-          }
+          await db
+            .update(payments)
+            .set({
+              status: newStatus,
+              gatewayPaymentId: verification.event.data.paymentId || payment.gatewayPaymentId,
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, payment.id));
+        } else if (gatewayOrderId || internalOrderId) {
+          console.warn(
+            `[Webhook] Payment record not found for gatewayOrderId=${gatewayOrderId}, internalOrderId=${internalOrderId}, config=${gatewayConfig.id}`
+          );
         }
       }
+
+      await db
+        .update(paymentGatewayConfigs)
+        .set({
+          webhookRequestCount: sql`${paymentGatewayConfigs.webhookRequestCount} + 1`,
+          lastWebhookAt: new Date(),
+        })
+        .where(eq(paymentGatewayConfigs.id, gatewayConfig.id));
 
       res.status(200).json({
         success: true,
         event: verification.event?.type,
       });
     } catch (error: any) {
+      console.error('[Webhook Error]', {
+        error: error.message,
+        stack: error.stack,
+        webhookToken: req.params.webhookToken?.substring(0, 8) + '...',
+      });
       res.status(500).json(
         sanitizeError(
           error,

@@ -252,6 +252,15 @@ export class PaymentGatewayFactory {
       }
     }
     keysToDelete.forEach(key => this.instances.delete(key));
+    
+    console.log(`[PaymentGatewayFactory] Cleared ${keysToDelete.length + (orgKeys?.size || 0)} cached instances for org ${organizationId}`);
+  }
+  
+  static clearAllCache(): void {
+    const totalInstances = this.instances.size;
+    this.instances.clear();
+    this.orgInstancesMap.clear();
+    console.log(`[PaymentGatewayFactory] Cleared all ${totalInstances} cached gateway instances`);
   }
 
   static getSupportedGateways(): Array<{

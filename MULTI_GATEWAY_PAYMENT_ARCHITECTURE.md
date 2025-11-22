@@ -272,9 +272,13 @@ Each webhook URL uses a unique, cryptographically random 64-character token that
 **Authentication Mechanism:**
 1. Webhook token in URL is looked up in database (constant-time comparison)
 2. If token exists and config is active, load the gateway configuration
-3. HMAC signature verified using the `webhookSecret` from that specific config
-4. Payment records matched using BOTH `internalOrderId` AND `gatewayOrderId`
-5. All operations scoped to the `gatewayConfigId` for complete tenant isolation
+3. **Mandatory timestamp** - Header `x-webhook-timestamp` required (no bypass)
+4. **Timestamp validation** - Reject requests >5 minutes old/future (replay protection)
+5. **Event deduplication** - Check `webhookEvents` table for duplicate event IDs
+6. HMAC signature verified using the `webhookSecret` from that specific config
+7. Payment records matched using BOTH `internalOrderId` AND `gatewayOrderId`
+8. All operations scoped to the `gatewayConfigId` for complete tenant isolation
+9. **Event tracking** - Store processed event IDs with 1-hour expiry for deduplication
 
 **Why Token-Based URLs Are Required (Six Sigma Security):**
 
@@ -292,11 +296,15 @@ Each webhook URL uses a unique, cryptographically random 64-character token that
 **Defense-in-Depth Layers (Six Sigma Quality):**
 1. **Unguessable token in URL** - 2^256 possible values, cryptographically secure
 2. **Config lookup by token** - Validates token exists and config is active
-3. **HMAC signature verification** - Cryptographic authentication using webhookSecret
-4. **Dual payment matching** - Uses BOTH internalOrderId (our ID) AND gatewayOrderId (gateway ID)
-5. **Config scoping** - All queries filtered by gatewayConfigId to prevent cross-config pollution
-6. **Organization isolation** - Config belongs to specific org, impossible to cross-pollute
-7. **Security logging** - Invalid tokens, signatures, and attempts logged for monitoring
+3. **Mandatory timestamp header** - No timestamp = automatic rejection (cannot bypass)
+4. **Timestamp validation** - 5-minute window prevents replay attacks
+5. **Event deduplication** - Database-backed event ID tracking prevents reprocessing
+6. **HMAC signature verification** - Cryptographic authentication using webhookSecret
+7. **Dual payment matching** - Uses BOTH internalOrderId (our ID) AND gatewayOrderId (gateway ID)
+8. **Config scoping** - All queries filtered by gatewayConfigId to prevent cross-config pollution
+9. **Organization isolation** - Config belongs to specific org, impossible to cross-pollute
+10. **Security logging** - Invalid tokens, signatures, timestamps, duplicates logged
+11. **Usage tracking** - webhookRequestCount enables rate limit detection
 
 **Six Sigma Traceability:**
 - `internalOrderId`: Our generated ID sent to gateway (e.g., `ORD_1701234567_abc123`)
@@ -304,12 +312,50 @@ Each webhook URL uses a unique, cryptographically random 64-character token that
 - `payments.id`: Database primary key UUID
 - Webhooks matched by ANY of these IDs for 100% reconciliation reliability
 
-**Credential Rotation:**
+**Credential Rotation & Emergency Response:**
+
 When updating webhook secrets in gateway configuration:
-1. All cached gateway instances for that organization are flushed immediately
-2. New webhook token generated automatically
-3. Update gateway dashboard with new webhook URL
-4. No server restart required - credential rotation is instant
+1. All cached gateway instances for that organization are flushed immediately (tracked via orgInstancesMap)
+2. Legacy cache entries removed via prefix matching fallback
+3. New webhook token generated automatically
+4. Update gateway dashboard with new webhook URL
+5. No server restart required - credential rotation is instant
+
+**Emergency Webhook Token Rotation:**
+If a webhook token is compromised:
+1. Update the gateway configuration (automatically generates new token)
+2. All cache cleared for organization
+3. Update webhook URL in gateway provider dashboard immediately
+4. Old token becomes invalid instantly (config lookup fails)
+5. Monitor `webhookRequestCount` and `lastWebhookAt` for suspicious activity
+
+**Webhook Forensics & Monitoring:**
+- `webhookRequestCount`: Total webhooks received (detects replay/DoS attempts)
+- `lastWebhookAt`: Last successful webhook timestamp
+- Invalid token attempts logged with partial token for forensics
+- Invalid signature attempts logged with config ID
+- Payment matching failures logged with order IDs
+
+**Additional Security Measures:**
+1. **Replay Attack Protection**: 
+   - Mandatory timestamp header (no bypass possible)
+   - 5-minute timestamp window
+   - Database-backed event ID deduplication
+   - 1-hour event ID retention prevents reprocessing
+2. **Rate Limiting**: Monitor `webhookRequestCount` growth rate to detect abuse
+3. **Dual ID Matching**: OR-based lookup (try gatewayOrderId first, fallback to internalOrderId)
+4. **Cache Migration**: Complete flush on startup handles all legacy formats
+5. **Audit Trail**: All webhook attempts logged for security analysis
+6. **Event Cleanup**: Auto-expire processed event IDs after 1 hour (prevents table bloat)
+
+**Multi-Instance Deployment Considerations:**
+- Current cache implementation uses in-memory Map (suitable for single-instance deployments)
+- For horizontally scaled deployments (multiple server instances):
+  - Option 1: Use shared Redis cache with pub/sub for cache invalidation
+  - Option 2: Accept eventual consistency (each instance clears its own cache on config update)
+  - Option 3: Stateless approach (query database on every payment gateway operation, no caching)
+- Recommendation: For production at scale, migrate to Redis-backed cache with cluster-wide invalidation
+- Current implementation optimized for single-instance deployment (most accounting firms)
 
 ---
 
