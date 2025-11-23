@@ -5532,16 +5532,26 @@ Title:`;
         .where(eq(schema.subscriptionPlans.id, subscription[0].planId))
         .limit(1);
       
-      // Check if agent is bundled in the plan
-      const isBundled = plan[0]?.featureIdentifiers?.includes(req.params.agentSlug) || false;
+      // Check if plan includes AI agents feature (not individual agent slugs)
+      const hasAIAgentsFeature = plan[0]?.featureIdentifiers?.includes('ai_agents') || false;
+      
+      // Check if agent slug is explicitly bundled (for special cases)
+      const isExplicitlyBundled = plan[0]?.featureIdentifiers?.includes(req.params.agentSlug) || false;
       
       // Check if agent is premium (has pricing)
       const isPremiumAgent = agent[0].pricingTier !== 'free';
       
+      // Check if subscription is in trial period
+      const isTrialActive = subscription[0].trialEndsAt && new Date(subscription[0].trialEndsAt) > new Date();
+      
       // Allow installation if:
-      // 1. Agent is bundled in the plan, OR
-      // 2. Agent is free (available to all plans)
-      if (!isBundled && isPremiumAgent) {
+      // 1. Plan has ai_agents feature (grants access to all AI agents), OR
+      // 2. Agent slug is explicitly bundled in the plan, OR
+      // 3. Agent is free (available to all plans), OR
+      // 4. Subscription is in active trial period (trial = access to everything)
+      const canInstall = hasAIAgentsFeature || isExplicitlyBundled || !isPremiumAgent || isTrialActive;
+      
+      if (!canInstall) {
         return res.status(403).json({ 
           error: `This agent is not included in your ${plan[0]?.name || 'current'} plan. Please upgrade your subscription to access this agent.`,
           agentName: agentManifest.name,
