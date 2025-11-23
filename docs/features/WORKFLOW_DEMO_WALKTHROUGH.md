@@ -167,19 +167,86 @@ This guide demonstrates that FinACEverse's core platform features **actually wor
 ✅ **Notification appears** (either in-app notification bell or toast message)
 
 ### Key Indicators of Success:
-1. **Check Notifications** (click bell icon in top nav):
-   - Look for notification titled: `Email sent: Welcome to Your 2024 Tax Return`
-   - Message should say: `To: [client email]` and `Email sent successfully via Resend`
-   - OR if Resend not configured: `Email service unavailable - notification created instead`
 
-2. **Check Database** (optional verification):
-   ```sql
-   SELECT * FROM notifications 
-   WHERE title LIKE '%Email sent%' 
-   ORDER BY created_at DESC 
-   LIMIT 5;
-   ```
-   Expected: Row with `type = 'info'` and `metadata` containing `emailMessageId` or `emailError`
+#### 1. **Check Notifications** (UI Method)
+- Click bell icon in top nav (`data-testid="button-notifications"`)
+- Look for notification titled: `Email sent: Welcome to Your 2024 Tax Return`
+- Message should say: `To: [client email]` and `Email sent successfully via Resend`
+- OR if Resend not configured: `Email service unavailable - notification created instead`
+
+#### 2. **Check Notifications** (API Method)
+**Endpoint**: `GET /api/notifications`
+
+**Expected Response**:
+```json
+{
+  "notifications": [
+    {
+      "id": "...",
+      "title": "Email sent: Welcome to Your 2024 Tax Return",
+      "message": "To: client@example.com\n\nEmail sent successfully via Resend",
+      "type": "info",
+      "metadata": {
+        "emailMessageId": "...",
+        "workflowId": "...",
+        "organizationId": "..."
+      },
+      "createdAt": "2025-11-23T...",
+      "read": false
+    }
+  ]
+}
+```
+
+**If Resend not configured**:
+```json
+{
+  "title": "Email notification: Welcome to Your 2024 Tax Return",
+  "type": "warning",
+  "metadata": {
+    "emailError": "Resend API key not configured"
+  }
+}
+```
+
+#### 3. **Check Database** (Direct SQL Verification)
+**Table**: `notifications`
+
+**Query**:
+```sql
+SELECT 
+  id, 
+  title, 
+  message, 
+  type, 
+  metadata, 
+  created_at 
+FROM notifications 
+WHERE title LIKE '%Email sent%' 
+  OR title LIKE '%Email notification%'
+ORDER BY created_at DESC 
+LIMIT 5;
+```
+
+**Expected Row**:
+- `type`: `'info'` (if email sent) or `'warning'` (if fallback)
+- `metadata`: JSON containing `emailMessageId` (success) or `emailError` (fallback)
+- `title`: Contains `"Email sent:"` or `"Email notification:"`
+
+#### 4. **Check Server Logs** (Resend Debugging)
+**Location**: Replit Workflows → "Start application" → View Logs
+
+**Search for**:
+```
+[AutomationEngine] Sending email to: client@example.com
+[AutomationEngine] Email sent successfully via Resend
+```
+
+**OR if Resend fails**:
+```
+[AutomationEngine] Resend email failed: ...
+[AutomationEngine] Created fallback notification instead
+```
 
 ### Screenshot Checkpoint:
 📸 **Capture**: Notification showing email sent confirmation
@@ -211,11 +278,49 @@ This guide demonstrates that FinACEverse's core platform features **actually wor
    - ✅ Client does **NOT** see admin/team assignments
    - ✅ Assignment status reflects main app state (`in_progress`, completed stage, etc.)
 
-6. **Click** on assignment card
+**API Verification**:
+**Endpoint**: `GET /api/assignments/my-tasks` (client-scoped)
+
+**Expected Response** (client session):
+```json
+{
+  "assignments": [
+    {
+      "id": "...",
+      "name": "John Doe - 2024 Tax Return",
+      "status": "in_progress",
+      "workflowId": "...",
+      "clientId": "[current client ID]",
+      "currentStageId": "...",
+      "progress": 50
+    }
+  ]
+}
+```
+
+**Database Verification**:
+```sql
+-- Verify assignment has correct clientId
+SELECT 
+  id, 
+  name, 
+  status, 
+  client_id, 
+  workflow_id,
+  organization_id
+FROM assignments 
+WHERE name = 'John Doe - 2024 Tax Return';
+```
+
+Expected:
+- `client_id` matches authenticated client user's ID
+- `organization_id` matches firm's organization
+
+6. **Click** on assignment card (`data-testid="assignment-card-{id}"`)
 7. **Verify Client Detail View**:
-   - ✅ Client sees stage progress
-   - ✅ Client sees task checklist (if tasks exist)
-   - ✅ Client **cannot** see internal notes (if feature exists)
+   - ✅ Client sees stage progress (`data-testid="stage-progress"`)
+   - ✅ Client sees task checklist (`data-testid="task-list"`)
+   - ✅ Client **cannot** see internal notes (no `data-testid="internal-notes"` element)
 
 ### Screenshot Checkpoint:
 📸 **Capture**: Client portal `/my-tasks` showing only client-scoped assignments
@@ -308,14 +413,50 @@ This guide demonstrates that FinACEverse's core platform features **actually wor
 
 **Solution**: This is EXPECTED behavior! The automation engine creates a fallback notification instead of failing.
 
-**Verification**:
-- Check notification message contains: `Email service unavailable - notification created instead`
+**Verification Methods**:
+
+**1. Check Notification UI**:
+- Notification message contains: `Email service unavailable - notification created instead`
 - This proves automation **executed** but fell back to notification
 
+**2. Check API**:
+```bash
+curl -H "Cookie: [your-session-cookie]" http://localhost:5000/api/notifications
+```
+Look for `"type": "warning"` and `"metadata": { "emailError": "..." }`
+
+**3. Check Database**:
+```sql
+SELECT 
+  title, 
+  type, 
+  metadata->>'emailError' AS error_reason
+FROM notifications 
+WHERE title LIKE '%Email notification%'
+ORDER BY created_at DESC 
+LIMIT 1;
+```
+
+**4. Check Server Logs**:
+Search for:
+```
+[AutomationEngine] Resend email failed: Resend API key not configured
+```
+
 **To Enable Real Emails**:
-1. Add `RESEND_API_KEY` secret to Replit
+1. Add `RESEND_API_KEY` secret to Replit:
+   - Sidebar → Secrets (🔒 icon)
+   - Key: `RESEND_API_KEY`
+   - Value: Your Resend API key (get from https://resend.com/api-keys)
 2. Restart workflow: `Start application`
 3. Repeat Step 4 (trigger automation)
+
+**Expected Log After Fix**:
+```
+[AutomationEngine] Sending email to: client@example.com
+[AutomationEngine] Email sent successfully via Resend
+[AutomationEngine] Message ID: re_...
+```
 
 ---
 
@@ -357,15 +498,46 @@ This guide demonstrates that FinACEverse's core platform features **actually wor
 
 ### Email Delivery Time
 - **Expected**: < 5 seconds from trigger to notification creation
-- **Measure**: Timestamp on assignment status change → timestamp on notification
+- **Measurement Method**:
+  ```sql
+  -- Compare timestamp delta
+  SELECT 
+    a.updated_at AS assignment_updated,
+    n.created_at AS notification_created,
+    EXTRACT(EPOCH FROM (n.created_at - a.updated_at)) AS seconds_elapsed
+  FROM assignments a
+  JOIN notifications n ON n.metadata->>'workflowId' = a.workflow_id::text
+  WHERE a.id = '[assignment-id]'
+    AND n.title LIKE '%Email sent%'
+  ORDER BY n.created_at DESC
+  LIMIT 1;
+  ```
+  Expected: `seconds_elapsed` < 5
 
 ### Client Portal Data Sync
 - **Expected**: Immediate (same database)
-- **Measure**: Complete stage in admin → refresh client portal → verify status
+- **Measurement Method**:
+  1. Admin session: Complete stage → Note timestamp
+  2. Client portal: Refresh `/my-tasks` → Verify status updated
+  3. OR use API: `GET /api/assignments/my-tasks` → Confirm `status` and `progress` reflect latest
 
 ### Automation Execution
 - **Expected**: < 2 seconds from stage completion to action execution
-- **Measure**: Click "Complete Stage" → notification appears
+- **Measurement Method**:
+  ```sql
+  -- Check automation engine execution time
+  SELECT 
+    ws.updated_at AS stage_completed,
+    n.created_at AS action_executed,
+    EXTRACT(EPOCH FROM (n.created_at - ws.updated_at)) AS execution_time_seconds
+  FROM workflow_stages ws
+  JOIN notifications n ON n.metadata->>'stageId' = ws.id::text
+  WHERE ws.id = '[stage-id]'
+    AND ws.status = 'completed'
+  ORDER BY n.created_at DESC
+  LIMIT 1;
+  ```
+  Expected: `execution_time_seconds` < 2
 
 ---
 
