@@ -206,8 +206,8 @@ export class EventTriggersEngine {
       for (const dep of dependents) {
         // Check if this is a blocking dependency that's now satisfied
         if (dep.isBlocking && !dep.isSatisfied) {
-          // Mark dependency as satisfied
-          await this.storage.updateWorkflowTaskDependency(dep.id, {
+          // Mark dependency as satisfied (with org scoping for security)
+          await this.storage.updateWorkflowTaskDependency(dep.id, organizationId, {
             isSatisfied: true,
             satisfiedAt: new Date(),
           });

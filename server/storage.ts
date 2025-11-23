@@ -177,7 +177,7 @@ export interface IStorage {
   // Workflow Task Dependencies (richer schema with blocking/satisfied status)
   getWorkflowTaskDependenciesByTask(taskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]>;
   getWorkflowTaskDependents(dependsOnTaskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]>;
-  updateWorkflowTaskDependency(id: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined>;
+  updateWorkflowTaskDependency(id: string, organizationId: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined>;
 
   // AI Agents
   getAiAgent(id: string): Promise<AiAgent | undefined>;
@@ -1654,7 +1654,8 @@ export class DbStorage implements IStorage {
       .from(schema.workflowTaskDependencies)
       .where(
         and(
-          eq(schema.workflowTaskDependencies.taskId, taskId)
+          eq(schema.workflowTaskDependencies.taskId, taskId),
+          eq(schema.workflowTaskDependencies.organizationId, organizationId)
         )
       );
   }
@@ -1663,14 +1664,23 @@ export class DbStorage implements IStorage {
     return await db.select()
       .from(schema.workflowTaskDependencies)
       .where(
-        eq(schema.workflowTaskDependencies.dependsOnTaskId, dependsOnTaskId)
+        and(
+          eq(schema.workflowTaskDependencies.dependsOnTaskId, dependsOnTaskId),
+          eq(schema.workflowTaskDependencies.organizationId, organizationId)
+        )
       );
   }
 
-  async updateWorkflowTaskDependency(id: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined> {
+  async updateWorkflowTaskDependency(id: string, organizationId: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined> {
+    // SECURITY: Verify organization ownership before update
     const result = await db.update(schema.workflowTaskDependencies)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(schema.workflowTaskDependencies.id, id))
+      .where(
+        and(
+          eq(schema.workflowTaskDependencies.id, id),
+          eq(schema.workflowTaskDependencies.organizationId, organizationId)
+        )
+      )
       .returning();
     return result[0];
   }
