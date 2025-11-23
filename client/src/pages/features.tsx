@@ -183,51 +183,9 @@ export default function Features() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-12 bg-muted/30">
+      <footer className="border-t bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <Link 
-                href="/"
-                className="flex items-center gap-2 mb-4 hover-elevate rounded-md p-2"
-                data-testid="link-footer-home"
-              >
-                <img src={logoUrl} alt="Accute" className="h-6 w-6" />
-                <span className="font-display font-bold">Accute</span>
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                AI-powered accounting workflow automation for modern practices
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/features" className="hover-elevate" data-testid="link-footer-features">Features</Link></li>
-                <li><Link href="/subscription-pricing" className="hover-elevate" data-testid="link-footer-pricing">Pricing</Link></li>
-                <li><Link href="/security" className="hover-elevate" data-testid="link-footer-security">Security</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/about" className="hover-elevate" data-testid="link-footer-about">About</Link></li>
-                <li><Link href="/contact" className="hover-elevate" data-testid="link-footer-contact">Contact</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/privacy" className="hover-elevate" data-testid="link-footer-privacy">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="hover-elevate" data-testid="link-footer-terms">Terms of Service</Link></li>
-              </ul>
-            </div>
-          </div>
-          
           <FinACEverseBranding />
-
-          <div className="mt-8 text-center text-sm text-muted-foreground">
-            <p>&copy; 2025 Accute. All rights reserved.</p>
-          </div>
         </div>
       </footer>
     </div>
