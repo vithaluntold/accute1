@@ -371,6 +371,19 @@ app.use((req, res, next) => {
     
     console.log('🎉 System initialization complete!');
     
+    // Load automation triggers from database into memory
+    console.log('🔧 Loading automation triggers from database...');
+    try {
+      const { getEventTriggersEngine } = await import('./event-triggers');
+      const { storage } = await import('./storage');
+      const eventEngine = getEventTriggersEngine(storage);
+      await eventEngine.loadTriggersFromDatabase();
+      console.log('✅ Automation triggers loaded successfully');
+    } catch (triggerError) {
+      console.error('❌ Failed to load automation triggers:', triggerError);
+      console.warn('⚠️  Continuing without automation triggers - they can be created via API');
+    }
+    
     // CRITICAL: Setup Vite/static serving AFTER agent routes are registered
     // This prevents Vite's catch-all from intercepting agent endpoints
     const distPath = path.resolve(moduleDir, "public");

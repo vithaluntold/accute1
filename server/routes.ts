@@ -13290,6 +13290,33 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         organizationId: req.user!.organizationId!,
         createdBy: req.user!.id,
       });
+      
+      // Register trigger with EventTriggersEngine if enabled
+      if (trigger.enabled) {
+        setImmediate(async () => {
+          try {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            eventEngine.registerTrigger({
+              id: trigger.id,
+              event: trigger.event as any,
+              workflowId: trigger.workflowId || undefined,
+              stageId: trigger.stageId || undefined,
+              stepId: trigger.stepId || undefined,
+              conditions: trigger.conditions as any[],
+              actions: trigger.actions as any[],
+              autoAdvance: trigger.autoAdvanceEnabled ? {
+                enabled: true,
+                autoAdvanceTargetStageId: trigger.autoAdvanceTargetStageId || undefined,
+                autoAdvanceTargetStepId: trigger.autoAdvanceTargetStepId || undefined,
+              } : undefined,
+            });
+          } catch (error) {
+            console.error('[AUTOMATION] Failed to register trigger:', error);
+          }
+        });
+      }
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "create", "automation_trigger", trigger.id, trigger, req);
       res.status(201).json(trigger);
     } catch (error: any) {
@@ -13322,6 +13349,40 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       }
       
       const updated = await storage.updateAutomationTrigger(req.params.id, safeUpdates);
+      
+      // Update trigger registration in EventTriggersEngine
+      if (updated) {
+        setImmediate(async () => {
+          try {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            
+            // Unregister old version
+            eventEngine.unregisterTrigger(updated.id);
+            
+            // Register new version if enabled
+            if (updated.enabled) {
+              eventEngine.registerTrigger({
+                id: updated.id,
+                event: updated.event as any,
+                workflowId: updated.workflowId || undefined,
+                stageId: updated.stageId || undefined,
+                stepId: updated.stepId || undefined,
+                conditions: updated.conditions as any[],
+                actions: updated.actions as any[],
+                autoAdvance: updated.autoAdvanceEnabled ? {
+                  enabled: true,
+                  autoAdvanceTargetStageId: updated.autoAdvanceTargetStageId || undefined,
+                  autoAdvanceTargetStepId: updated.autoAdvanceTargetStepId || undefined,
+                } : undefined,
+              });
+            }
+          } catch (error) {
+            console.error('[AUTOMATION] Failed to update trigger registration:', error);
+          }
+        });
+      }
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "update", "automation_trigger", req.params.id, safeUpdates, req);
       res.json(updated);
     } catch (error: any) {
@@ -13342,6 +13403,18 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(403).json({ error: "Access denied" });
       }
       await storage.deleteAutomationTrigger(req.params.id);
+      
+      // Unregister trigger from EventTriggersEngine
+      setImmediate(async () => {
+        try {
+          const { getEventTriggersEngine } = await import('./event-triggers');
+          const eventEngine = getEventTriggersEngine(storage);
+          eventEngine.unregisterTrigger(req.params.id);
+        } catch (error) {
+          console.error('[AUTOMATION] Failed to unregister deleted trigger:', error);
+        }
+      });
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "delete", "automation_trigger", req.params.id, {}, req);
       res.json({ success: true, message: "Automation trigger deleted" });
     } catch (error: any) {
@@ -13362,6 +13435,40 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(403).json({ error: "Access denied" });
       }
       const updated = await storage.updateAutomationTrigger(req.params.id, { enabled: !trigger.enabled });
+      
+      // Update trigger registration based on enabled state
+      if (updated) {
+        setImmediate(async () => {
+          try {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            
+            if (updated.enabled) {
+              // Register trigger when enabled
+              eventEngine.registerTrigger({
+                id: updated.id,
+                event: updated.event as any,
+                workflowId: updated.workflowId || undefined,
+                stageId: updated.stageId || undefined,
+                stepId: updated.stepId || undefined,
+                conditions: updated.conditions as any[],
+                actions: updated.actions as any[],
+                autoAdvance: updated.autoAdvanceEnabled ? {
+                  enabled: true,
+                  autoAdvanceTargetStageId: updated.autoAdvanceTargetStageId || undefined,
+                  autoAdvanceTargetStepId: updated.autoAdvanceTargetStepId || undefined,
+                } : undefined,
+              });
+            } else {
+              // Unregister trigger when disabled
+              eventEngine.unregisterTrigger(updated.id);
+            }
+          } catch (error) {
+            console.error('[AUTOMATION] Failed to toggle trigger registration:', error);
+          }
+        });
+      }
+      
       await logActivity(req.user!.id, req.user!.organizationId!, "toggle", "automation_trigger", req.params.id, { enabled: updated?.enabled }, req);
       res.json(updated);
     } catch (error: any) {

@@ -29,8 +29,8 @@ export interface EventTriggerConfig {
   actions?: ActionConfig[];
   autoAdvance?: {
     enabled: boolean;
-    targetStageId?: string;
-    targetStepId?: string;
+    autoAdvanceTargetStageId?: string;
+    autoAdvanceTargetStepId?: string;
   };
 }
 
@@ -274,7 +274,7 @@ export class EventTriggersEngine {
         if (trigger.autoAdvance?.enabled && data.assignmentId) {
           await this.autoAdvanceToStage(
             data.assignmentId,
-            trigger.autoAdvance.targetStageId
+            trigger.autoAdvance.autoAdvanceTargetStageId
           );
         }
 
@@ -399,6 +399,50 @@ export class EventTriggersEngine {
   clearAllTriggers(): void {
     this.eventListeners.clear();
     console.log('[EventTriggers] All triggers cleared');
+  }
+
+  /**
+   * Load all active triggers from database and register them
+   * Called during server startup to restore persisted triggers
+   */
+  async loadTriggersFromDatabase(): Promise<void> {
+    try {
+      console.log('[EventTriggers] Loading triggers from database...');
+      
+      const triggers = await this.storage.getAllAutomationTriggers();
+      const activeTriggers = triggers.filter(t => t.enabled);
+      
+      let loadedCount = 0;
+      for (const dbTrigger of activeTriggers) {
+        try {
+          // Convert database trigger to EventTriggerConfig format
+          const triggerConfig: EventTriggerConfig = {
+            id: dbTrigger.id,
+            event: dbTrigger.event as TriggerEvent,
+            workflowId: dbTrigger.workflowId || undefined,
+            stageId: dbTrigger.stageId || undefined,
+            stepId: dbTrigger.stepId || undefined,
+            conditions: dbTrigger.conditions as any[],
+            actions: dbTrigger.actions as ActionConfig[],
+            autoAdvance: dbTrigger.autoAdvanceEnabled ? {
+              enabled: true,
+              autoAdvanceTargetStageId: dbTrigger.autoAdvanceTargetStageId || undefined,
+              autoAdvanceTargetStepId: dbTrigger.autoAdvanceTargetStepId || undefined,
+            } : undefined,
+          };
+          
+          this.registerTrigger(triggerConfig);
+          loadedCount++;
+        } catch (error) {
+          console.error(`[EventTriggers] Failed to load trigger ${dbTrigger.id}:`, error);
+        }
+      }
+      
+      console.log(`[EventTriggers] Loaded ${loadedCount} active triggers from database`);
+    } catch (error) {
+      console.error('[EventTriggers] Failed to load triggers from database:', error);
+      throw error;
+    }
   }
 }
 

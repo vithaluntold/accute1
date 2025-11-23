@@ -150,6 +150,7 @@ export interface IStorage {
   getAutomationTrigger(id: string): Promise<schema.AutomationTrigger | undefined>;
   updateAutomationTrigger(id: string, updates: Partial<schema.InsertAutomationTrigger>): Promise<schema.AutomationTrigger | undefined>;
   deleteAutomationTrigger(id: string): Promise<void>;
+  getAllAutomationTriggers(): Promise<schema.AutomationTrigger[]>;
   getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]>;
   getAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
   getEnabledAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
@@ -1272,6 +1273,11 @@ export class DbStorage implements IStorage {
 
   async deleteAutomationTrigger(id: string): Promise<void> {
     await db.delete(schema.automationTriggers).where(eq(schema.automationTriggers.id, id));
+  }
+
+  async getAllAutomationTriggers(): Promise<schema.AutomationTrigger[]> {
+    return await db.select().from(schema.automationTriggers)
+      .orderBy(desc(schema.automationTriggers.createdAt));
   }
 
   async getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]> {
