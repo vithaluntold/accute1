@@ -48,32 +48,103 @@ export class SchedulerService {
     
     for (const trigger of triggers) {
       try {
-        await this.executeTrigger(trigger);
+        const acquired = await this.acquireLock(trigger.id);
+        if (!acquired) {
+          console.log(`Skipping trigger ${trigger.id}: already being executed by another worker`);
+          continue;
+        }
+
+        try {
+          const nextExecution = await this.executeTrigger(trigger);
+          if (nextExecution) {
+            await this.releaseLock(trigger.id, nextExecution);
+          } else {
+            console.warn(`Executor returned null nextExecution for ${trigger.id}, preserving existing value`);
+            await this.releaseLock(trigger.id, null, true);
+          }
+        } catch (error) {
+          console.error(`Failed to execute/release trigger ${trigger.id}:`, error);
+          const fallbackNext = this.computeFallbackNextExecution(trigger);
+          if (fallbackNext) {
+            await this.releaseLock(trigger.id, fallbackNext);
+          } else {
+            console.warn(`Failed to compute fallback nextExecution for ${trigger.id}, preserving existing value`);
+            await this.releaseLock(trigger.id, null, true);
+          }
+        }
       } catch (error) {
         console.error(`Failed to execute trigger ${trigger.id}:`, error);
       }
     }
   }
 
+  private async acquireLock(triggerId: string): Promise<boolean> {
+    const now = new Date();
+    const lockTimeout = new Date(now.getTime() - 5 * 60 * 1000);
+
+    const locked = await storage.atomicAcquireTriggerLock(triggerId, lockTimeout);
+    
+    return !!locked;
+  }
+
+  private async releaseLock(triggerId: string, nextExecution: Date | null, preserveNext: boolean = false): Promise<void> {
+    await storage.releaseTriggerLock(triggerId, nextExecution, preserveNext);
+  }
+
   private async executeTrigger(trigger: schema.AutomationTrigger) {
     const now = new Date();
+    let nextExecution: Date | null = null;
 
-    if (trigger.scheduleType === 'cron' && trigger.cronExpression) {
-      const interval = parser.parseExpression(trigger.cronExpression);
-      const nextRun = interval.next().toDate();
-      
-      await storage.updateAutomationTrigger(trigger.id, {
-        lastExecuted: now,
-        nextExecution: nextRun,
-      });
-    } else if (trigger.scheduleType === 'one_time') {
-      await storage.updateAutomationTrigger(trigger.id, {
-        lastExecuted: now,
-        enabled: false,
-      });
+    try {
+      const { AutomationEngine } = await import('./automation-engine');
+      const automationEngine = new AutomationEngine(storage);
+
+      const context = {
+        triggerId: trigger.id,
+        triggerName: trigger.name,
+        organizationId: trigger.organizationId,
+        workflowId: trigger.workflowId,
+        event: trigger.event,
+        scheduleType: trigger.scheduleType,
+        executedAt: now,
+      };
+
+      await automationEngine.executeActions(
+        trigger.actions as any,
+        context
+      );
+
+      console.log(`✅ Executed scheduled trigger: ${trigger.name} (${trigger.id})`);
+
+      if (trigger.scheduleType === 'cron' && trigger.cronExpression) {
+        const interval = parser.parseExpression(trigger.cronExpression, {
+          currentDate: now
+        });
+        nextExecution = interval.next().toDate();
+      } else if (trigger.scheduleType === 'one_time') {
+        await storage.updateAutomationTrigger(trigger.id, {
+          enabled: false,
+        });
+      }
+    } catch (error) {
+      console.error(`❌ Failed to execute trigger ${trigger.id}:`, error);
     }
 
-    console.log(`Executed scheduled trigger: ${trigger.name} (${trigger.id})`);
+    return nextExecution;
+  }
+
+  private computeFallbackNextExecution(trigger: schema.AutomationTrigger): Date | null {
+    if (trigger.scheduleType === 'cron' && trigger.cronExpression) {
+      try {
+        const interval = parser.parseExpression(trigger.cronExpression, {
+          currentDate: new Date()
+        });
+        return interval.next().toDate();
+      } catch {
+        return null;
+      }
+    }
+    return trigger.nextExecution;
   }
 
   static computeNextCronExecution(cronExpression: string): Date | null {

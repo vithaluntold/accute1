@@ -12,7 +12,7 @@ export class TaskDependenciesService {
     taskId: string,
     dependsOnTaskId: string,
     organizationId: string,
-    dependencyType: string = "finish-to-start",
+    dependencyType: string = "finish_to_start",
     lag: number = 0
   ) {
     // Self-dependency check

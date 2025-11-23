@@ -13220,6 +13220,179 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Task Dependency Routes ====================
+
+  // Create task dependency
+  app.post("/api/tasks/:taskId/dependencies", requireAuth, requirePermission("workflows.update"), async (req: Request, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { dependsOnTaskId, dependencyType, lag } = req.body;
+
+      // Normalize dependencyType: convert hyphens to underscores for backward compatibility
+      const normalizedDependencyType = dependencyType ? dependencyType.replace(/-/g, '_') : 'finish_to_start';
+
+      const dependsOnTask = await storage.getWorkflowTask(dependsOnTaskId);
+      if (!dependsOnTask) {
+        return res.status(404).json({ error: "Dependency task not found" });
+      }
+
+      const depStep = await storage.getWorkflowStep(dependsOnTask.stepId);
+      if (!depStep) {
+        return res.status(404).json({ error: "Dependency task step not found" });
+      }
+
+      const depStage = await storage.getWorkflowStage(depStep.stageId);
+      if (!depStage) {
+        return res.status(404).json({ error: "Dependency task stage not found" });
+      }
+
+      const depWorkflow = await storage.getWorkflow(depStage.workflowId);
+      if (!depWorkflow) {
+        return res.status(404).json({ error: "Dependency task workflow not found" });
+      }
+
+      if (depWorkflow.id !== workflow.id) {
+        return res.status(400).json({ error: "Dependencies must be within the same workflow" });
+      }
+
+      if (depWorkflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied to dependency task" });
+      }
+
+      const hasCircular = await storage.checkCircularDependency(req.params.taskId, dependsOnTaskId, workflow.id);
+      if (hasCircular) {
+        return res.status(400).json({ error: "Circular dependency detected" });
+      }
+
+      const dependency = await storage.createTaskDependency({
+        taskId: req.params.taskId,
+        dependsOnTaskId,
+        dependencyType: normalizedDependencyType,
+        lag: lag || 0,
+        organizationId: req.user!.organizationId!,
+        workflowId: workflow.id,
+      });
+
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "task_dependency", dependency.id, dependency, req);
+      res.json(dependency);
+    } catch (error: any) {
+      if (error.message && error.message.includes('duplicate')) {
+        return res.status(400).json({ error: "Dependency already exists" });
+      }
+      res.status(500).json({ error: "Failed to create task dependency", details: error.message });
+    }
+  });
+
+  // Get task dependencies
+  app.get("/api/tasks/:taskId/dependencies", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const dependencies = await storage.getTaskDependencies(req.params.taskId);
+      
+      const filteredDeps = dependencies.filter(dep => 
+        dep.organizationId === req.user!.organizationId
+      );
+      
+      res.json(filteredDeps);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch task dependencies" });
+    }
+  });
+
+  // Get task dependents (tasks that depend on this task)
+  app.get("/api/tasks/:taskId/dependents", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+    try {
+      const task = await storage.getWorkflowTask(req.params.taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      const step = await storage.getWorkflowStep(task.stepId);
+      if (!step) {
+        return res.status(404).json({ error: "Step not found" });
+      }
+
+      const stage = await storage.getWorkflowStage(step.stageId);
+      if (!stage) {
+        return res.status(404).json({ error: "Stage not found" });
+      }
+
+      const workflow = await storage.getWorkflow(stage.workflowId);
+      if (!workflow || workflow.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const dependents = await storage.getTaskDependents(req.params.taskId);
+      
+      const filteredDeps = dependents.filter(dep => 
+        dep.organizationId === req.user!.organizationId
+      );
+      
+      res.json(filteredDeps);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch task dependents" });
+    }
+  });
+
+  // Delete task dependency
+  app.delete("/api/tasks/dependencies/:id", requireAuth, requirePermission("workflows.update"), async (req: Request, res: Response) => {
+    try {
+      const dependency = await storage.getTaskDependency(req.params.id);
+      
+      if (!dependency) {
+        return res.status(404).json({ error: "Dependency not found" });
+      }
+      
+      if (dependency.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteTaskDependency(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "task_dependency", req.params.id, {}, req);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to delete task dependency" });
+    }
+  });
+
   // Manually trigger workflow automation
   app.post("/api/workflows/:id/trigger-automation", requireAuth, requirePermission("workflows.update"), async (req: Request, res: Response) => {
     try {
@@ -13851,11 +14024,14 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         return res.status(400).json({ error: "dependsOnTaskId is required" });
       }
 
+      // Normalize dependencyType: convert hyphens to underscores for backward compatibility
+      const normalizedDependencyType = dependencyType ? dependencyType.replace(/-/g, '_') : 'finish_to_start';
+
       const dependency = await TaskDependenciesService.createDependency(
         req.params.taskId,
         dependsOnTaskId,
         req.user!.organizationId,
-        dependencyType || "finish-to-start",
+        normalizedDependencyType,
         lag || 0
       );
 

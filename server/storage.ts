@@ -149,6 +149,8 @@ export interface IStorage {
   createAutomationTrigger(trigger: schema.InsertAutomationTrigger): Promise<schema.AutomationTrigger>;
   getAutomationTrigger(id: string): Promise<schema.AutomationTrigger | undefined>;
   updateAutomationTrigger(id: string, updates: Partial<schema.InsertAutomationTrigger>): Promise<schema.AutomationTrigger | undefined>;
+  atomicAcquireTriggerLock(id: string, lockTimeout: Date): Promise<schema.AutomationTrigger | undefined>;
+  releaseTriggerLock(id: string, nextExecution: Date | null, preserveNext?: boolean): Promise<void>;
   deleteAutomationTrigger(id: string): Promise<void>;
   getAllAutomationTriggers(): Promise<schema.AutomationTrigger[]>;
   getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]>;
@@ -161,11 +163,12 @@ export interface IStorage {
   createTaskDependency(dependency: {
     taskId: string;
     dependsOnTaskId: string;
-    dependencyType: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+    dependencyType: 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish';
     lag: number;
     organizationId: string;
     workflowId: string;
   }): Promise<typeof schema.taskDependencies.$inferSelect>;
+  getTaskDependency(id: string): Promise<typeof schema.taskDependencies.$inferSelect | undefined>;
   getTaskDependencies(taskId: string): Promise<any[]>;
   getTaskDependents(taskId: string): Promise<any[]>;
   deleteTaskDependency(id: string): Promise<void>;
@@ -1287,6 +1290,57 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async atomicAcquireTriggerLock(id: string, lockTimeout: Date): Promise<schema.AutomationTrigger | undefined> {
+    const now = new Date();
+    const result = await db.update(schema.automationTriggers)
+      .set({ isExecuting: true, lockedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(schema.automationTriggers.id, id),
+          eq(schema.automationTriggers.enabled, true),
+          or(
+            // Normal case: trigger is not executing
+            eq(schema.automationTriggers.isExecuting, false),
+            // Orphaned lock recovery: trigger is executing but lock has expired
+            and(
+              eq(schema.automationTriggers.isExecuting, true),
+              or(
+                isNull(schema.automationTriggers.lockedAt),
+                sql`${schema.automationTriggers.lockedAt} < ${lockTimeout}`
+              )
+            )
+          )
+        )
+      )
+      .returning();
+    return result[0];
+  }
+
+  async releaseTriggerLock(id: string, nextExecution: Date | null, preserveNext: boolean = false): Promise<void> {
+    const now = new Date();
+    
+    if (preserveNext) {
+      await db.update(schema.automationTriggers)
+        .set({ 
+          isExecuting: false, 
+          lockedAt: null,
+          lastExecuted: now,
+          updatedAt: now 
+        })
+        .where(eq(schema.automationTriggers.id, id));
+    } else {
+      await db.update(schema.automationTriggers)
+        .set({ 
+          isExecuting: false,
+          lockedAt: null,
+          lastExecuted: now,
+          nextExecution: nextExecution,
+          updatedAt: now 
+        })
+        .where(eq(schema.automationTriggers.id, id));
+    }
+  }
+
   async deleteAutomationTrigger(id: string): Promise<void> {
     await db.delete(schema.automationTriggers).where(eq(schema.automationTriggers.id, id));
   }
@@ -1325,11 +1379,24 @@ export class DbStorage implements IStorage {
 
   async getScheduledTriggersDueForExecution(): Promise<schema.AutomationTrigger[]> {
     const now = new Date();
+    const lockTimeoutThreshold = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes
+    
     return await db.select().from(schema.automationTriggers)
       .where(
         and(
           eq(schema.automationTriggers.isScheduled, true),
           eq(schema.automationTriggers.enabled, true),
+          // Include triggers that are not executing OR have an expired lock
+          or(
+            eq(schema.automationTriggers.isExecuting, false),
+            and(
+              eq(schema.automationTriggers.isExecuting, true),
+              or(
+                isNull(schema.automationTriggers.lockedAt),
+                sql`${schema.automationTriggers.lockedAt} < ${lockTimeoutThreshold}`
+              )
+            )
+          ),
           or(
             // Cron triggers that are due
             and(
@@ -1364,6 +1431,7 @@ export class DbStorage implements IStorage {
           eq(schema.automationTriggers.organizationId, organizationId),
           eq(schema.automationTriggers.isScheduled, true),
           eq(schema.automationTriggers.enabled, true),
+          isNotNull(schema.automationTriggers.dueDateOffset),
           or(
             eq(schema.automationTriggers.scheduleType, 'due_date_approaching'),
             eq(schema.automationTriggers.scheduleType, 'overdue')
@@ -1374,41 +1442,50 @@ export class DbStorage implements IStorage {
     const triggersWithTasks = [];
     
     for (const trigger of triggers) {
-      const offsetMinutes = trigger.dueDateOffset || 0;
-      const offsetMs = offsetMinutes * 60 * 1000;
+      const offsetMinutes = trigger.dueDateOffset!;
       
-      let taskQuery = db.select()
-        .from(schema.workflowTasks)
-        .where(
-          and(
-            eq(schema.workflowTasks.organizationId, organizationId),
-            isNotNull(schema.workflowTasks.dueDate)
-          )
-        );
-      
-      if (trigger.scheduleType === 'due_date_approaching') {
-        taskQuery = taskQuery.where(
-          and(
-            sql`${schema.workflowTasks.dueDate} > ${now}`,
-            sql`${schema.workflowTasks.dueDate} <= ${new Date(now.getTime() + offsetMs)}`
-          )
-        ) as any;
-      } else if (trigger.scheduleType === 'overdue') {
-        taskQuery = taskQuery.where(
-          and(
-            sql`${schema.workflowTasks.dueDate} < ${now}`,
-            or(
-              eq(schema.workflowTasks.status, 'pending'),
-              eq(schema.workflowTasks.status, 'in_progress')
-            )
-          )
-        ) as any;
+      if (offsetMinutes < 0) {
+        console.warn(`Skipping trigger ${trigger.id}: negative dueDateOffset`);
+        continue;
       }
       
-      const tasks = await taskQuery;
+      const offsetMs = Math.abs(offsetMinutes) * 60 * 1000;
       
-      if (tasks.length > 0) {
-        triggersWithTasks.push(trigger);
+      if (trigger.scheduleType === 'due_date_approaching') {
+        const tasks = await db.select()
+          .from(schema.workflowTasks)
+          .where(
+            and(
+              eq(schema.workflowTasks.organizationId, organizationId),
+              trigger.workflowId ? eq(schema.workflowTasks.workflowId, trigger.workflowId) : sql`true`,
+              isNotNull(schema.workflowTasks.dueDate),
+              sql`${schema.workflowTasks.dueDate} > ${now}`,
+              sql`${schema.workflowTasks.dueDate} <= ${new Date(now.getTime() + offsetMs)}`
+            )
+          );
+        
+        if (tasks.length > 0) {
+          triggersWithTasks.push(trigger);
+        }
+      } else if (trigger.scheduleType === 'overdue') {
+        const tasks = await db.select()
+          .from(schema.workflowTasks)
+          .where(
+            and(
+              eq(schema.workflowTasks.organizationId, organizationId),
+              trigger.workflowId ? eq(schema.workflowTasks.workflowId, trigger.workflowId) : sql`true`,
+              isNotNull(schema.workflowTasks.dueDate),
+              sql`${schema.workflowTasks.dueDate} < ${now}`,
+              or(
+                eq(schema.workflowTasks.status, 'pending'),
+                eq(schema.workflowTasks.status, 'in_progress')
+              )
+            )
+          );
+        
+        if (tasks.length > 0) {
+          triggersWithTasks.push(trigger);
+        }
       }
     }
     
@@ -1419,12 +1496,65 @@ export class DbStorage implements IStorage {
   async createTaskDependency(dependency: {
     taskId: string;
     dependsOnTaskId: string;
-    dependencyType: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+    dependencyType: 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish';
     lag: number;
     organizationId: string;
     workflowId: string;
   }): Promise<typeof schema.taskDependencies.$inferSelect> {
+    // Validate both tasks exist and belong to the same workflow/org
+    const task = await db.select().from(schema.workflowTasks)
+      .where(eq(schema.workflowTasks.id, dependency.taskId));
+    if (!task[0]) {
+      throw new Error('Task not found');
+    }
+
+    const dependsOnTask = await db.select().from(schema.workflowTasks)
+      .where(eq(schema.workflowTasks.id, dependency.dependsOnTaskId));
+    if (!dependsOnTask[0]) {
+      throw new Error('Dependency task not found');
+    }
+
+    // Verify both tasks belong to the same workflow and organization
+    const taskStep = await db.select().from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.id, task[0].stepId));
+    const depTaskStep = await db.select().from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.id, dependsOnTask[0].stepId));
+
+    if (!taskStep[0] || !depTaskStep[0]) {
+      throw new Error('Task steps not found');
+    }
+
+    const taskStage = await db.select().from(schema.workflowStages)
+      .where(eq(schema.workflowStages.id, taskStep[0].stageId));
+    const depTaskStage = await db.select().from(schema.workflowStages)
+      .where(eq(schema.workflowStages.id, depTaskStep[0].stageId));
+
+    if (!taskStage[0] || !depTaskStage[0]) {
+      throw new Error('Task stages not found');
+    }
+
+    if (taskStage[0].workflowId !== depTaskStage[0].workflowId) {
+      throw new Error('Tasks must belong to the same workflow');
+    }
+
+    if (taskStage[0].workflowId !== dependency.workflowId) {
+      throw new Error('Workflow ID mismatch');
+    }
+
+    // Verify organization ownership
+    const workflow = await db.select().from(schema.workflows)
+      .where(eq(schema.workflows.id, taskStage[0].workflowId));
+    if (!workflow[0] || workflow[0].organizationId !== dependency.organizationId) {
+      throw new Error('Organization mismatch');
+    }
+
     const result = await db.insert(schema.taskDependencies).values(dependency).returning();
+    return result[0];
+  }
+
+  async getTaskDependency(id: string): Promise<typeof schema.taskDependencies.$inferSelect | undefined> {
+    const result = await db.select().from(schema.taskDependencies)
+      .where(eq(schema.taskDependencies.id, id));
     return result[0];
   }
 

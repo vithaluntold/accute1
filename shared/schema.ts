@@ -5480,6 +5480,8 @@ export const automationTriggers = pgTable("automation_triggers", {
   
   // Status
   enabled: boolean("enabled").notNull().default(true), // Active/inactive
+  isExecuting: boolean("is_executing").notNull().default(false), // Lock flag for preventing concurrent execution
+  lockedAt: timestamp("locked_at"), // Timestamp when lock was acquired (for timeout detection)
   
   // Metadata
   createdBy: varchar("created_by").notNull().references(() => users.id),
