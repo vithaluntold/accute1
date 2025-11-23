@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Mail, Phone, MapPin, MessageSquare } from "lucide-react";
 import logoUrl from "@assets/logo.png";
+import { FinACEverseBranding } from "@/components/finaceverse-branding";
 
 export default function Contact() {
   const { toast } = useToast();
@@ -292,7 +293,10 @@ export default function Contact() {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
+          
+          <FinACEverseBranding />
+
+          <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>&copy; 2025 Accute. All rights reserved.</p>
           </div>
         </div>

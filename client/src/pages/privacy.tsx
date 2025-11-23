@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import logoUrl from "@assets/logo.png";
+import { FinACEverseBranding } from "@/components/finaceverse-branding";
 
 export default function Privacy() {
 
@@ -202,7 +203,7 @@ export default function Privacy() {
               >
                 <img src={logoUrl} alt="Accute" className="h-6 w-6" />
                 <span className="font-display font-bold">Accute</span>
-              </button>
+              </Link>
               <p className="text-sm text-muted-foreground">
                 AI-powered accounting workflow automation for modern practices
               </p>
@@ -230,7 +231,10 @@ export default function Privacy() {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
+          
+          <FinACEverseBranding />
+
+          <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>&copy; 2025 Accute. All rights reserved.</p>
           </div>
         </div>

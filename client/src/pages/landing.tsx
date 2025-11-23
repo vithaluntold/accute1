@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle } from "lucide-react";
 import { Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
+import { FinACEverseBranding } from "@/components/finaceverse-branding";
 
 export default function Landing() {
 
@@ -519,7 +520,10 @@ export default function Landing() {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-12 pt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
+          
+          <FinACEverseBranding />
+
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
             <p>&copy; 2025 Accute. All rights reserved.</p>
             <div className="flex gap-6">
               <Link href="/privacy" className="hover-elevate" data-testid="link-footer-privacy">Privacy Policy</Link>

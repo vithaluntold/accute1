@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import logoUrl from "@assets/logo.png";
+import { FinACEverseBranding } from "@/components/finaceverse-branding";
 
 export default function Features() {
 
@@ -221,7 +222,10 @@ export default function Features() {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
+          
+          <FinACEverseBranding />
+
+          <div className="mt-8 text-center text-sm text-muted-foreground">
             <p>&copy; 2025 Accute. All rights reserved.</p>
           </div>
         </div>
