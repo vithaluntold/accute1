@@ -173,6 +173,11 @@ export interface IStorage {
   getTaskDependents(taskId: string): Promise<any[]>;
   deleteTaskDependency(id: string): Promise<void>;
   checkCircularDependency(taskId: string, dependsOnTaskId: string, workflowId: string): Promise<boolean>;
+  
+  // Workflow Task Dependencies (richer schema with blocking/satisfied status)
+  getWorkflowTaskDependenciesByTask(taskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]>;
+  getWorkflowTaskDependents(dependsOnTaskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]>;
+  updateWorkflowTaskDependency(id: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined>;
 
   // AI Agents
   getAiAgent(id: string): Promise<AiAgent | undefined>;
@@ -1641,6 +1646,33 @@ export class DbStorage implements IStorage {
     }
 
     return false; // No cycle detected
+  }
+
+  // Workflow Task Dependencies (Rich schema with blocking/satisfied status)
+  async getWorkflowTaskDependenciesByTask(taskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]> {
+    return await db.select()
+      .from(schema.workflowTaskDependencies)
+      .where(
+        and(
+          eq(schema.workflowTaskDependencies.taskId, taskId)
+        )
+      );
+  }
+
+  async getWorkflowTaskDependents(dependsOnTaskId: string, organizationId: string): Promise<typeof schema.workflowTaskDependencies.$inferSelect[]> {
+    return await db.select()
+      .from(schema.workflowTaskDependencies)
+      .where(
+        eq(schema.workflowTaskDependencies.dependsOnTaskId, dependsOnTaskId)
+      );
+  }
+
+  async updateWorkflowTaskDependency(id: string, updates: Partial<typeof schema.workflowTaskDependencies.$inferSelect>): Promise<typeof schema.workflowTaskDependencies.$inferSelect | undefined> {
+    const result = await db.update(schema.workflowTaskDependencies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.workflowTaskDependencies.id, id))
+      .returning();
+    return result[0];
   }
 
   // AI Agents

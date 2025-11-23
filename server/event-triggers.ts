@@ -187,8 +187,55 @@ export class EventTriggersEngine {
 
     try {
       await this.autoProgressionEngine.tryAutoProgressTask(data.taskId);
+      
+      // Check if any dependent tasks can now start
+      await this.checkAndStartDependentTasks(data.taskId, data.organizationId);
     } catch (error: any) {
       console.error('[EventTriggers] Failed to auto-progress task:', error);
+    }
+  }
+
+  /**
+   * Check if dependent tasks can start after a task completes
+   */
+  private async checkAndStartDependentTasks(completedTaskId: string, organizationId: string): Promise<void> {
+    try {
+      // Get all tasks that depend on this completed task (using workflowTaskDependencies)
+      const dependents = await this.storage.getWorkflowTaskDependents(completedTaskId, organizationId);
+      
+      for (const dep of dependents) {
+        // Check if this is a blocking dependency that's now satisfied
+        if (dep.isBlocking && !dep.isSatisfied) {
+          // Mark dependency as satisfied
+          await this.storage.updateWorkflowTaskDependency(dep.id, {
+            isSatisfied: true,
+            satisfiedAt: new Date(),
+          });
+          
+          // Check if all dependencies for the dependent task are now satisfied
+          const allDependencies = await this.storage.getWorkflowTaskDependenciesByTask(dep.taskId, organizationId);
+          const allSatisfied = allDependencies.every(d => !d.isBlocking || d.isSatisfied);
+          
+          if (allSatisfied) {
+            // All dependencies satisfied - auto-start the task
+            const dependentTask = await this.storage.getWorkflowTask(dep.taskId);
+            
+            if (dependentTask && dependentTask.status === 'pending') {
+              console.log(`[EventTriggers] Auto-starting task ${dep.taskId} - all dependencies satisfied`);
+              
+              await this.storage.updateWorkflowTask(dep.taskId, {
+                status: 'in_progress',
+                startDate: new Date(),
+              });
+              
+              // Fire task_started event for automation triggers
+              console.log(`[EventTriggers] Task ${dep.taskId} auto-started after dependency ${completedTaskId} completed`);
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('[EventTriggers] Failed to check dependent tasks:', error);
     }
   }
 
