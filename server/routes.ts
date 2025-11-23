@@ -21261,6 +21261,361 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // OAuth authorize - Start OAuth flow
+  app.get("/api/oauth/:provider/authorize", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const { videoOAuthService } = await import('./services/VideoConferencingOAuthService');
+      const redirectUri = videoOAuthService.getRedirectUri(provider);
+
+      // Generate state token for CSRF protection
+      const state = crypto.randomBytes(32).toString('hex');
+      const stateData = { organizationId, userId, provider };
+      
+      // Store state in session (expires in 10 minutes)
+      req.session.oauthState = {
+        state,
+        data: stateData,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      };
+
+      let authUrl: string;
+
+      switch (provider) {
+        case 'google_meet': {
+          const { google } = await import('googleapis');
+          const oauth2Client = new google.auth.OAuth2(
+            process.env.GMAIL_CLIENT_ID,
+            process.env.GMAIL_CLIENT_SECRET,
+            redirectUri
+          );
+
+          authUrl = oauth2Client.generateAuthUrl({
+            access_type: 'offline',
+            prompt: 'consent',
+            scope: [
+              'https://www.googleapis.com/auth/calendar.events',
+              'https://www.googleapis.com/auth/userinfo.email',
+            ],
+            state,
+          });
+          break;
+        }
+
+        case 'zoom': {
+          const clientId = process.env.ZOOM_CLIENT_ID;
+          if (!clientId) {
+            return res.status(500).json({ error: 'Zoom OAuth not configured. Please set ZOOM_CLIENT_ID and ZOOM_CLIENT_SECRET.' });
+          }
+
+          const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            state,
+          });
+
+          authUrl = `https://zoom.us/oauth/authorize?${params}`;
+          break;
+        }
+
+        case 'microsoft_teams': {
+          const clientId = process.env.MICROSOFT_CLIENT_ID;
+          if (!clientId) {
+            return res.status(500).json({ error: 'Microsoft OAuth not configured. Please set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET.' });
+          }
+
+          const params = new URLSearchParams({
+            client_id: clientId,
+            response_type: 'code',
+            redirect_uri: redirectUri,
+            response_mode: 'query',
+            scope: 'OnlineMeetings.ReadWrite offline_access',
+            state,
+          });
+
+          authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`;
+          break;
+        }
+
+        default:
+          return res.status(400).json({ error: 'Unknown provider' });
+      }
+
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error(`[OAuth] Failed to start ${req.params.provider} authorization:`, error);
+      res.status(500).json({ error: 'Failed to start OAuth flow' });
+    }
+  });
+
+  // OAuth callback - Handle provider callback
+  app.get("/api/oauth/:provider/callback", async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const { code, state } = req.query;
+
+      if (!code || !state) {
+        return res.status(400).send('<html><body><script>window.close();</script><p>Authorization failed. You can close this window.</p></body></html>');
+      }
+
+      // Verify state for CSRF protection
+      const sessionState = req.session.oauthState;
+      if (!sessionState || sessionState.state !== state || sessionState.data.provider !== provider) {
+        return res.status(400).send('<html><body><script>window.close();</script><p>Invalid state. You can close this window.</p></body></html>');
+      }
+
+      if (Date.now() > sessionState.expiresAt) {
+        return res.status(400).send('<html><body><script>window.close();</script><p>State expired. Please try again.</p></body></html>');
+      }
+
+      const { organizationId, userId } = sessionState.data;
+      const { videoOAuthService } = await import('./services/VideoConferencingOAuthService');
+      const redirectUri = videoOAuthService.getRedirectUri(provider);
+
+      let credentials: any;
+      let providerAccountId: string = '';
+
+      switch (provider) {
+        case 'google_meet': {
+          const { google } = await import('googleapis');
+          const oauth2Client = new google.auth.OAuth2(
+            process.env.GMAIL_CLIENT_ID,
+            process.env.GMAIL_CLIENT_SECRET,
+            redirectUri
+          );
+
+          const { tokens } = await oauth2Client.getToken(code as string);
+          
+          if (!tokens.access_token || !tokens.refresh_token || !tokens.expiry_date) {
+            throw new Error('Invalid token response from Google');
+          }
+
+          credentials = {
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            tokenExpiry: new Date(tokens.expiry_date),
+          };
+
+          // Get user email for providerAccountId
+          oauth2Client.setCredentials(tokens);
+          const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+          const userInfo = await oauth2.userinfo.get();
+          providerAccountId = userInfo.data.email || '';
+          
+          break;
+        }
+
+        case 'zoom': {
+          const clientId = process.env.ZOOM_CLIENT_ID;
+          const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+
+          if (!clientId || !clientSecret) {
+            throw new Error('Zoom credentials not configured');
+          }
+
+          const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+          const response = await fetch('https://zoom.us/oauth/token', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: code as string,
+              redirect_uri: redirectUri,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Zoom token exchange failed: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          credentials = {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            tokenExpiry: new Date(Date.now() + data.expires_in * 1000),
+          };
+
+          providerAccountId = data.scope || '';
+          break;
+        }
+
+        case 'microsoft_teams': {
+          const clientId = process.env.MICROSOFT_CLIENT_ID;
+          const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+          if (!clientId || !clientSecret) {
+            throw new Error('Microsoft credentials not configured');
+          }
+
+          const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              code: code as string,
+              redirect_uri: redirectUri,
+              grant_type: 'authorization_code',
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Microsoft token exchange failed: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          credentials = {
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            tokenExpiry: new Date(Date.now() + data.expires_in * 1000),
+          };
+
+          providerAccountId = data.scope || '';
+          break;
+        }
+
+        default:
+          throw new Error('Unknown provider');
+      }
+
+      // Check if connection already exists
+      const existing = await db.query.oauthConnections.findFirst({
+        where: and(
+          eq(schema.oauthConnections.organizationId, organizationId),
+          eq(schema.oauthConnections.userId, userId),
+          eq(schema.oauthConnections.provider, provider)
+        ),
+      });
+
+      const encryptedCreds = videoOAuthService.encryptCredentials({
+        ...credentials,
+        providerAccountId,
+      });
+
+      if (existing) {
+        // Update existing connection
+        await db.update(schema.oauthConnections)
+          .set({
+            encryptedCredentials: encryptedCreds,
+            status: 'active',
+            expiresAt: credentials.tokenExpiry,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.oauthConnections.id, existing.id));
+      } else {
+        // Create new connection
+        await db.insert(schema.oauthConnections).values({
+          organizationId,
+          userId,
+          provider,
+          encryptedCredentials: encryptedCreds,
+          status: 'active',
+          expiresAt: credentials.tokenExpiry,
+        });
+      }
+
+      // Clear session state (prevent reuse)
+      delete req.session.oauthState;
+
+      // Close popup window and notify opener
+      const successHtml = `
+        <html>
+          <body>
+            <script>
+              try {
+                if (window.opener && !window.opener.closed) {
+                  window.opener.postMessage({ 
+                    type: 'oauth_success', 
+                    provider: '${provider}' 
+                  }, window.location.origin);
+                  setTimeout(() => window.close(), 500);
+                } else {
+                  document.body.innerHTML = '<p style="font-family: sans-serif; padding: 20px;">✅ Connected successfully! You can close this window.</p>';
+                }
+              } catch (e) {
+                console.error('postMessage failed:', e);
+                document.body.innerHTML = '<p style="font-family: sans-serif; padding: 20px;">✅ Connected successfully! You can close this window.</p>';
+              }
+            </script>
+          </body>
+        </html>
+      `;
+
+      res.send(successHtml);
+      console.log(`[OAuth] Successfully connected ${provider} for user ${userId}`);
+    } catch (error: any) {
+      console.error(`[OAuth] Callback failed for ${req.params.provider}:`, error);
+      
+      // Clear session state even on error
+      if (req.session.oauthState) {
+        delete req.session.oauthState;
+      }
+
+      const errorHtml = `
+        <html>
+          <body>
+            <script>
+              try {
+                if (window.opener && !window.opener.closed) {
+                  window.opener.postMessage({ 
+                    type: 'oauth_error', 
+                    provider: '${req.params.provider}', 
+                    error: ${JSON.stringify(error.message)} 
+                  }, window.location.origin);
+                  setTimeout(() => window.close(), 500);
+                } else {
+                  document.body.innerHTML = '<p style="font-family: sans-serif; padding: 20px; color: red;">❌ Connection failed: ${error.message.replace(/'/g, "\\'")}. You can close this window.</p>';
+                }
+              } catch (e) {
+                console.error('postMessage failed:', e);
+                document.body.innerHTML = '<p style="font-family: sans-serif; padding: 20px; color: red;">❌ Connection failed. You can close this window.</p>';
+              }
+            </script>
+          </body>
+        </html>
+      `;
+
+      res.status(500).send(errorHtml);
+    }
+  });
+
+  // OAuth disconnect - Remove connection
+  app.delete("/api/oauth/:provider", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { provider } = req.params;
+      const organizationId = req.user?.organizationId;
+      const userId = req.user?.id;
+      
+      if (!organizationId || !userId) {
+        return res.status(403).json({ error: "Organization access required" });
+      }
+
+      const { videoOAuthService } = await import('./services/VideoConferencingOAuthService');
+      await videoOAuthService.revokeConnection(organizationId, userId, provider);
+
+      res.json({ success: true, message: `${provider} disconnected successfully` });
+    } catch (error: any) {
+      console.error(`[OAuth] Failed to disconnect ${req.params.provider}:`, error);
+      res.status(500).json({ error: 'Failed to disconnect OAuth connection' });
+    }
+  });
+
   // Create meeting
   app.post("/api/meetings", requireAuth, async (req: Request, res: Response) => {
     try {

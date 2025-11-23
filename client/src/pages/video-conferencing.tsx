@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertMeetingRecordSchema, type MeetingRecord, type OAuthConnection } from "@shared/schema";
-import { Video, Plus, Calendar, Users, ExternalLink } from "lucide-react";
+import { Video, Plus, Calendar, Users, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -26,9 +26,16 @@ const meetingFormSchema = z.object({
   meetingUrl: z.string().optional(),
 });
 
+const PROVIDERS = [
+  { id: 'google_meet', name: 'Google Meet', color: 'bg-blue-500' },
+  { id: 'zoom', name: 'Zoom', color: 'bg-indigo-500' },
+  { id: 'microsoft_teams', name: 'Microsoft Teams', color: 'bg-purple-500' },
+];
+
 export default function VideoConferencingPage() {
   const { toast } = useToast();
   const [showNewMeeting, setShowNewMeeting] = useState(false);
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof meetingFormSchema>>({
     resolver: zodResolver(meetingFormSchema),
@@ -44,7 +51,7 @@ export default function VideoConferencingPage() {
     },
   });
 
-  const { data: connections = [] } = useQuery<OAuthConnection[]>({
+  const { data: connections = [], refetch: refetchConnections } = useQuery<OAuthConnection[]>({
     queryKey: ["/api/oauth/connections"],
   });
 
@@ -62,6 +69,80 @@ export default function VideoConferencingPage() {
     },
     onError: () => toast({ title: "Failed to create meeting", variant: "destructive" }),
   });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (provider: string) => apiRequest(`/api/oauth/${provider}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/oauth/connections"] });
+      toast({ title: "Provider disconnected successfully" });
+    },
+    onError: () => toast({ title: "Failed to disconnect provider", variant: "destructive" }),
+  });
+
+  // Handle OAuth popup messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'oauth_success') {
+        toast({ title: `${event.data.provider} connected successfully!` });
+        refetchConnections();
+        setConnectingProvider(null);
+      } else if (event.data.type === 'oauth_error') {
+        toast({ 
+          title: `Failed to connect ${event.data.provider}`, 
+          description: event.data.error,
+          variant: "destructive" 
+        });
+        setConnectingProvider(null);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [toast, refetchConnections]);
+
+  const handleConnect = async (provider: string) => {
+    try {
+      setConnectingProvider(provider);
+      const response = await fetch(`/api/oauth/${provider}/authorize`, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        toast({ 
+          title: "Failed to start OAuth", 
+          description: error.error || "Unknown error",
+          variant: "destructive" 
+        });
+        setConnectingProvider(null);
+        return;
+      }
+
+      const { authUrl } = await response.json();
+      const popup = window.open(authUrl, 'oauth', 'width=600,height=700');
+
+      // Check if popup was blocked
+      if (!popup) {
+        toast({ 
+          title: "Popup blocked", 
+          description: "Please allow popups for this site",
+          variant: "destructive" 
+        });
+        setConnectingProvider(null);
+      }
+    } catch (error) {
+      toast({ title: "Failed to connect", variant: "destructive" });
+      setConnectingProvider(null);
+    }
+  };
+
+  const handleDisconnect = (provider: string) => {
+    disconnectMutation.mutate(provider);
+  };
+
+  const isConnected = (providerId: string) => {
+    return connections.some(c => c.provider === providerId && c.status === 'active');
+  };
 
   const onSubmit = (data: z.infer<typeof meetingFormSchema>) => {
     const startTime = new Date(`${data.date}T${data.time}`);
@@ -233,19 +314,61 @@ export default function VideoConferencingPage() {
             <CardDescription>Manage your video conferencing integrations</CardDescription>
           </CardHeader>
           <CardContent>
-            {connections.length === 0 ? (
-              <p className="text-muted-foreground text-sm" data-testid="text-no-connections">
-                No connected accounts. Connect Zoom, Google Meet, or Microsoft Teams to schedule meetings.
-              </p>
-            ) : (
-              <div className="flex gap-2 flex-wrap">
-                {connections.map((conn) => (
-                  <Badge key={conn.id} variant="outline" data-testid={`badge-connection-${conn.provider}`}>
-                    {conn.provider} - {conn.status}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {PROVIDERS.map((provider) => {
+                const connected = isConnected(provider.id);
+                const isConnecting = connectingProvider === provider.id;
+
+                return (
+                  <Card key={provider.id} data-testid={`card-provider-${provider.id}`}>
+                    <CardHeader className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full ${provider.color}`}></div>
+                          <CardTitle className="text-base">{provider.name}</CardTitle>
+                        </div>
+                        {connected ? (
+                          <Badge variant="default" className="gap-1" data-testid={`badge-status-${provider.id}`}>
+                            <CheckCircle2 className="w-3 h-3" />
+                            Connected
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" data-testid={`badge-status-${provider.id}`}>
+                            <XCircle className="w-3 h-3" />
+                            Not Connected
+                          </Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {connected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleDisconnect(provider.id)}
+                          disabled={disconnectMutation.isPending}
+                          data-testid={`button-disconnect-${provider.id}`}
+                        >
+                          Disconnect
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleConnect(provider.id)}
+                          disabled={isConnecting}
+                          data-testid={`button-connect-${provider.id}`}
+                        >
+                          {isConnecting ? "Connecting..." : "Connect"}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 
