@@ -16,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Edit, Trash2, Zap, Power, PowerOff, Settings, Info, AlertTriangle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { VisualTriggerBuilder } from "@/components/visual-trigger-builder";
 
 // Trigger events
 const TRIGGER_EVENTS = [
@@ -58,6 +59,12 @@ const triggerFormSchema = z.object({
   // Time-based fields
   cronExpression: z.string().optional(),
   dueDateOffsetDays: z.number().optional(),
+  // Visual conditions
+  conditions: z.array(z.object({
+    field: z.string(),
+    operator: z.string(),
+    value: z.string(),
+  })).optional(),
 });
 
 type TriggerFormValues = z.infer<typeof triggerFormSchema>;
@@ -123,10 +130,12 @@ export default function Automation() {
       actions: [],
       cronExpression: "",
       dueDateOffsetDays: 0,
+      conditions: [],
     },
   });
 
   const selectedEvent = form.watch('event');
+  const conditions = form.watch('conditions') || [];
 
   // Derive step arrays (must be after form definition)
   const scopedSteps = selectedStageId 
@@ -268,6 +277,9 @@ export default function Automation() {
       autoAdvanceTargetStageId: trigger.autoAdvanceTargetStageId || "",
       autoAdvanceTargetStepId: trigger.autoAdvanceTargetStepId || "",
       actions: trigger.actions || [],
+      cronExpression: (trigger as any).cronExpression || "",
+      dueDateOffsetDays: (trigger as any).dueDateOffsetDays || 0,
+      conditions: (trigger as any).conditions || [],
     });
     setSelectedWorkflowId(trigger.workflowId);
     setSelectedStageId(trigger.stageId);
@@ -525,6 +537,16 @@ export default function Automation() {
                       )}
                     />
                   )}
+                </div>
+
+                <Separator />
+
+                {/* Visual Condition Builder */}
+                <div className="space-y-4">
+                  <VisualTriggerBuilder
+                    conditions={conditions}
+                    onChange={(newConditions) => form.setValue('conditions', newConditions)}
+                  />
                 </div>
 
                 <Separator />
