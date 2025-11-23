@@ -1225,4 +1225,569 @@ export class AutomationEngine {
   private getNestedValue(obj: any, path: string): any {
     return path.split('.').reduce((current, key) => current?.[key], obj);
   }
+
+  // ============================================================================
+  // KARBON-STYLE TRIGGER EVALUATION SYSTEM
+  // ============================================================================
+
+  /**
+   * Fire a trigger and execute associated workflow actions
+   * This is the main entry point for all Karbon-style automation triggers
+   */
+  async fireTrigger(params: {
+    type: TriggerConfig['type'];
+    entityType: 'assignment' | 'task' | 'project' | 'invoice' | 'client' | 'stage' | 'step';
+    entityId: string;
+    organizationId: string;
+    workflowId?: string;
+    assignmentId?: string;
+    fieldName?: string;
+    oldValue?: any;
+    newValue?: any;
+    scheduledFor?: Date;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    const {
+      type,
+      entityType,
+      entityId,
+      organizationId,
+      workflowId,
+      assignmentId,
+      fieldName,
+      oldValue,
+      newValue,
+      scheduledFor,
+      metadata = {},
+    } = params;
+
+    try {
+      // Find all workflows that have this trigger type
+      const workflows = await this.findWorkflowsWithTrigger(type, organizationId, workflowId);
+
+      for (const workflow of workflows) {
+        const triggers = Array.isArray(workflow.triggers) ? workflow.triggers : [];
+        
+        for (const trigger of triggers) {
+          if (trigger.type !== type) continue;
+
+          // Evaluate if this specific trigger should fire
+          const shouldFire = await this.evaluateTriggerCondition(trigger, {
+            entityType,
+            entityId,
+            fieldName,
+            oldValue,
+            newValue,
+            metadata,
+          });
+
+          if (!shouldFire) continue;
+
+          // Get the actions configured for this trigger
+          const actions = trigger.actions || [];
+          
+          if (actions.length === 0) continue;
+
+          // Execute the actions
+          const executedActions = await this.executeActions(actions, {
+            workflowId: workflow.id,
+            organizationId,
+            userId: metadata.userId || '',
+            assignmentId: assignmentId || entityId,
+            data: {
+              entityType,
+              entityId,
+              fieldName,
+              oldValue,
+              newValue,
+              ...metadata,
+            },
+          });
+
+          // Log the trigger event
+          await this.logTriggerEvent({
+            workflowId: workflow.id,
+            assignmentId,
+            organizationId,
+            triggerType: type,
+            triggerConfig: trigger,
+            entityType,
+            entityId,
+            fieldName,
+            oldValue,
+            newValue,
+            scheduledFor,
+            actionsExecuted: executedActions,
+            executionStatus: executedActions.every(a => a.success) ? 'success' : 'partial',
+            metadata,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error(`[AutomationEngine] Error firing trigger ${type}:`, error);
+      
+      // Log failed trigger event
+      await this.logTriggerEvent({
+        workflowId: workflowId || '',
+        assignmentId,
+        organizationId,
+        triggerType: type,
+        triggerConfig: { type, config: {} },
+        entityType,
+        entityId,
+        fieldName,
+        oldValue,
+        newValue,
+        scheduledFor,
+        actionsExecuted: [],
+        executionStatus: 'failed',
+        executionError: error.message,
+        metadata,
+      });
+    }
+  }
+
+  /**
+   * Find workflows that have a specific trigger type configured
+   */
+  private async findWorkflowsWithTrigger(
+    triggerType: string,
+    organizationId: string,
+    specificWorkflowId?: string
+  ): Promise<any[]> {
+    try {
+      if (specificWorkflowId) {
+        const workflow = await this.storage.getWorkflow(specificWorkflowId);
+        return workflow ? [workflow] : [];
+      }
+
+      // Get all workflows for this organization
+      const workflows = await this.storage.getWorkflows(organizationId);
+      
+      // Filter to only those with matching triggers
+      return workflows.filter(w => {
+        const triggers = Array.isArray(w.triggers) ? w.triggers : [];
+        return triggers.some((t: any) => t.type === triggerType);
+      });
+    } catch (error: any) {
+      console.error('[AutomationEngine] Error finding workflows with trigger:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Evaluate if a trigger should fire based on its configuration
+   */
+  private async evaluateTriggerCondition(
+    trigger: TriggerConfig,
+    context: {
+      entityType: string;
+      entityId: string;
+      fieldName?: string;
+      oldValue?: any;
+      newValue?: any;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<boolean> {
+    const { config } = trigger;
+    const { entityType, fieldName, oldValue, newValue, metadata = {} } = context;
+
+    switch (trigger.type) {
+      case 'status_change':
+        return this.evaluateStatusChangeTrigger(config, { entityType, fieldName, oldValue, newValue });
+
+      case 'field_change':
+        return this.evaluateFieldChangeTrigger(config, { entityType, fieldName, oldValue, newValue });
+
+      case 'due_date_approaching':
+        return this.evaluateDueDateApproachingTrigger(config, metadata);
+
+      case 'overdue':
+        return this.evaluateOverdueTrigger(config, metadata);
+
+      case 'task_dependency':
+        return this.evaluateTaskDependencyTrigger(config, context);
+
+      case 'all_tasks_complete':
+        return this.evaluateAllTasksCompleteTrigger(config, context);
+
+      case 'template_instantiated':
+        return this.evaluateTemplateInstantiatedTrigger(config, metadata);
+
+      case 'client_contact_added':
+        return this.evaluateClientContactAddedTrigger(config, context);
+
+      case 'budget_threshold':
+        return this.evaluateBudgetThresholdTrigger(config, metadata);
+
+      case 'team_capacity':
+        return this.evaluateTeamCapacityTrigger(config, metadata);
+
+      case 'time_threshold':
+        return this.evaluateTimeThresholdTrigger(config, metadata);
+
+      case 'fiscal_deadline':
+        return this.evaluateFiscalDeadlineTrigger(config, metadata);
+
+      case 'conditional_section':
+        return this.evaluateConditionalSectionTrigger(config, metadata);
+
+      case 'relative_date':
+        return this.evaluateRelativeDateTrigger(config, metadata);
+
+      case 'integration_event':
+        return this.evaluateIntegrationEventTrigger(config, metadata);
+
+      // Original triggers
+      case 'manual':
+      case 'email':
+      case 'form':
+      case 'webhook':
+      case 'schedule':
+      case 'completion':
+        return true; // Already handled by existing system
+
+      default:
+        console.warn(`[AutomationEngine] Unknown trigger type: ${trigger.type}`);
+        return false;
+    }
+  }
+
+  // ============================================================================
+  // P0 TRIGGER EVALUATORS (Critical - Implement First)
+  // ============================================================================
+
+  /**
+   * P0-1: status_change - When assignment/task/project status changes
+   */
+  private evaluateStatusChangeTrigger(
+    config: any,
+    context: { entityType: string; fieldName?: string; oldValue?: any; newValue?: any }
+  ): boolean {
+    const { entityType, fieldName, oldValue, newValue } = context;
+
+    // Match entity type if specified
+    if (config.entityType && config.entityType !== entityType) {
+      return false;
+    }
+
+    // Match field name (defaults to 'status')
+    const targetField = config.fieldName || 'status';
+    if (fieldName !== targetField) {
+      return false;
+    }
+
+    // If anyChange is true, trigger on ANY status change
+    if (config.anyChange) {
+      return oldValue !== newValue;
+    }
+
+    // Check specific from/to values
+    if (config.fromValue && config.fromValue !== oldValue) {
+      return false;
+    }
+
+    if (config.toValue && config.toValue !== newValue) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * P0-2: due_date_approaching - X days before deadline
+   */
+  private evaluateDueDateApproachingTrigger(config: any, metadata: Record<string, any>): boolean {
+    const daysUntilDue = metadata.daysUntilDue;
+    const targetDays = config.daysBeforeDue || 3;
+
+    return daysUntilDue === targetDays;
+  }
+
+  /**
+   * P0-3: overdue - When past due date
+   */
+  private evaluateOverdueTrigger(config: any, metadata: Record<string, any>): boolean {
+    const daysOverdue = metadata.daysOverdue || 0;
+    const gracePeriod = config.gracePeriodDays || 0;
+
+    // Check if we're past the grace period
+    if (daysOverdue <= gracePeriod) {
+      return false;
+    }
+
+    // Check escalation logic
+    if (config.escalateAfterDays && daysOverdue >= config.escalateAfterDays) {
+      return true;
+    }
+
+    // Check repeat reminders
+    if (config.repeatEveryDays) {
+      const repeatInterval = config.repeatEveryDays;
+      const daysSinceGrace = daysOverdue - gracePeriod;
+      return daysSinceGrace % repeatInterval === 0;
+    }
+
+    return true;
+  }
+
+  /**
+   * P0-4: task_dependency - When prerequisite task completes
+   */
+  private async evaluateTaskDependencyTrigger(
+    config: any,
+    context: { entityType: string; entityId: string; metadata?: Record<string, any> }
+  ): Promise<boolean> {
+    // Only fire for task completion events
+    if (context.entityType !== 'task') {
+      return false;
+    }
+
+    // Check if the completed task is a prerequisite for any other tasks
+    const dependsOnTaskId = context.metadata?.dependsOnTaskId;
+    const taskId = config.taskId;
+
+    if (taskId && dependsOnTaskId !== taskId) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * P0-5: all_tasks_complete - When all tasks in section/stage complete
+   */
+  private evaluateAllTasksCompleteTrigger(
+    config: any,
+    context: { entityType: string; metadata?: Record<string, any> }
+  ): boolean {
+    // Only fire for step/stage completion events
+    if (context.entityType !== 'step' && context.entityType !== 'stage') {
+      return false;
+    }
+
+    // Verify all tasks are actually complete
+    const allComplete = context.metadata?.allTasksComplete || false;
+    
+    return allComplete;
+  }
+
+  // ============================================================================
+  // P1 TRIGGER EVALUATORS (High Priority)
+  // ============================================================================
+
+  /**
+   * P1-1: field_change - When any field value changes
+   */
+  private evaluateFieldChangeTrigger(
+    config: any,
+    context: { entityType: string; fieldName?: string; oldValue?: any; newValue?: any }
+  ): boolean {
+    const { entityType, fieldName, oldValue, newValue } = context;
+
+    // Match entity type if specified
+    if (config.entityType && config.entityType !== entityType) {
+      return false;
+    }
+
+    // Match field name
+    if (config.fieldName && config.fieldName !== fieldName) {
+      return false;
+    }
+
+    // If anyChange is true, trigger on ANY change
+    if (config.anyChange) {
+      return oldValue !== newValue;
+    }
+
+    // Check specific from/to values
+    if (config.fromValue !== undefined && config.fromValue !== oldValue) {
+      return false;
+    }
+
+    if (config.toValue !== undefined && config.toValue !== newValue) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * P1-2: time_threshold - After X hours of inactivity
+   */
+  private evaluateTimeThresholdTrigger(config: any, metadata: Record<string, any>): boolean {
+    const hoursInactive = metadata.hoursInactive || 0;
+    const thresholdHours = config.inactivityHours || 72;
+
+    return hoursInactive >= thresholdHours;
+  }
+
+  /**
+   * P1-3: template_instantiated - When workflow created from template
+   */
+  private evaluateTemplateInstantiatedTrigger(config: any, metadata: Record<string, any>): boolean {
+    const templateId = metadata.templateId;
+    const targetTemplateId = config.templateId;
+
+    if (targetTemplateId && targetTemplateId !== templateId) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * P1-4: client_contact_added - When new client added to system
+   */
+  private evaluateClientContactAddedTrigger(
+    config: any,
+    context: { entityType: string; metadata?: Record<string, any> }
+  ): boolean {
+    if (context.entityType !== 'client') {
+      return false;
+    }
+
+    const clientType = context.metadata?.clientType;
+    const targetType = config.clientType;
+
+    if (targetType && targetType !== 'any' && targetType !== clientType) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * P1-5: budget_threshold - When project cost reaches % of budget
+   */
+  private evaluateBudgetThresholdTrigger(config: any, metadata: Record<string, any>): boolean {
+    const percentage = metadata.percentage || 0;
+    const thresholdPercentage = config.thresholdPercentage || 80;
+
+    return percentage >= thresholdPercentage;
+  }
+
+  // ============================================================================
+  // P2 TRIGGER EVALUATORS (Nice-to-Have)
+  // ============================================================================
+
+  /**
+   * P2-1: team_capacity - When team member availability changes
+   */
+  private evaluateTeamCapacityTrigger(config: any, metadata: Record<string, any>): boolean {
+    const utilizationPercentage = metadata.utilizationPercentage || 0;
+    const maxUtilization = config.maxUtilizationPercentage || 90;
+
+    return utilizationPercentage >= maxUtilization;
+  }
+
+  /**
+   * P2-2: fiscal_deadline - Tax/fiscal year-end deadlines
+   */
+  private evaluateFiscalDeadlineTrigger(config: any, metadata: Record<string, any>): boolean {
+    const daysUntilDeadline = metadata.daysUntilFiscalDeadline || 0;
+    const warningDays = config.warningDays || 30;
+
+    return daysUntilDeadline <= warningDays;
+  }
+
+  /**
+   * P2-3: conditional_section - Show/hide sections based on conditions
+   */
+  private evaluateConditionalSectionTrigger(config: any, metadata: Record<string, any>): boolean {
+    // This is primarily a UI concern, but can trigger backend actions
+    const conditionsMet = metadata.conditionsMet || false;
+    return conditionsMet;
+  }
+
+  /**
+   * P2-4: relative_date - Relative to another date
+   */
+  private evaluateRelativeDateTrigger(config: any, metadata: Record<string, any>): boolean {
+    const targetDate = metadata.calculatedDate;
+    const today = new Date();
+
+    if (!targetDate) return false;
+
+    // Check if today matches the calculated relative date
+    const targetDateObj = new Date(targetDate);
+    return (
+      targetDateObj.getFullYear() === today.getFullYear() &&
+      targetDateObj.getMonth() === today.getMonth() &&
+      targetDateObj.getDate() === today.getDate()
+    );
+  }
+
+  /**
+   * P2-5: integration_event - External app events (QBO, Xero, Gmail, etc.)
+   */
+  private evaluateIntegrationEventTrigger(config: any, metadata: Record<string, any>): boolean {
+    const eventType = metadata.eventType;
+    const integration = metadata.integration;
+
+    if (config.integration && config.integration !== integration) {
+      return false;
+    }
+
+    if (config.eventType && config.eventType !== eventType) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Log trigger event to database for audit trail
+   */
+  private async logTriggerEvent(params: {
+    workflowId: string;
+    assignmentId?: string;
+    organizationId: string;
+    triggerType: string;
+    triggerConfig: any;
+    entityType: string;
+    entityId: string;
+    fieldName?: string;
+    oldValue?: any;
+    newValue?: any;
+    scheduledFor?: Date;
+    actionsExecuted: any[];
+    executionStatus: 'success' | 'failed' | 'partial';
+    executionError?: string;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    try {
+      // Note: This would insert into the workflow_trigger_events table
+      // For now, we'll log to console. Full implementation requires storage method.
+      
+      console.log('[AutomationEngine] Trigger Event:', {
+        type: params.triggerType,
+        workflow: params.workflowId,
+        entity: `${params.entityType}:${params.entityId}`,
+        status: params.executionStatus,
+        actionsCount: params.actionsExecuted.length,
+      });
+
+      // TODO: Implement storage.createTriggerEvent() method
+      // await this.storage.createTriggerEvent({
+      //   workflowId: params.workflowId,
+      //   assignmentId: params.assignmentId,
+      //   organizationId: params.organizationId,
+      //   triggerType: params.triggerType,
+      //   triggerConfig: params.triggerConfig,
+      //   entityType: params.entityType,
+      //   entityId: params.entityId,
+      //   fieldName: params.fieldName,
+      //   oldValue: params.oldValue ? String(params.oldValue) : null,
+      //   newValue: params.newValue ? String(params.newValue) : null,
+      //   scheduledFor: params.scheduledFor,
+      //   actionsExecuted: params.actionsExecuted,
+      //   executionStatus: params.executionStatus,
+      //   executionError: params.executionError,
+      //   metadata: params.metadata,
+      // });
+    } catch (error: any) {
+      console.error('[AutomationEngine] Failed to log trigger event:', error);
+    }
+  }
 }
