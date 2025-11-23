@@ -5,6 +5,7 @@ import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp,
 import { Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Landing() {
 
@@ -108,6 +109,7 @@ export default function Landing() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
+            <ThemeToggle />
           </div>
         </div>
       </nav>
