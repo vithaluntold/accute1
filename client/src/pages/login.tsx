@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
-import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { MFAVerificationModal } from "@/components/mfa-verification-modal";
 
 const loginSchema = z.object({

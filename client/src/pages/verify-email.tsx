@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 export default function VerifyEmail() {
   const [, setLocation] = useLocation();

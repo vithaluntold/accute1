@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, Building2, UserPlus, CheckCircle2 } from "lucide-react";
-import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 const superAdminSchema = z.object({
   email: z.string().email("Invalid email address"),

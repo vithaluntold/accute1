@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lock, CheckCircle2, AlertCircle } from "lucide-react";
-import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
+import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 const setPasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
