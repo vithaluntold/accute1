@@ -150,6 +150,11 @@ const app = express();
 // This ensures app.get("env") works correctly in production
 app.set("env", process.env.NODE_ENV || "development");
 
+// CRITICAL: Enable trust proxy for rate limiters to work correctly
+// Replit and other platforms run behind reverse proxies
+// Without this, rate limiters can't identify users correctly via X-Forwarded-For header
+app.set("trust proxy", true);
+
 app.use(cookieParser());
 
 declare module 'http' {
