@@ -10,12 +10,12 @@ export function FinACEverseBranding({ className = "" }: FinACEverseBrandingProps
       className={`border-t mt-12 pt-8 flex justify-center ${className}`}
       data-testid="section-finaceverse-branding"
     >
-      <div className="inline-flex items-baseline gap-2 whitespace-nowrap text-sm text-muted-foreground">
+      <div className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
         <span data-testid="text-powered-by">Powered by</span>
         <img 
           src={finaceverseLogoUrl} 
           alt="FinACEverse Logo" 
-          className="h-5 w-5 align-middle"
+          className="h-4 w-4"
           data-testid="img-finaceverse-logo"
         />
         <span className="font-semibold" data-testid="text-finaceverse">FinACEverse</span>
