@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import {
   ReactFlow,
   Node,
   Edge,
   addEdge,
   Connection,
-  useNodesState,
-  useEdgesState,
   Controls,
   Background,
   BackgroundVariant,
-  NodeTypes,
   Handle,
   Position,
+  NodeChange,
+  applyNodeChanges,
+  EdgeChange,
+  applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,126 +124,189 @@ function ConditionNode({ data, onDelete, onChange }: ConditionNodeProps) {
   );
 }
 
-const nodeTypes: NodeTypes = {
-  condition: ConditionNode,
-};
-
 interface VisualTriggerBuilderProps {
-  conditions: Array<{ field: string; operator: string; value: string }>;
-  onChange: (conditions: Array<{ field: string; operator: string; value: string }>) => void;
+  conditions: Array<{ id?: string; field: string; operator: string; value: string; x?: number; y?: number }>;
+  conditionEdges?: Array<{ id?: string; source: string; target: string }>;
+  onChange: (
+    conditions: Array<{ id: string; field: string; operator: string; value: string; x: number; y: number }>,
+    edges: Array<{ id: string; source: string; target: string }>
+  ) => void;
 }
 
-export function VisualTriggerBuilder({ conditions, onChange }: VisualTriggerBuilderProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const isInitialLoad = useRef(true);
-  const prevConditionsLength = useRef(conditions.length);
+function generateId(): string {
+  return `cond-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
 
-  // Sync nodes ONLY on initial load or when switching triggers (count change)
-  useEffect(() => {
-    // Only rebuild if this is initial load OR condition count changed (switching triggers)
-    const countChanged = prevConditionsLength.current !== conditions.length;
-    
-    if (isInitialLoad.current || countChanged) {
-      const conditionNodes: Node[] = conditions.map((cond, idx) => {
-        const nodeId = `condition-${idx}`; // Stable ID based on index
-        return {
-          id: nodeId,
-          type: 'condition',
-          position: { x: 250, y: idx * 180 + 50 },
-          data: {
-            id: nodeId,
-            field: cond.field,
-            operator: cond.operator,
-            value: cond.value,
-          } as ConditionNodeData,
-        };
-      });
-      setNodes(conditionNodes);
-      setEdges([]); // Only clear edges on full rebuild
+// State managed by reducer
+interface GraphState {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+type GraphAction =
+  | { type: 'HYDRATE'; conditions: any[]; edges: any[] }
+  | { type: 'NODE_CHANGES'; changes: NodeChange[] }
+  | { type: 'EDGE_CHANGES'; changes: EdgeChange[] }
+  | { type: 'CONNECT'; connection: Connection }
+  | { type: 'ADD_NODE' }
+  | { type: 'DELETE_NODE'; id: string }
+  | { type: 'UPDATE_NODE_DATA'; id: string; updates: any };
+
+function graphReducer(state: GraphState, action: GraphAction): GraphState {
+  switch (action.type) {
+    case 'HYDRATE': {
+      const { conditions, edges } = action;
       
-      isInitialLoad.current = false;
-      prevConditionsLength.current = conditions.length;
+      // Ensure conditions have stable IDs
+      const withIds = conditions.map((c, idx) => ({
+        ...c,
+        id: c.id || generateId(),
+        x: c.x ?? 250,
+        y: c.y ?? idx * 180 + 50,
+      }));
+
+      const nodes: Node[] = withIds.map((c) => ({
+        id: c.id,
+        type: 'condition',
+        position: { x: c.x, y: c.y },
+        data: { id: c.id, field: c.field, operator: c.operator, value: c.value } as ConditionNodeData,
+      }));
+
+      const edgesWithIds = edges.map((e: any) => ({
+        id: e.id || generateId(),
+        source: e.source,
+        target: e.target,
+      }));
+
+      return { nodes, edges: edgesWithIds };
     }
-  }, [conditions.length]); // Only watch length to detect trigger switches
+
+    case 'NODE_CHANGES':
+      return { ...state, nodes: applyNodeChanges(action.changes, state.nodes) };
+
+    case 'EDGE_CHANGES':
+      return { ...state, edges: applyEdgeChanges(action.changes, state.edges) };
+
+    case 'CONNECT':
+      return { ...state, edges: addEdge({ ...action.connection, id: generateId() }, state.edges) };
+
+    case 'ADD_NODE': {
+      const id = generateId();
+      return {
+        ...state,
+        nodes: [...state.nodes, {
+          id,
+          type: 'condition',
+          position: { x: 250, y: state.nodes.length * 180 + 50 },
+          data: { id, field: 'status', operator: 'equals', value: '' } as ConditionNodeData,
+        }],
+      };
+    }
+
+    case 'DELETE_NODE':
+      return {
+        nodes: state.nodes.filter(n => n.id !== action.id),
+        edges: state.edges.filter(e => e.source !== action.id && e.target !== action.id),
+      };
+
+    case 'UPDATE_NODE_DATA':
+      return {
+        ...state,
+        nodes: state.nodes.map(n =>
+          n.id === action.id ? { ...n, data: { ...n.data, ...action.updates } } : n
+        ),
+      };
+
+    default:
+      return state;
+  }
+}
+
+export function VisualTriggerBuilder({ conditions, conditionEdges = [], onChange }: VisualTriggerBuilderProps) {
+  const [state, dispatch] = useReducer(graphReducer, { nodes: [], edges: [] });
+  const prevSnapshotRef = useRef('');
+  const isHydratingRef = useRef(false);
+
+  // Synchronous emit to parent
+  const emitToParent = useCallback((newState: GraphState) => {
+    const updatedConditions = newState.nodes.map((n) => {
+      const data = n.data as ConditionNodeData;
+      return {
+        id: data.id,
+        field: data.field,
+        operator: data.operator,
+        value: data.value,
+        x: n.position.x,
+        y: n.position.y,
+      };
+    });
+    const updatedEdges = newState.edges.map(e => ({ id: e.id, source: e.source, target: e.target }));
+    onChange(updatedConditions, updatedEdges);
+  }, [onChange]);
+
+  // Hydrate from props
+  useEffect(() => {
+    const snapshot = JSON.stringify({ conditions, conditionEdges });
+    if (snapshot !== prevSnapshotRef.current) {
+      isHydratingRef.current = true;
+      const newState = graphReducer(state, { type: 'HYDRATE', conditions, edges: conditionEdges });
+      dispatch({ type: 'HYDRATE', conditions, edges: conditionEdges });
+      prevSnapshotRef.current = snapshot;
+      
+      // Persist IDs if generated
+      if (conditions.some(c => !c.id) || conditionEdges.some((e: any) => !e.id)) {
+        emitToParent(newState);
+      }
+      
+      isHydratingRef.current = false;
+    }
+  }, [JSON.stringify({ conditions, conditionEdges })]);
+
+  // Handlers dispatch ONCE, then use updated state ref
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    if (isHydratingRef.current) return;
+    dispatch({ type: 'NODE_CHANGES', changes });
+    // Wait for state update, then emit
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
+
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    if (isHydratingRef.current) return;
+    dispatch({ type: 'EDGE_CHANGES', changes });
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
+
+  const handleConnect = useCallback((connection: Connection) => {
+    if (isHydratingRef.current) return;
+    dispatch({ type: 'CONNECT', connection });
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
+
+  const handleAddNode = useCallback(() => {
+    dispatch({ type: 'ADD_NODE' });
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
 
   const handleDeleteNode = useCallback((id: string) => {
-    setNodes((nds) => {
-      const filtered = nds.filter((node) => node.id !== id);
-      // Convert to plain objects without functions
-      const plainConditions = filtered.map((n) => ({
-        field: (n.data as ConditionNodeData).field,
-        operator: (n.data as ConditionNodeData).operator,
-        value: (n.data as ConditionNodeData).value,
-      }));
-      prevConditionsLength.current = filtered.length; // Update length ref
-      onChange(plainConditions);
-      return filtered;
-    });
-    // Also clear edges connected to this node
-    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
-  }, [onChange, setNodes, setEdges]);
+    dispatch({ type: 'DELETE_NODE', id });
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
 
-  const handleNodeChange = useCallback((id: string, updates: Partial<Omit<ConditionNodeData, 'id'>>) => {
-    setNodes((nds) => {
-      const updated = nds.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, ...updates } as ConditionNodeData }
-          : node
-      );
-      // Convert to plain objects without functions
-      const plainConditions = updated.map((n) => ({
-        field: (n.data as ConditionNodeData).field,
-        operator: (n.data as ConditionNodeData).operator,
-        value: (n.data as ConditionNodeData).value,
-      }));
-      onChange(plainConditions);
-      return updated;
-    });
-  }, [onChange, setNodes]);
+  const handleNodeDataChange = useCallback((id: string, updates: any) => {
+    dispatch({ type: 'UPDATE_NODE_DATA', id, updates });
+    setTimeout(() => emitToParent(stateRef.current), 0);
+  }, [emitToParent]);
 
-  const handleAddCondition = useCallback(() => {
-    setNodes((nds) => {
-      const newId = `condition-${nds.length}`; // Stable ID based on count
-      const newNode: Node = {
-        id: newId,
-        type: 'condition',
-        position: { x: 250, y: nds.length * 180 + 50 },
-        data: {
-          id: newId,
-          field: 'status',
-          operator: 'equals',
-          value: '',
-        } as ConditionNodeData,
-      };
-      const updated = [...nds, newNode];
-      // Convert to plain objects without functions
-      const plainConditions = updated.map((n) => ({
-        field: (n.data as ConditionNodeData).field,
-        operator: (n.data as ConditionNodeData).operator,
-        value: (n.data as ConditionNodeData).value,
-      }));
-      prevConditionsLength.current = updated.length; // Update length ref
-      onChange(plainConditions);
-      return updated;
-    });
-  }, [onChange, setNodes]);
-
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  // Wrap ConditionNode with callbacks
   const wrappedNodeTypes = useMemo(() => ({
     condition: (props: any) => (
-      <ConditionNode
-        {...props}
-        onDelete={handleDeleteNode}
-        onChange={handleNodeChange}
-      />
+      <ConditionNode {...props} onDelete={handleDeleteNode} onChange={handleNodeDataChange} />
     ),
-  }), [handleDeleteNode, handleNodeChange]);
+  }), [handleDeleteNode, handleNodeDataChange]);
 
   return (
     <div className="space-y-4">
@@ -253,12 +317,7 @@ export function VisualTriggerBuilder({ conditions, onChange }: VisualTriggerBuil
             Drag conditions to reorder, connect nodes to create logic flow
           </p>
         </div>
-        <Button
-          onClick={handleAddCondition}
-          size="sm"
-          variant="outline"
-          data-testid="button-add-condition"
-        >
+        <Button onClick={handleAddNode} size="sm" variant="outline" data-testid="button-add-condition">
           <Plus className="h-3 w-3 mr-1" />
           Add Condition
         </Button>
@@ -266,11 +325,11 @@ export function VisualTriggerBuilder({ conditions, onChange }: VisualTriggerBuil
 
       <div className="h-[400px] border rounded-md bg-background">
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          nodes={state.nodes}
+          edges={state.edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={handleConnect}
           nodeTypes={wrappedNodeTypes}
           fitView
           data-testid="react-flow-canvas"

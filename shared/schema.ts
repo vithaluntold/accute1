@@ -5454,7 +5454,8 @@ export const automationTriggers = pgTable("automation_triggers", {
   
   // Event configuration
   event: text("event").notNull(), // TriggerEvent type: payment_received, document_uploaded, etc.
-  conditions: jsonb("conditions").default(sql`'[]'::jsonb`), // Optional conditions that must be met
+  conditions: jsonb("conditions").default(sql`'[]'::jsonb`), // Optional conditions (with id, x, y for visual builder)
+  conditionEdges: jsonb("condition_edges").default(sql`'[]'::jsonb`), // Visual trigger builder connections (source/target/id)
   
   // Scope - which workflows/stages/steps this applies to
   workflowId: varchar("workflow_id").references(() => workflows.id, { onDelete: 'cascade' }),

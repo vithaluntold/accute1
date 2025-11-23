@@ -59,11 +59,20 @@ const triggerFormSchema = z.object({
   // Time-based fields
   cronExpression: z.string().optional(),
   dueDateOffsetDays: z.number().optional(),
-  // Visual conditions
+  // Visual conditions with stable IDs and positions
   conditions: z.array(z.object({
+    id: z.string().optional(), // Stable ID for React Flow
     field: z.string(),
     operator: z.string(),
     value: z.string(),
+    x: z.number().optional(), // Node X position
+    y: z.number().optional(), // Node Y position
+  })).optional(),
+  // Visual condition connections (edges) with stable IDs
+  conditionEdges: z.array(z.object({
+    id: z.string().optional(), // Stable edge ID
+    source: z.string(),
+    target: z.string(),
   })).optional(),
 });
 
@@ -131,6 +140,7 @@ export default function Automation() {
       cronExpression: "",
       dueDateOffsetDays: 0,
       conditions: [],
+      conditionEdges: [],
     },
   });
 
@@ -280,6 +290,7 @@ export default function Automation() {
       cronExpression: (trigger as any).cronExpression || "",
       dueDateOffsetDays: (trigger as any).dueDateOffsetDays || 0,
       conditions: (trigger as any).conditions || [],
+      conditionEdges: (trigger as any).conditionEdges || [],
     });
     setSelectedWorkflowId(trigger.workflowId);
     setSelectedStageId(trigger.stageId);
@@ -545,7 +556,11 @@ export default function Automation() {
                 <div className="space-y-4">
                   <VisualTriggerBuilder
                     conditions={conditions}
-                    onChange={(newConditions) => form.setValue('conditions', newConditions)}
+                    conditionEdges={form.watch('conditionEdges') || []}
+                    onChange={(newConditions, newEdges) => {
+                      form.setValue('conditions', newConditions);
+                      form.setValue('conditionEdges', newEdges);
+                    }}
                   />
                 </div>
 
