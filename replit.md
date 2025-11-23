@@ -1,6 +1,34 @@
 # Overview
 Accute is an AI-native platform for accounting firms, aiming to automate workflows, boost efficiency, and ensure compliance. It features multi-agent orchestration, an extensive template library, support for multiple AI providers, and a dedicated AI agent marketplace. The platform seeks to revolutionize accounting with advanced AI, targeting significant global market share.
 
+# Deployment Requirements
+
+## Production Build Environment
+**CRITICAL:** The build command requires `NODE_ENV=production` to be set:
+
+```bash
+# Standard build (requires NODE_ENV=production in environment)
+npm run build
+
+# Manual build (sets NODE_ENV explicitly)
+NODE_ENV=production npm run build
+```
+
+**Why:** The vite.config.ts conditionally loads dev-only plugins (`@replit/vite-plugin-cartographer`, `@replit/vite-plugin-dev-banner`) that fail in production builds if NODE_ENV isn't set. These plugins are automatically disabled when `NODE_ENV=production`.
+
+**Deployment Platforms:**
+- ✅ **Replit Deployments:** Automatically set NODE_ENV=production (no action needed)
+- ⚠️ **Other Platforms:** Ensure CI/CD or deployment environment sets NODE_ENV=production
+
+## Recent Bug Fixes (November 23, 2025)
+
+### Build Error Fixes - PRODUCTION READY ✅
+1. **Logo Asset References** - Fixed 6 marketing pages (terms, privacy, contact, security, about, features) to use existing Accute logo instead of missing logo.png
+2. **Organization Field Consistency** - Fixed "No Workspace Selected" error with fallback pattern across 5 frontend files + 1 backend route
+3. **Trace Button Visibility** - Fixed agent installations endpoint to show "Add Skills with Trace" button in Employee Profile
+4. **Automation Triggers Schema** - Added missing condition_edges column to automation_triggers table
+5. **Floating Footer** - Removed FinACEverse footer from authenticated pages
+
 # User Preferences
 - Prefer database-backed storage over in-memory
 - Enterprise-grade security is paramount
