@@ -488,25 +488,27 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
   // CRITICAL: Applied AFTER authentication routes but enforces org scope on ALL subsequent routes
   
   // List of unauthenticated routes that should bypass organization enforcement
+  // NOTE: These paths are WITHOUT the /api prefix since they're checked inside app.use('/api/*')
   const unauthenticatedRoutes = [
-    '/api/health',
-    '/api/diagnostics',
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/auth/register-with-code',
-    '/api/auth/verify-email',
-    '/api/auth/forgot-password',
-    '/api/auth/reset-password',
-    '/api/auth/check-email',
-    '/api/invitations/accept',
-    '/api/portal/login',
-    '/api/sso/login',
-    '/api/sso/callback',
+    '/health',
+    '/diagnostics',
+    '/auth/login',
+    '/auth/register',
+    '/auth/register-with-code',
+    '/auth/verify-email',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/check-email',
+    '/invitations/accept',
+    '/portal/login',
+    '/sso/login',
+    '/sso/callback',
   ];
   
   // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
   app.use('/api/*', (req, res, next) => {
     // Skip unauthenticated routes
+    // req.path inside app.use('/api/*') has the /api prefix stripped
     if (unauthenticatedRoutes.some(route => req.path.startsWith(route))) {
       return next();
     }
