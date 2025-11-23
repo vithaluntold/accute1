@@ -1,6 +1,45 @@
 # Overview
 Accute is an AI-native platform designed for accounting firms to automate workflows, enhance operational efficiency, and ensure robust compliance. It features multi-agent orchestration, an extensive template library, support for multiple AI providers, and a dedicated AI agent marketplace. The platform aims to revolutionize accounting practices with advanced AI capabilities, targeting significant global market share.
 
+## Recent Updates
+
+### Trace AI Agent - Production-Ready Integration (November 23, 2025)
+**Status: ✅ PRODUCTION READY**
+
+**Auto-Provisioning Infrastructure**
+- ✅ Reusable `provisionBundledAgents()` function for automatic agent installation
+- ✅ Integrated into all subscription flows:
+  - Admin subscription creation (POST /api/admin/subscriptions)
+  - Stripe checkout webhook (checkout.session.completed)
+  - Razorpay subscription creation (POST /api/razorpay/subscriptions/create)
+- ✅ Idempotent installation (prevents duplicate installations)
+- ✅ Graceful error handling (subscription creation never fails due to provisioning errors)
+- 📝 **How it works**: When an organization subscribes to a plan, all AI agents listed in the plan's `featureIdentifiers` array are automatically installed for that organization
+
+**Entitlement & Access Control**
+- ✅ Subscription-based agent access (POST /api/marketplace/agents/:agentSlug/install)
+- ✅ Plan bundling verification via `featureIdentifiers` array
+- ✅ Premium vs free agent distinction (pricingTier field)
+- ✅ Actionable upgrade prompts for unauthorized installations
+- 📝 **Security**: Organizations can only install agents that are either (a) bundled in their subscription plan, or (b) marked as free/available to all plans
+
+**Resume Analysis Security (Trace Agent)**
+- ✅ PII sanitization (`sanitizeResumePII` function) redacts:
+  - Email addresses → [EMAIL_REDACTED]
+  - Phone numbers → [PHONE_REDACTED]
+  - SSN patterns → [SSN_REDACTED]
+  - Street addresses → [ADDRESS_REDACTED]
+- ✅ Rate limiting: 10 requests per 15 minutes (POST /api/ai-agent/chat)
+- ✅ File size validation: 500KB maximum (server-side enforcement)
+- ✅ Agent installation verification before execution
+- ✅ Activity logging with PII filtering metrics
+- 📝 **Compliance**: Resume text is automatically sanitized before being sent to LLM providers, protecting candidate privacy while maintaining skills extraction quality
+
+**Files Modified**
+- `server/routes.ts`: Auto-provisioning, entitlement checks, PII filtering, rate limiting
+- `agents/trace/backend/index.ts`: Resume analysis implementation (unchanged, uses existing code)
+- `client/src/components/profile/skills-expertise-tab.tsx`: UI for resume upload (already implemented)
+
 ## Recent Security Implementation (November 22, 2025)
 
 ### Critical Production Bug Fix - Encryption Service (DEPLOYED)

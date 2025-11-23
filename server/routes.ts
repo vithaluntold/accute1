@@ -89,6 +89,118 @@ import { MultiSamlStrategy } from "@node-saml/passport-saml";
 // Import foundry tables
 const { aiAgents, organizationAgents, userAgentAccess, platformSubscriptions } = schema;
 
+// ==================== PII Sanitization Helper ====================
+
+/**
+ * Sanitizes PII from resume text before sending to LLM
+ * Redacts: email addresses, phone numbers, social security numbers, addresses
+ */
+function sanitizeResumePII(text: string): string {
+  let sanitized = text;
+  
+  // Redact email addresses
+  sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL_REDACTED]');
+  
+  // Redact phone numbers (various formats)
+  sanitized = sanitized.replace(/(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/g, '[PHONE_REDACTED]');
+  
+  // Redact SSN patterns (XXX-XX-XXXX)
+  sanitized = sanitized.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN_REDACTED]');
+  
+  // Redact street addresses (simple pattern)
+  sanitized = sanitized.replace(/\b\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Circle|Cir)\b/gi, '[ADDRESS_REDACTED]');
+  
+  return sanitized;
+}
+
+// ==================== AI Agent Auto-Provisioning ====================
+
+/**
+ * Auto-provisions bundled AI agents for an organization based on subscription plan
+ * @param planId - The subscription plan ID
+ * @param organizationId - The organization ID
+ * @param installedBy - The user ID who triggered the provisioning
+ * @returns Promise<void>
+ */
+async function provisionBundledAgents(
+  planId: string,
+  organizationId: string,
+  installedBy: string
+): Promise<void> {
+  try {
+    // Get plan with featureIdentifiers
+    const plan = await db.select().from(schema.subscriptionPlans)
+      .where(eq(schema.subscriptionPlans.id, planId))
+      .limit(1);
+    
+    if (!plan[0]?.featureIdentifiers || plan[0].featureIdentifiers.length === 0) {
+      console.log(`[Provisioning] No bundled agents for plan ${planId}`);
+      return;
+    }
+    
+    const { agentRegistry } = await import("./agent-registry");
+    console.log(`[Provisioning] Auto-installing ${plan[0].featureIdentifiers.length} bundled agents for org ${organizationId}`);
+    
+    for (const agentSlug of plan[0].featureIdentifiers) {
+      try {
+        // Check if agent exists in registry
+        const agentManifest = agentRegistry.getAgent(agentSlug);
+        if (!agentManifest) {
+          console.warn(`[Provisioning] Agent ${agentSlug} not found in registry, skipping`);
+          continue;
+        }
+        
+        // Get agent from database
+        const agent = await db.select().from(schema.aiAgents)
+          .where(eq(schema.aiAgents.slug, agentSlug))
+          .limit(1);
+        
+        if (!agent[0]) {
+          console.warn(`[Provisioning] Agent ${agentSlug} not found in database, skipping`);
+          continue;
+        }
+        
+        // Idempotency check: skip if already installed
+        const existing = await db.select().from(schema.aiAgentInstallations)
+          .where(and(
+            eq(schema.aiAgentInstallations.agentId, agent[0].id),
+            eq(schema.aiAgentInstallations.organizationId, organizationId)
+          ))
+          .limit(1);
+        
+        if (existing.length > 0) {
+          console.log(`[Provisioning] Agent ${agentSlug} already installed for org ${organizationId}, skipping`);
+          continue;
+        }
+        
+        // Install the agent
+        await db.insert(schema.aiAgentInstallations).values({
+          agentId: agent[0].id,
+          organizationId,
+          installedBy,
+          configuration: {},
+          isActive: true,
+        });
+        
+        // Enable agent for organization
+        await agentRegistry.enableAgentForOrganization(
+          agentSlug,
+          organizationId,
+          installedBy
+        );
+        
+        console.log(`[Provisioning] Successfully installed agent ${agentSlug} for org ${organizationId}`);
+      } catch (agentError: any) {
+        // Log but don't fail provisioning
+        console.error(`[Provisioning] Failed to install agent ${agentSlug}:`, agentError);
+      }
+    }
+  } catch (provisioningError: any) {
+    // Log provisioning errors but don't fail subscription creation
+    console.error('[Provisioning] Failed to auto-install bundled agents:', provisioningError);
+  }
+}
+
 // SECURITY: Whitelist of allowed MIME types for document uploads
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -5371,6 +5483,7 @@ Title:`;
       }
       
       const agentId = agent[0].id;
+      const organizationId = req.user!.organizationId!;
       
       // Check if already installed
       const existing = await db
@@ -5378,12 +5491,53 @@ Title:`;
         .from(schema.aiAgentInstallations)
         .where(and(
           eq(schema.aiAgentInstallations.agentId, agentId),
-          eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId!)
+          eq(schema.aiAgentInstallations.organizationId, organizationId)
         ))
         .limit(1);
       
       if (existing.length > 0) {
         return res.status(400).json({ error: "Agent already installed" });
+      }
+      
+      // ENTITLEMENT CHECK: Verify organization can install this agent
+      const subscription = await db
+        .select()
+        .from(schema.platformSubscriptions)
+        .where(and(
+          eq(schema.platformSubscriptions.organizationId, organizationId),
+          eq(schema.platformSubscriptions.status, 'active')
+        ))
+        .limit(1);
+      
+      if (subscription.length === 0) {
+        return res.status(403).json({ 
+          error: "No active subscription found. Please subscribe to a plan to install AI agents." 
+        });
+      }
+      
+      // Get plan details to check featureIdentifiers
+      const plan = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(eq(schema.subscriptionPlans.id, subscription[0].planId))
+        .limit(1);
+      
+      // Check if agent is bundled in the plan
+      const isBundled = plan[0]?.featureIdentifiers?.includes(req.params.agentSlug) || false;
+      
+      // Check if agent is premium (has pricing)
+      const isPremiumAgent = agent[0].pricingTier !== 'free';
+      
+      // Allow installation if:
+      // 1. Agent is bundled in the plan, OR
+      // 2. Agent is free (available to all plans)
+      if (!isBundled && isPremiumAgent) {
+        return res.status(403).json({ 
+          error: `This agent is not included in your ${plan[0]?.name || 'current'} plan. Please upgrade your subscription to access this agent.`,
+          agentName: agentManifest.name,
+          planName: plan[0]?.name,
+          upgradeRequired: true
+        });
       }
       
       // Create installation
@@ -16147,76 +16301,13 @@ ${msg.bodyText || msg.bodyHtml || ''}
       const subscriptionData = insertPlatformSubscriptionSchema.parse(req.body);
       const subscription = await storage.createPlatformSubscription(subscriptionData);
       
-      // Auto-provision bundled AI agents from plan featureIdentifiers
+      // Auto-provision bundled AI agents
       if (subscription.planId && subscription.organizationId) {
-        try {
-          const plan = await db.select().from(schema.subscriptionPlans)
-            .where(eq(schema.subscriptionPlans.id, subscription.planId))
-            .limit(1);
-          
-          if (plan[0]?.featureIdentifiers && plan[0].featureIdentifiers.length > 0) {
-            const { agentRegistry } = await import("./agent-registry");
-            console.log(`[Provisioning] Auto-installing ${plan[0].featureIdentifiers.length} bundled agents for org ${subscription.organizationId}`);
-            
-            for (const agentSlug of plan[0].featureIdentifiers) {
-              try {
-                // Check if agent exists in registry
-                const agentManifest = agentRegistry.getAgent(agentSlug);
-                if (!agentManifest) {
-                  console.warn(`[Provisioning] Agent ${agentSlug} not found in registry, skipping`);
-                  continue;
-                }
-                
-                // Get agent from database
-                const agent = await db.select().from(schema.aiAgents)
-                  .where(eq(schema.aiAgents.slug, agentSlug))
-                  .limit(1);
-                
-                if (!agent[0]) {
-                  console.warn(`[Provisioning] Agent ${agentSlug} not found in database, skipping`);
-                  continue;
-                }
-                
-                // Idempotency check: skip if already installed
-                const existing = await db.select().from(schema.aiAgentInstallations)
-                  .where(and(
-                    eq(schema.aiAgentInstallations.agentId, agent[0].id),
-                    eq(schema.aiAgentInstallations.organizationId, subscription.organizationId)
-                  ))
-                  .limit(1);
-                
-                if (existing.length > 0) {
-                  console.log(`[Provisioning] Agent ${agentSlug} already installed for org ${subscription.organizationId}, skipping`);
-                  continue;
-                }
-                
-                // Install the agent
-                await db.insert(schema.aiAgentInstallations).values({
-                  agentId: agent[0].id,
-                  organizationId: subscription.organizationId,
-                  installedBy: req.userId!, // Admin who created the subscription
-                  configuration: {},
-                  isActive: true,
-                });
-                
-                // Enable agent for organization
-                await agentRegistry.enableAgentForOrganization(
-                  agentSlug,
-                  subscription.organizationId,
-                  req.userId!
-                );
-                
-                console.log(`[Provisioning] Successfully installed agent ${agentSlug} for org ${subscription.organizationId}`);
-              } catch (agentError: any) {
-                // Log but don't fail subscription creation
-                console.error(`[Provisioning] Failed to install agent ${agentSlug}:`, agentError);
-              }
-            }
-          }
-        } catch (provisioningError: any) {
-          // Log provisioning errors but don't fail subscription creation
-          console.error('[Provisioning] Failed to auto-install bundled agents:', provisioningError);
-        }
+        await provisionBundledAgents(
+          subscription.planId,
+          subscription.organizationId,
+          req.userId!
+        );
       }
       
       // TODO: Implement downgrade/uninstall automation
@@ -17561,6 +17652,13 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
           await db.insert(schema.platformSubscriptions).values(subscriptionData);
 
+          // Auto-provision bundled AI agents
+          await provisionBundledAgents(
+            metadata.planId,
+            organizationId,
+            userId
+          );
+
           // Increment coupon usage if applicable
           if (metadata.couponCode) {
             await db
@@ -18762,6 +18860,13 @@ ${msg.bodyText || msg.bodyHtml || ''}
           updatedAt: new Date(),
         })
         .returning();
+
+      // Auto-provision bundled AI agents
+      await provisionBundledAgents(
+        plan.id,
+        organizationId,
+        user.id
+      );
 
       res.json({
         subscription: platformSubscription,
@@ -21891,6 +21996,124 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // ==================== PERSONALITY PROFILING ROUTES ====================
   registerPersonalityProfilingRoutes(app);
+
+  // ==================== AI AGENT CHAT (NON-STREAMING) ====================
+  
+  // Rate limiter for resume analysis (stricter limits)
+  const resumeAnalysisLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 requests per 15 minutes (enough for multiple resumes but prevents abuse)
+    message: "Too many resume analysis requests. Please try again later.",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  
+  /**
+   * POST /api/ai-agent/chat
+   * Non-streaming AI agent execution for resume analysis and other one-shot tasks
+   * SECURITY: PII filtering, rate limiting, file size validation
+   */
+  app.post("/api/ai-agent/chat", requireAuth, resumeAnalysisLimiter, async (req: Request, res: Response) => {
+    try {
+      const { agentSlug, message, sessionId } = req.body;
+      const organizationId = req.user!.organizationId;
+      const userId = req.userId!;
+      
+      if (!agentSlug || !message) {
+        return res.status(400).json({ error: "agentSlug and message are required" });
+      }
+      
+      // SECURITY: Validate message size (500KB max to prevent abuse)
+      if (message.length > 500 * 1024) {
+        return res.status(413).json({ 
+          error: "Message too large. Maximum size is 500KB.",
+          maxSize: "500KB",
+          currentSize: `${Math.round(message.length / 1024)}KB`
+        });
+      }
+      
+      // Check if agent exists
+      const { agentRegistry } = await import("./agent-registry");
+      const agentManifest = agentRegistry.getAgent(agentSlug);
+      
+      if (!agentManifest) {
+        return res.status(404).json({ error: `AI agent '${agentSlug}' not found` });
+      }
+      
+      // Check if agent is installed for the organization
+      if (organizationId) {
+        const agent = await db.select().from(schema.aiAgents)
+          .where(eq(schema.aiAgents.slug, agentSlug))
+          .limit(1);
+        
+        if (agent.length === 0) {
+          return res.status(404).json({ error: "Agent not found in database" });
+        }
+        
+        const installation = await db.select().from(schema.aiAgentInstallations)
+          .where(and(
+            eq(schema.aiAgentInstallations.agentId, agent[0].id),
+            eq(schema.aiAgentInstallations.organizationId, organizationId),
+            eq(schema.aiAgentInstallations.isActive, true)
+          ))
+          .limit(1);
+        
+        if (installation.length === 0) {
+          return res.status(403).json({ 
+            error: `Agent '${agentManifest.name}' is not installed for your organization.`,
+            agentSlug,
+            installRequired: true
+          });
+        }
+      }
+      
+      // SECURITY: Apply PII sanitization if this appears to be resume analysis
+      let processedMessage = message;
+      if (message.length > 1000 && agentSlug === 'trace') {
+        // Likely a resume - apply PII filtering
+        processedMessage = sanitizeResumePII(message);
+        console.log(`[Security] PII filtering applied to ${agentSlug} request (${message.length} chars -> ${processedMessage.length} chars)`);
+      }
+      
+      // Get LLM configuration for the organization
+      const llmConfigService = getLLMConfigService();
+      const llmConfig = await llmConfigService.getConfigForOrganization(
+        organizationId || 'platform',
+        userId,
+        agentSlug
+      );
+      
+      // Execute agent (non-streaming)
+      const AgentClass = agentManifest.AgentClass;
+      const agentInstance = new AgentClass(llmConfig);
+      
+      const result = await agentInstance.execute(processedMessage, {
+        userId,
+        organizationId,
+        sessionId,
+        resumeText: processedMessage,
+      });
+      
+      // Log activity
+      await logActivity(userId, organizationId, "execute", "ai_agent_chat", agentSlug, { 
+        messageLength: message.length,
+        piiFiltered: processedMessage.length !== message.length,
+        sessionId 
+      }, req);
+      
+      res.json({
+        content: result,
+        agentSlug,
+        sessionId,
+      });
+    } catch (error: any) {
+      console.error("[AI Agent Chat] Execution failed:", error);
+      res.status(500).json({ 
+        error: "Failed to execute AI agent",
+        message: error.message 
+      });
+    }
+  });
 
   // ==================== SSE AGENT STREAM ROUTES ====================
   registerSSEAgentRoutes(app);
