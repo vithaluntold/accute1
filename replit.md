@@ -3,6 +3,35 @@ Accute is an AI-native platform designed for accounting firms to automate workfl
 
 ## Recent Updates
 
+### Workflow Automation Engine - Dependency & Time-Based Triggers (November 23, 2025)
+**Status: ✅ PRODUCTION READY**
+
+**Karbon-Style Workflow Automation**
+- ✅ Dependency-aware task orchestration with 4 dependency types (finish_to_start, start_to_start, finish_to_finish, start_to_finish)
+- ✅ Event-driven auto-progression: Tasks auto-start when all blocking dependencies satisfied
+- ✅ Time-based triggers: Cron scheduling + due-date offset triggers
+- ✅ Visual trigger builder UI with scope configuration (workflow/stage/step-level)
+- ✅ Transaction-safe dependency updates with organization scoping
+
+**Security Hardening**
+- ✅ Multi-tenant data isolation: All dependency storage queries org-scoped
+- ✅ Transactional dependency satisfaction: Race condition prevention
+- ✅ Organization-filtered scheduled trigger endpoints
+- ✅ Permission-gated automation management (workflows.view/create/update/delete)
+
+**Architecture Decisions**
+- **Consolidated Schema**: `workflowTaskDependencies` table with `isBlocking`, `isSatisfied`, `lagDays`, `satisfiedAt` fields
+- **Auto-Start Flow**: Task completion → Mark dependencies satisfied → Check all dependencies → Auto-start ready tasks
+- **Dependency Types**: Snake_case normalized (finish_to_start, start_to_start, finish_to_finish, start_to_finish)
+- **Time-Based Config**: Cron expressions + due-date offsets stored in `automationTriggers.cronExpression/dueDateOffsetDays`
+
+**Files Modified**
+- `server/storage.ts`: Org-scoped dependency queries (getWorkflowTaskDependents, getWorkflowTaskDependenciesByTask, updateWorkflowTaskDependency)
+- `server/event-triggers.ts`: Auto-start logic with dependency satisfaction checks
+- `server/routes.ts`: Time-based automation routes (preview-schedule, due-date-triggers, scheduled/due)
+- `client/src/pages/automation.tsx`: Time-based trigger UI (cron/due-date configuration)
+- `client/src/components/task-dependency-manager.tsx`: Visual dependency builder
+
 ### Trace AI Agent - Production-Ready Integration (November 23, 2025)
 **Status: ✅ PRODUCTION READY**
 

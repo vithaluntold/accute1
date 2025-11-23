@@ -13686,11 +13686,13 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
   
-  // Get scheduled triggers due for execution (admin/testing only)
-  app.get("/api/automation/scheduled/due", requireAuth, requirePermission("system.admin"), async (req: Request, res: Response) => {
+  // Get scheduled triggers due for execution (org-scoped, admin only for debugging)
+  app.get("/api/automation/scheduled/due", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
     try {
-      const triggers = await storage.getScheduledTriggersDueForExecution();
-      res.json(triggers);
+      // SECURITY FIX: Only return triggers for the user's organization
+      const allTriggers = await storage.getScheduledTriggersDueForExecution();
+      const orgTriggers = allTriggers.filter(t => t.organizationId === req.user!.organizationId);
+      res.json(orgTriggers);
     } catch (error: any) {
       console.error("Failed to fetch scheduled triggers:", error);
       res.status(500).json({ error: "Failed to fetch scheduled triggers" });
