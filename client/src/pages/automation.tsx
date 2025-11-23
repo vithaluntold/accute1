@@ -99,11 +99,8 @@ export default function Automation() {
 
   const stages = stagesData;
 
-  // Extract steps from selected stage (stages include steps by default)
+  // Extract steps from selected stage (for scoped step selection)
   const [selectedStageId, setSelectedStageId] = useState<string | undefined>();
-  const steps = selectedStageId 
-    ? (stages.find((s: any) => s.id === selectedStageId)?.steps || [])
-    : [];
 
   // Create trigger form
   const form = useForm<TriggerFormValues>({
@@ -121,6 +118,16 @@ export default function Automation() {
       actions: [],
     },
   });
+
+  // Derive step arrays (must be after form definition)
+  const scopedSteps = selectedStageId 
+    ? (stages.find((s: any) => s.id === selectedStageId)?.steps || [])
+    : [];
+
+  const targetStageId = form.watch('autoAdvanceTargetStageId');
+  const targetSteps = targetStageId 
+    ? (stages.find((s: any) => s.id === targetStageId)?.steps || [])
+    : [];
 
   // Create trigger mutation
   const createTrigger = useMutation({
@@ -450,7 +457,7 @@ export default function Automation() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="">Any step</SelectItem>
-                              {steps.map((step: any) => (
+                              {scopedSteps.map((step: any) => (
                                 <SelectItem key={step.id} value={step.id}>
                                   {step.name}
                                 </SelectItem>
@@ -535,7 +542,7 @@ export default function Automation() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="">None</SelectItem>
-                                {steps.map((step: any) => (
+                                {targetSteps.map((step: any) => (
                                   <SelectItem key={step.id} value={step.id}>
                                     {step.name}
                                   </SelectItem>
@@ -551,6 +558,229 @@ export default function Automation() {
                       />
                     </>
                   )}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium">Actions</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Define what happens when this trigger fires
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentActions = form.getValues('actions') || [];
+                        form.setValue('actions', [
+                          ...currentActions,
+                          { type: 'send_notification', config: { title: '', message: '' } }
+                        ]);
+                      }}
+                      data-testid="button-add-action"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Action
+                    </Button>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="actions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <div className="space-y-3">
+                            {(field.value || []).map((action: any, index: number) => (
+                              <Card key={index} className="p-4" data-testid={`action-card-${index}`}>
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <Select
+                                      value={action.type}
+                                      onValueChange={(value) => {
+                                        const newActions = [...(field.value || [])];
+                                        newActions[index] = {
+                                          type: value,
+                                          config: value === 'send_notification' 
+                                            ? { title: '', message: '' }
+                                            : value === 'send_email'
+                                            ? { to: '', subject: '', body: '' }
+                                            : value === 'assign_task'
+                                            ? { userId: '', taskName: '' }
+                                            : value === 'update_status'
+                                            ? { status: '' }
+                                            : { documentType: '' }
+                                        };
+                                        form.setValue('actions', newActions);
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-[200px]" data-testid={`select-action-type-${index}`}>
+                                        <SelectValue placeholder="Select action type" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {ACTION_TYPES.map((type) => (
+                                          <SelectItem key={type.value} value={type.value}>
+                                            {type.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        const newActions = (field.value || []).filter((_: any, i: number) => i !== index);
+                                        form.setValue('actions', newActions);
+                                      }}
+                                      data-testid={`button-delete-action-${index}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+
+                                  {/* Action-specific configuration fields */}
+                                  {action.type === 'send_notification' && (
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="Notification title"
+                                        value={action.config.title || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.title = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-notification-title-${index}`}
+                                      />
+                                      <Textarea
+                                        placeholder="Notification message"
+                                        value={action.config.message || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.message = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-notification-message-${index}`}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {action.type === 'send_email' && (
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="Recipient email"
+                                        type="email"
+                                        value={action.config.to || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.to = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-email-to-${index}`}
+                                      />
+                                      <Input
+                                        placeholder="Email subject"
+                                        value={action.config.subject || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.subject = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-email-subject-${index}`}
+                                      />
+                                      <Textarea
+                                        placeholder="Email body"
+                                        value={action.config.body || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.body = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-email-body-${index}`}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {action.type === 'assign_task' && (
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="User ID"
+                                        value={action.config.userId || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.userId = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-task-user-${index}`}
+                                      />
+                                      <Input
+                                        placeholder="Task name"
+                                        value={action.config.taskName || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.taskName = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-task-name-${index}`}
+                                      />
+                                    </div>
+                                  )}
+
+                                  {action.type === 'update_status' && (
+                                    <div className="space-y-2">
+                                      <Select
+                                        value={action.config.status || ''}
+                                        onValueChange={(value) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.status = value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                      >
+                                        <SelectTrigger data-testid={`select-status-${index}`}>
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="pending">Pending</SelectItem>
+                                          <SelectItem value="in_progress">In Progress</SelectItem>
+                                          <SelectItem value="completed">Completed</SelectItem>
+                                          <SelectItem value="on_hold">On Hold</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+
+                                  {action.type === 'create_document' && (
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="Document type"
+                                        value={action.config.documentType || ''}
+                                        onChange={(e) => {
+                                          const newActions = [...(field.value || [])];
+                                          newActions[index].config.documentType = e.target.value;
+                                          form.setValue('actions', newActions);
+                                        }}
+                                        data-testid={`input-document-type-${index}`}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </Card>
+                            ))}
+                            {(!field.value || field.value.length === 0) && (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                No actions configured. Add an action to get started.
+                              </p>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <DialogFooter>
