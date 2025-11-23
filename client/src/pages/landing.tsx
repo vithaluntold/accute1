@@ -2,11 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 export default function Landing() {
-  const [, setLocation] = useLocation();
 
   const features = [
     {
@@ -82,12 +81,16 @@ export default function Landing() {
       {/* Navigation */}
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link 
+            href="/"
+            className="flex items-center gap-2 hover-elevate rounded-md p-2"
+            data-testid="link-home-logo"
+          >
             <img src={logoUrl} alt="Accute" className="h-8 w-8" />
             <span className="font-display text-xl font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
               Accute
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
             <a href="#features" className="text-sm hover-elevate px-3 py-2 rounded-md" data-testid="link-features">
               Features
@@ -95,20 +98,14 @@ export default function Landing() {
             <a href="#use-cases" className="text-sm hover-elevate px-3 py-2 rounded-md" data-testid="link-use-cases">
               Use Cases
             </a>
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/login")}
-              data-testid="button-login"
-            >
-              Login
+            <Button asChild variant="ghost" data-testid="button-login">
+              <Link href="/login">Login</Link>
             </Button>
-            <Button
-              onClick={() => setLocation("/register")}
-              data-testid="button-get-started"
-              className="bg-gradient-to-r from-[#e5a660] to-[#d76082]"
-            >
-              Get Started
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button asChild data-testid="button-get-started" className="bg-gradient-to-r from-[#e5a660] to-[#d76082]">
+              <Link href="/register">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </div>
@@ -140,13 +137,15 @@ export default function Landing() {
 
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
               <Button
+                asChild
                 size="lg"
-                onClick={() => setLocation("/register")}
                 className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8"
                 data-testid="button-hero-start-trial"
               >
-                Start Free Trial
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <Link href="/register">
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
               <Button
                 size="lg"
@@ -459,15 +458,16 @@ export default function Landing() {
                 delight clients, and grow revenue
               </p>
               <div className="flex flex-wrap items-center justify-center gap-4">
-                <Button
-                  size="lg"
-                  onClick={() => setLocation("/register")}
-                  className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8"
-                  data-testid="button-cta-start"
-                >
+                <Link href="/register">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8"
+                data-testid="button-cta-start"
+              >
                   Start Free Trial
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
                 <Button
                   size="lg"
                   variant="outline"

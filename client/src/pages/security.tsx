@@ -1,4 +1,4 @@
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import {
 import logoUrl from "@assets/logo.png";
 
 export default function Security() {
-  const [, setLocation] = useLocation();
 
   const securityFeatures = [
     {
@@ -61,8 +60,8 @@ export default function Security() {
       {/* Navigation */}
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <button 
-            onClick={() => setLocation("/")}
+          <Link 
+            href="/"
             className="flex items-center gap-2 hover-elevate rounded-md p-2"
             data-testid="button-home"
           >
@@ -70,22 +69,16 @@ export default function Security() {
             <span className="font-display text-xl font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
               Accute
             </span>
-          </button>
+          </Link>
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/login")}
-              data-testid="button-login"
-            >
-              Login
+            <Button asChild variant="ghost" data-testid="button-login">
+              <Link href="/login">Login</Link>
             </Button>
-            <Button
-              onClick={() => setLocation("/register")}
-              data-testid="button-get-started"
-              className="bg-gradient-to-r from-[#e5a660] to-[#d76082]"
-            >
-              Get Started
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button asChild data-testid="button-get-started" className="bg-gradient-to-r from-[#e5a660] to-[#d76082]">
+              <Link href="/register">
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </div>
@@ -259,14 +252,11 @@ export default function Security() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Our security team is happy to answer any questions and provide detailed documentation.
           </p>
-          <Button
-            size="lg"
-            onClick={() => setLocation("/contact")}
-            className="bg-gradient-to-r from-[#e5a660] to-[#d76082]"
-            data-testid="button-cta-contact"
-          >
-            Contact Security Team
-            <ArrowRight className="ml-2 h-5 w-5" />
+          <Button asChild size="lg" className="bg-gradient-to-r from-[#e5a660] to-[#d76082]" data-testid="button-cta-contact">
+            <Link href="/contact">
+              Contact Security Team
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
           </Button>
         </div>
       </section>
@@ -276,13 +266,14 @@ export default function Security() {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <button 
-                onClick={() => setLocation("/")}
+              <Link 
+                href="/"
                 className="flex items-center gap-2 mb-4 hover-elevate rounded-md p-2"
+                data-testid="link-footer-home"
               >
                 <img src={logoUrl} alt="Accute" className="h-6 w-6" />
                 <span className="font-display font-bold">Accute</span>
-              </button>
+              </Link>
               <p className="text-sm text-muted-foreground">
                 AI-powered accounting workflow automation for modern practices
               </p>
