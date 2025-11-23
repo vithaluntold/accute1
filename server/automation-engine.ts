@@ -7,7 +7,30 @@ import { LLMService } from './llm-service';
 import type { IStorage } from './storage';
 
 export interface TriggerConfig {
-  type: 'email' | 'form' | 'webhook' | 'schedule' | 'manual' | 'completion';
+  type: 
+    // Original 6 triggers
+    | 'email' 
+    | 'form' 
+    | 'webhook' 
+    | 'schedule' 
+    | 'manual' 
+    | 'completion'
+    // NEW: Karbon-style triggers (15 additional)
+    | 'status_change'          // When assignment/task/project status changes
+    | 'field_change'           // When any field value changes
+    | 'due_date_approaching'   // X days before due date
+    | 'overdue'                // When past due date
+    | 'task_dependency'        // When prerequisite task completes
+    | 'all_tasks_complete'     // When all tasks in section/stage complete
+    | 'template_instantiated'  // When workflow created from template
+    | 'client_contact_added'   // When new client added to system
+    | 'budget_threshold'       // When project cost reaches % of budget
+    | 'team_capacity'          // When team member availability changes
+    | 'time_threshold'         // After X hours/days of inactivity
+    | 'fiscal_deadline'        // Tax/fiscal year-end deadlines
+    | 'conditional_section'    // Show/hide sections based on conditions
+    | 'relative_date'          // Relative to another date (e.g., "3 months after tax year-end")
+    | 'integration_event';     // External app events (QBO, Xero, Gmail, etc.)
   config: Record<string, any>;
 }
 

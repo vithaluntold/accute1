@@ -5400,6 +5400,135 @@ export const mlModelOutputs = pgTable("ml_model_outputs", {
 }));
 
 // ============================================================================
+// KARBON-STYLE WORKFLOW AUTOMATION TRIGGERS
+// ============================================================================
+
+// Workflow Trigger Events - Track when triggers fire
+export const workflowTriggerEvents = pgTable("workflow_trigger_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").notNull().references(() => workflows.id, { onDelete: 'cascade' }),
+  assignmentId: varchar("assignment_id").references(() => workflowAssignments.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Trigger details
+  triggerType: text("trigger_type").notNull(), // 'status_change', 'due_date_approaching', 'overdue', 'task_dependency', etc.
+  triggerConfig: jsonb("trigger_config").notNull().default(sql`'{}'::jsonb`), // Original trigger configuration
+  
+  // Event context
+  entityType: text("entity_type").notNull(), // 'assignment', 'task', 'invoice', 'project'
+  entityId: varchar("entity_id").notNull(), // ID of the entity that triggered the event
+  
+  // Change tracking (for status_change, field_change triggers)
+  fieldName: text("field_name"), // Which field changed
+  oldValue: text("old_value"), // Previous value
+  newValue: text("new_value"), // New value
+  
+  // Time-based trigger metadata
+  scheduledFor: timestamp("scheduled_for"), // When the trigger was scheduled to fire
+  firedAt: timestamp("fired_at").notNull().defaultNow(), // When it actually fired
+  
+  // Execution results
+  actionsExecuted: jsonb("actions_executed").default(sql`'[]'::jsonb`), // Which actions were triggered
+  executionStatus: text("execution_status").notNull().default("success"), // 'success', 'failed', 'partial'
+  executionError: text("execution_error"), // Error message if failed
+  
+  // Metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  workflowIdx: index("workflow_trigger_events_workflow_idx").on(table.workflowId),
+  assignmentIdx: index("workflow_trigger_events_assignment_idx").on(table.assignmentId),
+  triggerTypeIdx: index("workflow_trigger_events_type_idx").on(table.triggerType),
+  scheduledIdx: index("workflow_trigger_events_scheduled_idx").on(table.scheduledFor),
+  orgIdx: index("workflow_trigger_events_org_idx").on(table.organizationId),
+}));
+
+// Task Dependencies - Track which tasks must complete before others can start (Karbon-style)
+export const workflowTaskDependencies = pgTable("workflow_task_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => workflowTasks.id, { onDelete: 'cascade' }),
+  dependsOnTaskId: varchar("depends_on_task_id").notNull().references(() => workflowTasks.id, { onDelete: 'cascade' }),
+  
+  // Dependency type
+  dependencyType: text("dependency_type").notNull().default("finish_to_start"), // 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'
+  
+  // Lag time (in days) - e.g., task can start 2 days after dependency completes
+  lagDays: integer("lag_days").notNull().default(0),
+  
+  // Status
+  isBlocking: boolean("is_blocking").notNull().default(true), // If true, task cannot start until dependency completes
+  isSatisfied: boolean("is_satisfied").notNull().default(false), // Whether dependency condition is met
+  satisfiedAt: timestamp("satisfied_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  taskIdx: index("workflow_task_dependencies_task_idx").on(table.taskId),
+  dependsOnIdx: index("workflow_task_dependencies_depends_on_idx").on(table.dependsOnTaskId),
+  // Prevent circular dependencies
+  uniqueTaskDep: unique("workflow_task_dependencies_unique").on(table.taskId, table.dependsOnTaskId),
+}));
+
+// Budget Thresholds - Track project budget warnings (Karbon-style)
+export const projectBudgetThresholds = pgTable("project_budget_thresholds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Threshold configuration
+  thresholdPercentage: integer("threshold_percentage").notNull(), // e.g., 80 for 80% of budget
+  budgetAmount: numeric("budget_amount", { precision: 12, scale: 2 }).notNull(),
+  thresholdAmount: numeric("threshold_amount", { precision: 12, scale: 2 }).notNull(), // Calculated: budgetAmount * (thresholdPercentage / 100)
+  
+  // Status
+  isTriggered: boolean("is_triggered").notNull().default(false),
+  triggeredAt: timestamp("triggered_at"),
+  currentSpend: numeric("current_spend", { precision: 12, scale: 2 }).notNull().default(sql`0`),
+  
+  // Actions to execute when threshold reached
+  onThresholdActions: jsonb("on_threshold_actions").default(sql`'[]'::jsonb`),
+  lastNotifiedAt: timestamp("last_notified_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectIdx: index("project_budget_thresholds_project_idx").on(table.projectId),
+  triggeredIdx: index("project_budget_thresholds_triggered_idx").on(table.isTriggered),
+}));
+
+// Team Capacity Tracking - Monitor workload for auto-assignment (Karbon-style)
+export const teamCapacitySnapshots = pgTable("team_capacity_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  
+  // Capacity metrics
+  currentWorkload: integer("current_workload").notNull().default(0), // Number of active assignments
+  maxCapacity: integer("max_capacity").notNull().default(10), // Maximum concurrent assignments
+  utilizationPercentage: integer("utilization_percentage").notNull().default(0), // (currentWorkload / maxCapacity) * 100
+  
+  // Availability
+  isAvailable: boolean("is_available").notNull().default(true),
+  unavailableReason: text("unavailable_reason"), // 'pto', 'sick', 'training', 'full_capacity'
+  unavailableUntil: timestamp("unavailable_until"),
+  
+  // Skills and specializations (for smart assignment)
+  skills: text("skills").array().default(sql`ARRAY[]::text[]`), // ['tax', 'audit', 'payroll']
+  certifications: text("certifications").array().default(sql`ARRAY[]::text[]`), // ['cpa', 'cma', 'ea']
+  
+  // Performance metrics
+  averageCompletionTime: numeric("average_completion_time", { precision: 10, scale: 2 }), // In hours
+  qualityScore: integer("quality_score").default(100), // 0-100
+  
+  snapshotDate: timestamp("snapshot_date").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userOrgIdx: index("team_capacity_snapshots_user_org_idx").on(table.userId, table.organizationId),
+  snapshotDateIdx: index("team_capacity_snapshots_date_idx").on(table.snapshotDate),
+  availableIdx: index("team_capacity_snapshots_available_idx").on(table.isAvailable),
+}));
+
+// ============================================================================
 // INSERT SCHEMAS & TYPES - AI PERSONALITY PROFILING & PERFORMANCE MONITORING
 // ============================================================================
 
