@@ -335,7 +335,7 @@ function WorkspaceSwitcher({ user }: { user: any }) {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || !memberships) {
     return (
       <SidebarMenuItem>
         <div className="px-2 py-2">

@@ -46,20 +46,23 @@ export async function enforceOrganizationScope(
       return next();
     }
 
-    // Get user's role information
+    // Get user information
     const user = await db.query.users.findFirst({
       where: eq(schema.users.id, req.userId),
-      with: {
-        role: true,
-      },
     });
 
     if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    // Check if user is Super Admin (bypass organization checks)
-    const isSuperAdmin = user.role?.name === 'Super Admin';
+    // Get user's role separately (avoid using Drizzle relations)
+    let isSuperAdmin = false;
+    if (user.roleId) {
+      const role = await db.query.roles.findFirst({
+        where: eq(schema.roles.id, user.roleId),
+      });
+      isSuperAdmin = role?.name === 'Super Admin';
+    }
     req.isSuperAdmin = isSuperAdmin;
 
     // Get all organizations user belongs to
