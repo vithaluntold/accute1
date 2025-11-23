@@ -13650,6 +13650,53 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
     }
   });
 
+  // ==================== Time-Based Automation Routes ====================
+  
+  // Preview next execution time for a cron schedule
+  app.post("/api/automation/preview-schedule", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { cronExpression, count = 5 } = req.body;
+      
+      if (!cronExpression) {
+        return res.status(400).json({ error: "Cron expression is required" });
+      }
+      
+      const parser = await import('cron-parser');
+      const interval = parser.parseExpression(cronExpression);
+      
+      const nextExecutions = [];
+      for (let i = 0; i < count; i++) {
+        nextExecutions.push(interval.next().toDate());
+      }
+      
+      res.json({ nextExecutions });
+    } catch (error: any) {
+      res.status(400).json({ error: "Invalid cron expression", details: error.message });
+    }
+  });
+  
+  // Get due date triggers for organization
+  app.get("/api/automation/due-date-triggers", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+    try {
+      const triggers = await storage.getDueDateTriggers(req.user!.organizationId!);
+      res.json(triggers);
+    } catch (error: any) {
+      console.error("Failed to fetch due date triggers:", error);
+      res.status(500).json({ error: "Failed to fetch due date triggers" });
+    }
+  });
+  
+  // Get scheduled triggers due for execution (admin/testing only)
+  app.get("/api/automation/scheduled/due", requireAuth, requirePermission("system.admin"), async (req: Request, res: Response) => {
+    try {
+      const triggers = await storage.getScheduledTriggersDueForExecution();
+      res.json(triggers);
+    } catch (error: any) {
+      console.error("Failed to fetch scheduled triggers:", error);
+      res.status(500).json({ error: "Failed to fetch scheduled triggers" });
+    }
+  });
+
   // Get automation trigger templates (predefined configurations)
   app.get("/api/automation/trigger-templates", requireAuth, async (req: Request, res: Response) => {
     try {

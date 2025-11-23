@@ -28,6 +28,8 @@ const TRIGGER_EVENTS = [
   { value: 'task_completed', label: 'Task Completed' },
   { value: 'step_completed', label: 'Step Completed' },
   { value: 'stage_completed', label: 'Stage Completed' },
+  { value: 'scheduled', label: 'Scheduled (Cron)' },
+  { value: 'due_date', label: 'Due Date Trigger' },
 ];
 
 // Action types
@@ -53,6 +55,9 @@ const triggerFormSchema = z.object({
     type: z.string(),
     config: z.any(),
   })).optional(),
+  // Time-based fields
+  cronExpression: z.string().optional(),
+  dueDateOffsetDays: z.number().optional(),
 });
 
 type TriggerFormValues = z.infer<typeof triggerFormSchema>;
@@ -116,8 +121,12 @@ export default function Automation() {
       autoAdvanceTargetStageId: "",
       autoAdvanceTargetStepId: "",
       actions: [],
+      cronExpression: "",
+      dueDateOffsetDays: 0,
     },
   });
+
+  const selectedEvent = form.watch('event');
 
   // Derive step arrays (must be after form definition)
   const scopedSteps = selectedStageId 
@@ -379,6 +388,53 @@ export default function Automation() {
                     </FormItem>
                   )}
                 />
+
+                <Separator />
+                
+                {/* Time-Based Configuration */}
+                {selectedEvent === 'scheduled' && (
+                  <FormField
+                    control={form.control}
+                    name="cronExpression"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cron Expression</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="0 9 * * *" data-testid="input-cron-expression" />
+                        </FormControl>
+                        <FormDescription>
+                          Unix cron format (e.g., "0 9 * * *" for daily at 9am)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                {selectedEvent === 'due_date' && (
+                  <FormField
+                    control={form.control}
+                    name="dueDateOffsetDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Days Before Due Date</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            placeholder="3"
+                            data-testid="input-due-date-offset"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Trigger X days before task due date (e.g., 3 = 3 days before)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <Separator />
 
