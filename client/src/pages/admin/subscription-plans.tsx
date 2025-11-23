@@ -13,8 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Search, Plus, MoreVertical, Edit, Trash2, DollarSign, Users, Package } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Search, Plus, MoreVertical, Edit, Trash2, DollarSign, Users, Package, Bot } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GradientHero } from "@/components/gradient-hero";
@@ -25,6 +26,14 @@ import {
   transformPlanFormData,
   defaultPlanFormValues
 } from "@shared/schema";
+
+interface AIAgent {
+  slug: string;
+  name: string;
+  description: string;
+  category: string;
+  capabilities: string[];
+}
 
 export default function SubscriptionPlansPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,6 +49,11 @@ export default function SubscriptionPlansPage() {
 
   const { data: plans, isLoading } = useQuery<SubscriptionPlan[]>({
     queryKey: ["/api/subscription-plans"],
+  });
+
+  // Fetch available AI agents
+  const { data: aiAgents = [] } = useQuery<AIAgent[]>({
+    queryKey: ['/api/marketplace/agents'],
   });
 
   const createMutation = useMutation({
@@ -100,6 +114,7 @@ export default function SubscriptionPlansPage() {
         yearlyPrice: plan.yearlyPrice,
         features: plan.features,
         featuresInput: plan.features.join("\n"),
+        featureIdentifiers: plan.featureIdentifiers || [],
         maxUsers: plan.maxUsers,
         maxClients: plan.maxClients,
         maxStorage: plan.maxStorage,
@@ -506,6 +521,71 @@ export default function SubscriptionPlansPage() {
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* AI Agent Bundling */}
+              <FormField
+                control={form.control}
+                name="featureIdentifiers"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-5 w-5 text-primary" />
+                        <FormLabel>Bundled AI Agents</FormLabel>
+                      </div>
+                      <FormDescription>
+                        Select AI agents to automatically install for subscribers of this plan
+                      </FormDescription>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-lg p-4">
+                        {aiAgents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground col-span-2">
+                            No AI agents available
+                          </p>
+                        ) : (
+                          aiAgents.map((agent) => (
+                            <FormItem
+                              key={agent.slug}
+                              className="flex items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(agent.slug)}
+                                  onCheckedChange={(checked) => {
+                                    const current = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...current, agent.slug]);
+                                    } else {
+                                      field.onChange(current.filter((slug) => slug !== agent.slug));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-agent-${agent.slug}`}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <label
+                                    htmlFor={agent.slug}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {agent.name}
+                                  </label>
+                                  <Badge variant="outline" className="text-xs capitalize">
+                                    {agent.category}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {agent.description}
+                                </p>
+                              </div>
+                            </FormItem>
+                          ))
+                        )}
+                      </div>
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />

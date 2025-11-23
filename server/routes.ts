@@ -5309,6 +5309,201 @@ Title:`;
     }
   });
 
+  // ==================== AI Agent Marketplace Routes ====================
+  
+  // Get all AI agents (from agent registry)
+  app.get("/api/marketplace/agents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const allAgents = agentRegistry.getAllAgents();
+      
+      // Get installed agents for this organization
+      const installed = req.user!.organizationId
+        ? await db.select()
+            .from(schema.aiAgentInstallations)
+            .where(and(
+              eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId),
+              eq(schema.aiAgentInstallations.isActive, true)
+            ))
+        : [];
+      
+      const installedSlugs = new Set(
+        await Promise.all(
+          installed.map(async (inst) => {
+            const agent = await db.select().from(schema.aiAgents).where(eq(schema.aiAgents.id, inst.agentId)).limit(1);
+            return agent[0]?.slug;
+          })
+        )
+      );
+      
+      // Add installation status to each agent
+      const agentsWithStatus = allAgents.map((agent) => ({
+        ...agent,
+        isInstalled: installedSlugs.has(agent.slug),
+      }));
+      
+      res.json(agentsWithStatus);
+    } catch (error: any) {
+      console.error("Failed to fetch AI agents:", error);
+      res.status(500).json({ error: "Failed to fetch AI agents" });
+    }
+  });
+  
+  // Install AI agent
+  app.post("/api/marketplace/agents/:agentSlug/install", requireAuth, requirePermission("marketplace.install"), async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const agentManifest = agentRegistry.getAgent(req.params.agentSlug);
+      
+      if (!agentManifest) {
+        return res.status(404).json({ error: "AI agent not found" });
+      }
+      
+      // Get agent from database
+      const agent = await db
+        .select()
+        .from(schema.aiAgents)
+        .where(eq(schema.aiAgents.slug, req.params.agentSlug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "AI agent not found in database" });
+      }
+      
+      const agentId = agent[0].id;
+      
+      // Check if already installed
+      const existing = await db
+        .select()
+        .from(schema.aiAgentInstallations)
+        .where(and(
+          eq(schema.aiAgentInstallations.agentId, agentId),
+          eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        return res.status(400).json({ error: "Agent already installed" });
+      }
+      
+      // Create installation
+      const installation = await db
+        .insert(schema.aiAgentInstallations)
+        .values({
+          agentId,
+          organizationId: req.user!.organizationId!,
+          installedBy: req.userId!,
+          configuration: {},
+          isActive: true,
+        })
+        .returning();
+      
+      // Enable agent for organization
+      await agentRegistry.enableAgentForOrganization(
+        req.params.agentSlug,
+        req.user!.organizationId!,
+        req.userId!
+      );
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "install", "ai_agent", agentId, { slug: req.params.agentSlug, name: agentManifest.name }, req);
+      
+      res.json({
+        ...installation[0],
+        agent: agentManifest,
+      });
+    } catch (error: any) {
+      console.error("Failed to install AI agent:", error);
+      res.status(500).json({ error: "Failed to install AI agent: " + error.message });
+    }
+  });
+  
+  // Uninstall AI agent
+  app.delete("/api/marketplace/agents/:agentSlug/uninstall", requireAuth, requirePermission("marketplace.install"), async (req: Request, res: Response) => {
+    try {
+      // Get agent from database
+      const agent = await db
+        .select()
+        .from(schema.aiAgents)
+        .where(eq(schema.aiAgents.slug, req.params.agentSlug))
+        .limit(1);
+      
+      if (agent.length === 0) {
+        return res.status(404).json({ error: "AI agent not found" });
+      }
+      
+      const agentId = agent[0].id;
+      
+      // Find installation
+      const installation = await db
+        .select()
+        .from(schema.aiAgentInstallations)
+        .where(and(
+          eq(schema.aiAgentInstallations.agentId, agentId),
+          eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId!)
+        ))
+        .limit(1);
+      
+      if (installation.length === 0) {
+        return res.status(404).json({ error: "Agent not installed" });
+      }
+      
+      // Delete installation
+      await db
+        .delete(schema.aiAgentInstallations)
+        .where(eq(schema.aiAgentInstallations.id, installation[0].id));
+      
+      // Disable agent for organization
+      await db
+        .update(schema.organizationAgents)
+        .set({ status: 'disabled', disabledAt: new Date() })
+        .where(and(
+          eq(schema.organizationAgents.agentId, agentId),
+          eq(schema.organizationAgents.organizationId, req.user!.organizationId!)
+        ));
+      
+      await logActivity(req.userId, req.user!.organizationId || undefined, "uninstall", "ai_agent", agentId, { slug: req.params.agentSlug }, req);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to uninstall AI agent:", error);
+      res.status(500).json({ error: "Failed to uninstall AI agent: " + error.message });
+    }
+  });
+  
+  // Get installed AI agents for organization
+  app.get("/api/marketplace/agents/installations", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user!.organizationId) {
+        return res.json([]);
+      }
+      
+      const installations = await db
+        .select({
+          id: schema.aiAgentInstallations.id,
+          agentId: schema.aiAgentInstallations.agentId,
+          organizationId: schema.aiAgentInstallations.organizationId,
+          installedBy: schema.aiAgentInstallations.installedBy,
+          configuration: schema.aiAgentInstallations.configuration,
+          isActive: schema.aiAgentInstallations.isActive,
+          createdAt: schema.aiAgentInstallations.createdAt,
+          agentSlug: schema.aiAgents.slug,
+          agentName: schema.aiAgents.name,
+          agentCategory: schema.aiAgents.category,
+        })
+        .from(schema.aiAgentInstallations)
+        .innerJoin(schema.aiAgents, eq(schema.aiAgentInstallations.agentId, schema.aiAgents.id))
+        .where(and(
+          eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId),
+          eq(schema.aiAgentInstallations.isActive, true)
+        ));
+      
+      res.json(installations);
+    } catch (error: any) {
+      console.error("Failed to fetch AI agent installations:", error);
+      res.status(500).json({ error: "Failed to fetch AI agent installations" });
+    }
+  });
+
   // ==================== Workflow Assignment Routes ====================
   
   // Get all assignments for organization
@@ -15951,6 +16146,87 @@ ${msg.bodyText || msg.bodyHtml || ''}
     try {
       const subscriptionData = insertPlatformSubscriptionSchema.parse(req.body);
       const subscription = await storage.createPlatformSubscription(subscriptionData);
+      
+      // Auto-provision bundled AI agents from plan featureIdentifiers
+      if (subscription.planId && subscription.organizationId) {
+        try {
+          const plan = await db.select().from(schema.subscriptionPlans)
+            .where(eq(schema.subscriptionPlans.id, subscription.planId))
+            .limit(1);
+          
+          if (plan[0]?.featureIdentifiers && plan[0].featureIdentifiers.length > 0) {
+            const { agentRegistry } = await import("./agent-registry");
+            console.log(`[Provisioning] Auto-installing ${plan[0].featureIdentifiers.length} bundled agents for org ${subscription.organizationId}`);
+            
+            for (const agentSlug of plan[0].featureIdentifiers) {
+              try {
+                // Check if agent exists in registry
+                const agentManifest = agentRegistry.getAgent(agentSlug);
+                if (!agentManifest) {
+                  console.warn(`[Provisioning] Agent ${agentSlug} not found in registry, skipping`);
+                  continue;
+                }
+                
+                // Get agent from database
+                const agent = await db.select().from(schema.aiAgents)
+                  .where(eq(schema.aiAgents.slug, agentSlug))
+                  .limit(1);
+                
+                if (!agent[0]) {
+                  console.warn(`[Provisioning] Agent ${agentSlug} not found in database, skipping`);
+                  continue;
+                }
+                
+                // Idempotency check: skip if already installed
+                const existing = await db.select().from(schema.aiAgentInstallations)
+                  .where(and(
+                    eq(schema.aiAgentInstallations.agentId, agent[0].id),
+                    eq(schema.aiAgentInstallations.organizationId, subscription.organizationId)
+                  ))
+                  .limit(1);
+                
+                if (existing.length > 0) {
+                  console.log(`[Provisioning] Agent ${agentSlug} already installed for org ${subscription.organizationId}, skipping`);
+                  continue;
+                }
+                
+                // Install the agent
+                await db.insert(schema.aiAgentInstallations).values({
+                  agentId: agent[0].id,
+                  organizationId: subscription.organizationId,
+                  installedBy: req.userId!, // Admin who created the subscription
+                  configuration: {},
+                  isActive: true,
+                });
+                
+                // Enable agent for organization
+                await agentRegistry.enableAgentForOrganization(
+                  agentSlug,
+                  subscription.organizationId,
+                  req.userId!
+                );
+                
+                console.log(`[Provisioning] Successfully installed agent ${agentSlug} for org ${subscription.organizationId}`);
+              } catch (agentError: any) {
+                // Log but don't fail subscription creation
+                console.error(`[Provisioning] Failed to install agent ${agentSlug}:`, agentError);
+              }
+            }
+          }
+        } catch (provisioningError: any) {
+          // Log provisioning errors but don't fail subscription creation
+          console.error('[Provisioning] Failed to auto-install bundled agents:', provisioningError);
+        }
+      }
+      
+      // TODO: Implement downgrade/uninstall automation
+      // When a subscription is cancelled or downgraded to a plan without certain agents,
+      // those agents should be automatically uninstalled. This requires:
+      // 1. Detecting plan changes in updatePlatformSubscription
+      // 2. Comparing old vs new featureIdentifiers
+      // 3. Uninstalling agents that are no longer in the new plan
+      // 4. Adding telemetry hooks for tracking automated uninstalls
+      
       res.status(201).json(subscription);
     } catch (error: any) {
       console.error('Create subscription error:', error);

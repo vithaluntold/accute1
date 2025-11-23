@@ -11,6 +11,9 @@ import {
   Calendar,
   TrendingUp,
   Star,
+  Bot,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,11 +82,30 @@ const proficiencyConfig = {
   expert: { label: "Expert", color: "bg-amber-500" },
 };
 
+interface AgentInstallation {
+  id: string;
+  agentSlug: string;
+  agentName: string;
+  isActive: boolean;
+}
+
 export function SkillsExpertiseTab() {
   const { toast } = useToast();
   const user = getUser();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState<UserSkillWithDetails | null>(null);
+  const [traceDialogOpen, setTraceDialogOpen] = useState(false);
+  const [resumeText, setResumeText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Check if Trace agent is installed
+  const { data: agentInstallations = [] } = useQuery<AgentInstallation[]>({
+    queryKey: ['/api/marketplace/agents/installations'],
+  });
+
+  const isTraceInstalled = agentInstallations.some(
+    (inst) => inst.agentSlug === 'trace' && inst.isActive
+  );
 
   // Fetch organization skills catalog
   const { data: skillsCatalog = [], isLoading: catalogLoading } = useQuery<Skill[]>({
@@ -243,6 +265,122 @@ export function SkillsExpertiseTab() {
     }
   };
 
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type - Only TXT supported for MVP
+    if (file.type !== "text/plain") {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a TXT file. PDF/DOCX support coming soon.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (2MB max for text files)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload a file smaller than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Read text content
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setResumeText(text);
+      analyzeResume(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const analyzeResume = async (text: string) => {
+    if (!text.trim()) {
+      toast({
+        title: "No content",
+        description: "The resume appears to be empty",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      const response = await apiRequest('POST', '/api/ai-agent/chat', {
+        agentSlug: 'trace',
+        message: `Please analyze this resume and extract all skills with their proficiency levels:\n\n${text}`,
+        sessionId: `resume-analysis-${Date.now()}`,
+      });
+
+      const data = await response.json();
+
+      // Parse the AI response
+      let extractedData;
+      try {
+        extractedData = JSON.parse(data.content);
+      } catch (e) {
+        // If not JSON, try to parse from text
+        toast({
+          title: "Analysis complete",
+          description: "Skills extracted. Please review and add them manually.",
+        });
+        setIsAnalyzing(false);
+        setTraceDialogOpen(false);
+        return;
+      }
+
+      // Add extracted skills to user's profile
+      if (extractedData.technicalSkills && Array.isArray(extractedData.technicalSkills)) {
+        let successCount = 0;
+        for (const skillName of extractedData.technicalSkills) {
+          // Find or create skill in catalog
+          let skill = skillsCatalog.find(
+            (s) => s.name.toLowerCase() === skillName.toLowerCase()
+          );
+
+          if (skill) {
+            // Add to user's skills
+            try {
+              await apiRequest("POST", "/api/users/me/skills", {
+                skillId: skill.id,
+                proficiencyLevel: "intermediate",
+                yearsExperience: 0,
+                certifications: [],
+              });
+              successCount++;
+            } catch (error) {
+              // Skip if already exists
+            }
+          }
+        }
+
+        if (successCount > 0) {
+          queryClient.invalidateQueries({ queryKey: ["/api/users/me/skills"] });
+          toast({
+            title: "Skills added",
+            description: `Added ${successCount} skills from your resume`,
+          });
+        }
+      }
+
+      setIsAnalyzing(false);
+      setTraceDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Analysis failed",
+        description: error.message || "Failed to analyze resume",
+        variant: "destructive",
+      });
+      setIsAnalyzing(false);
+    }
+  };
+
   // Group skills by proficiency level
   const skillsByProficiency = userSkills.reduce(
     (acc, userSkill) => {
@@ -267,7 +405,7 @@ export function SkillsExpertiseTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Add Button */}
+      {/* Header with Add Buttons */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Skills & Expertise</h2>
@@ -275,10 +413,22 @@ export function SkillsExpertiseTab() {
             Manage your professional skills and certifications
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()} data-testid="button-add-skill">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Skill
-        </Button>
+        <div className="flex gap-2">
+          {isTraceInstalled && (
+            <Button
+              variant="outline"
+              onClick={() => setTraceDialogOpen(true)}
+              data-testid="button-add-skills-with-trace"
+            >
+              <Bot className="h-4 w-4 mr-2" />
+              Add Skills with Trace
+            </Button>
+          )}
+          <Button onClick={() => handleOpenDialog()} data-testid="button-add-skill">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Skill
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -610,6 +760,83 @@ export function SkillsExpertiseTab() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Trace Resume Analysis Dialog */}
+      <Dialog open={traceDialogOpen} onOpenChange={setTraceDialogOpen}>
+        <DialogContent data-testid="dialog-trace-resume">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-primary" />
+              Add Skills with Trace AI
+            </DialogTitle>
+            <DialogDescription>
+              Upload your resume and let Trace AI automatically extract your skills
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+              <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-sm font-medium mb-2">Upload your resume (TXT only)</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Currently supporting TXT format only (max 2MB)
+                <br />
+                <span className="text-xs italic">PDF/DOCX support coming soon</span>
+              </p>
+              <input
+                type="file"
+                accept=".txt"
+                onChange={handleResumeUpload}
+                className="hidden"
+                id="resume-upload"
+                data-testid="input-resume-upload"
+              />
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById('resume-upload')?.click()}
+                disabled={isAnalyzing}
+                data-testid="button-browse-resume"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isAnalyzing ? "Analyzing..." : "Browse TXT File"}
+              </Button>
+            </div>
+
+            {isAnalyzing && (
+              <div className="flex items-center justify-center gap-3 p-4 bg-muted/50 rounded-lg">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Analyzing your resume...</p>
+                  <p className="text-xs text-muted-foreground">
+                    Trace AI is extracting skills and experience
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {resumeText && !isAnalyzing && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-2">Resume preview:</p>
+                <p className="text-sm line-clamp-3">{resumeText}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTraceDialogOpen(false);
+                setResumeText("");
+              }}
+              disabled={isAnalyzing}
+              data-testid="button-cancel-trace"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
