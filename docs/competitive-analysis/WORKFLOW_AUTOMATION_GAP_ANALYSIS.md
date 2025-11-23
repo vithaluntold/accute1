@@ -14,16 +14,19 @@
 ---
 
 ## ✅ Current FinACEverse Automation Capabilities
+**Verified**: November 23, 2025 - Code audit of `server/automation-engine.ts` lines 9-11
 
-### **Triggers (6 Types)**
-| Trigger Type | Description | Status |
-|--------------|-------------|--------|
-| `email` | Triggered when email received | ✅ Implemented |
-| `form` | Triggered when form submitted | ✅ Implemented |
-| `webhook` | Triggered by external HTTP POST | ✅ Implemented |
-| `schedule` | Time-based trigger (cron-like) | ✅ Implemented |
-| `manual` | User manually starts workflow | ✅ Implemented |
-| `completion` | Triggered when stage/task completes | ✅ Implemented |
+### **Triggers (6 Types) - VERIFIED ACCURATE**
+| Trigger Type | Description | Status | Code Reference |
+|--------------|-------------|--------|----------------|
+| `email` | Triggered when email received | ✅ Implemented | `automation-engine.ts:10` |
+| `form` | Triggered when form submitted | ✅ Implemented | `automation-engine.ts:10` |
+| `webhook` | Triggered by external HTTP POST | ✅ Implemented | `automation-engine.ts:10` |
+| `schedule` | Time-based trigger (cron-like) | ✅ Implemented | `automation-engine.ts:10` |
+| `manual` | User manually starts workflow | ✅ Implemented | `automation-engine.ts:10` |
+| `completion` | Triggered when stage/task completes | ✅ Implemented | `automation-engine.ts:10` |
+
+**Note**: The `completion` trigger internally handles task completion → step auto-progression → stage auto-progression cascade (lines 444-529), but these are variants of the single `completion` trigger type, not separate status change triggers.
 
 ### **Actions (16 Types)**
 | Action Type | Description | Status |

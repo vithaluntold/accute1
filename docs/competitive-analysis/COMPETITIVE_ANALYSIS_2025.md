@@ -12,7 +12,7 @@
 
 ### Workflow Automation Triggers - Significant Competitive Disadvantage
 
-**Finding**: FinACEverse has **6 trigger types** vs. industry leaders with **15-25+ automation triggers**
+**Finding**: FinACEverse has **6 trigger types** (verified via code audit `automation-engine.ts:10`) vs. industry leaders with **15-25+ automation triggers**
 
 **Impact Severity**: 🔴 **CRITICAL**  
 - Missing 70% of industry-standard automation triggers
