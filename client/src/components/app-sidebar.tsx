@@ -2,7 +2,7 @@ import { useState } from "react";
 import { 
   Home, Workflow, Bot, FileText, Users, Settings, BarChart3, LogOut, Tag, Building2, 
   UserCircle, ClipboardList, ClipboardCheck, FolderOpen, MessageSquare, Clock, 
-  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog, Video, Activity
+  Receipt, CreditCard, FileSignature, Kanban, MessagesSquare, Calendar, Mail, Network, Shield, Store, ListTodo, Folder, Smartphone, ChevronRight, Inbox as InboxIcon, Plus, Package, HelpCircle, CheckSquare, DollarSign, Globe, Percent, TrendingUp, Rocket, ChevronsUpDown, Check, GanttChartSquare, FileBarChart2, CalendarDays, UserCog, Video, Activity, Zap
 } from "lucide-react";
 import { useLocation } from "wouter";
 import {
@@ -101,6 +101,7 @@ const organizationMenuCategories = [
     title: "Workflow Management",
     items: [
       { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
+      { title: "Automation", url: "/automation", icon: Zap, permission: "workflows.view" },
       { title: "Assignments", url: "/assignments", icon: ListTodo, permission: "workflows.view" },
       { title: "Kanban Board", url: "/kanban", icon: Kanban, permission: "workflows.view" },
       { title: "Projects", url: "/projects", icon: Network, permission: "projects.view" },

@@ -58,6 +58,7 @@ const Analytics = lazy(() => import("@/pages/analytics"));
 const Workflows = lazy(() => import("@/pages/workflows"));
 const WorkflowDetail = lazy(() => import("@/pages/workflow-detail"));
 const WorkflowBuilder = lazy(() => import("@/pages/workflow-builder"));
+const Automation = lazy(() => import("@/pages/automation"));
 const AIAgents = lazy(() => import("@/pages/ai-agents"));
 const AgentDetail = lazy(() => import("@/pages/agent-detail"));
 const Marketplace = lazy(() => import("@/pages/marketplace"));
@@ -802,6 +803,13 @@ function Router() {
         <OrganizationRoute>
           <AppLayout>
             <Workflows />
+          </AppLayout>
+        </OrganizationRoute>
+      </Route>
+      <Route path="/automation">
+        <OrganizationRoute>
+          <AppLayout>
+            <Automation />
           </AppLayout>
         </OrganizationRoute>
       </Route>
