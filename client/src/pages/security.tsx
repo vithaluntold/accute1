@@ -12,7 +12,7 @@ import {
   CheckCircle,
   ArrowRight
 } from "lucide-react";
-import logoUrl from "@assets/logo.png";
+import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
 
 export default function Security() {
