@@ -152,8 +152,9 @@ app.set("env", process.env.NODE_ENV || "development");
 
 // CRITICAL: Enable trust proxy for rate limiters to work correctly
 // Replit and other platforms run behind reverse proxies
-// Without this, rate limiters can't identify users correctly via X-Forwarded-For header
-app.set("trust proxy", true);
+// Trust only the first proxy (Replit's reverse proxy) for security
+// This prevents IP spoofing while allowing rate limiters to work
+app.set("trust proxy", 1);
 
 app.use(cookieParser());
 
