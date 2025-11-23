@@ -13,11 +13,27 @@ Accute is an AI-native platform designed for accounting firms to automate workfl
 - ✅ Files Fixed: App.tsx, organization-settings.tsx, contacts.tsx, clients.tsx, proposals.tsx (5 files)
 - ✅ Also Fixed: Removed floating FinACEverse footer component from authenticated pages
 
+**Bug Fixed: Trace Button Not Visible in Employee Profile**
+- ✅ Issue: "Add Skills with Trace" button not showing in Employee Profile > Skills & Expertise tab
+- ✅ Root Cause: Backend `/api/marketplace/agents/installations` was checking `req.user!.organizationId` only
+- ✅ Database Status: Trace agent IS installed and active for Sterling Accounting Firm
+- ✅ Solution: Added fallback pattern to backend route (line 5654 in routes.ts)
+- ✅ Verification: SQL query confirmed installation exists with `is_active = true`
+
+**Bug Fixed: Automation Triggers Schema Error**
+- ✅ Issue: Server crashed on startup with `column "condition_edges" does not exist` error
+- ✅ Root Cause: Schema defined `conditionEdges` column but database was missing it (db:push timeout)
+- ✅ Solution: Added column manually via SQL `ALTER TABLE automation_triggers ADD COLUMN condition_edges`
+- ✅ Verification: Server now shows `✅ Automation triggers loaded successfully`
+
 **Technical Details**
 - Schema has TWO organization fields: `organizationId` (legacy) and `defaultOrganizationId` (preferred)
 - Some legacy users only have `organizationId` populated
 - Fallback pattern ensures backward compatibility while preferring new field
-- Comment added to each fix explaining the fallback pattern
+- **Frontend fixes** (5 files): Comment added explaining fallback
+- **Backend fix** (1 route): `/api/marketplace/agents/installations` now uses fallback
+- **Schema fix** (1 column): `automation_triggers.condition_edges` added manually (db:push timeout workaround)
+- **Note**: This issue likely affects MANY other backend routes (76+ occurrences of `req.user!.organizationId` found)
 
 ### Workflow Automation Engine - Dependency & Time-Based Triggers (November 23, 2025)
 **Status: ✅ PRODUCTION READY**

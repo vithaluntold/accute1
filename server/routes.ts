@@ -5647,7 +5647,9 @@ Title:`;
   // Get installed AI agents for organization
   app.get("/api/marketplace/agents/installations", requireAuth, async (req: Request, res: Response) => {
     try {
-      if (!req.user!.organizationId) {
+      // Use fallback pattern for organization ID (handles legacy organizationId and new defaultOrganizationId)
+      const orgId = req.user!.defaultOrganizationId || req.user!.organizationId;
+      if (!orgId) {
         return res.json([]);
       }
       
@@ -5667,7 +5669,7 @@ Title:`;
         .from(schema.aiAgentInstallations)
         .innerJoin(schema.aiAgents, eq(schema.aiAgentInstallations.agentId, schema.aiAgents.id))
         .where(and(
-          eq(schema.aiAgentInstallations.organizationId, req.user!.organizationId),
+          eq(schema.aiAgentInstallations.organizationId, orgId),
           eq(schema.aiAgentInstallations.isActive, true)
         ));
       
