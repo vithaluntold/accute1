@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import logoUrl from "@assets/Accute Main Logo_1761505804712.png";
 import { MFAVerificationModal } from "@/components/mfa-verification-modal";
 
@@ -24,6 +24,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
   const [showMFAModal, setShowMFAModal] = useState(false);
   const [mfaData, setMFAData] = useState<{
     userId: string;
@@ -166,13 +167,31 @@ export default function Login() {
                       </Button>
                     </div>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="••••••••"
-                        data-testid="input-password"
-                        disabled={loginMutation.isPending}
-                      />
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          data-testid="input-password"
+                          disabled={loginMutation.isPending}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={loginMutation.isPending}
+                          data-testid="button-toggle-password"
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
