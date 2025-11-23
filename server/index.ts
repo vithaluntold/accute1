@@ -384,6 +384,17 @@ app.use((req, res, next) => {
       console.warn('⚠️  Continuing without automation triggers - they can be created via API');
     }
     
+    // Start automation scheduler for time-based triggers
+    console.log('🔧 Starting automation scheduler...');
+    try {
+      const { schedulerService } = await import('./scheduler-service');
+      schedulerService.start();
+      console.log('✅ Automation scheduler started successfully');
+    } catch (schedulerError) {
+      console.error('❌ Failed to start scheduler:', schedulerError);
+      console.warn('⚠️  Continuing without scheduler - time-based triggers will not execute');
+    }
+    
     // CRITICAL: Setup Vite/static serving AFTER agent routes are registered
     // This prevents Vite's catch-all from intercepting agent endpoints
     const distPath = path.resolve(moduleDir, "public");

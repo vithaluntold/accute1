@@ -1331,9 +1331,10 @@ export class DbStorage implements IStorage {
           eq(schema.automationTriggers.isScheduled, true),
           eq(schema.automationTriggers.enabled, true),
           or(
-            // Cron triggers that haven't been executed yet or are due
+            // Cron triggers that are due
             and(
               eq(schema.automationTriggers.scheduleType, 'cron'),
+              isNotNull(schema.automationTriggers.cronExpression),
               or(
                 isNull(schema.automationTriggers.nextExecution),
                 sql`${schema.automationTriggers.nextExecution} <= ${now}`
@@ -1342,6 +1343,7 @@ export class DbStorage implements IStorage {
             // One-time scheduled triggers that are due
             and(
               eq(schema.automationTriggers.scheduleType, 'one_time'),
+              isNotNull(schema.automationTriggers.scheduleTime),
               sql`${schema.automationTriggers.scheduleTime} <= ${now}`,
               or(
                 isNull(schema.automationTriggers.lastExecuted),
@@ -1354,7 +1356,9 @@ export class DbStorage implements IStorage {
   }
 
   async getDueDateTriggers(organizationId: string): Promise<schema.AutomationTrigger[]> {
-    return await db.select().from(schema.automationTriggers)
+    const now = new Date();
+    
+    const triggers = await db.select().from(schema.automationTriggers)
       .where(
         and(
           eq(schema.automationTriggers.organizationId, organizationId),
@@ -1366,6 +1370,49 @@ export class DbStorage implements IStorage {
           )
         )
       );
+
+    const triggersWithTasks = [];
+    
+    for (const trigger of triggers) {
+      const offsetMinutes = trigger.dueDateOffset || 0;
+      const offsetMs = offsetMinutes * 60 * 1000;
+      
+      let taskQuery = db.select()
+        .from(schema.workflowTasks)
+        .where(
+          and(
+            eq(schema.workflowTasks.organizationId, organizationId),
+            isNotNull(schema.workflowTasks.dueDate)
+          )
+        );
+      
+      if (trigger.scheduleType === 'due_date_approaching') {
+        taskQuery = taskQuery.where(
+          and(
+            sql`${schema.workflowTasks.dueDate} > ${now}`,
+            sql`${schema.workflowTasks.dueDate} <= ${new Date(now.getTime() + offsetMs)}`
+          )
+        ) as any;
+      } else if (trigger.scheduleType === 'overdue') {
+        taskQuery = taskQuery.where(
+          and(
+            sql`${schema.workflowTasks.dueDate} < ${now}`,
+            or(
+              eq(schema.workflowTasks.status, 'pending'),
+              eq(schema.workflowTasks.status, 'in_progress')
+            )
+          )
+        ) as any;
+      }
+      
+      const tasks = await taskQuery;
+      
+      if (tasks.length > 0) {
+        triggersWithTasks.push(trigger);
+      }
+    }
+    
+    return triggersWithTasks;
   }
 
   // Task Dependencies
