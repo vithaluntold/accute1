@@ -507,9 +507,17 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
   
   // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
   app.use('/api/*', (req, res, next) => {
-    // Skip unauthenticated routes
-    // req.path inside app.use('/api/*') has the /api prefix stripped
-    if (unauthenticatedRoutes.some(route => req.path.startsWith(route))) {
+    // CRITICAL FIX: req.path is stripped by Express when using app.use('/api/*')
+    // For /api/auth/login, req.path becomes just '/' 
+    // We must use req.originalUrl to get the full path
+    const fullPath = req.originalUrl.split('?')[0]; // Remove query params
+    
+    // Skip unauthenticated routes - check against full path WITH /api prefix
+    const isUnauthenticated = unauthenticatedRoutes.some(route => 
+      fullPath === `/api${route}` || fullPath.startsWith(`/api${route}/`)
+    );
+    
+    if (isUnauthenticated) {
       return next();
     }
     
