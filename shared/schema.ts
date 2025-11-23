@@ -5443,6 +5443,46 @@ export const workflowTriggerEvents = pgTable("workflow_trigger_events", {
   orgIdx: index("workflow_trigger_events_org_idx").on(table.organizationId),
 }));
 
+// Automation Triggers - Store event-based automation configurations
+export const automationTriggers = pgTable("automation_triggers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  
+  // Trigger identification
+  name: text("name").notNull(), // User-friendly name
+  description: text("description"), // What this trigger does
+  
+  // Event configuration
+  event: text("event").notNull(), // TriggerEvent type: payment_received, document_uploaded, etc.
+  conditions: jsonb("conditions").default(sql`'[]'::jsonb`), // Optional conditions that must be met
+  
+  // Scope - which workflows/stages/steps this applies to
+  workflowId: varchar("workflow_id").references(() => workflows.id, { onDelete: 'cascade' }),
+  stageId: varchar("stage_id").references(() => workflowStages.id, { onDelete: 'cascade' }),
+  stepId: varchar("step_id").references(() => workflowSteps.id, { onDelete: 'cascade' }),
+  
+  // Actions to execute when triggered
+  actions: jsonb("actions").notNull().default(sql`'[]'::jsonb`), // Array of ActionConfig
+  
+  // Auto-advance configuration
+  autoAdvanceEnabled: boolean("auto_advance_enabled").notNull().default(false),
+  autoAdvanceTargetStageId: varchar("auto_advance_target_stage_id").references(() => workflowStages.id, { onDelete: 'set null' }),
+  autoAdvanceTargetStepId: varchar("auto_advance_target_step_id").references(() => workflowSteps.id, { onDelete: 'set null' }),
+  
+  // Status
+  enabled: boolean("enabled").notNull().default(true), // Active/inactive
+  
+  // Metadata
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("automation_triggers_org_idx").on(table.organizationId),
+  eventIdx: index("automation_triggers_event_idx").on(table.event),
+  workflowIdx: index("automation_triggers_workflow_idx").on(table.workflowId),
+  enabledIdx: index("automation_triggers_enabled_idx").on(table.enabled),
+}));
+
 // Task Dependencies - Track which tasks must complete before others can start (Karbon-style)
 export const workflowTaskDependencies = pgTable("workflow_task_dependencies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -5623,3 +5663,12 @@ export const insertMlModelOutputSchema = createInsertSchema(mlModelOutputs).omit
 });
 export type InsertMlModelOutput = z.infer<typeof insertMlModelOutputSchema>;
 export type MlModelOutput = typeof mlModelOutputs.$inferSelect;
+
+// Automation Triggers
+export const insertAutomationTriggerSchema = createInsertSchema(automationTriggers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAutomationTrigger = z.infer<typeof insertAutomationTriggerSchema>;
+export type AutomationTrigger = typeof automationTriggers.$inferSelect;

@@ -6336,6 +6336,28 @@ Title:`;
         hash: documentHash.substring(0, 16) + "...", // Log partial hash for audit trail
         signed: true 
       }, req);
+
+      // EVENT HOOK: Trigger document_uploaded automation
+      setImmediate(async () => {
+        try {
+          // Only trigger automation if clientId exists (some uploads are not client-specific)
+          if (req.body.clientId) {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            await eventEngine.handleDocumentUploaded({
+              documentId: document.id,
+              clientId: req.body.clientId,
+              organizationId: req.user!.organizationId!,
+              documentType: document.type,
+              assignmentId: req.body.assignmentId,
+              workflowId: document.workflowId || undefined,
+            });
+          }
+        } catch (error) {
+          console.error('[EVENT HOOK] Failed to trigger document_uploaded event:', error);
+        }
+      });
+
       res.json(document);
     } catch (error: any) {
       console.error("Document upload error:", error);
@@ -8644,6 +8666,24 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         { formName: form.name, submissionId: submission.id },
         req
       );
+
+      // EVENT HOOK: Trigger form_submitted/organizer_submitted automation
+      setImmediate(async () => {
+        try {
+          const { getEventTriggersEngine } = await import('./event-triggers');
+          const eventEngine = getEventTriggersEngine(storage);
+          await eventEngine.handleOrganizerSubmitted({
+            formSubmissionId: submission.id,
+            clientId: clientId || '',
+            organizationId: form.organizationId,
+            formTemplateId: req.params.id,
+            assignmentId: req.body.assignmentId,
+            workflowId: req.body.workflowId,
+          });
+        } catch (error) {
+          console.error('[EVENT HOOK] Failed to trigger organizer_submitted event:', error);
+        }
+      });
       
       res.status(201).json(submission);
     } catch (error: any) {
@@ -10797,6 +10837,24 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
         createdBy: invoice.createdBy, // Use invoice creator as payment creator
       });
 
+      // EVENT HOOK: Trigger payment_received automation
+      setImmediate(async () => {
+        try {
+          const { getEventTriggersEngine } = await import('./event-triggers');
+          const eventEngine = getEventTriggersEngine(storage);
+          await eventEngine.handlePaymentReceived({
+            invoiceId: invoice.id,
+            clientId: invoice.clientId,
+            organizationId: invoice.organizationId,
+            amount: invoice.total,
+            assignmentId: invoice.assignmentId,
+            workflowId: invoice.workflowId,
+          });
+        } catch (error) {
+          console.error('[EVENT HOOK] Failed to trigger payment_received event:', error);
+        }
+      });
+
       res.json({ 
         success: true, 
         message: "Payment verified successfully",
@@ -12524,6 +12582,26 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       // Trigger auto-progression if task status changed to completed
       if (req.body.status === 'completed' && task.status !== 'completed') {
         await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+
+        // EVENT HOOK: Trigger task_completed automation
+        setImmediate(async () => {
+          try {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            // Safely fetch step - it may not exist or may have been deleted
+            const step = await storage.getWorkflowStep(task.stepId);
+            if (step) {
+              await eventEngine.handleTaskCompleted({
+                taskId: req.params.id,
+                stepId: task.stepId,
+                organizationId: req.user!.organizationId!,
+                assignmentId: step.assignmentId,
+              });
+            }
+          } catch (error) {
+            console.error('[EVENT HOOK] Failed to trigger task_completed event:', error);
+          }
+        });
       }
       
       res.json(updated);
@@ -12576,6 +12654,26 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       // Trigger auto-progression if task status changed to completed
       if (req.body.status === 'completed' && task.status !== 'completed') {
         await autoProgressionEngine.tryAutoProgressStep(task.stepId);
+
+        // EVENT HOOK: Trigger task_completed automation
+        setImmediate(async () => {
+          try {
+            const { getEventTriggersEngine } = await import('./event-triggers');
+            const eventEngine = getEventTriggersEngine(storage);
+            // Safely fetch step - it may not exist or may have been deleted
+            const workflowStep = await storage.getWorkflowStep(task.stepId);
+            if (workflowStep) {
+              await eventEngine.handleTaskCompleted({
+                taskId: req.params.id,
+                stepId: task.stepId,
+                organizationId: req.user!.organizationId!,
+                assignmentId: workflowStep.assignmentId,
+              });
+            }
+          } catch (error) {
+            console.error('[EVENT HOOK] Failed to trigger task_completed event:', error);
+          }
+        });
       }
       
       res.json(updated);
@@ -13141,6 +13239,178 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       res.json({ success: true, message: "Workflow automation triggered" });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to trigger automation" });
+    }
+  });
+
+  // ==================== Automation Triggers ====================
+
+  // List all automation triggers for organization
+  app.get("/api/automation/triggers", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+    try {
+      const triggers = await storage.getAutomationTriggersByOrganization(req.user!.organizationId!);
+      res.json(triggers);
+    } catch (error: any) {
+      console.error("Failed to fetch automation triggers:", error);
+      res.status(500).json({ error: "Failed to fetch automation triggers" });
+    }
+  });
+
+  // Get automation trigger by ID
+  app.get("/api/automation/triggers/:id", requireAuth, requirePermission("workflows.view"), async (req: Request, res: Response) => {
+    try {
+      const trigger = await storage.getAutomationTrigger(req.params.id);
+      if (!trigger) {
+        return res.status(404).json({ error: "Automation trigger not found" });
+      }
+      // Verify organization access
+      if (trigger.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(trigger);
+    } catch (error: any) {
+      console.error("Failed to fetch automation trigger:", error);
+      res.status(500).json({ error: "Failed to fetch automation trigger" });
+    }
+  });
+
+  // Create new automation trigger
+  app.post("/api/automation/triggers", requireAuth, requirePermission("workflows.create"), async (req: Request, res: Response) => {
+    try {
+      const validatedData = schema.insertAutomationTriggerSchema.parse(req.body);
+      
+      // Validate actions array is not empty (unless auto-advance is enabled without actions)
+      if (Array.isArray(validatedData.actions) && validatedData.actions.length === 0 && !validatedData.autoAdvanceEnabled) {
+        return res.status(400).json({ 
+          error: "Automation trigger must have at least one action configured or enable auto-advance" 
+        });
+      }
+      
+      const trigger = await storage.createAutomationTrigger({
+        ...validatedData,
+        organizationId: req.user!.organizationId!,
+        createdBy: req.user!.id,
+      });
+      await logActivity(req.user!.id, req.user!.organizationId!, "create", "automation_trigger", trigger.id, trigger, req);
+      res.status(201).json(trigger);
+    } catch (error: any) {
+      console.error("Failed to create automation trigger:", error);
+      res.status(400).json({ error: error.message || "Failed to create automation trigger" });
+    }
+  });
+
+  // Update automation trigger
+  app.put("/api/automation/triggers/:id", requireAuth, requirePermission("workflows.update"), async (req: Request, res: Response) => {
+    try {
+      const trigger = await storage.getAutomationTrigger(req.params.id);
+      if (!trigger) {
+        return res.status(404).json({ error: "Automation trigger not found" });
+      }
+      // Verify organization access
+      if (trigger.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // SECURITY: Prevent organizationId tampering - exclude from update payload
+      const { organizationId, createdBy, createdAt, id, ...safeUpdates } = req.body;
+      
+      // Validate actions array is not empty (unless auto-advance is enabled)
+      const autoAdvanceEnabled = safeUpdates.autoAdvanceEnabled !== undefined ? safeUpdates.autoAdvanceEnabled : trigger.autoAdvanceEnabled;
+      if (safeUpdates.actions !== undefined && Array.isArray(safeUpdates.actions) && safeUpdates.actions.length === 0 && !autoAdvanceEnabled) {
+        return res.status(400).json({ 
+          error: "Automation trigger must have at least one action configured or enable auto-advance" 
+        });
+      }
+      
+      const updated = await storage.updateAutomationTrigger(req.params.id, safeUpdates);
+      await logActivity(req.user!.id, req.user!.organizationId!, "update", "automation_trigger", req.params.id, safeUpdates, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update automation trigger:", error);
+      res.status(400).json({ error: error.message || "Failed to update automation trigger" });
+    }
+  });
+
+  // Delete automation trigger
+  app.delete("/api/automation/triggers/:id", requireAuth, requirePermission("workflows.delete"), async (req: Request, res: Response) => {
+    try {
+      const trigger = await storage.getAutomationTrigger(req.params.id);
+      if (!trigger) {
+        return res.status(404).json({ error: "Automation trigger not found" });
+      }
+      // Verify organization access
+      if (trigger.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      await storage.deleteAutomationTrigger(req.params.id);
+      await logActivity(req.user!.id, req.user!.organizationId!, "delete", "automation_trigger", req.params.id, {}, req);
+      res.json({ success: true, message: "Automation trigger deleted" });
+    } catch (error: any) {
+      console.error("Failed to delete automation trigger:", error);
+      res.status(500).json({ error: "Failed to delete automation trigger" });
+    }
+  });
+
+  // Toggle automation trigger enabled/disabled
+  app.post("/api/automation/triggers/:id/toggle", requireAuth, requirePermission("workflows.update"), async (req: Request, res: Response) => {
+    try {
+      const trigger = await storage.getAutomationTrigger(req.params.id);
+      if (!trigger) {
+        return res.status(404).json({ error: "Automation trigger not found" });
+      }
+      // Verify organization access
+      if (trigger.organizationId !== req.user!.organizationId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateAutomationTrigger(req.params.id, { enabled: !trigger.enabled });
+      await logActivity(req.user!.id, req.user!.organizationId!, "toggle", "automation_trigger", req.params.id, { enabled: updated?.enabled }, req);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to toggle automation trigger:", error);
+      res.status(500).json({ error: "Failed to toggle automation trigger" });
+    }
+  });
+
+  // Get automation trigger templates (predefined configurations)
+  app.get("/api/automation/trigger-templates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const templates = [
+        {
+          id: "auto-advance-on-payment",
+          name: "Auto-advance workflow on payment received",
+          description: "Automatically move to next stage when payment is received",
+          event: "payment_received",
+          actions: [{ type: "send_notification", config: { template: "payment_received" } }],
+          autoAdvanceEnabled: true,
+        },
+        {
+          id: "notify-on-document-upload",
+          name: "Notify team on document upload",
+          description: "Send notification to team when client uploads a document",
+          event: "document_uploaded",
+          actions: [{ type: "send_notification", config: { template: "document_uploaded" } }],
+          autoAdvanceEnabled: false,
+        },
+        {
+          id: "auto-advance-on-form-submit",
+          name: "Auto-advance on form submission",
+          description: "Move to next stage when organizer/form is submitted",
+          event: "organizer_submitted",
+          actions: [],
+          autoAdvanceEnabled: true,
+        },
+        {
+          id: "assign-task-on-completion",
+          name: "Assign next task on completion",
+          description: "Automatically assign the next task when current one is completed",
+          event: "task_completed",
+          actions: [{ type: "assign_task", config: {} }],
+          autoAdvanceEnabled: false,
+        },
+      ];
+      res.json(templates);
+    } catch (error: any) {
+      console.error("Failed to fetch trigger templates:", error);
+      res.status(500).json({ error: "Failed to fetch trigger templates" });
     }
   });
 

@@ -145,6 +145,15 @@ export interface IStorage {
   getWorkflowsByOrganization(organizationId: string): Promise<Workflow[]>;
   getWorkflowsByUser(userId: string): Promise<Workflow[]>;
 
+  // Automation Triggers
+  createAutomationTrigger(trigger: schema.InsertAutomationTrigger): Promise<schema.AutomationTrigger>;
+  getAutomationTrigger(id: string): Promise<schema.AutomationTrigger | undefined>;
+  updateAutomationTrigger(id: string, updates: Partial<schema.InsertAutomationTrigger>): Promise<schema.AutomationTrigger | undefined>;
+  deleteAutomationTrigger(id: string): Promise<void>;
+  getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]>;
+  getAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
+  getEnabledAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
+
   // AI Agents
   getAiAgent(id: string): Promise<AiAgent | undefined>;
   createAiAgent(agent: InsertAiAgent): Promise<AiAgent>;
@@ -1239,6 +1248,57 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.workflows)
       .where(eq(schema.workflows.createdBy, userId))
       .orderBy(desc(schema.workflows.updatedAt));
+  }
+
+  // Automation Triggers
+  async createAutomationTrigger(trigger: schema.InsertAutomationTrigger): Promise<schema.AutomationTrigger> {
+    const result = await db.insert(schema.automationTriggers).values(trigger).returning();
+    return result[0];
+  }
+
+  async getAutomationTrigger(id: string): Promise<schema.AutomationTrigger | undefined> {
+    const result = await db.select().from(schema.automationTriggers)
+      .where(eq(schema.automationTriggers.id, id));
+    return result[0];
+  }
+
+  async updateAutomationTrigger(id: string, updates: Partial<schema.InsertAutomationTrigger>): Promise<schema.AutomationTrigger | undefined> {
+    const result = await db.update(schema.automationTriggers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.automationTriggers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAutomationTrigger(id: string): Promise<void> {
+    await db.delete(schema.automationTriggers).where(eq(schema.automationTriggers.id, id));
+  }
+
+  async getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]> {
+    return await db.select().from(schema.automationTriggers)
+      .where(eq(schema.automationTriggers.organizationId, organizationId))
+      .orderBy(desc(schema.automationTriggers.createdAt));
+  }
+
+  async getAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]> {
+    return await db.select().from(schema.automationTriggers)
+      .where(
+        and(
+          eq(schema.automationTriggers.organizationId, organizationId),
+          eq(schema.automationTriggers.event, event)
+        )
+      );
+  }
+
+  async getEnabledAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]> {
+    return await db.select().from(schema.automationTriggers)
+      .where(
+        and(
+          eq(schema.automationTriggers.organizationId, organizationId),
+          eq(schema.automationTriggers.event, event),
+          eq(schema.automationTriggers.enabled, true)
+        )
+      );
   }
 
   // AI Agents
