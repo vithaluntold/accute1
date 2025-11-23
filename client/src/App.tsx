@@ -43,6 +43,12 @@ import { lazy, Suspense, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const Landing = lazy(() => import("@/pages/landing"));
+const Features = lazy(() => import("@/pages/features"));
+const About = lazy(() => import("@/pages/about"));
+const Contact = lazy(() => import("@/pages/contact"));
+const Security = lazy(() => import("@/pages/security"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Terms = lazy(() => import("@/pages/terms"));
 const Login = lazy(() => import("@/pages/login"));
 const Register = lazy(() => import("@/pages/register"));
 const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
@@ -444,6 +450,12 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
       <Route path="/" component={Landing} />
+      <Route path="/features" component={Features} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/security" component={Security} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
       <Route path="/register" component={Register} />

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 
 export default function Landing() {
@@ -500,37 +500,30 @@ export default function Landing() {
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#features" className="hover-elevate inline-block">Features</a></li>
-                <li><a href="#pricing" className="hover-elevate inline-block">Pricing</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Integrations</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Security</a></li>
+                <li><Link href="/features" className="hover-elevate" data-testid="link-footer-features">Features</Link></li>
+                <li><Link href="/subscription-pricing" className="hover-elevate" data-testid="link-footer-pricing">Pricing</Link></li>
+                <li><Link href="/security" className="hover-elevate" data-testid="link-footer-security">Security</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Resources</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover-elevate inline-block">Documentation</a></li>
-                <li><a href="#" className="hover-elevate inline-block">API Reference</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Help Center</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Community</a></li>
+                <li><Link href="/help" className="hover-elevate" data-testid="link-footer-help">Help Center</Link></li>
               </ul>
             </div>
             <div>
               <h3 className="font-semibold mb-4">Company</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover-elevate inline-block">About</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Blog</a></li>
-                <li><a href="#" className="hover-elevrate inline-block">Careers</a></li>
-                <li><a href="#" className="hover-elevate inline-block">Contact</a></li>
+                <li><Link href="/about" className="hover-elevate" data-testid="link-footer-about">About</Link></li>
+                <li><Link href="/contact" className="hover-elevate" data-testid="link-footer-contact">Contact</Link></li>
               </ul>
             </div>
           </div>
           <div className="border-t mt-12 pt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
             <p>&copy; 2025 Accute. All rights reserved.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover-elevate">Privacy Policy</a>
-              <a href="#" className="hover-elevate">Terms of Service</a>
-              <a href="#" className="hover-elevate">Cookie Policy</a>
+              <Link href="/privacy" className="hover-elevate" data-testid="link-footer-privacy">Privacy Policy</Link>
+              <Link href="/terms" className="hover-elevate" data-testid="link-footer-terms">Terms of Service</Link>
             </div>
           </div>
         </div>
