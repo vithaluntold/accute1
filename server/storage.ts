@@ -154,6 +154,22 @@ export interface IStorage {
   getAutomationTriggersByOrganization(organizationId: string): Promise<schema.AutomationTrigger[]>;
   getAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
   getEnabledAutomationTriggersByEvent(organizationId: string, event: string): Promise<schema.AutomationTrigger[]>;
+  getScheduledTriggersDueForExecution(): Promise<schema.AutomationTrigger[]>;
+  getDueDateTriggers(organizationId: string): Promise<schema.AutomationTrigger[]>;
+
+  // Task Dependencies
+  createTaskDependency(dependency: {
+    taskId: string;
+    dependsOnTaskId: string;
+    dependencyType: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+    lag: number;
+    organizationId: string;
+    workflowId: string;
+  }): Promise<typeof schema.taskDependencies.$inferSelect>;
+  getTaskDependencies(taskId: string): Promise<any[]>;
+  getTaskDependents(taskId: string): Promise<any[]>;
+  deleteTaskDependency(id: string): Promise<void>;
+  checkCircularDependency(taskId: string, dependsOnTaskId: string, workflowId: string): Promise<boolean>;
 
   // AI Agents
   getAiAgent(id: string): Promise<AiAgent | undefined>;
@@ -1305,6 +1321,149 @@ export class DbStorage implements IStorage {
           eq(schema.automationTriggers.enabled, true)
         )
       );
+  }
+
+  async getScheduledTriggersDueForExecution(): Promise<schema.AutomationTrigger[]> {
+    const now = new Date();
+    return await db.select().from(schema.automationTriggers)
+      .where(
+        and(
+          eq(schema.automationTriggers.isScheduled, true),
+          eq(schema.automationTriggers.enabled, true),
+          or(
+            // Cron triggers that haven't been executed yet or are due
+            and(
+              eq(schema.automationTriggers.scheduleType, 'cron'),
+              or(
+                isNull(schema.automationTriggers.nextExecution),
+                sql`${schema.automationTriggers.nextExecution} <= ${now}`
+              )
+            ),
+            // One-time scheduled triggers that are due
+            and(
+              eq(schema.automationTriggers.scheduleType, 'one_time'),
+              sql`${schema.automationTriggers.scheduleTime} <= ${now}`,
+              or(
+                isNull(schema.automationTriggers.lastExecuted),
+                sql`${schema.automationTriggers.lastExecuted} < ${schema.automationTriggers.scheduleTime}`
+              )
+            )
+          )
+        )
+      );
+  }
+
+  async getDueDateTriggers(organizationId: string): Promise<schema.AutomationTrigger[]> {
+    return await db.select().from(schema.automationTriggers)
+      .where(
+        and(
+          eq(schema.automationTriggers.organizationId, organizationId),
+          eq(schema.automationTriggers.isScheduled, true),
+          eq(schema.automationTriggers.enabled, true),
+          or(
+            eq(schema.automationTriggers.scheduleType, 'due_date_approaching'),
+            eq(schema.automationTriggers.scheduleType, 'overdue')
+          )
+        )
+      );
+  }
+
+  // Task Dependencies
+  async createTaskDependency(dependency: {
+    taskId: string;
+    dependsOnTaskId: string;
+    dependencyType: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+    lag: number;
+    organizationId: string;
+    workflowId: string;
+  }): Promise<typeof schema.taskDependencies.$inferSelect> {
+    const result = await db.insert(schema.taskDependencies).values(dependency).returning();
+    return result[0];
+  }
+
+  async getTaskDependencies(taskId: string): Promise<any[]> {
+    return await db.select({
+      id: schema.taskDependencies.id,
+      taskId: schema.taskDependencies.taskId,
+      dependsOnTaskId: schema.taskDependencies.dependsOnTaskId,
+      dependencyType: schema.taskDependencies.dependencyType,
+      lag: schema.taskDependencies.lag,
+      organizationId: schema.taskDependencies.organizationId,
+      workflowId: schema.taskDependencies.workflowId,
+      createdAt: schema.taskDependencies.createdAt,
+      dependsOnTask: {
+        id: schema.workflowTasks.id,
+        name: schema.workflowTasks.name,
+        status: schema.workflowTasks.status,
+        dueDate: schema.workflowTasks.dueDate,
+      }
+    })
+    .from(schema.taskDependencies)
+    .leftJoin(schema.workflowTasks, eq(schema.taskDependencies.dependsOnTaskId, schema.workflowTasks.id))
+    .where(eq(schema.taskDependencies.taskId, taskId));
+  }
+
+  async getTaskDependents(taskId: string): Promise<any[]> {
+    return await db.select({
+      id: schema.taskDependencies.id,
+      taskId: schema.taskDependencies.taskId,
+      dependsOnTaskId: schema.taskDependencies.dependsOnTaskId,
+      dependencyType: schema.taskDependencies.dependencyType,
+      lag: schema.taskDependencies.lag,
+      organizationId: schema.taskDependencies.organizationId,
+      workflowId: schema.taskDependencies.workflowId,
+      createdAt: schema.taskDependencies.createdAt,
+      dependentTask: {
+        id: schema.workflowTasks.id,
+        name: schema.workflowTasks.name,
+        status: schema.workflowTasks.status,
+        dueDate: schema.workflowTasks.dueDate,
+      }
+    })
+    .from(schema.taskDependencies)
+    .leftJoin(schema.workflowTasks, eq(schema.taskDependencies.taskId, schema.workflowTasks.id))
+    .where(eq(schema.taskDependencies.dependsOnTaskId, taskId));
+  }
+
+  async deleteTaskDependency(id: string): Promise<void> {
+    await db.delete(schema.taskDependencies).where(eq(schema.taskDependencies.id, id));
+  }
+
+  async checkCircularDependency(taskId: string, dependsOnTaskId: string, workflowId: string): Promise<boolean> {
+    // Check if adding dependency (taskId depends on dependsOnTaskId) creates a cycle
+    // This means checking if dependsOnTaskId (directly or transitively) depends on taskId
+    
+    const visited = new Set<string>();
+    const queue: string[] = [dependsOnTaskId];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      
+      // Skip if already visited
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      // If we reach taskId, there's a cycle
+      if (currentId === taskId) {
+        return true;
+      }
+
+      // Get all tasks that currentId depends on (upstream dependencies)
+      const upstreamDeps = await db.select()
+        .from(schema.taskDependencies)
+        .where(
+          and(
+            eq(schema.taskDependencies.taskId, currentId),
+            eq(schema.taskDependencies.workflowId, workflowId)
+          )
+        );
+
+      for (const dep of upstreamDeps) {
+        queue.push(dep.dependsOnTaskId);
+      }
+    }
+
+    return false; // No cycle detected
   }
 
   // AI Agents

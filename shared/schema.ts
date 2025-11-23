@@ -5469,6 +5469,15 @@ export const automationTriggers = pgTable("automation_triggers", {
   autoAdvanceTargetStageId: varchar("auto_advance_target_stage_id").references(() => workflowStages.id, { onDelete: 'set null' }),
   autoAdvanceTargetStepId: varchar("auto_advance_target_step_id").references(() => workflowSteps.id, { onDelete: 'set null' }),
   
+  // Time-based trigger configuration
+  isScheduled: boolean("is_scheduled").notNull().default(false), // Whether this is a scheduled/time-based trigger
+  scheduleType: text("schedule_type"), // 'cron', 'due_date_approaching', 'overdue', 'one_time'
+  cronExpression: text("cron_expression"), // Cron expression for recurring schedules (e.g., "0 9 * * 1" = every Monday at 9am)
+  scheduleTime: timestamp("schedule_time"), // Specific time for one-time scheduled triggers
+  dueDateOffset: integer("due_date_offset"), // Minutes before/after due date (positive = before, negative = after)
+  lastExecuted: timestamp("last_executed"), // Track when time-based trigger last ran
+  nextExecution: timestamp("next_execution"), // When the trigger will next run (for cron schedules)
+  
   // Status
   enabled: boolean("enabled").notNull().default(true), // Active/inactive
   
