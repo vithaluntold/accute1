@@ -85,11 +85,11 @@ export default function ProposalsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingProposal, setDeletingProposal] = useState<Proposal | null>(null);
 
-  // Get current user for organization context
+  // Get current user for organization context (with fallback for legacy organizationId)
   const { data: user } = useQuery<any>({
     queryKey: ["/api/users/me"],
   });
-  const orgId = user?.defaultOrganizationId;
+  const orgId = user?.defaultOrganizationId || user?.organizationId;
 
   // Fetch current user permissions
   const { data: currentUser } = useQuery({ queryKey: ["/api/auth/me"] });

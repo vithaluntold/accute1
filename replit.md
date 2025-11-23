@@ -3,6 +3,22 @@ Accute is an AI-native platform designed for accounting firms to automate workfl
 
 ## Recent Updates
 
+### Organization Field Consistency Fix (November 23, 2025)
+**Status: ✅ PRODUCTION READY**
+
+**Bug Fixed: "No Workspace Selected" Error**
+- ✅ Issue: Some users saw "No Workspace Selected" despite having active workspace "Sterling Accounting Firm"
+- ✅ Root Cause: Frontend inconsistency between `organizationId` (legacy field) and `defaultOrganizationId` (preferred field)
+- ✅ Solution: Implemented fallback pattern `user?.defaultOrganizationId || user?.organizationId` across all pages
+- ✅ Files Fixed: App.tsx, organization-settings.tsx, contacts.tsx, clients.tsx, proposals.tsx (5 files)
+- ✅ Also Fixed: Removed floating FinACEverse footer component from authenticated pages
+
+**Technical Details**
+- Schema has TWO organization fields: `organizationId` (legacy) and `defaultOrganizationId` (preferred)
+- Some legacy users only have `organizationId` populated
+- Fallback pattern ensures backward compatibility while preferring new field
+- Comment added to each fix explaining the fallback pattern
+
 ### Workflow Automation Engine - Dependency & Time-Based Triggers (November 23, 2025)
 **Status: ✅ PRODUCTION READY**
 

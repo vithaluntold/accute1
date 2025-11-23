@@ -184,10 +184,11 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     enabled: !!user,
   });
 
-  // Fetch current organization data
+  // Fetch current organization data (with fallback for legacy organizationId)
+  const orgId = user?.defaultOrganizationId || user?.organizationId;
   const { data: currentOrg } = useQuery<any>({
-    queryKey: ["/api/organizations", user?.organizationId],
-    enabled: !!user?.organizationId,
+    queryKey: ["/api/organizations", orgId],
+    enabled: !!orgId,
   });
 
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;

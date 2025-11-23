@@ -96,11 +96,11 @@ export default function OrganizationSettings() {
   const [editingLlmId, setEditingLlmId] = useState<string | null>(null);
   const [deleteLlmTarget, setDeleteLlmTarget] = useState<string | null>(null);
 
-  // Get current user and organization
+  // Get current user and organization (with fallback for legacy organizationId)
   const { data: user } = useQuery<any>({
     queryKey: ["/api/users/me"],
   });
-  const orgId = user?.defaultOrganizationId;
+  const orgId = user?.defaultOrganizationId || user?.organizationId;
 
   // Fetch organization settings
   const { data: organization, isLoading: orgLoading } = useQuery<any>({

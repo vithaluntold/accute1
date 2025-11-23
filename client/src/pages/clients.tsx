@@ -74,11 +74,11 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  // Get current user for workspace context
+  // Get current user for workspace context (with fallback for legacy organizationId)
   const { data: user } = useQuery<any>({
     queryKey: ["/api/users/me"],
   });
-  const orgId = user?.defaultOrganizationId;
+  const orgId = user?.defaultOrganizationId || user?.organizationId;
 
   // Workspace-scoped client query
   const { data: clients = [], isLoading } = useQuery<Client[]>({

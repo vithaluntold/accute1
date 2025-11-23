@@ -25,11 +25,11 @@ export default function Contacts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  // Get current user for workspace context
+  // Get current user for workspace context (with fallback for legacy organizationId)
   const { data: user } = useQuery<any>({
     queryKey: ["/api/users/me"],
   });
-  const orgId = user?.defaultOrganizationId;
+  const orgId = user?.defaultOrganizationId || user?.organizationId;
 
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ["/api/contacts", orgId, selectedClientFilter],
