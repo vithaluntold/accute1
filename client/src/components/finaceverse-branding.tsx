@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import finaceverseLogoUrl from "@assets/FinACEverse Transparent symbol_1763876301002.png";
+import finaceverseLogoUrl from "@assets/FinACEverse Transparent symbol (1)_1763884273845.png";
 
 interface FinACEverseBrandingProps {
   className?: string;
