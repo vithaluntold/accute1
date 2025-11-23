@@ -1,0 +1,27 @@
+{
+  "slug": "trace",
+  "name": "Trace",
+  "description": "Resume Analysis & Skills Extraction Specialist - Automatically extracts skills, experience, and qualifications from resumes during employee onboarding",
+  "category": "hr",
+  "provider": "openai",
+  "frontendEntry": "frontend/index.tsx",
+  "backendEntry": "backend/index.ts",
+  "iconPath": null,
+  "capabilities": [
+    "resume_parsing",
+    "skills_extraction",
+    "experience_analysis",
+    "qualification_detection",
+    "employee_onboarding"
+  ],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["hr", "recruitment", "onboarding", "skills", "resume"],
+  "configuration": {
+    "supportedFileTypes": ["pdf", "docx", "doc", "txt"],
+    "maxFileSize": 10485760,
+    "extractionMode": "comprehensive"
+  }
+}

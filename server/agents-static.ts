@@ -21,6 +21,7 @@ import * as omnispectraBackend from '../agents/omnispectra/backend/index';
 import * as parityBackend from '../agents/parity/backend/index';
 import * as radarBackend from '../agents/radar/backend/index';
 import * as relayBackend from '../agents/relay/backend/index';
+import * as traceBackend from '../agents/trace/backend/index';
 import * as scribeBackend from '../agents/scribe/backend/index';
 
 // Agent backend interface
@@ -39,6 +40,7 @@ const AGENT_BACKENDS: Record<string, AgentBackend> = {
   'parity': parityBackend as AgentBackend,
   'radar': radarBackend as AgentBackend,
   'relay': relayBackend as AgentBackend,
+  'trace': traceBackend as AgentBackend,
   'scribe': scribeBackend as AgentBackend,
 };
 

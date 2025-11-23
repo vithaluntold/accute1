@@ -25,6 +25,7 @@ import { OmniSpectraAgent } from '../agents/omnispectra/backend/index';
 import { ParityAgent } from '../agents/parity/backend/index';
 import { RadarAgent } from '../agents/radar/backend/index';
 import { RelayAgent } from '../agents/relay/backend/index';
+import { TraceAgent } from '../agents/trace/backend/index';
 import { ScribeAgent } from '../agents/scribe/backend/index';
 
 // Map of agent names to their constructors
@@ -38,6 +39,7 @@ const AGENT_CONSTRUCTORS: Record<string, new (llmConfig: LlmConfiguration) => Ba
   parity: ParityAgent,
   radar: RadarAgent,
   relay: RelayAgent,
+  trace: TraceAgent,
   scribe: ScribeAgent,
 };
 
