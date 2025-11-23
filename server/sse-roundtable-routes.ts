@@ -11,7 +11,7 @@ import {
   type RoundtableParticipant,
 } from "@shared/schema";
 import { z } from "zod";
-import { getAgentBySlug } from "@shared/agent-registry";
+import { agentRegistry } from "./agent-registry";
 
 /**
  * SSE Roundtable Routes
@@ -248,7 +248,7 @@ export function registerSSERoundtableRoutes(app: Express) {
       }
 
       // Get agent info from registry
-      const agent = getAgentBySlug(agentSlug);
+      const agent = agentRegistry.getAgent(agentSlug);
       
       if (!agent) {
         return res.status(404).json({ error: 'Agent not found' });
@@ -260,7 +260,7 @@ export function registerSSERoundtableRoutes(app: Express) {
         participantType: 'agent',
         participantId: agentSlug,
         displayName: agent.name,
-        role: role || agent.role,
+        role: role || 'participant',
       });
 
       // Broadcast agent joined

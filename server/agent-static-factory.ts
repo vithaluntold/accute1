@@ -6,7 +6,14 @@
  */
 
 import type { LlmConfiguration } from '@shared/schema';
-import type { BaseAgent } from './agent-loader';
+
+/**
+ * Base interface that all agents must implement
+ */
+export interface BaseAgent {
+  execute(input: any, context?: any): Promise<any>;
+  executeStream?(input: any, onChunk: (chunk: string) => void): Promise<string>;
+}
 
 // Static imports of all agent classes
 import { CadenceAgent } from '../agents/cadence/backend/index';

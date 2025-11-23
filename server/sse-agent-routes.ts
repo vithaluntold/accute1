@@ -6,8 +6,7 @@ import { storage } from './storage';
 import { sessionService } from './agent-session-service';
 import { getLLMConfig } from './middleware/agent-llm-middleware';
 import { createStaticAgentInstance } from './agent-static-factory';
-import { agentSupportsStreaming } from './agent-loader';
-import { getAgentBySlug } from '@shared/agent-registry';
+import { agentRegistry } from './agent-registry';
 
 const router = Router();
 
@@ -70,7 +69,7 @@ router.post('/stream', requireAuth, async (req: AuthRequest, res: Response) => {
     }
     
     // Validate agent exists in Agent Registry
-    const agentMetadata = getAgentBySlug(agentSlug);
+    const agentMetadata = agentRegistry.getAgent(agentSlug);
     if (!agentMetadata) {
       return res.status(404).json({ error: 'Agent not found' });
     }
@@ -378,8 +377,8 @@ async function processAgentStream(
       throw new Error(`Agent ${agentSlug} not found`);
     }
     
-    // Check if agent supports streaming
-    const supportsStreaming = agentSupportsStreaming(agentSlug);
+    // All agents support streaming via executeStream method
+    const supportsStreaming = typeof agent.executeStream === 'function';
     
     stream.start({ agentSlug, supportsStreaming });
     
