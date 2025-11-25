@@ -97,7 +97,7 @@ The accounting practice management market is dominated by established players li
 ### Win Strategy Against TaxDome
 
 **Positioning:**  
-*"TaxDome manages your workflows. Accute executes them with AI agents—at a better price."*
+*"Building on the workflow management foundation TaxDome pioneered, we're introducing AI-powered execution—the next chapter in practice automation."*
 
 **Key Messages:**
 1. **Show the AI difference:** 
@@ -127,7 +127,7 @@ The accounting practice management market is dominated by established players li
 **Common Objections & Responses:**
 
 **"We're already on TaxDome and it works fine"**
-→ *"That's great—TaxDome is excellent for workflow management. Here's the key difference: TaxDome helps you organize who does what and when. Accute has AI team members who actually DO the work—preparing tax returns, answering client questions 24/7, reviewing documents for errors. Think of it as TaxDome + 10 AI employees. Would you like to see Luca prepare a 1040 right now?"*
+→ *"TaxDome is excellent—they've earned their market leadership. We're not suggesting you replace them. Instead, we're introducing complementary AI capabilities. While TaxDome manages workflows beautifully, we add AI agents that execute tasks—like preparing returns, answering client questions 24/7, reviewing documents. We learned from TaxDome's workflow management excellence and focused our innovation on AI execution. Would you like to see how this could complement your existing setup?"*
 
 **"TaxDome has unlimited storage, you only have 100GB"**
 → *"Fair point on storage. Our Professional tier includes 100GB, and Enterprise has unlimited like TaxDome. But here's what TaxDome doesn't have: AI agents that cut your tax prep time by 75%. Let me show you the ROI—for a 20-person firm, the time savings pay for the entire platform 85x over. Storage is included; productivity is the real value."*
@@ -375,7 +375,7 @@ The accounting practice management market is dominated by established players li
 4. ✅ **Better flexibility** - Monthly option vs. annual only
 
 **Bottom Line:**  
-*"TaxDome manages workflows. Accute executes them with AI—at a better price."*
+*"Building on what TaxDome pioneered in workflow management, we're advancing the industry with AI-powered execution—respectfully innovating for the next generation."*
 
 ---
 

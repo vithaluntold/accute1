@@ -7,7 +7,7 @@ Accounting firms, law firms, consulting practices, and advisory services
 
 ## Elevator Pitch (30 seconds)
 
-**"Accute is the AI-native practice management platform that transforms professional firms into Six Sigma quality operations. While TaxDome and competitors manage workflows, Accute actually executes them through 10 specialized AI agents—achieving 99.99966% defect-free quality at 26% lower cost than TaxDome."**
+**"Accute is the AI-native practice management platform built on the foundation TaxDome helped establish. While TaxDome excels at workflow management, we're introducing the next evolution: AI agents that actually execute tasks—preparing returns, answering client questions, reviewing documents—achieving 99.99966% defect-free quality while respecting the competitive pricing TaxDome set for the market."**
 
 ---
 
@@ -161,7 +161,7 @@ Your clients are drowning in:
 | **Time to Value** | ✅✅✅ Days | ⚠️ Weeks (learning curve) | ✅ Weeks | ✅✅ Days | ❌ Months |
 | **Multi-Provider AI** | ✅✅✅ 3 providers | ❌ Proprietary only | ❌ None | ❌ None | ❌ None |
 
-**Accute Advantage:** Only platform that EXECUTES work with AI agents (not just manages it), at better pricing than TaxDome
+**What We Bring:** Building on workflow management excellence, we add AI execution capabilities that complement what platforms like TaxDome pioneered
 
 ---
 
@@ -195,33 +195,33 @@ Your clients are drowning in:
 ### "We're already on TaxDome and it works fine"
 
 **Response:**  
-*"That's fantastic—TaxDome is the market leader for good reason. They pioneered modern practice management. Here's the key difference: TaxDome helps you organize workflows and manage tasks, but your team still does all the work manually. Accute has AI agents that actually EXECUTE the work—Luca prepares tax returns in 2 hours instead of 8, answers client questions at 2 AM, reviews documents for errors automatically. Think of it as TaxDome + 10 AI team members. Oh, and we're 26% less expensive at $49/user vs. their $66/user."*
+*"TaxDome is an excellent choice—they've set the standard for modern practice management and have earned their market leadership. We're not asking you to replace what works. Instead, we're introducing something complementary: AI agents that execute tasks alongside workflow management. While TaxDome organizes your work beautifully, Luca can prepare tax returns in 2 hours instead of 8, answer client questions at 2 AM, and review documents for errors automatically. We learned from what TaxDome did right and added the AI execution layer. And we've priced it competitively at $49/user to make innovation accessible."*
 
 **Show:**
 - Luca agent preparing 1040 in 2 hours vs. 8 hours manual
-- Client portal question answered by AI at 11 PM (TaxDome = manual response next day)
-- Side-by-side pricing: $49 vs. $66/user
-- Quality dashboard showing Six Sigma metrics (TaxDome has no SLA)
+- Client portal AI answering questions 24/7 (enhancing the portal experience)
+- Side-by-side pricing: $49 vs. $66/user (competitive, not claiming superiority)
+- Quality dashboard showing Six Sigma metrics (additive capability)
 
 ### "TaxDome has unlimited storage, you only have 100GB on Professional tier"
 
 **Response:**  
-*"Fair point on storage. Enterprise tier has unlimited like TaxDome, and Professional can add storage for $50/100GB. But here's what TaxDome doesn't have: AI agents that cut your tax prep time by 75%. Let me show you the ROI—for a 20-person firm, the time savings from AI automation are worth $500K annually. Even if you paid for extra storage, the productivity gains pay for it 85x over. Would you rather have unlimited storage or unlimited productivity?"*
+*"You're absolutely right—TaxDome's unlimited storage is a strong offering, and we match that in our Enterprise tier. For Professional tier, we offer 100GB with affordable expansion options. We made a different trade-off decision: rather than compete on storage alone, we invested in AI capabilities that drive productivity. For a 20-person firm, our AI automation creates about $500K in annual value through time savings. Both approaches have merit—TaxDome focuses on comprehensive infrastructure, we focus on AI-powered productivity. Many firms find the combination of our competitive pricing and AI capabilities addresses their priorities."*
 
 **Show:**
-- ROI calculator showing $500K savings
-- Luca agent demo (the productivity driver)
-- Storage pricing: Enterprise tier = unlimited included
+- ROI calculator showing $500K productivity gains
+- Luca agent demo (our differentiated capability)
+- Storage options: Enterprise tier = unlimited included, Professional = expandable
 
 ### "TaxDome is the market leader with 10,000 customers—you're new"
 
 **Response:**  
-*"You're absolutely right that TaxDome is established—they're the market leader for a reason. But remember, every market leader eventually gets disrupted by better technology. TaxDome disrupted Thomson Reuters' legacy systems. We're the next evolution—AI-native vs. manual workflow management. The question is: do you want to be an early adopter who gains 2-3 years of competitive advantage, or wait until everyone has it? Uber had fewer customers than Yellow Cab in 2010. Better technology wins."*
+*"You're absolutely right, and TaxDome's success speaks to the quality of their platform—they've earned the trust of thousands of firms. We have deep respect for what they've built. We're not claiming to replace them overnight; we're introducing innovation in a specific area: AI-powered task execution. Think about how TaxDome itself started—they were new once too, bringing workflow management innovation to an industry dominated by Thomson Reuters. We're following that same pattern of respectful innovation, focusing on AI capabilities while learning from TaxDome's success in areas like user experience and workflow design. Some firms prefer proven solutions, others want early access to emerging capabilities. Both are valid choices."*
 
 **Show:**
-- AI agent capabilities TaxDome doesn't have
-- Time-to-value comparison (days vs. weeks)
-- 30-day risk-free pilot proposal
+- AI agent capabilities (our innovation area)
+- Time-to-value comparison (one of our strengths)
+- 30-day risk-free pilot proposal (low-risk evaluation)
 
 ### "We already use Karbon and are happy with it"
 
@@ -340,18 +340,18 @@ Your clients are drowning in:
 | Thomson Reuters | Enterprise suite | $150+ | $36,000+ | +$24,240 (+206%) | Legacy UI, no AI |
 | Canopy | All-in-One | $49 | $11,760 | Same price | No AI agents, no quality SLA |
 
-**Key Insight:** Accute delivers TaxDome-level features + 10 AI agents at $49/user (26% less than TaxDome 1-year pricing)
+**Key Insight:** We've priced competitively with market leaders while adding AI capabilities as our differentiator
 
 ### 50-Person Firm Example (with Volume Discounts)
 
-| Provider | Discount | Price/User/Month | Annual Cost | vs Accute | Annual Savings |
-|----------|----------|------------------|-------------|-----------|----------------|
-| **Accute Professional** | **10%** | **$44.10** | **$26,460** | **Baseline** | **-** |
-| TaxDome (1-year) | Unknown | $66 | $39,600 | +$13,140 (+50%) | **-$13,140/year** |
-| TaxDome (3-year) | Unknown | $50 | $30,000 | +$3,540 (+13%) | **-$3,540/year** |
-| Karbon | Unknown | $59 | $35,400 | +$8,940 (+34%) | **-$8,940/year** |
+| Provider | Discount | Price/User/Month | Annual Cost | Difference | Value Proposition |
+|----------|----------|------------------|-------------|------------|-------------------|
+| **Accute Professional** | **10%** | **$44.10** | **$26,460** | **Baseline** | **Workflow mgmt + 10 AI agents** |
+| TaxDome (1-year) | Unknown | $66 | $39,600 | +$13,140 | Proven market leader, unlimited storage |
+| TaxDome (3-year) | Unknown | $50 | $30,000 | +$3,540 | Market leader with commitment discount |
+| Karbon | Unknown | $59 | $35,400 | +$8,940 | Excellent collaboration features |
 
-**ROI Impact:** A 50-person firm saves $13,140 annually vs. TaxDome (1-year) while gaining 10 AI agents
+**Investment Consideration:** Firms can access AI capabilities at competitive pricing while TaxDome offers proven infrastructure
 
 ---
 

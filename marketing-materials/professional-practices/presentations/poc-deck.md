@@ -85,7 +85,7 @@ Duration: 30-45 minutes
 
 **Result: 91% time reduction vs. TaxDome**
 
-**The Difference:** TaxDome organizes WHO does WHAT. Accute's AI agents actually DO the work.
+**The Evolution:** Building on TaxDome's workflow management foundation, we add AI agents that execute tasks—the natural next step in practice automation.
 
 ---
 

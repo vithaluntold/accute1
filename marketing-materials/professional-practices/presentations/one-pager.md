@@ -81,7 +81,7 @@ Professional firms face mounting pressure:
 | **Workflow Execution** | AI executes tasks | You do tasks manually | You do tasks manually |
 | **Time to Value** | Days | Weeks (learning curve) | Weeks or months |
 
-**Accute Advantage:** TaxDome manages workflows. Accute executes them with AI—at 26% lower cost.
+**What We Add:** Building on workflow management foundations TaxDome established, we introduce AI execution capabilities at competitive market pricing.
 
 ---
 
@@ -131,7 +131,7 @@ Professional firms face mounting pressure:
 | TaxDome (1-year) | $15,840 | +$4,080 (+35%) |
 | TaxDome (3-year lock) | $12,000 | +$240 (+2%) |
 
-**Plus:** Accute includes 10 AI agents TaxDome doesn't have
+**Our Innovation:** AI-powered task execution complements TaxDome's workflow management approach
 
 ---
 
