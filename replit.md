@@ -23,11 +23,23 @@ NODE_ENV=production npm run build
 ## Recent Bug Fixes (November 25, 2025)
 
 ### Critical LLM Configuration Fix - PERMANENT FIX ✅
-**Root Cause:** Double decryption bug causing recurring "LLM configuration" failures
+**Root Cause 1:** Double decryption bug causing recurring "LLM configuration" failures
 - **Problem:** ConfigResolver was decrypting API keys, then LLMService constructor tried to decrypt again, causing double-decryption failure
 - **Fix:** ConfigResolver now returns encrypted keys (validation only); LLMService handles all decryption (single responsibility)
 - **Architecture:** `ConfigResolver` → returns encrypted config → `LLMService` constructor → decrypts API key
-- **Files Changed:** `server/config-resolver.ts`, `server/__tests__/agents/llm-config.test.ts`, `server/__tests__/agents/integration/llm-api.test.ts`
+
+**Root Cause 2:** Multiple encryption formats across codebase (FIXED)
+- The codebase historically used 3 different encryption formats, causing "invalid encrypted API key" validation failures:
+  | Source File | Algorithm | Format | Key Derivation |
+  |-------------|-----------|--------|----------------|
+  | auth.ts | AES-256-CBC | `iv:encrypted` (2 parts) | SHA-256 hash |
+  | crypto-utils.ts | AES-256-GCM | `iv:encrypted:authTag` (3 parts) | scrypt |
+  | llm-service.ts | AES-256-GCM | concatenated (no colons) | direct slice |
+- **Fix:** `ConfigResolver.isValidEncryptedApiKey()` now accepts ALL 3 formats for backward compatibility
+- **Fix:** `LLMService.decrypt()` handles all 3 formats with correct key derivation for each
+- **Files Changed:** `server/config-resolver.ts`, `server/llm-service.ts`
+
+**IMPORTANT:** For future encryption, use `auth.ts` encrypt() which is imported by `routes.ts` for LLM config creation. The multi-format decrypt ensures backward compatibility with any existing data.
 
 ### Scheduler Service Fix ✅
 - **Problem:** "isNotNull is not defined" error every few seconds in scheduler service

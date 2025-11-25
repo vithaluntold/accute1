@@ -41,11 +41,90 @@ export function encrypt(text: string): string {
 }
 
 /**
- * Decrypt sensitive data using AES-256-GCM
+ * Multi-format decryption for backward compatibility
+ * 
+ * IMPORTANT: The codebase has multiple encryption formats due to historical evolution:
+ * 1. auth.ts encrypt() → AES-256-CBC → format: "iv:encrypted" (2 parts, colon-separated)
+ * 2. crypto-utils.ts encrypt() → AES-256-GCM → format: "iv:encrypted:authTag" (3 parts)
+ * 3. llm-service.ts encrypt() → AES-256-GCM → format: concatenated (no colons)
+ * 
+ * This function handles ALL formats for backward compatibility.
  */
 export function decrypt(encryptedData: string): string {
   checkEncryptionKey();
   
+  const parts = encryptedData.split(':');
+  
+  // Format 1: AES-256-CBC from auth.ts → "iv:encrypted" (2 parts)
+  if (parts.length === 2) {
+    console.log('[LLMService] Decrypting AES-256-CBC format (2 parts)');
+    return decryptCBC(encryptedData);
+  }
+  
+  // Format 2: AES-256-GCM from crypto-utils.ts → "iv:encrypted:authTag" (3 parts)
+  if (parts.length === 3) {
+    console.log('[LLMService] Decrypting AES-256-GCM format (3 parts)');
+    return decryptGCM3Parts(encryptedData);
+  }
+  
+  // Format 3: Concatenated AES-256-GCM from llm-service.ts → no colons
+  if (parts.length === 1) {
+    console.log('[LLMService] Decrypting AES-256-GCM concatenated format (no colons)');
+    return decryptGCMConcatenated(encryptedData);
+  }
+  
+  throw new Error(`Unrecognized encryption format: ${parts.length} parts`);
+}
+
+/**
+ * Decrypt AES-256-CBC format: "iv:encrypted" (from auth.ts)
+ * IMPORTANT: auth.ts uses SHA-256 hash for key derivation, must match exactly
+ */
+function decryptCBC(encryptedData: string): string {
+  // Must match auth.ts key derivation: SHA-256 hash of ENCRYPTION_KEY
+  const ENCRYPTION_KEY = crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY!).digest();
+  const parts = encryptedData.split(':');
+  const iv = Buffer.from(parts[0], 'hex');
+  const encrypted = parts[1];
+  
+  const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+
+/**
+ * Decrypt AES-256-GCM 3-part format: "iv:encrypted:authTag" (from crypto-utils.ts)
+ * IMPORTANT: crypto-utils.ts uses scrypt-based key derivation, must match exactly
+ */
+function decryptGCM3Parts(encryptedData: string): string {
+  // Must match crypto-utils.ts key derivation: scrypt with 'salt'
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY!, 'salt', 32);
+  const parts = encryptedData.split(':');
+  const iv = Buffer.from(parts[0], 'hex');
+  const encrypted = parts[1];
+  const authTag = Buffer.from(parts[2], 'hex');
+  
+  const decipher = crypto.createDecipheriv(
+    ALGORITHM,
+    key,
+    iv,
+    { authTagLength: AUTH_TAG_LENGTH }
+  );
+  
+  decipher.setAuthTag(authTag);
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+
+/**
+ * Decrypt AES-256-GCM concatenated format: iv+authTag+encrypted (from llm-service.ts)
+ */
+function decryptGCMConcatenated(encryptedData: string): string {
   const ivHex = encryptedData.slice(0, IV_LENGTH * 2);
   const authTagHex = encryptedData.slice(IV_LENGTH * 2, (IV_LENGTH + AUTH_TAG_LENGTH) * 2);
   const encrypted = encryptedData.slice((IV_LENGTH + AUTH_TAG_LENGTH) * 2);

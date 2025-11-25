@@ -268,29 +268,64 @@ class ConfigResolver {
   
   /**
    * Validate that an encrypted API key is properly formatted
+   * 
+   * IMPORTANT: The codebase has multiple encryption formats due to historical evolution:
+   * 1. auth.ts encrypt() → AES-256-CBC → format: "iv:encrypted" (2 parts)
+   * 2. crypto-utils.ts encrypt() → AES-256-GCM → format: "iv:encrypted:authTag" (3 parts)
+   * 3. llm-service.ts encrypt() → AES-256-GCM → format: concatenated (no colons)
+   * 
+   * This validator accepts ALL formats for backward compatibility.
+   * LLMService.decrypt() handles multi-format decryption.
    */
   private isValidEncryptedApiKey(encryptedApiKey: string | null | undefined): boolean {
     if (!encryptedApiKey || typeof encryptedApiKey !== 'string') {
+      console.warn('[ConfigResolver] API key validation failed: empty or non-string');
       return false;
     }
     
-    // Check if it has the expected format: iv:encrypted:authTag
-    const parts = encryptedApiKey.split(':');
-    if (parts.length !== 3) {
+    if (encryptedApiKey.trim().length === 0) {
+      console.warn('[ConfigResolver] API key validation failed: empty string');
       return false;
     }
     
-    // Check if all parts are hex strings with reasonable lengths
-    const [iv, encrypted, authTag] = parts;
     const hexPattern = /^[0-9a-fA-F]+$/;
+    const parts = encryptedApiKey.split(':');
     
-    // IV should be 32 hex chars (16 bytes), authTag should be 32 hex chars (16 bytes)
-    // Encrypted part should be at least some reasonable length
-    return (
-      hexPattern.test(iv) && iv.length === 32 &&
-      hexPattern.test(encrypted) && encrypted.length > 0 &&
-      hexPattern.test(authTag) && authTag.length === 32
-    );
+    // Format 1: AES-256-CBC from auth.ts → "iv:encrypted" (2 parts)
+    if (parts.length === 2) {
+      const [iv, encrypted] = parts;
+      if (hexPattern.test(iv) && iv.length === 32 && hexPattern.test(encrypted) && encrypted.length > 0) {
+        console.log('[ConfigResolver] Valid encrypted key format: AES-256-CBC (2 parts)');
+        return true;
+      }
+    }
+    
+    // Format 2: AES-256-GCM from crypto-utils.ts → "iv:encrypted:authTag" (3 parts)
+    if (parts.length === 3) {
+      const [iv, encrypted, authTag] = parts;
+      if (
+        hexPattern.test(iv) && iv.length === 32 &&
+        hexPattern.test(encrypted) && encrypted.length > 0 &&
+        hexPattern.test(authTag) && authTag.length === 32
+      ) {
+        console.log('[ConfigResolver] Valid encrypted key format: AES-256-GCM (3 parts)');
+        return true;
+      }
+    }
+    
+    // Format 3: Concatenated AES-256-GCM from llm-service.ts → no colons
+    // Format: iv(32 hex) + authTag(32 hex) + encrypted(variable)
+    if (parts.length === 1 && hexPattern.test(encryptedApiKey) && encryptedApiKey.length >= 96) {
+      console.log('[ConfigResolver] Valid encrypted key format: AES-256-GCM concatenated (no colons)');
+      return true;
+    }
+    
+    console.warn('[ConfigResolver] API key validation failed: unrecognized format', {
+      partsCount: parts.length,
+      totalLength: encryptedApiKey.length,
+      previewStart: encryptedApiKey.substring(0, 20) + '...'
+    });
+    return false;
   }
 }
 
