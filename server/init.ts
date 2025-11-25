@@ -158,13 +158,8 @@ export async function initializeSystem(app: Express) {
     // Handle forced reset if requested
     await handleForcedKeyReset();
     
-    // Validate key consistency
+    // Validate key consistency (non-blocking - just logs warnings)
     const keyGuardResult = await validateEncryptionKeyConsistency();
-    
-    if (!keyGuardResult.success) {
-      console.error(keyGuardResult.error);
-      throw new Error('Encryption key validation failed - see above for recovery options');
-    }
     
     if (keyGuardResult.action === 'first_run') {
       console.log("🔐 First run: Encryption key fingerprint registered");
@@ -172,6 +167,8 @@ export async function initializeSystem(app: Express) {
       console.log("✅ Encryption key verified");
     } else if (keyGuardResult.action === 'no_encrypted_data') {
       console.log("🔄 No encrypted data - key fingerprint updated");
+    } else if (keyGuardResult.action === 'key_mismatch') {
+      console.warn("⚠️  Encryption key changed - some LLM configs may need to be re-entered");
     }
 
     // Check if system roles exist (PHASE 1: Now 5 roles including Owner)

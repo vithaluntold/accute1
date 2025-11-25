@@ -42,18 +42,17 @@ NODE_ENV=production npm run build
 **IMPORTANT:** For future encryption, use `auth.ts` encrypt() which is imported by `routes.ts` for LLM config creation. The multi-format decrypt ensures backward compatibility with any existing data.
 
 ### Encryption Key Guard System (NEW) ✅
-**Purpose:** Prevents the "bad decrypt" nightmare where ENCRYPTION_KEY changes make encrypted data unreadable.
+**Purpose:** Warns when ENCRYPTION_KEY changes so encrypted data issues are visible (not silent failures).
 
 **How it works:**
 1. On first startup: Stores a fingerprint of the current ENCRYPTION_KEY in `system_settings` table
 2. On subsequent startups: Validates current key matches stored fingerprint
-3. If mismatch AND encrypted data exists: **BLOCKS startup** with clear recovery instructions
-4. If no encrypted data exists: Safely updates fingerprint to new key
+3. If mismatch detected: **Logs a warning** (does NOT block server - production-safe)
+4. Decryption failures handled gracefully at runtime with clear error messages
 
-**Recovery Options (if key mismatch detected):**
-1. **Restore old key:** Set ENCRYPTION_KEY to original value
-2. **Force reset:** Set `FORCE_ENCRYPTION_KEY_RESET=true` (deletes encrypted configs, uses new key)
-3. **Manual cleanup:** `DELETE FROM llm_configurations;` then restart
+**Important distinction:**
+- **JWT_SECRET rotation** = Safe, just logs users out (they re-authenticate)
+- **ENCRYPTION_KEY rotation** = Affects stored encrypted data (API keys) - users may need to re-enter
 
 **Files:** `server/encryption-key-guard.ts`, `server/init.ts`
 

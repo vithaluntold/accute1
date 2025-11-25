@@ -141,35 +141,29 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
       };
     }
 
-    // FATAL: Key changed and we cannot decrypt existing data
+    // Key changed and we cannot decrypt existing data
+    // WARNING: Do NOT block the server - just log a warning and continue
+    // The decryption failures will be handled gracefully at runtime
+    console.warn(`
+⚠️  [KeyGuard] WARNING: ENCRYPTION_KEY may have changed
+    ${encryptedConfigCount} encrypted LLM configuration(s) may fail to decrypt.
+    Users will need to re-enter their API credentials if decryption fails.
+    
+    To prevent this warning, ensure ENCRYPTION_KEY is stable across deployments.
+`);
+    
+    // Update fingerprint to new key so future checks pass
+    await db.execute(sql`
+      UPDATE system_settings 
+      SET value = ${currentFingerprint}, updated_at = NOW()
+      WHERE key = 'encryption_key_fingerprint'
+    `);
+    
     return {
-      success: false,
+      success: true, // Don't block - let server start
       action: 'key_mismatch',
       encryptedConfigCount,
-      error: `
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║                    ⛔ ENCRYPTION KEY MISMATCH - STARTUP BLOCKED ⛔              ║
-╠═══════════════════════════════════════════════════════════════════════════════╣
-║                                                                               ║
-║  The ENCRYPTION_KEY has changed since LLM configurations were saved.         ║
-║  ${encryptedConfigCount} encrypted configuration(s) cannot be decrypted with the current key.  ║
-║                                                                               ║
-║  OPTIONS:                                                                     ║
-║                                                                               ║
-║  1. RESTORE OLD KEY (Recommended if you have it):                            ║
-║     Set ENCRYPTION_KEY to the original value that was used when              ║
-║     the LLM configurations were created.                                     ║
-║                                                                               ║
-║  2. FORCE RESET (Data loss - requires re-entering API keys):                 ║
-║     Set environment variable: FORCE_ENCRYPTION_KEY_RESET=true                ║
-║     This will delete all encrypted configs and use the new key.              ║
-║                                                                               ║
-║  3. MANUAL DATABASE CLEANUP:                                                  ║
-║     DELETE FROM llm_configurations;                                          ║
-║     Then restart the server.                                                 ║
-║                                                                               ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-`
+      error: 'Encryption key changed - some configs may fail to decrypt'
     };
 
   } catch (error) {
