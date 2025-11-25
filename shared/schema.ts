@@ -5581,6 +5581,224 @@ export const teamCapacitySnapshots = pgTable("team_capacity_snapshots", {
 }));
 
 // ============================================================================
+// ENTERPRISE ENCRYPTION - KEK/DEK HIERARCHY & AZURE KEY VAULT INTEGRATION
+// ============================================================================
+
+// Key Encryption Keys (KEK) Registry - HSM-backed master keys in Azure Key Vault
+export const kekRegistry = pgTable("kek_registry", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Key identification
+  keyName: varchar("key_name", { length: 255 }).notNull().unique(), // Azure Key Vault key name
+  keyVersion: varchar("key_version", { length: 255 }).notNull(), // Azure Key Vault key version
+  vaultUrl: text("vault_url").notNull(), // e.g., https://accute-vault.vault.azure.net/
+  
+  // Key metadata
+  algorithm: varchar("algorithm", { length: 50 }).notNull().default("RSA-OAEP-256"), // 'RSA-OAEP-256', 'AES-256'
+  keyType: varchar("key_type", { length: 20 }).notNull().default("master"), // 'master', 'tenant', 'domain'
+  purpose: text("purpose").notNull(), // 'llm_credentials', 'payment_secrets', 'user_data', 'all'
+  
+  // Status
+  status: varchar("status", { length: 20 }).notNull().default("active"), // 'active', 'rotating', 'archived', 'disabled'
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Rotation tracking
+  rotatedFrom: varchar("rotated_from").references((): any => kekRegistry.id),
+  rotationSchedule: varchar("rotation_schedule", { length: 50 }).default("90d"), // '30d', '90d', '365d'
+  nextRotationAt: timestamp("next_rotation_at"),
+  lastRotatedAt: timestamp("last_rotated_at"),
+  
+  // Audit
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  keyNameIdx: index("kek_registry_key_name_idx").on(table.keyName),
+  statusIdx: index("kek_registry_status_idx").on(table.status),
+  activeIdx: index("kek_registry_active_idx").on(table.isActive),
+}));
+
+// Data Encryption Keys (DEK) - Wrapped by KEK, used for actual encryption
+export const dekRegistry = pgTable("dek_registry", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Key identification
+  keyId: varchar("key_id", { length: 255 }).notNull().unique(), // Internal DEK identifier
+  kekId: varchar("kek_id").notNull().references(() => kekRegistry.id), // Parent KEK
+  
+  // Wrapped key material
+  wrappedKeyMaterial: text("wrapped_key_material").notNull(), // DEK encrypted by KEK (base64)
+  keyWrapAlgorithm: varchar("key_wrap_algorithm", { length: 50 }).notNull().default("RSA-OAEP-256"),
+  
+  // Key metadata
+  algorithm: varchar("algorithm", { length: 50 }).notNull().default("AES-256-GCM"),
+  domain: varchar("domain", { length: 100 }).notNull(), // 'llm_credentials', 'payment_gateways', 'user_secrets'
+  
+  // Scope
+  organizationId: varchar("organization_id").references(() => organizations.id), // null = platform-wide
+  
+  // Status
+  status: varchar("status", { length: 20 }).notNull().default("active"), // 'active', 'rotating', 'archived'
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"), // Optional expiry
+  
+  // Usage tracking
+  usageCount: integer("usage_count").notNull().default(0), // Number of encryptions
+  lastUsedAt: timestamp("last_used_at"),
+  
+  // Audit
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  keyIdIdx: index("dek_registry_key_id_idx").on(table.keyId),
+  kekIdIdx: index("dek_registry_kek_id_idx").on(table.kekId),
+  domainIdx: index("dek_registry_domain_idx").on(table.domain),
+  orgIdx: index("dek_registry_org_idx").on(table.organizationId),
+  activeIdx: index("dek_registry_active_idx").on(table.isActive),
+}));
+
+// Cryptographic Audit Log - Tamper-proof hash chain for security operations
+export const cryptoAuditLog = pgTable("crypto_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Sequence for hash chain
+  sequenceNumber: serial("sequence_number").notNull(),
+  
+  // Operation details
+  operation: varchar("operation", { length: 50 }).notNull(), // 'encrypt', 'decrypt', 'wrap', 'unwrap', 'rotate', 'create', 'revoke'
+  operationType: varchar("operation_type", { length: 20 }).notNull(), // 'kek', 'dek', 'data'
+  resourceType: varchar("resource_type", { length: 50 }).notNull(), // 'llm_config', 'payment_gateway', 'user_secret'
+  resourceId: varchar("resource_id", { length: 255 }), // ID of affected resource
+  
+  // Key references
+  kekId: varchar("kek_id").references(() => kekRegistry.id),
+  dekId: varchar("dek_id").references(() => dekRegistry.id),
+  
+  // Hash chain for tamper detection
+  entryHash: varchar("entry_hash", { length: 128 }).notNull(), // SHA-512 of this entry
+  previousHash: varchar("previous_hash", { length: 128 }), // Hash of previous entry (null for first)
+  
+  // Signature for non-repudiation
+  signature: text("signature"), // RSA signature using log signing key
+  signatureKeyId: varchar("signature_key_id", { length: 255 }), // Key Vault key used for signing
+  
+  // Actor information
+  actorUserId: varchar("actor_user_id").references(() => users.id),
+  actorIpAddress: varchar("actor_ip_address", { length: 45 }),
+  actorUserAgent: text("actor_user_agent"),
+  
+  // Status
+  status: varchar("status", { length: 20 }).notNull().default("success"), // 'success', 'failed', 'denied'
+  errorMessage: text("error_message"),
+  
+  // Metadata
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  seqIdx: index("crypto_audit_log_seq_idx").on(table.sequenceNumber),
+  operationIdx: index("crypto_audit_log_operation_idx").on(table.operation),
+  resourceIdx: index("crypto_audit_log_resource_idx").on(table.resourceType, table.resourceId),
+  actorIdx: index("crypto_audit_log_actor_idx").on(table.actorUserId),
+  createdAtIdx: index("crypto_audit_log_created_at_idx").on(table.createdAt),
+}));
+
+// Split Knowledge Approval Queue - Require multiple admins for sensitive operations
+export const keyOperationApprovals = pgTable("key_operation_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Operation details
+  operationType: varchar("operation_type", { length: 50 }).notNull(), // 'create_kek', 'rotate_kek', 'revoke_kek', 'emergency_decrypt'
+  operationPayload: jsonb("operation_payload").notNull(), // Operation parameters (encrypted)
+  
+  // Quorum requirements
+  requiredApprovals: integer("required_approvals").notNull().default(2), // Number of approvals needed
+  currentApprovals: integer("current_approvals").notNull().default(0),
+  
+  // Approval tokens (time-bound, signed)
+  approvalTokenHash: varchar("approval_token_hash", { length: 128 }).notNull(), // SHA-512 hash
+  expiresAt: timestamp("expires_at").notNull(), // Approval window expires
+  
+  // Status
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'approved', 'rejected', 'expired', 'executed'
+  
+  // Initiator
+  initiatedBy: varchar("initiated_by").notNull().references(() => users.id),
+  initiatedAt: timestamp("initiated_at").notNull().defaultNow(),
+  
+  // Execution tracking
+  executedAt: timestamp("executed_at"),
+  executedBy: varchar("executed_by").references(() => users.id),
+  executionResult: jsonb("execution_result"),
+  
+  // Audit
+  auditLogId: varchar("audit_log_id").references(() => cryptoAuditLog.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("key_operation_approvals_status_idx").on(table.status),
+  expiresIdx: index("key_operation_approvals_expires_idx").on(table.expiresAt),
+  initiatorIdx: index("key_operation_approvals_initiator_idx").on(table.initiatedBy),
+}));
+
+// Individual approvals for split knowledge
+export const keyOperationApprovalVotes = pgTable("key_operation_approval_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  approvalId: varchar("approval_id").notNull().references(() => keyOperationApprovals.id, { onDelete: 'cascade' }),
+  
+  // Voter information
+  approverId: varchar("approver_id").notNull().references(() => users.id),
+  vote: varchar("vote", { length: 20 }).notNull(), // 'approve', 'reject'
+  
+  // Verification
+  signedTokenHash: varchar("signed_token_hash", { length: 128 }).notNull(), // Voter's signed approval
+  
+  // Metadata
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  reason: text("reason"), // Optional justification
+  
+  votedAt: timestamp("voted_at").notNull().defaultNow(),
+}, (table) => ({
+  approvalIdx: index("key_operation_approval_votes_approval_idx").on(table.approvalId),
+  approverIdx: index("key_operation_approval_votes_approver_idx").on(table.approverId),
+  uniqueVote: unique("key_operation_approval_votes_unique").on(table.approvalId, table.approverId),
+}));
+
+// Azure Key Vault Configuration - Store vault connection details
+export const keyVaultConfig = pgTable("key_vault_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Vault identification
+  name: varchar("name", { length: 255 }).notNull().unique(), // Configuration name
+  vaultUrl: text("vault_url").notNull(), // e.g., https://accute-vault.vault.azure.net/
+  
+  // Authentication method
+  authMethod: varchar("auth_method", { length: 50 }).notNull().default("managed_identity"), // 'managed_identity', 'client_secret', 'certificate'
+  
+  // Client credentials (encrypted, only for client_secret auth)
+  tenantId: varchar("tenant_id", { length: 255 }),
+  clientId: varchar("client_id", { length: 255 }),
+  clientSecretEncrypted: text("client_secret_encrypted"), // Encrypted with local key during bootstrap
+  
+  // Status
+  isActive: boolean("is_active").notNull().default(true),
+  isPrimary: boolean("is_primary").notNull().default(false), // Primary vault for new keys
+  
+  // Health monitoring
+  lastHealthCheck: timestamp("last_health_check"),
+  healthStatus: varchar("health_status", { length: 20 }).default("unknown"), // 'healthy', 'degraded', 'unhealthy', 'unknown'
+  
+  // Audit
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  activeIdx: index("key_vault_config_active_idx").on(table.isActive),
+  primaryIdx: index("key_vault_config_primary_idx").on(table.isPrimary),
+}));
+
+// ============================================================================
 // INSERT SCHEMAS & TYPES - AI PERSONALITY PROFILING & PERFORMANCE MONITORING
 // ============================================================================
 
