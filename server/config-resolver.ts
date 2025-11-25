@@ -1,4 +1,3 @@
-import { safeDecrypt } from './encryption-service';
 import { db } from './db';
 import { llmConfigurations, type LlmConfiguration } from '@shared/schema';
 import { and, eq, or, isNull } from 'drizzle-orm';
@@ -63,34 +62,27 @@ class ConfigResolver {
       throw new Error('No active LLM configuration found. Please configure an AI provider in Workspace Settings or your User Settings.');
     }
     
-    // Decrypt API key
-    let decryptedKey: string;
-    try {
-      // Validate that we have an encrypted API key
-      if (!config.apiKeyEncrypted || typeof config.apiKeyEncrypted !== 'string') {
-        throw new Error(`LLM configuration ${config.id} has no encrypted API key. Please reconfigure this AI provider.`);
-      }
-      
-      decryptedKey = safeDecrypt(config.apiKeyEncrypted);
-      
-      // Validate the decrypted key is not empty
-      if (!decryptedKey || decryptedKey.trim().length === 0) {
-        throw new Error(`LLM configuration ${config.id} has an empty API key after decryption.`);
-      }
-    } catch (error) {
-      console.error(`[ConfigResolver] Failed to decrypt API key for config ${config.id}:`, error);
-      throw new Error('Failed to decrypt LLM credentials. Please contact your administrator.');
+    // IMPORTANT: Do NOT decrypt API key here!
+    // LLMService constructor handles decryption (single responsibility principle)
+    // Previously this was decrypting, causing double-decryption failures when LLMService also decrypted
+    
+    // Just validate that the encrypted key exists
+    if (!config.apiKeyEncrypted || typeof config.apiKeyEncrypted !== 'string') {
+      console.error(`[ConfigResolver] Config ${config.id} has no encrypted API key`);
+      throw new Error(`LLM configuration ${config.id} has no encrypted API key. Please reconfigure this AI provider.`);
     }
     
-    // Return decrypted configuration
-    const resolved: LlmConfiguration = {
-      ...config,
-      apiKeyEncrypted: decryptedKey, // Return decrypted key in the same field
-    };
+    if (config.apiKeyEncrypted.trim().length === 0) {
+      console.error(`[ConfigResolver] Config ${config.id} has empty API key`);
+      throw new Error(`LLM configuration ${config.id} has an empty API key. Please reconfigure this AI provider.`);
+    }
     
-    this.setCache(cacheKey, resolved);
+    console.log(`[ConfigResolver] Returning config ${config.id} with encrypted API key (decryption deferred to LLMService)`);
     
-    return resolved;
+    // Return config with ENCRYPTED key - LLMService will decrypt it
+    this.setCache(cacheKey, config);
+    
+    return config;
   }
   
   /**
@@ -173,14 +165,26 @@ class ConfigResolver {
       return null;
     }
     
-    return cached.config;
+    // Return a deep clone to prevent cache corruption if caller mutates
+    return this.cloneConfig(cached.config);
   }
   
   private setCache(key: string, config: LlmConfiguration): void {
+    // Store a deep clone to prevent mutations from affecting cache
     this.cache.set(key, {
-      config,
+      config: this.cloneConfig(config),
       expiresAt: new Date(Date.now() + this.CACHE_TTL),
     });
+  }
+  
+  /**
+   * Deep clone a config object to prevent cache corruption
+   * Ensures callers cannot mutate cached data
+   * Uses structuredClone to preserve Date instances and other special types
+   */
+  private cloneConfig(config: LlmConfiguration): LlmConfiguration {
+    // structuredClone preserves Date objects, unlike JSON.parse(JSON.stringify(...))
+    return structuredClone(config);
   }
   
   private async fetchConfigWithFallback(

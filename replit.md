@@ -20,9 +20,20 @@ NODE_ENV=production npm run build
 - ✅ **Replit Deployments:** Automatically set NODE_ENV=production (no action needed)
 - ⚠️ **Other Platforms:** Ensure CI/CD or deployment environment sets NODE_ENV=production
 
-## Recent Bug Fixes (November 23, 2025)
+## Recent Bug Fixes (November 25, 2025)
 
-### Build Error Fixes - PRODUCTION READY ✅
+### Critical LLM Configuration Fix - PERMANENT FIX ✅
+**Root Cause:** Double decryption bug causing recurring "LLM configuration" failures
+- **Problem:** ConfigResolver was decrypting API keys, then LLMService constructor tried to decrypt again, causing double-decryption failure
+- **Fix:** ConfigResolver now returns encrypted keys (validation only); LLMService handles all decryption (single responsibility)
+- **Architecture:** `ConfigResolver` → returns encrypted config → `LLMService` constructor → decrypts API key
+- **Files Changed:** `server/config-resolver.ts`, `server/__tests__/agents/llm-config.test.ts`, `server/__tests__/agents/integration/llm-api.test.ts`
+
+### Scheduler Service Fix ✅
+- **Problem:** "isNotNull is not defined" error every few seconds in scheduler service
+- **Fix:** Added missing `isNotNull` import from drizzle-orm in `server/storage.ts`
+
+### Build Error Fixes (November 23, 2025) - PRODUCTION READY ✅
 1. **Logo Asset References** - Fixed 6 marketing pages (terms, privacy, contact, security, about, features) to use existing Accute logo instead of missing logo.png
 2. **Organization Field Consistency** - Fixed "No Workspace Selected" error with fallback pattern across 5 frontend files + 1 backend route
 3. **Trace Button Visibility** - Fixed agent installations endpoint to show "Add Skills with Trace" button in Employee Profile
@@ -51,7 +62,7 @@ The frontend is built with React 18, TypeScript, Vite, Tailwind CSS, and shadcn/
 Accute offers a multi-tenant architecture with four-tier RBAC and a Client Portal. Key features include an AI Client Onboarding System, conversational AI agents with auto-title generation, a unified workflows system, an AI Agent Marketplace, secure LLM Configuration Management, AI Psychology Assessment & Performance Monitoring, PKI Digital Signatures, Secure Document Management, a Template Marketplace, Projects Management, an AI Agent Foundry, and comprehensive collaboration tools.
 
 ## System Design Choices
-The project is structured into `client/`, `server/`, and `shared/` directories, emphasizing security, multi-tenancy, and robust authentication/encryption. The Automation Engine supports various action types, including dependency-aware task orchestration with four dependency types (finish_to_start, start_to_start, finish_to_finish, start_to_finish) and time-based triggers (cron and due-date offset). AI agents are dynamically routed and lazy-loaded. A centralized `ConfigResolver` manages LLM configurations with caching, decryption, and fallback. A `FileParserService` handles diverse document types. Server initialization prioritizes health checks, system setup, agent route registration, and then Vite middleware. Auto-title generation occurs after the first message exchange using an LLM. Unified session routes support all 10 agents. Real-time communication utilizes SSE for User-to-AI streaming (e.g., AI Agent Chat, Luca Chat Widget) and WebSockets for User-to-User real-time interactions (e.g., Team Chat, Live Chat, Roundtable). Row Level Security (RLS) is implemented across 87 tables with 347 policies, enforced by both database RLS and application middleware, ensuring multi-tenant data isolation. A critical fix addressed `safeDecrypt` silent failure, now throwing loud errors for failed decryptions. The system includes auto-provisioning for AI agents upon subscription creation and robust entitlement and access control based on subscription plans. Resume analysis for the Trace agent includes PII sanitization, rate limiting, and file size validation for compliance. The AI Psychology Assessment & Performance Monitoring system uses a privacy-preserving multi-framework personality profiling system with hybrid ML model fusion, ensuring GDPR compliance and discarding raw message content after analysis.
+The project is structured into `client/`, `server/`, and `shared/` directories, emphasizing security, multi-tenancy, and robust authentication/encryption. The Automation Engine supports various action types, including dependency-aware task orchestration with four dependency types (finish_to_start, start_to_start, finish_to_finish, start_to_finish) and time-based triggers (cron and due-date offset). AI agents are dynamically routed and lazy-loaded. A centralized `ConfigResolver` manages LLM configurations with caching and fallback (ConfigResolver validates encrypted keys; LLMService handles all decryption). A `FileParserService` handles diverse document types. Server initialization prioritizes health checks, system setup, agent route registration, and then Vite middleware. Auto-title generation occurs after the first message exchange using an LLM. Unified session routes support all 10 agents. Real-time communication utilizes SSE for User-to-AI streaming (e.g., AI Agent Chat, Luca Chat Widget) and WebSockets for User-to-User real-time interactions (e.g., Team Chat, Live Chat, Roundtable). Row Level Security (RLS) is implemented across 87 tables with 347 policies, enforced by both database RLS and application middleware, ensuring multi-tenant data isolation. A critical fix addressed `safeDecrypt` silent failure, now throwing loud errors for failed decryptions. The system includes auto-provisioning for AI agents upon subscription creation and robust entitlement and access control based on subscription plans. Resume analysis for the Trace agent includes PII sanitization, rate limiting, and file size validation for compliance. The AI Psychology Assessment & Performance Monitoring system uses a privacy-preserving multi-framework personality profiling system with hybrid ML model fusion, ensuring GDPR compliance and discarding raw message content after analysis.
 
 # External Dependencies
 - PostgreSQL (Neon)

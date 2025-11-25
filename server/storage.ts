@@ -1,4 +1,4 @@
-import { eq, and, or, desc, sql, lt, lte, gt, gte, ne, isNull } from "drizzle-orm";
+import { eq, and, or, desc, sql, lt, lte, gt, gte, ne, isNull, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import type {

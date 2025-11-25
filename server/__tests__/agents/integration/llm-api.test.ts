@@ -143,7 +143,9 @@ describe('LLM API Integration Tests', () => {
       expect(config.provider).toBe('openai');
       expect(config.model).toBe('gpt-4');
       expect(config.apiKeyEncrypted).toBeDefined();
-      expect(config.apiKeyEncrypted).toMatch(/^test-api-key-/);
+      // ConfigResolver returns encrypted key; verify decryption works via decrypt()
+      const decryptedKey = decrypt(config.apiKeyEncrypted);
+      expect(decryptedKey).toMatch(/^test-api-key-/);
     });
 
     it('should support GPT-4 model', async () => {
@@ -168,13 +170,17 @@ describe('LLM API Integration Tests', () => {
 
     it('should handle OpenAI API key decryption', async () => {
       const testKey = 'sk-test-' + nanoid();
+      const encryptedTestKey = encrypt(testKey);
       await createUserLLMConfig('openai', testUserId, {
-        apiKeyEncrypted: encrypt(testKey),
+        apiKeyEncrypted: encryptedTestKey,
       });
 
       const config = await configResolver.resolve({ organizationId: testOrgId, userId: testUserId });
 
-      expect(config.apiKeyEncrypted).toBe(testKey);
+      // ConfigResolver returns encrypted key (LLMService handles decryption)
+      expect(config.apiKeyEncrypted).toBe(encryptedTestKey);
+      // Verify decryption works correctly
+      expect(decrypt(config.apiKeyEncrypted)).toBe(testKey);
     });
 
     it('should support workspace-level OpenAI config', async () => {

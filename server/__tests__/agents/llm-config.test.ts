@@ -676,15 +676,16 @@ describe('AI Agent System - LLM Configuration', () => {
   // ============================================================
 
   describe('Encryption & Security', () => {
-    it('should decrypt API keys correctly', async () => {
+    it('should return encrypted API keys from ConfigResolver (LLMService decrypts)', async () => {
       const originalKey = 'sk-test-api-key-12345';
+      const encryptedKey = encrypt(originalKey);
       const [config] = await db.insert(llmConfigurations).values({
         scope: 'workspace',
         organizationId: testOrgId,
         userId: null,
         name: 'Decrypt Test',
         provider: 'openai',
-        apiKeyEncrypted: encrypt(originalKey),
+        apiKeyEncrypted: encryptedKey,
         model: 'gpt-4',
         isActive: true,
         isDefault: true,
@@ -693,27 +694,35 @@ describe('AI Agent System - LLM Configuration', () => {
 
       const resolved = await configResolver.resolve({ organizationId: testOrgId });
 
-      expect(resolved.apiKeyEncrypted).toBe(originalKey); // Returns decrypted
+      // ConfigResolver returns encrypted key (LLMService handles decryption)
+      expect(resolved.apiKeyEncrypted).toBe(encryptedKey);
+      
+      // Verify the key can be decrypted by LLMService
+      const decryptedKey = decrypt(resolved.apiKeyEncrypted);
+      expect(decryptedKey).toBe(originalKey);
     });
 
-    it('should throw error on decryption failure', async () => {
-      // Create config with invalid encrypted data
+    it('should validate encrypted key exists but not decrypt', async () => {
+      // ConfigResolver validates key exists but doesn't decrypt
+      // Invalid encrypted data is caught by LLMService constructor, not ConfigResolver
       await db.insert(llmConfigurations).values({
         scope: 'workspace',
         organizationId: testOrgId,
         userId: null,
-        name: 'Bad Encryption',
+        name: 'Invalid Format',
         provider: 'openai',
-        apiKeyEncrypted: 'invalid-encrypted-data', // Not properly encrypted
+        apiKeyEncrypted: 'some-invalid-but-non-empty-data',
         model: 'gpt-4',
         isActive: true,
         isDefault: true,
         createdBy: testUserId,
       });
 
-      await expect(
-        configResolver.resolve({ organizationId: testOrgId })
-      ).rejects.toThrow('Failed to decrypt LLM credentials');
+      // ConfigResolver should succeed (just validates key exists)
+      const resolved = await configResolver.resolve({ organizationId: testOrgId });
+      expect(resolved.apiKeyEncrypted).toBe('some-invalid-but-non-empty-data');
+      
+      // The actual decryption error would happen when LLMService tries to decrypt
     });
 
     it('should not expose encrypted keys in database queries', async () => {
