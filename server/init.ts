@@ -4,6 +4,7 @@ import * as schema from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { storage } from "./storage";
 import { hashPassword } from "./auth";
+import { validateEncryptionKeyConsistency, handleForcedKeyReset } from "./encryption-key-guard";
 
 async function createPersistentSeedAccountsInline() {
   // Get roles
@@ -149,6 +150,29 @@ async function createPersistentSeedAccountsInline() {
 export async function initializeSystem(app: Express) {
   try {
     console.log("🔧 Initializing system...");
+
+    // CRITICAL: Validate encryption key consistency BEFORE accessing any encrypted data
+    // This prevents the "bad decrypt" nightmare where key changes make data unreadable
+    console.log("🔐 Validating encryption key consistency...");
+    
+    // Handle forced reset if requested
+    await handleForcedKeyReset();
+    
+    // Validate key consistency
+    const keyGuardResult = await validateEncryptionKeyConsistency();
+    
+    if (!keyGuardResult.success) {
+      console.error(keyGuardResult.error);
+      throw new Error('Encryption key validation failed - see above for recovery options');
+    }
+    
+    if (keyGuardResult.action === 'first_run') {
+      console.log("🔐 First run: Encryption key fingerprint registered");
+    } else if (keyGuardResult.action === 'key_match') {
+      console.log("✅ Encryption key verified");
+    } else if (keyGuardResult.action === 'no_encrypted_data') {
+      console.log("🔄 No encrypted data - key fingerprint updated");
+    }
 
     // Check if system roles exist (PHASE 1: Now 5 roles including Owner)
     const existingRoles = await db.select().from(schema.roles).where(eq(schema.roles.isSystemRole, true));

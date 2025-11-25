@@ -41,6 +41,22 @@ NODE_ENV=production npm run build
 
 **IMPORTANT:** For future encryption, use `auth.ts` encrypt() which is imported by `routes.ts` for LLM config creation. The multi-format decrypt ensures backward compatibility with any existing data.
 
+### Encryption Key Guard System (NEW) ✅
+**Purpose:** Prevents the "bad decrypt" nightmare where ENCRYPTION_KEY changes make encrypted data unreadable.
+
+**How it works:**
+1. On first startup: Stores a fingerprint of the current ENCRYPTION_KEY in `system_settings` table
+2. On subsequent startups: Validates current key matches stored fingerprint
+3. If mismatch AND encrypted data exists: **BLOCKS startup** with clear recovery instructions
+4. If no encrypted data exists: Safely updates fingerprint to new key
+
+**Recovery Options (if key mismatch detected):**
+1. **Restore old key:** Set ENCRYPTION_KEY to original value
+2. **Force reset:** Set `FORCE_ENCRYPTION_KEY_RESET=true` (deletes encrypted configs, uses new key)
+3. **Manual cleanup:** `DELETE FROM llm_configurations;` then restart
+
+**Files:** `server/encryption-key-guard.ts`, `server/init.ts`
+
 ### Scheduler Service Fix ✅
 - **Problem:** "isNotNull is not defined" error every few seconds in scheduler service
 - **Fix:** Added missing `isNotNull` import from drizzle-orm in `server/storage.ts`
