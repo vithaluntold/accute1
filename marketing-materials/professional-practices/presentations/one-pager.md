@@ -70,16 +70,18 @@ Professional firms face mounting pressure:
 
 ---
 
-## How We're Different
+## How We're Different vs TaxDome & Competitors
 
-| Feature | Accute | Competitors |
-|---------|--------|-------------|
-| **AI Agents** | 10 specialized agents | None or basic chatbot |
-| **Quality Metrics** | 99.99966% (Six Sigma) | Manual QA |
-| **Workflow Automation** | Event-driven + AI | Manual or basic rules |
-| **Client Portal** | AI-powered self-service | Static document sharing |
-| **Pricing** | $49/user transparent | "Contact sales" |
-| **Time to Value** | Days | Weeks or months |
+| Feature | Accute | TaxDome (Market Leader) | Other Competitors |
+|---------|--------|-------------------------|-------------------|
+| **AI Agents** | 10 specialized agents | Doc tagging only | None |
+| **Pricing** | $49/user (monthly option) | $50-66/user (annual only) | $59-150+/user |
+| **Quality SLA** | 99.99966% (Six Sigma) | No guarantee | Manual QA |
+| **Client Portal** | AI-powered 24/7 (Luca) | Good (manual only) | Basic |
+| **Workflow Execution** | AI executes tasks | You do tasks manually | You do tasks manually |
+| **Time to Value** | Days | Weeks (learning curve) | Weeks or months |
+
+**Accute Advantage:** TaxDome manages workflows. Accute executes them with AI—at 26% lower cost.
 
 ---
 
@@ -121,6 +123,15 @@ Professional firms face mounting pressure:
 - Unlimited storage
 
 **Volume discounts:** 10-20% for 50+ users
+
+### vs TaxDome Pricing (20-person firm)
+| Provider | Annual Cost | Difference |
+|----------|-------------|------------|
+| **Accute Professional** | **$11,760** | **Baseline** |
+| TaxDome (1-year) | $15,840 | +$4,080 (+35%) |
+| TaxDome (3-year lock) | $12,000 | +$240 (+2%) |
+
+**Plus:** Accute includes 10 AI agents TaxDome doesn't have
 
 ---
 

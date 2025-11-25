@@ -7,7 +7,7 @@ Accounting firms, law firms, consulting practices, and advisory services
 
 ## Elevator Pitch (30 seconds)
 
-**"Accute is the AI-native practice management platform that transforms professional firms into Six Sigma quality operations. While competitors offer workflow automation, Accute delivers a complete AI ecosystem with 10 specialized agents, manifest-driven architecture, and Karbon-style automation—achieving 99.99966% defect-free quality at scale."**
+**"Accute is the AI-native practice management platform that transforms professional firms into Six Sigma quality operations. While TaxDome and competitors manage workflows, Accute actually executes them through 10 specialized AI agents—achieving 99.99966% defect-free quality at 26% lower cost than TaxDome."**
 
 ---
 
@@ -147,18 +147,21 @@ Your clients are drowning in:
 
 ## Key Differentiators vs Competition
 
-| Feature | Accute | Karbon | Practice Ignition | Thomson Reuters | Canopy |
-|---------|--------|--------|-------------------|-----------------|--------|
-| **AI Agents** | ✅ 10 specialized | ❌ None | ❌ None | ❌ None | ❌ None |
-| **Workflow Automation** | ✅✅✅ Event-driven + AI | ✅✅ Manual | ✅ Basic | ✅ Limited | ✅ Basic |
-| **Quality Metrics** | ✅✅✅ Six Sigma (99.99966%) | ❌ Manual QA | ❌ Manual QA | ❌ Manual QA | ❌ Manual QA |
-| **Client Portal** | ✅✅✅ AI self-service | ✅ Basic | ✅ Limited | ✅ Basic | ✅✅ Good |
-| **Document Mgmt** | ✅✅✅ PKI + AI | ✅✅ Good | ✅ Basic | ✅✅ Good | ✅✅ Good |
-| **Multi-tenancy** | ✅✅✅ Enterprise RLS | ✅✅ Good | ✅ Basic | ✅✅ Enterprise | ✅✅ Good |
-| **Modern UI/UX** | ✅✅✅ Linear-inspired | ✅✅ Good | ✅✅ Good | ❌ Legacy (1990s) | ✅✅ Good |
-| **Pricing** | ✅✅✅ $49/user transparent | ❌ Contact sales (~$59) | ❌ Contact sales (~$99) | ❌ Complex (~$150+) | ✅✅ ~$49/user |
-| **Time to Value** | ✅✅✅ Days | ✅ Weeks | ✅✅ Days | ❌ Months | ✅✅ Days |
-| **Mobile** | ✅✅✅ Full PWA | ✅✅ Good | ✅✅ Good | ❌ Poor | ✅✅ Good |
+| Feature | Accute | TaxDome | Karbon | Practice Ignition | Thomson Reuters |
+|---------|--------|---------|--------|-------------------|-----------------|
+| **AI Agents** | ✅✅✅ 10 specialized | ❌ None (doc tagging only) | ❌ None | ❌ None | ❌ None |
+| **Workflow Automation** | ✅✅✅ Event-driven + AI | ✅✅ Visual templates | ✅✅ Manual | ✅ Basic | ✅ Limited |
+| **Quality SLA** | ✅✅✅ 99.99966% (Six Sigma) | ❌ No guarantee | ❌ Manual QA | ❌ Manual QA | ❌ Manual QA |
+| **Client Portal** | ✅✅✅ AI self-service 24/7 | ✅✅ Good (no AI) | ✅ Basic | ✅ Limited | ✅ Basic |
+| **Document Storage** | ✅✅ 100GB→Unlimited | ✅✅✅ Unlimited included | ✅✅ Integration only | ✅ Basic | ✅✅ Good |
+| **E-Signatures** | ✅✅ Integrated | ✅✅ IRS-compliant | ⚠️ Integration | ✅✅ Built-in | ✅✅ Built-in |
+| **Modern UI/UX** | ✅✅✅ Linear-inspired | ✅✅ Good | ✅✅ Good | ✅✅ Good | ❌ Legacy (1990s) |
+| **Pricing** | ✅✅✅ $49/user transparent | ⚠️ $50-66/user annual only | ❌ ~$59/user | ❌ ~$99/user | ❌ Complex (~$150+) |
+| **Payment Terms** | ✅✅ Monthly or annual | ❌ Annual upfront only | ⚠️ Annual | ⚠️ Annual | ❌ Complex |
+| **Time to Value** | ✅✅✅ Days | ⚠️ Weeks (learning curve) | ✅ Weeks | ✅✅ Days | ❌ Months |
+| **Multi-Provider AI** | ✅✅✅ 3 providers | ❌ Proprietary only | ❌ None | ❌ None | ❌ None |
+
+**Accute Advantage:** Only platform that EXECUTES work with AI agents (not just manages it), at better pricing than TaxDome
 
 ---
 
@@ -188,6 +191,37 @@ Your clients are drowning in:
 ---
 
 ## Common Objections & Responses
+
+### "We're already on TaxDome and it works fine"
+
+**Response:**  
+*"That's fantastic—TaxDome is the market leader for good reason. They pioneered modern practice management. Here's the key difference: TaxDome helps you organize workflows and manage tasks, but your team still does all the work manually. Accute has AI agents that actually EXECUTE the work—Luca prepares tax returns in 2 hours instead of 8, answers client questions at 2 AM, reviews documents for errors automatically. Think of it as TaxDome + 10 AI team members. Oh, and we're 26% less expensive at $49/user vs. their $66/user."*
+
+**Show:**
+- Luca agent preparing 1040 in 2 hours vs. 8 hours manual
+- Client portal question answered by AI at 11 PM (TaxDome = manual response next day)
+- Side-by-side pricing: $49 vs. $66/user
+- Quality dashboard showing Six Sigma metrics (TaxDome has no SLA)
+
+### "TaxDome has unlimited storage, you only have 100GB on Professional tier"
+
+**Response:**  
+*"Fair point on storage. Enterprise tier has unlimited like TaxDome, and Professional can add storage for $50/100GB. But here's what TaxDome doesn't have: AI agents that cut your tax prep time by 75%. Let me show you the ROI—for a 20-person firm, the time savings from AI automation are worth $500K annually. Even if you paid for extra storage, the productivity gains pay for it 85x over. Would you rather have unlimited storage or unlimited productivity?"*
+
+**Show:**
+- ROI calculator showing $500K savings
+- Luca agent demo (the productivity driver)
+- Storage pricing: Enterprise tier = unlimited included
+
+### "TaxDome is the market leader with 10,000 customers—you're new"
+
+**Response:**  
+*"You're absolutely right that TaxDome is established—they're the market leader for a reason. But remember, every market leader eventually gets disrupted by better technology. TaxDome disrupted Thomson Reuters' legacy systems. We're the next evolution—AI-native vs. manual workflow management. The question is: do you want to be an early adopter who gains 2-3 years of competitive advantage, or wait until everyone has it? Uber had fewer customers than Yellow Cab in 2010. Better technology wins."*
+
+**Show:**
+- AI agent capabilities TaxDome doesn't have
+- Time-to-value comparison (days vs. weeks)
+- 30-day risk-free pilot proposal
 
 ### "We already use Karbon and are happy with it"
 
@@ -289,6 +323,35 @@ Your clients are drowning in:
 - **Data migration:** Starting at $2,500
 - **Custom integrations:** Starting at $5,000
 - **Training:** Included (live + recorded)
+
+---
+
+## Pricing Comparison vs Competitors
+
+### 20-Person Firm Example (Annual Cost)
+
+| Provider | Tier | Price/User/Month | Annual Cost | vs Accute | What's Missing |
+|----------|------|------------------|-------------|-----------|----------------|
+| **Accute Professional** | **All-in-One + AI** | **$49** | **$11,760** | **Baseline** | **Nothing - complete platform** |
+| TaxDome (1-year) | All-in-One | $66 | $15,840 | +$4,080 (+35%) | No AI agents, no quality SLA |
+| TaxDome (3-year lock) | All-in-One | $50 | $12,000 | +$240 (+2%) | No AI agents, 3-year commitment |
+| Karbon | Workflow only | $59 | $14,160 | +$2,400 (+20%) | No AI, no docs, no billing |
+| Practice Ignition | Proposals only | $99 | $23,760 | +$12,000 (+102%) | No AI, limited scope |
+| Thomson Reuters | Enterprise suite | $150+ | $36,000+ | +$24,240 (+206%) | Legacy UI, no AI |
+| Canopy | All-in-One | $49 | $11,760 | Same price | No AI agents, no quality SLA |
+
+**Key Insight:** Accute delivers TaxDome-level features + 10 AI agents at $49/user (26% less than TaxDome 1-year pricing)
+
+### 50-Person Firm Example (with Volume Discounts)
+
+| Provider | Discount | Price/User/Month | Annual Cost | vs Accute | Annual Savings |
+|----------|----------|------------------|-------------|-----------|----------------|
+| **Accute Professional** | **10%** | **$44.10** | **$26,460** | **Baseline** | **-** |
+| TaxDome (1-year) | Unknown | $66 | $39,600 | +$13,140 (+50%) | **-$13,140/year** |
+| TaxDome (3-year) | Unknown | $50 | $30,000 | +$3,540 (+13%) | **-$3,540/year** |
+| Karbon | Unknown | $59 | $35,400 | +$8,940 (+34%) | **-$8,940/year** |
+
+**ROI Impact:** A 50-person firm saves $13,140 annually vs. TaxDome (1-year) while gaining 10 AI agents
 
 ---
 

@@ -67,23 +67,25 @@ Duration: 30-45 minutes
 
 ---
 
-## Slide 5: How It Works - Client Onboarding Example
+## Slide 5: TaxDome vs Accute - Client Onboarding Example
 
-**Traditional Process: 3 Days**
-1. Send engagement letter → Wait for signature (1-2 days)
-2. Manually request documents → Chase client (1-2 days)
-3. Review documents → Request corrections (2-4 hours)
-4. Set up client in system → Assign team (1 hour)
-5. Kickoff meeting → Start work (scheduled)
+**With TaxDome (Workflow Management): Still 3 Days**
+1. TaxDome sends engagement letter → Wait for signature (1-2 days)
+2. TaxDome requests documents → **You manually chase client** (1-2 days)
+3. **You manually review documents** → Request corrections (2-4 hours)
+4. TaxDome creates client record → **You manually assign** team (1 hour)
+5. **You manually schedule** kickoff → Start work
 
-**With Accute: 4 Hours**
-1. **Automated:** AI generates engagement letter → E-signature sent
-2. **Automated:** Document requests sent based on service type
-3. **AI-Powered:** Luca reviews documents, flags issues automatically
-4. **Automated:** Client created, portal provisioned, team assigned
-5. **Automated:** Kickoff meeting scheduled, workflow started
+**With Accute (AI Execution): 4 Hours**
+1. **Luca AI generates** engagement letter → E-signature sent automatically
+2. **AI sends** document requests based on service type
+3. **Luca reviews** documents, flags issues automatically
+4. **AI creates** client, provisions portal, assigns team by capacity
+5. **AI schedules** kickoff meeting, starts workflow automatically
 
-**Result: 91% time reduction, 3x more clients onboarded**
+**Result: 91% time reduction vs. TaxDome**
+
+**The Difference:** TaxDome organizes WHO does WHAT. Accute's AI agents actually DO the work.
 
 ---
 
