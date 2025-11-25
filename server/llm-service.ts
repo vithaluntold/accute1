@@ -79,69 +79,137 @@ export function decrypt(encryptedData: string): string {
 /**
  * Decrypt AES-256-CBC format: "iv:encrypted" (from auth.ts)
  * IMPORTANT: auth.ts uses SHA-256 hash for key derivation, must match exactly
+ * Supports key rotation: tries current key first, then falls back to previous key
  */
 function decryptCBC(encryptedData: string): string {
-  // Must match auth.ts key derivation: SHA-256 hash of ENCRYPTION_KEY
-  const ENCRYPTION_KEY = crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY!).digest();
   const parts = encryptedData.split(':');
   const iv = Buffer.from(parts[0], 'hex');
   const encrypted = parts[1];
   
-  const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  // Try current key first
+  const currentKey = process.env.ENCRYPTION_KEY!;
+  try {
+    const derivedKey = crypto.createHash('sha256').update(currentKey).digest();
+    const decipher = crypto.createDecipheriv('aes-256-cbc', derivedKey, iv);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (currentKeyError) {
+    // Try previous key if available (key rotation support)
+    const previousKey = process.env.ENCRYPTION_KEY_PREVIOUS;
+    if (previousKey) {
+      try {
+        console.log('[LLMService] Current key failed, trying previous key (key rotation)');
+        const derivedKey = crypto.createHash('sha256').update(previousKey).digest();
+        const decipher = crypto.createDecipheriv('aes-256-cbc', derivedKey, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        console.log('[LLMService] Decrypted with previous key - consider running key migration');
+        return decrypted;
+      } catch (previousKeyError) {
+        throw new Error('Failed to decrypt with both current and previous keys');
+      }
+    }
+    throw currentKeyError;
+  }
 }
 
 /**
  * Decrypt AES-256-GCM 3-part format: "iv:encrypted:authTag" (from crypto-utils.ts)
  * IMPORTANT: crypto-utils.ts uses scrypt-based key derivation, must match exactly
+ * Supports key rotation: tries current key first, then falls back to previous key
  */
 function decryptGCM3Parts(encryptedData: string): string {
-  // Must match crypto-utils.ts key derivation: scrypt with 'salt'
-  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY!, 'salt', 32);
   const parts = encryptedData.split(':');
   const iv = Buffer.from(parts[0], 'hex');
   const encrypted = parts[1];
   const authTag = Buffer.from(parts[2], 'hex');
   
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    key,
-    iv,
-    { authTagLength: AUTH_TAG_LENGTH }
-  );
-  
-  decipher.setAuthTag(authTag);
-  
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  // Try current key first
+  const currentKey = process.env.ENCRYPTION_KEY!;
+  try {
+    const key = crypto.scryptSync(currentKey, 'salt', 32);
+    const decipher = crypto.createDecipheriv(
+      ALGORITHM,
+      key,
+      iv,
+      { authTagLength: AUTH_TAG_LENGTH }
+    );
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (currentKeyError) {
+    // Try previous key if available (key rotation support)
+    const previousKey = process.env.ENCRYPTION_KEY_PREVIOUS;
+    if (previousKey) {
+      try {
+        console.log('[LLMService] Current key failed for GCM-3part, trying previous key');
+        const key = crypto.scryptSync(previousKey, 'salt', 32);
+        const decipher = crypto.createDecipheriv(
+          ALGORITHM,
+          key,
+          iv,
+          { authTagLength: AUTH_TAG_LENGTH }
+        );
+        decipher.setAuthTag(authTag);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        console.log('[LLMService] Decrypted with previous key - consider running key migration');
+        return decrypted;
+      } catch (previousKeyError) {
+        throw new Error('Failed to decrypt GCM-3part with both current and previous keys');
+      }
+    }
+    throw currentKeyError;
+  }
 }
 
 /**
  * Decrypt AES-256-GCM concatenated format: iv+authTag+encrypted (from llm-service.ts)
+ * Supports key rotation: tries current key first, then falls back to previous key
  */
 function decryptGCMConcatenated(encryptedData: string): string {
   const ivHex = encryptedData.slice(0, IV_LENGTH * 2);
   const authTagHex = encryptedData.slice(IV_LENGTH * 2, (IV_LENGTH + AUTH_TAG_LENGTH) * 2);
   const encrypted = encryptedData.slice((IV_LENGTH + AUTH_TAG_LENGTH) * 2);
   
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    Buffer.from(process.env.ENCRYPTION_KEY!.slice(0, 32)),
-    Buffer.from(ivHex, 'hex'),
-    { authTagLength: AUTH_TAG_LENGTH }
-  );
-  
-  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
-  
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  
-  return decrypted;
+  // Try current key first
+  const currentKey = process.env.ENCRYPTION_KEY!;
+  try {
+    const decipher = crypto.createDecipheriv(
+      ALGORITHM,
+      Buffer.from(currentKey.slice(0, 32)),
+      Buffer.from(ivHex, 'hex'),
+      { authTagLength: AUTH_TAG_LENGTH }
+    );
+    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (currentKeyError) {
+    // Try previous key if available (key rotation support)
+    const previousKey = process.env.ENCRYPTION_KEY_PREVIOUS;
+    if (previousKey) {
+      try {
+        console.log('[LLMService] Current key failed for GCM-concat, trying previous key');
+        const decipher = crypto.createDecipheriv(
+          ALGORITHM,
+          Buffer.from(previousKey.slice(0, 32)),
+          Buffer.from(ivHex, 'hex'),
+          { authTagLength: AUTH_TAG_LENGTH }
+        );
+        decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        console.log('[LLMService] Decrypted with previous key - consider running key migration');
+        return decrypted;
+      } catch (previousKeyError) {
+        throw new Error('Failed to decrypt GCM-concat with both current and previous keys');
+      }
+    }
+    throw currentKeyError;
+  }
 }
 
 /**

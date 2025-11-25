@@ -41,20 +41,34 @@ NODE_ENV=production npm run build
 
 **IMPORTANT:** For future encryption, use `auth.ts` encrypt() which is imported by `routes.ts` for LLM config creation. The multi-format decrypt ensures backward compatibility with any existing data.
 
-### Encryption Key Guard System (NEW) ✅
-**Purpose:** Warns when ENCRYPTION_KEY changes so encrypted data issues are visible (not silent failures).
+### Encryption Key Rotation System (COMPLETE) ✅
+**Purpose:** Enables safe ENCRYPTION_KEY rotation without data loss.
 
-**How it works:**
-1. On first startup: Stores a fingerprint of the current ENCRYPTION_KEY in `system_settings` table
-2. On subsequent startups: Validates current key matches stored fingerprint
-3. If mismatch detected: **Logs a warning** (does NOT block server - production-safe)
-4. Decryption failures handled gracefully at runtime with clear error messages
+**How key rotation works:**
+1. Set new key as `ENCRYPTION_KEY`
+2. Set old key as `ENCRYPTION_KEY_PREVIOUS`
+3. Server decrypts using fallback: tries current key first, falls back to previous key
+4. Call `POST /api/encryption/migrate-keys` to re-encrypt all data with new key
+5. Remove `ENCRYPTION_KEY_PREVIOUS` after successful migration
+
+**All decrypt formats support key rotation:**
+| Format | Function | Key Fallback |
+|--------|----------|--------------|
+| AES-256-CBC (`iv:encrypted`) | decryptCBC() | ✅ Tries current key, then ENCRYPTION_KEY_PREVIOUS |
+| AES-256-GCM 3-part (`iv:encrypted:authTag`) | decryptGCM3Parts() | ✅ Tries current key, then ENCRYPTION_KEY_PREVIOUS |
+| AES-256-GCM concatenated | decryptGCMConcatenated() | ✅ Tries current key, then ENCRYPTION_KEY_PREVIOUS |
+
+**Migration re-encrypts to CBC format for consistency** - The migration process reads any format and writes back using CBC (auth.ts encrypt), standardizing on one format.
+
+**API Endpoints:**
+- `GET /api/encryption/key-rotation-status` - Check if rotation is pending
+- `POST /api/encryption/migrate-keys` - Re-encrypt all data (Super Admin/Owner only)
 
 **Important distinction:**
 - **JWT_SECRET rotation** = Safe, just logs users out (they re-authenticate)
-- **ENCRYPTION_KEY rotation** = Affects stored encrypted data (API keys) - users may need to re-enter
+- **ENCRYPTION_KEY rotation** = Use the dual-key system above to avoid data loss
 
-**Files:** `server/encryption-key-guard.ts`, `server/init.ts`
+**Files:** `server/key-rotation.ts`, `server/llm-service.ts`, `server/encryption-key-guard.ts`
 
 ### Scheduler Service Fix ✅
 - **Problem:** "isNotNull is not defined" error every few seconds in scheduler service

@@ -4043,6 +4043,73 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
+  // Key rotation status endpoint
+  app.get("/api/encryption/key-rotation-status", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { getKeyRotationStatus, isKeyRotationPending } = await import('./key-rotation');
+      const status = await getKeyRotationStatus();
+      
+      res.json({
+        hasPreviousKey: status.hasPreviousKey,
+        recordsNeedingMigration: status.recordsNeedingMigration,
+        rotationPending: isKeyRotationPending()
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: "Failed to get key rotation status", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Key rotation migration endpoint (Super Admin only)
+  app.post("/api/encryption/migrate-keys", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      // Only allow Super Admin to run migration
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ 
+          error: "Only Super Admin or Owner can run key migration" 
+        });
+      }
+      
+      const { migrateEncryptedData, isKeyRotationPending } = await import('./key-rotation');
+      
+      if (!isKeyRotationPending()) {
+        return res.status(400).json({ 
+          error: "No key rotation pending",
+          message: "Set ENCRYPTION_KEY_PREVIOUS to the old key to enable migration"
+        });
+      }
+      
+      console.log(`[KeyRotation] Migration triggered by ${user?.email}`);
+      const result = await migrateEncryptedData();
+      
+      await logActivity(
+        req.user!.id, 
+        req.user!.organizationId || undefined, 
+        "migrate", 
+        "encryption_keys", 
+        "system",
+        { 
+          recordsMigrated: result.recordsMigrated, 
+          recordsFailed: result.recordsFailed 
+        }, 
+        req
+      );
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('[KeyRotation] Migration failed:', error);
+      res.status(500).json({ 
+        error: "Key migration failed", 
+        message: error.message 
+      });
+    }
+  });
+
   // Health check endpoint for all LLM configurations and agents
   app.get("/api/agents/health", requireAuth, async (req: Request, res: Response) => {
     try {
