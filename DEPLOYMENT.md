@@ -90,8 +90,9 @@ Add these **optional** environment variables (based on features you use):
 |----------|---------|--------------|
 | `RAZORPAY_KEY_ID` | Razorpay | Indian payments |
 | `RAZORPAY_KEY_SECRET` | Razorpay | Indian payments |
-| `STRIPE_SECRET_KEY` | Stripe | International payments |
-| `VITE_STRIPE_PUBLIC_KEY` | Stripe | Stripe frontend |
+| `STRIPE_SECRET_KEY` | Stripe | International payments (server-side) |
+| `VITE_STRIPE_PUBLIC_KEY` | Stripe | Stripe frontend (must start with `pk_`) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe | Webhook signature verification |
 | `TWILIO_ACCOUNT_SID` | Twilio | SMS notifications |
 | `TWILIO_AUTH_TOKEN` | Twilio | SMS notifications |
 | `TWILIO_PHONE_NUMBER` | Twilio | SMS notifications |
