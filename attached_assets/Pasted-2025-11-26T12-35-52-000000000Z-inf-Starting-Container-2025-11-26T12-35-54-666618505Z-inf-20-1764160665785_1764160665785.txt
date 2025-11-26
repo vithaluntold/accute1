@@ -1,0 +1,111 @@
+2025-11-26T12:35:52.000000000Z [inf]  Starting Container
+2025-11-26T12:35:54.666618505Z [inf]  
+2025-11-26T12:35:54.666771445Z [inf]  > rest-express@1.0.0 start
+2025-11-26T12:35:54.666778879Z [inf]  > NODE_ENV=production node dist/index.js
+2025-11-26T12:35:54.666785796Z [inf]  
+2025-11-26T12:35:56.777284171Z [inf]  🔐 Encryption service initialized successfully
+2025-11-26T12:35:56.777297956Z [inf]  [PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)
+2025-11-26T12:35:56.782127069Z [inf]  ✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)
+2025-11-26T12:35:56.782132845Z [inf]  🚀 Starting server in production mode...
+2025-11-26T12:35:56.782137831Z [inf]     Port: 5000
+2025-11-26T12:35:56.782143772Z [inf]     Host: 0.0.0.0
+2025-11-26T12:35:56.823463479Z [inf]  ✅ SSE Agent routes registered
+2025-11-26T12:35:56.823471701Z [inf]  ✅ SSE Roundtable routes registered
+2025-11-26T12:35:56.827552458Z [inf]  ✅ Server listening on 0.0.0.0:5000
+2025-11-26T12:35:56.827562810Z [inf]     Environment: production
+2025-11-26T12:35:56.827570587Z [inf]  🌐 Access your app at: https://localhost:5000
+2025-11-26T12:35:56.854319342Z [inf]     DATABASE_URL: SET (length: 94)
+2025-11-26T12:35:56.854329703Z [inf]  12:35:56 PM [express] serving on port 5000
+2025-11-26T12:35:56.854334616Z [inf]     ENCRYPTION_KEY: SET (length: 44)
+2025-11-26T12:35:56.854335308Z [inf]  🔧 Initializing WebSocket servers...
+2025-11-26T12:35:56.854340154Z [inf]  🔧 Setting up lazy WebSocket loader...
+2025-11-26T12:35:56.854343095Z [inf]     AZURE_OPENAI_API_KEY: NOT SET
+2025-11-26T12:35:56.854345546Z [inf]  ✅ Lazy WebSocket loader ready
+2025-11-26T12:35:56.854350086Z [inf]  🔧 Initializing system...
+2025-11-26T12:35:56.854352231Z [inf]  🔧 Starting system initialization...
+2025-11-26T12:35:56.854357176Z [inf]     NODE_ENV: production
+2025-11-26T12:35:56.854361997Z [inf]  🔐 Validating encryption key consistency...
+2025-11-26T12:35:56.854369151Z [inf]  🔌 Initializing pg pool (production mode - SSL no verify)...
+2025-11-26T12:35:56.854375722Z [inf]  ✅ Database pool initialized
+2025-11-26T12:35:56.854382539Z [inf]  🔧 Initializing Drizzle ORM...
+2025-11-26T12:35:56.863774596Z [inf]  ✅ Drizzle ORM initialized
+2025-11-26T12:35:56.940505988Z [err]    syscall: 'read'
+2025-11-26T12:35:56.940515135Z [err]  }
+2025-11-26T12:35:56.940521509Z [inf]  🔐 First run: Encryption key fingerprint registered
+2025-11-26T12:35:56.940565699Z [err]  [KeyGuard] Error during validation: Error: read ECONNRESET
+2025-11-26T12:35:56.940570890Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:35:56.940575263Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-26T12:35:56.940584654Z [err]      at async validateEncryptionKeyConsistency (file:///app/dist/index.js:53136:5)
+2025-11-26T12:35:56.940593012Z [err]      at async initializeSystem (file:///app/dist/index.js:53408:28)
+2025-11-26T12:35:56.940598403Z [err]      at async file:///app/dist/index.js:55532:7 {
+2025-11-26T12:35:56.940603011Z [err]    errno: -104,
+2025-11-26T12:35:56.940607481Z [err]    code: 'ECONNRESET',
+2025-11-26T12:35:56.946645545Z [err]  ❌ System initialization failed: Error: Connection terminated unexpectedly
+2025-11-26T12:35:56.946656489Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:35:56.946663702Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-26T12:35:56.946670173Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:35:56.946676471Z [err]      at async initializeSystem (file:///app/dist/index.js:53418:27)
+2025-11-26T12:35:56.946682990Z [err]      at async file:///app/dist/index.js:55532:7
+2025-11-26T12:35:56.946688931Z [inf]  ✅ System initialized successfully
+2025-11-26T12:35:56.946700300Z [inf]  🔧 Registering AI agent routes (AFTER initialization)...
+2025-11-26T12:35:56.949136974Z [inf]  📋 Registering 11 agent routes...
+2025-11-26T12:35:56.949144250Z [inf]  [STATIC AGENT LOADER] Registering 11 agents...
+2025-11-26T12:35:56.949152753Z [inf]  [STATIC AGENT LOADER] Registering routes for: cadence
+2025-11-26T12:35:56.949158787Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: cadence
+2025-11-26T12:35:56.949165336Z [inf]  [STATIC AGENT LOADER] Registering routes for: echo
+2025-11-26T12:35:56.949173060Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: echo
+2025-11-26T12:35:56.949179268Z [inf]  [STATIC AGENT LOADER] Registering routes for: forma
+2025-11-26T12:35:56.949185654Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: forma
+2025-11-26T12:35:56.949192290Z [inf]  [STATIC AGENT LOADER] Registering routes for: luca
+2025-11-26T12:35:56.950385334Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: luca
+2025-11-26T12:35:56.950393359Z [inf]  [STATIC AGENT LOADER] Registering routes for: lynk
+2025-11-26T12:35:56.950399193Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: lynk
+2025-11-26T12:35:56.950404929Z [inf]  [STATIC AGENT LOADER] Registering routes for: omnispectra
+2025-11-26T12:35:56.950410297Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: omnispectra
+2025-11-26T12:35:56.950415561Z [inf]  [STATIC AGENT LOADER] Registering routes for: parity
+2025-11-26T12:35:56.951943749Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: parity
+2025-11-26T12:35:56.951947727Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: scribe
+2025-11-26T12:35:56.951955617Z [inf]  [STATIC AGENT LOADER] Registering routes for: radar
+2025-11-26T12:35:56.951959128Z [inf]  [STATIC AGENT LOADER] ✅ All 11 agents registered successfully
+2025-11-26T12:35:56.951964587Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: radar
+2025-11-26T12:35:56.951967580Z [inf]  📋 Registering session routes for 11 agents...
+2025-11-26T12:35:56.951972958Z [inf]  [STATIC AGENT LOADER] Registering routes for: relay
+2025-11-26T12:35:56.951978798Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: relay
+2025-11-26T12:35:56.951983115Z [inf]  [STATIC AGENT LOADER] Registering routes for: trace
+2025-11-26T12:35:56.951988506Z [inf]  [Trace Agent] Routes registered
+2025-11-26T12:35:56.951992846Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: trace
+2025-11-26T12:35:56.951997629Z [inf]  [STATIC AGENT LOADER] Registering routes for: scribe
+2025-11-26T12:35:56.953471324Z [inf]  ✅ Agent routes registered successfully
+2025-11-26T12:35:56.953476193Z [inf]  🎉 System initialization complete!
+2025-11-26T12:35:56.953480932Z [inf]  🔧 Loading automation triggers from database...
+2025-11-26T12:35:56.953487943Z [inf]  [EventTriggers] Loading triggers from database...
+2025-11-26T12:35:57.019283454Z [err]  ❌ Failed to load automation triggers: Error: read ECONNRESET
+2025-11-26T12:35:57.019294548Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:35:57.019301866Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-26T12:35:57.019304639Z [err]  [EventTriggers] Failed to load triggers from database: Error: read ECONNRESET
+2025-11-26T12:35:57.019308447Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:35:57.019314061Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:35:57.019315389Z [err]      at async DbStorage.getAllAutomationTriggers (file:///app/dist/index.js:5949:16)
+2025-11-26T12:35:57.019322421Z [err]      at async EventTriggersEngine.loadTriggersFromDatabase (file:///app/dist/index.js:23872:28)
+2025-11-26T12:35:57.019323660Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-26T12:35:57.019328314Z [err]      at async file:///app/dist/index.js:55564:7 {
+2025-11-26T12:35:57.019334187Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:35:57.019334336Z [err]    errno: -104,
+2025-11-26T12:35:57.019342269Z [err]    code: 'ECONNRESET',
+2025-11-26T12:35:57.019343772Z [err]      at async DbStorage.getAllAutomationTriggers (file:///app/dist/index.js:5949:16)
+2025-11-26T12:35:57.019351086Z [err]    syscall: 'read'
+2025-11-26T12:35:57.019353632Z [err]      at async EventTriggersEngine.loadTriggersFromDatabase (file:///app/dist/index.js:23872:28)
+2025-11-26T12:35:57.019359617Z [err]      at async file:///app/dist/index.js:55564:7 {
+2025-11-26T12:35:57.019366160Z [err]    errno: -104,
+2025-11-26T12:35:57.019374368Z [err]    code: 'ECONNRESET',
+2025-11-26T12:35:57.019381042Z [err]    syscall: 'read'
+2025-11-26T12:35:57.019386886Z [err]  }
+2025-11-26T12:35:57.023059408Z [inf]  ✅ Static file serving initialized (production mode) - routes ready
+2025-11-26T12:35:57.023078087Z [inf]     Serving from: /app/dist/public
+2025-11-26T12:35:57.023151128Z [err]  }
+2025-11-26T12:35:57.023158321Z [err]  ⚠️  Continuing without automation triggers - they can be created via API
+2025-11-26T12:35:57.023169177Z [inf]  🔧 Starting automation scheduler...
+2025-11-26T12:35:57.023177012Z [inf]  Starting automation scheduler...
+2025-11-26T12:35:57.023184167Z [inf]  ✅ Automation scheduler started successfully
+2025-11-26T12:35:57.023197689Z [inf]  ✅ Upload serving initialized
+2025-11-26T12:35:57.023208539Z [inf]     Serving from: /app/uploads

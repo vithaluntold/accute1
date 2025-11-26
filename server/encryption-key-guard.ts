@@ -16,6 +16,34 @@ import crypto from 'crypto';
 import { db } from './db';
 import { sql } from 'drizzle-orm';
 
+// Helper: Execute query with retry for connection issues
+async function executeWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  label = 'query'
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isConnectionError = 
+        error.code === 'ECONNRESET' || 
+        error.code === 'ECONNREFUSED' ||
+        error.message?.includes('Connection terminated') ||
+        error.message?.includes('connection');
+      
+      if (isConnectionError && attempt < maxRetries) {
+        const waitTime = Math.min(1000 * attempt, 3000);
+        console.log(`[KeyGuard] ${label} failed (attempt ${attempt}/${maxRetries}), retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error(`${label} failed after ${maxRetries} attempts`);
+}
+
 // Generate a fingerprint of the encryption key (NOT the key itself for security)
 function generateKeyFingerprint(key: string): string {
   // Double-hash to prevent rainbow table attacks while maintaining consistency
@@ -54,36 +82,52 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
   
   try {
     // Ensure system_settings table exists for storing the key fingerprint
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS system_settings (
-        key VARCHAR(255) PRIMARY KEY,
-        value TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
+    await executeWithRetry(
+      () => db.execute(sql`
+        CREATE TABLE IF NOT EXISTS system_settings (
+          key VARCHAR(255) PRIMARY KEY,
+          value TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `),
+      3,
+      'create system_settings table'
+    );
 
     // Get stored fingerprint
-    const result = await db.execute(sql`
-      SELECT value FROM system_settings WHERE key = 'encryption_key_fingerprint'
-    `);
+    const result = await executeWithRetry(
+      () => db.execute(sql`
+        SELECT value FROM system_settings WHERE key = 'encryption_key_fingerprint'
+      `),
+      3,
+      'get fingerprint'
+    );
     
     const storedFingerprint = (result.rows[0] as { value: string } | undefined)?.value;
 
     // Check how many encrypted LLM configs exist
-    const configCountResult = await db.execute(sql`
-      SELECT COUNT(*) as count FROM llm_configurations WHERE api_key_encrypted IS NOT NULL
-    `);
+    const configCountResult = await executeWithRetry(
+      () => db.execute(sql`
+        SELECT COUNT(*) as count FROM llm_configurations WHERE api_key_encrypted IS NOT NULL
+      `),
+      3,
+      'count encrypted configs'
+    );
     const encryptedConfigCount = parseInt((configCountResult.rows[0] as { count: string })?.count || '0');
 
     // CASE 1: First run - no stored fingerprint
     if (!storedFingerprint) {
       // Store the current fingerprint
-      await db.execute(sql`
-        INSERT INTO system_settings (key, value, updated_at)
-        VALUES ('encryption_key_fingerprint', ${currentFingerprint}, NOW())
-        ON CONFLICT (key) DO UPDATE SET value = ${currentFingerprint}, updated_at = NOW()
-      `);
+      await executeWithRetry(
+        () => db.execute(sql`
+          INSERT INTO system_settings (key, value, updated_at)
+          VALUES ('encryption_key_fingerprint', ${currentFingerprint}, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = ${currentFingerprint}, updated_at = NOW()
+        `),
+        3,
+        'store fingerprint'
+      );
       
       console.log('🔐 [KeyGuard] First run: Encryption key fingerprint stored');
       return {
@@ -111,11 +155,15 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
     // If no encrypted data exists, we can safely update the fingerprint
     if (encryptedConfigCount === 0) {
       console.log('🔄 [KeyGuard] No encrypted data found - updating fingerprint to new key');
-      await db.execute(sql`
-        UPDATE system_settings 
-        SET value = ${currentFingerprint}, updated_at = NOW()
-        WHERE key = 'encryption_key_fingerprint'
-      `);
+      await executeWithRetry(
+        () => db.execute(sql`
+          UPDATE system_settings 
+          SET value = ${currentFingerprint}, updated_at = NOW()
+          WHERE key = 'encryption_key_fingerprint'
+        `),
+        3,
+        'update fingerprint'
+      );
       return {
         success: true,
         action: 'no_encrypted_data',
@@ -129,11 +177,15 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
     if (canDecrypt) {
       // Key changed but we can still decrypt (maybe same key, different encoding)
       console.log('✅ [KeyGuard] Key fingerprint differs but decryption works - updating fingerprint');
-      await db.execute(sql`
-        UPDATE system_settings 
-        SET value = ${currentFingerprint}, updated_at = NOW()
-        WHERE key = 'encryption_key_fingerprint'
-      `);
+      await executeWithRetry(
+        () => db.execute(sql`
+          UPDATE system_settings 
+          SET value = ${currentFingerprint}, updated_at = NOW()
+          WHERE key = 'encryption_key_fingerprint'
+        `),
+        3,
+        'update fingerprint after decrypt test'
+      );
       return {
         success: true,
         action: 'key_match',
@@ -153,11 +205,15 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
 `);
     
     // Update fingerprint to new key so future checks pass
-    await db.execute(sql`
-      UPDATE system_settings 
-      SET value = ${currentFingerprint}, updated_at = NOW()
-      WHERE key = 'encryption_key_fingerprint'
-    `);
+    await executeWithRetry(
+      () => db.execute(sql`
+        UPDATE system_settings 
+        SET value = ${currentFingerprint}, updated_at = NOW()
+        WHERE key = 'encryption_key_fingerprint'
+      `),
+      3,
+      'update fingerprint on mismatch'
+    );
     
     return {
       success: true, // Don't block - let server start
@@ -182,11 +238,15 @@ export async function validateEncryptionKeyConsistency(): Promise<KeyGuardResult
  */
 async function testDecryptionCapability(): Promise<boolean> {
   try {
-    const result = await db.execute(sql`
-      SELECT api_key_encrypted FROM llm_configurations 
-      WHERE api_key_encrypted IS NOT NULL 
-      LIMIT 1
-    `);
+    const result = await executeWithRetry(
+      () => db.execute(sql`
+        SELECT api_key_encrypted FROM llm_configurations 
+        WHERE api_key_encrypted IS NOT NULL 
+        LIMIT 1
+      `),
+      3,
+      'test decryption capability'
+    );
     
     if (result.rows.length === 0) {
       return true; // No encrypted data to test
@@ -231,19 +291,27 @@ export async function handleForcedKeyReset(): Promise<void> {
   
   try {
     // Delete all encrypted LLM configurations
-    const result = await db.execute(sql`
-      DELETE FROM llm_configurations WHERE api_key_encrypted IS NOT NULL
-    `);
+    await executeWithRetry(
+      () => db.execute(sql`
+        DELETE FROM llm_configurations WHERE api_key_encrypted IS NOT NULL
+      `),
+      3,
+      'delete encrypted configs'
+    );
     
     console.log(`🗑️  [KeyGuard] Deleted encrypted LLM configurations`);
     
     // Update fingerprint to new key
     const currentFingerprint = generateKeyFingerprint(process.env.ENCRYPTION_KEY!);
-    await db.execute(sql`
-      INSERT INTO system_settings (key, value, updated_at)
-      VALUES ('encryption_key_fingerprint', ${currentFingerprint}, NOW())
-      ON CONFLICT (key) DO UPDATE SET value = ${currentFingerprint}, updated_at = NOW()
-    `);
+    await executeWithRetry(
+      () => db.execute(sql`
+        INSERT INTO system_settings (key, value, updated_at)
+        VALUES ('encryption_key_fingerprint', ${currentFingerprint}, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = ${currentFingerprint}, updated_at = NOW()
+      `),
+      3,
+      'update fingerprint after reset'
+    );
     
     console.log('✅ [KeyGuard] Encryption key fingerprint updated to new key');
     console.log('');

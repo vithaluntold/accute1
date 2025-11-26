@@ -334,6 +334,28 @@ app.use((req, res, next) => {
     console.log(`   ENCRYPTION_KEY: ${process.env.ENCRYPTION_KEY ? 'SET (length: ' + process.env.ENCRYPTION_KEY.length + ')' : 'NOT SET'}`);
     console.log(`   AZURE_OPENAI_API_KEY: ${process.env.AZURE_OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
     
+    // Warmup database connection before system initialization
+    console.log('🔧 Warming up database connection...');
+    const { pool } = await import('./db');
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+        console.log(`✅ Database connection verified (attempt ${attempt})`);
+        break;
+      } catch (dbError: any) {
+        console.log(`   Database warmup attempt ${attempt}/5 failed: ${dbError.message}`);
+        if (attempt < 5) {
+          const waitTime = Math.min(1000 * attempt, 3000);
+          console.log(`   Retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        } else {
+          console.warn('⚠️ Database warmup failed after 5 attempts - continuing anyway');
+        }
+      }
+    }
+    
     try {
       await initializeSystem(app);
       console.log('✅ System initialized successfully');
