@@ -1,0 +1,601 @@
+2025-11-26T11:48:47.000000000Z [inf]  Starting Container
+2025-11-26T11:48:49.025299786Z [inf]  
+2025-11-26T11:48:49.025306951Z [inf]  > rest-express@1.0.0 start
+2025-11-26T11:48:49.025315270Z [inf]  > NODE_ENV=production node dist/index.js
+2025-11-26T11:48:49.025327554Z [inf]  
+2025-11-26T11:48:51.331482639Z [inf]  ✅ Drizzle ORM initialized
+2025-11-26T11:48:51.331689465Z [err]        error: [Function],
+2025-11-26T11:48:51.331697908Z [err]        message: [Function],
+2025-11-26T11:48:51.331708275Z [err]        close: [Function],
+2025-11-26T11:48:51.331742269Z [err]  [KeyGuard] Error during validation: ErrorEvent {
+2025-11-26T11:48:51.331746677Z [err]      _eventsCount: 4,
+2025-11-26T11:48:51.331757336Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:48:51.331763171Z [err]      _maxListeners: undefined,
+2025-11-26T11:48:51.331768070Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:48:51.331776311Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:48:51.331783136Z [err]      },
+2025-11-26T11:48:51.331803217Z [err]        open: [Function]
+2025-11-26T11:48:51.331887113Z [inf]  🔐 Encryption service initialized successfully
+2025-11-26T11:48:51.331890936Z [inf]  [PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)
+2025-11-26T11:48:51.331895048Z [inf]  ✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)
+2025-11-26T11:48:51.331899738Z [inf]  🚀 Starting server in production mode...
+2025-11-26T11:48:51.331905639Z [inf]     Port: 5000
+2025-11-26T11:48:51.331910482Z [inf]     Host: 0.0.0.0
+2025-11-26T11:48:51.331916362Z [inf]  ✅ SSE Agent routes registered
+2025-11-26T11:48:51.331920890Z [inf]  ✅ SSE Roundtable routes registered
+2025-11-26T11:48:51.331924924Z [inf]  ✅ Server listening on 0.0.0.0:5000
+2025-11-26T11:48:51.331929737Z [inf]     Environment: production
+2025-11-26T11:48:51.331933889Z [inf]  🌐 Access your app at: https://localhost:5000
+2025-11-26T11:48:51.331939934Z [inf]  11:48:51 AM [express] serving on port 5000
+2025-11-26T11:48:51.331945402Z [inf]  🔧 Initializing WebSocket servers...
+2025-11-26T11:48:51.331949438Z [inf]  🔧 Setting up lazy WebSocket loader...
+2025-11-26T11:48:51.331954407Z [inf]  ✅ Lazy WebSocket loader ready
+2025-11-26T11:48:51.331956375Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:48:51.331961689Z [inf]  🔧 Starting system initialization...
+2025-11-26T11:48:51.331965838Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:48:51.331968716Z [inf]     NODE_ENV: production
+2025-11-26T11:48:51.331969292Z [err]      _closeCode: 1006,
+2025-11-26T11:48:51.331974742Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:48:51.331975813Z [inf]     DATABASE_URL: SET (length: 94)
+2025-11-26T11:48:51.331977706Z [err]      _closeFrameReceived: false,
+2025-11-26T11:48:51.331982296Z [err]        ext_key_usage: [Array],
+2025-11-26T11:48:51.331984382Z [err]      _closeFrameSent: false,
+2025-11-26T11:48:51.331986459Z [inf]     ENCRYPTION_KEY: SET (length: 44)
+2025-11-26T11:48:51.331990754Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:48:51.331991284Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:48:51.331992674Z [inf]     AZURE_OPENAI_API_KEY: NOT SET
+2025-11-26T11:48:51.331997044Z [err]      _closeTimer: null,
+2025-11-26T11:48:51.331999194Z [inf]  🔧 Initializing system...
+2025-11-26T11:48:51.332000333Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:48:51.332004486Z [inf]  🔐 Validating encryption key consistency...
+2025-11-26T11:48:51.332004763Z [err]      _errorEmitted: true,
+2025-11-26T11:48:51.332008883Z [err]        issuerCertificate: [Object]
+2025-11-26T11:48:51.332012947Z [err]      _extensions: {},
+2025-11-26T11:48:51.332014611Z [inf]  🔌 Initializing Neon serverless pool (production mode)...
+2025-11-26T11:48:51.332017215Z [err]      }
+2025-11-26T11:48:51.332020125Z [err]      _paused: false,
+2025-11-26T11:48:51.332020436Z [inf]  ✅ Database pool initialized
+2025-11-26T11:48:51.332025387Z [err]    },
+2025-11-26T11:48:51.332026297Z [err]      _protocol: '',
+2025-11-26T11:48:51.332028113Z [inf]  🔧 Initializing Drizzle ORM...
+2025-11-26T11:48:51.332032078Z [err]      _readyState: 3,
+2025-11-26T11:48:51.332034111Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:48:51.332037552Z [err]      _receiver: null,
+2025-11-26T11:48:51.332042750Z [err]      _sender: null,
+2025-11-26T11:48:51.332042805Z [err]  }
+2025-11-26T11:48:51.332047128Z [err]      _socket: null,
+2025-11-26T11:48:51.332052622Z [err]      _bufferedAmount: 0,
+2025-11-26T11:48:51.332053264Z [inf]  🔐 First run: Encryption key fingerprint registered
+2025-11-26T11:48:51.332057517Z [err]      _isServer: false,
+2025-11-26T11:48:51.332061581Z [err]      _redirects: 0,
+2025-11-26T11:48:51.332066034Z [err]      _autoPong: true,
+2025-11-26T11:48:51.332070395Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:48:51.332074579Z [err]      _req: null,
+2025-11-26T11:48:51.332080013Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:48:51.332084754Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:48:51.332091642Z [err]    },
+2025-11-26T11:48:51.332096181Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:48:51.332148927Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:48:51.332158070Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:48:51.332162609Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:48:51.332166676Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:48:51.332170686Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:48:51.332174621Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:48:51.332178607Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:48:51.332224434Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:48:51.332230070Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:48:51.332235500Z [err]      cert: {
+2025-11-26T11:48:51.332241721Z [err]        subject: [Object: null prototype],
+2025-11-26T11:48:51.332248904Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:48:51.332253823Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:48:51.332259027Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:48:51.332264639Z [err]        ca: false,
+2025-11-26T11:48:51.332270178Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:48:51.332276338Z [err]        bits: 4096,
+2025-11-26T11:48:51.332282317Z [err]        exponent: '0x10001',
+2025-11-26T11:48:51.332289313Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:48:51.332295338Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:48:51.332308592Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:48:51.469772680Z [err]  ❌ System initialization failed: ErrorEvent {
+2025-11-26T11:48:51.469858684Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:48:51.469866400Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:48:51.469871156Z [err]        error: [Function],
+2025-11-26T11:48:51.469875329Z [err]        message: [Function],
+2025-11-26T11:48:51.469879858Z [err]        close: [Function],
+2025-11-26T11:48:51.469884902Z [err]        open: [Function]
+2025-11-26T11:48:51.469889148Z [err]      },
+2025-11-26T11:48:51.469893487Z [err]      _eventsCount: 4,
+2025-11-26T11:48:51.469897923Z [err]      _maxListeners: undefined,
+2025-11-26T11:48:51.469903354Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:48:51.469907471Z [err]      _closeCode: 1006,
+2025-11-26T11:48:51.469911899Z [err]      _closeFrameReceived: false,
+2025-11-26T11:48:51.469915862Z [err]      _closeFrameSent: false,
+2025-11-26T11:48:51.469920100Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:48:51.469924058Z [err]      _closeTimer: null,
+2025-11-26T11:48:51.469931542Z [err]      _errorEmitted: true,
+2025-11-26T11:48:51.469935563Z [err]      _extensions: {},
+2025-11-26T11:48:51.469941849Z [err]      _paused: false,
+2025-11-26T11:48:51.469947426Z [err]      _protocol: '',
+2025-11-26T11:48:51.469951490Z [err]      _readyState: 3,
+2025-11-26T11:48:51.469955572Z [err]      _receiver: null,
+2025-11-26T11:48:51.469959836Z [err]      _sender: null,
+2025-11-26T11:48:51.469963608Z [err]      _socket: null,
+2025-11-26T11:48:51.469968191Z [err]      _bufferedAmount: 0,
+2025-11-26T11:48:51.469972031Z [err]      _isServer: false,
+2025-11-26T11:48:51.469977139Z [err]      _redirects: 0,
+2025-11-26T11:48:51.469981460Z [err]      _autoPong: true,
+2025-11-26T11:48:51.469986366Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:48:51.469990424Z [err]      _req: null,
+2025-11-26T11:48:51.474633845Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:48:51.474645627Z [err]    },
+2025-11-26T11:48:51.474652515Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:48:51.474655452Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:48:51.474659390Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:48:51.474664964Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:48:51.474665937Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:48:51.474671637Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:48:51.474673831Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:48:51.474680759Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:48:51.474683264Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:48:51.474686571Z [err]        ca: false,
+2025-11-26T11:48:51.474703973Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:48:51.474705071Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:48:51.474715622Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:48:51.474715852Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:48:51.474716890Z [err]      cert: {
+2025-11-26T11:48:51.474719715Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:48:51.474726937Z [err]        subject: [Object: null prototype],
+2025-11-26T11:48:51.474738103Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:48:51.477220359Z [err]        bits: 4096,
+2025-11-26T11:48:51.477230727Z [err]        exponent: '0x10001',
+2025-11-26T11:48:51.477238808Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:48:51.477245418Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:48:51.477252025Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:48:51.477254007Z [err]        ext_key_usage: [Array],
+2025-11-26T11:48:51.477258202Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:48:51.477261570Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:48:51.477268466Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:48:51.477269502Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:48:51.477276692Z [err]        issuerCertificate: [Object]
+2025-11-26T11:48:51.477277621Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:48:51.477284083Z [err]      }
+2025-11-26T11:48:51.477291459Z [err]    },
+2025-11-26T11:48:51.477297358Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:48:51.477302000Z [err]  }
+2025-11-26T11:48:51.477306913Z [inf]  ✅ System initialized successfully
+2025-11-26T11:48:51.477312017Z [inf]  🔧 Registering AI agent routes (AFTER initialization)...
+2025-11-26T11:48:51.479583829Z [inf]  📋 Registering 11 agent routes...
+2025-11-26T11:48:51.479589087Z [inf]  [STATIC AGENT LOADER] Registering 11 agents...
+2025-11-26T11:48:51.479595925Z [inf]  [STATIC AGENT LOADER] Registering routes for: cadence
+2025-11-26T11:48:51.479601044Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: cadence
+2025-11-26T11:48:51.479606343Z [inf]  [STATIC AGENT LOADER] Registering routes for: echo
+2025-11-26T11:48:51.479610747Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: echo
+2025-11-26T11:48:51.479615248Z [inf]  [STATIC AGENT LOADER] Registering routes for: forma
+2025-11-26T11:48:51.479620124Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: forma
+2025-11-26T11:48:51.479625557Z [inf]  [STATIC AGENT LOADER] Registering routes for: luca
+2025-11-26T11:48:51.479630977Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: luca
+2025-11-26T11:48:51.479637258Z [inf]  [STATIC AGENT LOADER] Registering routes for: lynk
+2025-11-26T11:48:51.479641903Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: lynk
+2025-11-26T11:48:51.479646676Z [inf]  [STATIC AGENT LOADER] Registering routes for: omnispectra
+2025-11-26T11:48:51.479651678Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: omnispectra
+2025-11-26T11:48:51.479656436Z [inf]  [STATIC AGENT LOADER] Registering routes for: parity
+2025-11-26T11:48:51.479662443Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: parity
+2025-11-26T11:48:51.479667822Z [inf]  [STATIC AGENT LOADER] Registering routes for: radar
+2025-11-26T11:48:51.479674032Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: radar
+2025-11-26T11:48:51.479678533Z [inf]  [STATIC AGENT LOADER] Registering routes for: relay
+2025-11-26T11:48:51.479683144Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: relay
+2025-11-26T11:48:51.479687708Z [inf]  [STATIC AGENT LOADER] Registering routes for: trace
+2025-11-26T11:48:51.482433179Z [inf]  [Trace Agent] Routes registered
+2025-11-26T11:48:51.482439822Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: trace
+2025-11-26T11:48:51.482444866Z [inf]  [STATIC AGENT LOADER] Registering routes for: scribe
+2025-11-26T11:48:51.482449063Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: scribe
+2025-11-26T11:48:51.482454275Z [inf]  [STATIC AGENT LOADER] ✅ All 11 agents registered successfully
+2025-11-26T11:48:51.482459101Z [inf]  📋 Registering session routes for 11 agents...
+2025-11-26T11:48:51.482466471Z [inf]  ✅ Agent routes registered successfully
+2025-11-26T11:48:51.482471221Z [inf]  🎉 System initialization complete!
+2025-11-26T11:48:51.482478108Z [inf]  🔧 Loading automation triggers from database...
+2025-11-26T11:48:51.482483733Z [inf]  [EventTriggers] Loading triggers from database...
+2025-11-26T11:48:51.584995371Z [err]      _errorEmitted: true,
+2025-11-26T11:48:51.585004539Z [err]      _extensions: {},
+2025-11-26T11:48:51.585010435Z [err]      _paused: false,
+2025-11-26T11:48:51.585015835Z [err]      _protocol: '',
+2025-11-26T11:48:51.585021449Z [err]      _readyState: 3,
+2025-11-26T11:48:51.585027225Z [err]      _receiver: null,
+2025-11-26T11:48:51.585032731Z [err]      _sender: null,
+2025-11-26T11:48:51.585038354Z [err]      _socket: null,
+2025-11-26T11:48:51.585043894Z [err]      _bufferedAmount: 0,
+2025-11-26T11:48:51.585054443Z [err]      _isServer: false,
+2025-11-26T11:48:51.585060130Z [err]      _redirects: 0,
+2025-11-26T11:48:51.585064952Z [err]      _autoPong: true,
+2025-11-26T11:48:51.585069766Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:48:51.585075155Z [err]  [EventTriggers] Failed to load triggers from database: ErrorEvent {
+2025-11-26T11:48:51.585076633Z [err]      _req: null,
+2025-11-26T11:48:51.585080787Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:48:51.585085614Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:48:51.585090113Z [err]        error: [Function],
+2025-11-26T11:48:51.585094692Z [err]        message: [Function],
+2025-11-26T11:48:51.585099113Z [err]        close: [Function],
+2025-11-26T11:48:51.585103285Z [err]        open: [Function]
+2025-11-26T11:48:51.585107208Z [err]      },
+2025-11-26T11:48:51.585111539Z [err]      _eventsCount: 4,
+2025-11-26T11:48:51.585116130Z [err]      _maxListeners: undefined,
+2025-11-26T11:48:51.585120369Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:48:51.585126169Z [err]      _closeCode: 1006,
+2025-11-26T11:48:51.585130293Z [err]      _closeFrameReceived: false,
+2025-11-26T11:48:51.585135389Z [err]      _closeFrameSent: false,
+2025-11-26T11:48:51.585139385Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:48:51.585143598Z [err]      _closeTimer: null,
+2025-11-26T11:48:51.586989849Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:48:51.587004350Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:48:51.587009458Z [err]    },
+2025-11-26T11:48:51.587014027Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:48:51.587018937Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:48:51.587023887Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:48:51.587028061Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:48:51.587032587Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:48:51.587038616Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:48:51.587051260Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:48:51.587056190Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:48:51.587073307Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:48:51.587091859Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:48:51.587098052Z [err]      cert: {
+2025-11-26T11:48:51.587104288Z [err]        subject: [Object: null prototype],
+2025-11-26T11:48:51.587121771Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:48:51.587138996Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:48:51.587143881Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:48:51.587148811Z [err]        ca: false,
+2025-11-26T11:48:51.587153536Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:48:51.588519759Z [err]        bits: 4096,
+2025-11-26T11:48:51.588526176Z [err]        exponent: '0x10001',
+2025-11-26T11:48:51.588531246Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:48:51.588536242Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:48:51.588546524Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:48:51.588552514Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:48:51.588558246Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:48:51.588563523Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:48:51.588568991Z [err]        ext_key_usage: [Array],
+2025-11-26T11:48:51.588575113Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:48:51.588580549Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:48:51.588585347Z [err]        issuerCertificate: [Object]
+2025-11-26T11:48:51.588590221Z [err]      }
+2025-11-26T11:48:51.588595384Z [err]    },
+2025-11-26T11:48:51.588600394Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:48:51.588606001Z [err]  }
+2025-11-26T11:48:51.588610700Z [inf]  🔧 Starting automation scheduler...
+2025-11-26T11:48:51.588616066Z [inf]  Starting automation scheduler...
+2025-11-26T11:48:51.593082776Z [err]      _closeCode: 1006,
+2025-11-26T11:48:51.593083107Z [inf]  ✅ Automation scheduler started successfully
+2025-11-26T11:48:51.593091514Z [inf]  ✅ Static file serving initialized (production mode) - routes ready
+2025-11-26T11:48:51.593099109Z [err]      _closeFrameReceived: false,
+2025-11-26T11:48:51.593103705Z [inf]     Serving from: /app/dist/public
+2025-11-26T11:48:51.593109595Z [inf]  ✅ Upload serving initialized
+2025-11-26T11:48:51.593116148Z [inf]     Serving from: /app/uploads
+2025-11-26T11:48:51.593123984Z [err]      _closeFrameSent: false,
+2025-11-26T11:48:51.593127291Z [err]  ❌ Failed to load automation triggers: ErrorEvent {
+2025-11-26T11:48:51.593135920Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:48:51.593139661Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:48:51.593144750Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:48:51.593152392Z [err]      _closeTimer: null,
+2025-11-26T11:48:51.593155315Z [err]        error: [Function],
+2025-11-26T11:48:51.593161497Z [err]        message: [Function],
+2025-11-26T11:48:51.593167622Z [err]        close: [Function],
+2025-11-26T11:48:51.593178927Z [err]        open: [Function]
+2025-11-26T11:48:51.593179189Z [err]      _errorEmitted: true,
+2025-11-26T11:48:51.593188496Z [err]      },
+2025-11-26T11:48:51.593194714Z [err]      _eventsCount: 4,
+2025-11-26T11:48:51.593202935Z [err]      _extensions: {},
+2025-11-26T11:48:51.593204821Z [err]      _maxListeners: undefined,
+2025-11-26T11:48:51.593211752Z [err]      _paused: false,
+2025-11-26T11:48:51.593218137Z [err]      _protocol: '',
+2025-11-26T11:48:51.593221308Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:48:51.593240093Z [err]      _readyState: 3,
+2025-11-26T11:48:51.593244730Z [err]      _receiver: null,
+2025-11-26T11:48:51.593249430Z [err]      _sender: null,
+2025-11-26T11:48:51.593273036Z [err]      _socket: null,
+2025-11-26T11:48:51.595483898Z [err]      _bufferedAmount: 0,
+2025-11-26T11:48:51.595489153Z [err]      _isServer: false,
+2025-11-26T11:48:51.595493107Z [err]      _redirects: 0,
+2025-11-26T11:48:51.595497407Z [err]      _autoPong: true,
+2025-11-26T11:48:51.595502637Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:48:51.595506676Z [err]      _req: null,
+2025-11-26T11:48:51.595510898Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:48:51.595515211Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:48:51.595519014Z [err]    },
+2025-11-26T11:48:51.595530691Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:48:51.595536714Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:48:51.595542040Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:48:51.595547575Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:48:51.595552836Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:48:51.595557918Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:48:51.595563248Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:48:51.595568254Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:48:51.595573341Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:48:51.595578843Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:48:51.595584002Z [err]      cert: {
+2025-11-26T11:48:51.595588789Z [err]        subject: [Object: null prototype],
+2025-11-26T11:48:51.595593884Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:48:51.595599860Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:48:51.595605072Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:48:51.597732190Z [err]        ca: false,
+2025-11-26T11:48:51.597739561Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:48:51.597744823Z [err]        bits: 4096,
+2025-11-26T11:48:51.597876603Z [err]        exponent: '0x10001',
+2025-11-26T11:48:51.597880844Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:48:51.597885086Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:48:51.597892179Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:48:51.597895863Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:48:51.597899746Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:48:51.597903771Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:48:51.599556074Z [err]        ext_key_usage: [Array],
+2025-11-26T11:48:51.599566856Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:48:51.599572258Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:48:51.599577092Z [err]        issuerCertificate: [Object]
+2025-11-26T11:48:51.599582698Z [err]      }
+2025-11-26T11:48:51.599589182Z [err]    },
+2025-11-26T11:48:51.599596676Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:48:51.599602221Z [err]  }
+2025-11-26T11:48:51.599607170Z [err]  ⚠️  Continuing without automation triggers - they can be created via API
+2025-11-26T11:49:51.635356824Z [err]  Scheduler error: ErrorEvent {
+2025-11-26T11:49:51.635357136Z [err]      _receiver: null,
+2025-11-26T11:49:51.635368460Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:49:51.635371252Z [err]      _sender: null,
+2025-11-26T11:49:51.635376597Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:49:51.635379949Z [err]      _socket: null,
+2025-11-26T11:49:51.635384598Z [err]        error: [Function],
+2025-11-26T11:49:51.635386889Z [err]      _bufferedAmount: 0,
+2025-11-26T11:49:51.635392430Z [err]        message: [Function],
+2025-11-26T11:49:51.635393904Z [err]      _isServer: false,
+2025-11-26T11:49:51.635400402Z [err]        close: [Function],
+2025-11-26T11:49:51.635401263Z [err]      _redirects: 0,
+2025-11-26T11:49:51.635409174Z [err]        open: [Function]
+2025-11-26T11:49:51.635409612Z [err]      _autoPong: true,
+2025-11-26T11:49:51.635415844Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:49:51.635416563Z [err]      },
+2025-11-26T11:49:51.635422573Z [err]      _eventsCount: 4,
+2025-11-26T11:49:51.635423559Z [err]      _req: null,
+2025-11-26T11:49:51.635428170Z [err]      _maxListeners: undefined,
+2025-11-26T11:49:51.635432333Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:49:51.635437190Z [err]      _closeCode: 1006,
+2025-11-26T11:49:51.635440861Z [err]      _closeFrameReceived: false,
+2025-11-26T11:49:51.635444874Z [err]      _closeFrameSent: false,
+2025-11-26T11:49:51.635448834Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:49:51.635452586Z [err]      _closeTimer: null,
+2025-11-26T11:49:51.635456247Z [err]      _errorEmitted: true,
+2025-11-26T11:49:51.635460233Z [err]      _extensions: {},
+2025-11-26T11:49:51.635464034Z [err]      _paused: false,
+2025-11-26T11:49:51.635469485Z [err]      _protocol: '',
+2025-11-26T11:49:51.635473569Z [err]      _readyState: 3,
+2025-11-26T11:49:51.636684043Z [err]      cert: {
+2025-11-26T11:49:51.636693325Z [err]        subject: [Object: null prototype],
+2025-11-26T11:49:51.636702947Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:49:51.636703979Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:49:51.636714484Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:49:51.636717651Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:49:51.636723983Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:49:51.636729436Z [err]    },
+2025-11-26T11:49:51.636733575Z [err]        ca: false,
+2025-11-26T11:49:51.636737758Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:49:51.636746004Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:49:51.636748388Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:49:51.636756449Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:49:51.636762000Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:49:51.636767895Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:49:51.636773452Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:49:51.636778800Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:49:51.636785328Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:49:51.636790968Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:49:51.636796695Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:49:51.638155738Z [err]        bits: 4096,
+2025-11-26T11:49:51.638161646Z [err]        exponent: '0x10001',
+2025-11-26T11:49:51.638167176Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:49:51.638172649Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:49:51.638178623Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:49:51.638189504Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:49:51.638195016Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:49:51.638201661Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:49:51.638207106Z [err]        ext_key_usage: [Array],
+2025-11-26T11:49:51.638211975Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:49:51.638217151Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:49:51.638221511Z [err]        issuerCertificate: [Object]
+2025-11-26T11:49:51.638226369Z [err]      }
+2025-11-26T11:49:51.638231989Z [err]    },
+2025-11-26T11:49:51.638237083Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:49:51.638242441Z [err]  }
+2025-11-26T11:50:51.653447820Z [err]      _req: null,
+2025-11-26T11:50:51.653449081Z [err]  Scheduler error: ErrorEvent {
+2025-11-26T11:50:51.653455500Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:50:51.653462836Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:50:51.653471174Z [err]        error: [Function],
+2025-11-26T11:50:51.653471913Z [err]      _closeFrameReceived: false,
+2025-11-26T11:50:51.653477272Z [err]        message: [Function],
+2025-11-26T11:50:51.653482399Z [err]        close: [Function],
+2025-11-26T11:50:51.653487911Z [err]        open: [Function]
+2025-11-26T11:50:51.653496649Z [err]      },
+2025-11-26T11:50:51.653499608Z [err]      _closeFrameSent: false,
+2025-11-26T11:50:51.653504133Z [err]      _eventsCount: 4,
+2025-11-26T11:50:51.653508895Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:50:51.653515554Z [err]      _maxListeners: undefined,
+2025-11-26T11:50:51.653523103Z [err]      _closeTimer: null,
+2025-11-26T11:50:51.653531030Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:50:51.653532206Z [err]      _errorEmitted: true,
+2025-11-26T11:50:51.653539408Z [err]      _closeCode: 1006,
+2025-11-26T11:50:51.653543439Z [err]      _extensions: {},
+2025-11-26T11:50:51.653548370Z [err]      _paused: false,
+2025-11-26T11:50:51.653554082Z [err]      _protocol: '',
+2025-11-26T11:50:51.653559564Z [err]      _readyState: 3,
+2025-11-26T11:50:51.653565939Z [err]      _receiver: null,
+2025-11-26T11:50:51.653573450Z [err]      _sender: null,
+2025-11-26T11:50:51.653579343Z [err]      _socket: null,
+2025-11-26T11:50:51.653586476Z [err]      _bufferedAmount: 0,
+2025-11-26T11:50:51.653596637Z [err]      _isServer: false,
+2025-11-26T11:50:51.653605127Z [err]      _redirects: 0,
+2025-11-26T11:50:51.653613070Z [err]      _autoPong: true,
+2025-11-26T11:50:51.653621440Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:50:51.654916620Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:50:51.654923604Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:50:51.654926821Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:50:51.654932203Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:50:51.654935845Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:50:51.654940590Z [err]    },
+2025-11-26T11:50:51.654945072Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:50:51.654950090Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:50:51.654954167Z [err]      cert: {
+2025-11-26T11:50:51.654959313Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:50:51.654963147Z [err]        subject: [Object: null prototype],
+2025-11-26T11:50:51.654967351Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:50:51.654971615Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:50:51.654975660Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:50:51.654979454Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:50:51.654988266Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:50:51.654988743Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:50:51.654997566Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:50:51.654999215Z [err]        ca: false,
+2025-11-26T11:50:51.655004939Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:50:51.656615227Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:50:51.656625597Z [err]        bits: 4096,
+2025-11-26T11:50:51.656626112Z [err]  }
+2025-11-26T11:50:51.656635910Z [err]        exponent: '0x10001',
+2025-11-26T11:50:51.656641469Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:50:51.656645940Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:50:51.656652514Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:50:51.656657534Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:50:51.656662647Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:50:51.656668813Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:50:51.656673527Z [err]        ext_key_usage: [Array],
+2025-11-26T11:50:51.656678466Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:50:51.656683382Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:50:51.656687963Z [err]        issuerCertificate: [Object]
+2025-11-26T11:50:51.656692758Z [err]      }
+2025-11-26T11:50:51.656697650Z [err]    },
+2025-11-26T11:51:51.807997181Z [err]        open: [Function]
+2025-11-26T11:51:51.808005721Z [err]      },
+2025-11-26T11:51:51.808013072Z [err]      _eventsCount: 4,
+2025-11-26T11:51:51.808019913Z [err]      _maxListeners: undefined,
+2025-11-26T11:51:51.808027924Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:51:51.808037402Z [err]  Scheduler error: ErrorEvent {
+2025-11-26T11:51:51.808037798Z [err]      _closeFrameReceived: false,
+2025-11-26T11:51:51.808042738Z [err]      _closeCode: 1006,
+2025-11-26T11:51:51.808043334Z [err]      _closeFrameSent: false,
+2025-11-26T11:51:51.808046683Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:51:51.808051999Z [err]      _protocol: '',
+2025-11-26T11:51:51.808054739Z [err]      _closeTimer: null,
+2025-11-26T11:51:51.808055145Z [err]      _autoPong: true,
+2025-11-26T11:51:51.808057548Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:51:51.808058464Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:51:51.808065531Z [err]      _readyState: 3,
+2025-11-26T11:51:51.808067942Z [err]      _sender: null,
+2025-11-26T11:51:51.808069935Z [err]        error: [Function],
+2025-11-26T11:51:51.808071812Z [err]      _errorEmitted: true,
+2025-11-26T11:51:51.808072615Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:51:51.808078205Z [err]      _receiver: null,
+2025-11-26T11:51:51.808083014Z [err]        message: [Function],
+2025-11-26T11:51:51.808085759Z [err]      _req: null,
+2025-11-26T11:51:51.808086478Z [err]      _extensions: {},
+2025-11-26T11:51:51.808090538Z [err]      _socket: null,
+2025-11-26T11:51:51.808093843Z [err]        close: [Function],
+2025-11-26T11:51:51.808100433Z [err]      _paused: false,
+2025-11-26T11:51:51.808103096Z [err]      _bufferedAmount: 0,
+2025-11-26T11:51:51.808113269Z [err]      _isServer: false,
+2025-11-26T11:51:51.808119541Z [err]      _redirects: 0,
+2025-11-26T11:51:51.812215743Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:51:51.812220736Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:51:51.812225642Z [err]    },
+2025-11-26T11:51:51.812229916Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:51:51.812234297Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:51:51.812238968Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:51:51.812244098Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:51:51.812248478Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:51:51.812252774Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:51:51.812257928Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:51:51.812262281Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:51:51.812266936Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:51:51.812276035Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:51:51.812280577Z [err]      cert: {
+2025-11-26T11:51:51.812285558Z [err]        subject: [Object: null prototype],
+2025-11-26T11:51:51.812289929Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:51:51.812294296Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:51:51.812298124Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:51:51.812302573Z [err]        ca: false,
+2025-11-26T11:51:51.812307447Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:51:51.812312684Z [err]        bits: 4096,
+2025-11-26T11:51:51.812317012Z [err]        exponent: '0x10001',
+2025-11-26T11:51:51.812321247Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:51:51.812325483Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:51:51.812329660Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:51:51.812334563Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:51:51.812339930Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:51:51.812346913Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:51:51.812351649Z [err]        ext_key_usage: [Array],
+2025-11-26T11:51:51.812356009Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:51:51.812360957Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,
+2025-11-26T11:51:51.812366376Z [err]        issuerCertificate: [Object]
+2025-11-26T11:51:51.812371861Z [err]      }
+2025-11-26T11:51:51.812375987Z [err]    },
+2025-11-26T11:51:51.812380706Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:51:51.812385143Z [err]  }
+2025-11-26T11:52:52.037538391Z [err]  Scheduler error: ErrorEvent {
+2025-11-26T11:52:52.037545334Z [err]    [Symbol(kTarget)]: WebSocket {
+2025-11-26T11:52:52.037549473Z [err]      _events: [Object: null prototype] {
+2025-11-26T11:52:52.037554409Z [err]        error: [Function],
+2025-11-26T11:52:52.037558792Z [err]        message: [Function],
+2025-11-26T11:52:52.037562578Z [err]        close: [Function],
+2025-11-26T11:52:52.037566680Z [err]        open: [Function]
+2025-11-26T11:52:52.037572291Z [err]      },
+2025-11-26T11:52:52.037580003Z [err]      _eventsCount: 4,
+2025-11-26T11:52:52.037587403Z [err]      _extensions: {},
+2025-11-26T11:52:52.037589490Z [err]      _maxListeners: undefined,
+2025-11-26T11:52:52.037596100Z [err]      _binaryType: 'arraybuffer',
+2025-11-26T11:52:52.037600289Z [err]      _paused: false,
+2025-11-26T11:52:52.037603615Z [err]      _closeCode: 1006,
+2025-11-26T11:52:52.037609101Z [err]      _protocol: '',
+2025-11-26T11:52:52.037609964Z [err]      _closeFrameReceived: false,
+2025-11-26T11:52:52.037615917Z [err]      _closeFrameSent: false,
+2025-11-26T11:52:52.037617297Z [err]      _readyState: 3,
+2025-11-26T11:52:52.037621156Z [err]      _closeMessage: <Buffer >,
+2025-11-26T11:52:52.037624950Z [err]      _closeTimer: null,
+2025-11-26T11:52:52.037628791Z [err]      _errorEmitted: true,
+2025-11-26T11:52:52.037632996Z [err]      _receiver: null,
+2025-11-26T11:52:52.037640236Z [err]      _sender: null,
+2025-11-26T11:52:52.037645662Z [err]      _socket: null,
+2025-11-26T11:52:52.037650555Z [err]      _bufferedAmount: 0,
+2025-11-26T11:52:52.037655160Z [err]      _isServer: false,
+2025-11-26T11:52:52.037660358Z [err]      _redirects: 0,
+2025-11-26T11:52:52.037666261Z [err]      _autoPong: true,
+2025-11-26T11:52:52.037671069Z [err]      _url: 'wss://roundhouse.proxy.rlwy.net/v2',
+2025-11-26T11:52:52.037676037Z [err]      _req: null,
+2025-11-26T11:52:52.038836640Z [err]        subject: [Object: null prototype],
+2025-11-26T11:52:52.038842701Z [err]      [Symbol(shapeMode)]: false,
+2025-11-26T11:52:52.038843221Z [err]        issuer: [Object: null prototype],
+2025-11-26T11:52:52.038851862Z [err]        subjectaltname: 'DNS:*.up.railway.app',
+2025-11-26T11:52:52.038852830Z [err]      [Symbol(kCapture)]: false
+2025-11-26T11:52:52.038859510Z [err]    },
+2025-11-26T11:52:52.038860187Z [err]        infoAccess: [Object: null prototype],
+2025-11-26T11:52:52.038865616Z [err]    [Symbol(kType)]: 'error',
+2025-11-26T11:52:52.038866200Z [err]        ca: false,
+2025-11-26T11:52:52.038872684Z [err]        modulus: 'A2FF18A851B687A03CFCD4D306C7AD5C927990FD71C9095E70CAD578B49083CDDF7E63DE37B68201FEC1E396836C6848B4B4EEDD02B7607151CDBA80479C254797B3C00701DFB881FB21B2E3936FF26330B4DE5182D03C55EF66D123F8C656DBAE2245B48522593FD1F546F81B4CD762676E2655103A20FB7AB5C2029A3631B094B4A276602E7023F87E332961FAA89925C13C1FBC4322C5D7C61DAFE377708F1C92E30B05789D221172FF31A6B08A37A58BF13EC8D94D8920DA19A52ED7C9A5FFA08DCED4F9EAED78732121D90C8C5F632BBE71AD272A656EE0EDFAAEA6A8B9FAC36A9E852D920D9910CC356FD9C91DC1B5859399A2970E86C5E4E3F1AEFF555E62A448B6E1FC9E7F581DAACCA3FD4419F77A105EFE5A3C1E428E0DFA61615682CCCEF80D7486F92E32697AA251669A60EE80222DD382E10401EF78E015235A17818027ECAF94897B59BE7D51B3D2070F3E179F5A7E90778EC3B09D8619FB45785EC397DA788E0E880C7D2C201B8AB83884CA43D5823EC7E73D1DA7F8D54DB4FA53FAB01EA3C9835AFE6A2BA18F1B8B2A66770FD590BCBEE5068B114D9594372F32F320BBB2836D930E4B05E6DA6F5C326EB4E09D91A9509FA646D6DB95823D3EACE446E319A3F13946E94E10541B5F44D8153F3D37DA3D4F4FB0A25545BCDC488CF6996E45145B5760FA2FCC80EF3BB43B08B5EC247C8D6BAC031656989849',
+2025-11-26T11:52:52.038873625Z [err]    [Symbol(kError)]: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app
+2025-11-26T11:52:52.038878995Z [err]        at Object.checkServerIdentity (node:tls:316:12)
+2025-11-26T11:52:52.038884122Z [err]        at TLSSocket.onConnectSecure (node:_tls_wrap:1687:27)
+2025-11-26T11:52:52.038889389Z [err]        at TLSSocket.emit (node:events:524:28)
+2025-11-26T11:52:52.038894615Z [err]        at TLSSocket._finishInit (node:_tls_wrap:1076:8)
+2025-11-26T11:52:52.038899999Z [err]        at ssl.onhandshakedone (node:_tls_wrap:862:12) {
+2025-11-26T11:52:52.038905189Z [err]      code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+2025-11-26T11:52:52.038910212Z [err]      reason: "Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app",
+2025-11-26T11:52:52.038915350Z [err]      host: 'roundhouse.proxy.rlwy.net',
+2025-11-26T11:52:52.038920769Z [err]      cert: {
+2025-11-26T11:52:52.040362894Z [err]        issuerCertificate: [Object]
+2025-11-26T11:52:52.040366530Z [err]        bits: 4096,
+2025-11-26T11:52:52.040372311Z [err]      }
+2025-11-26T11:52:52.040376512Z [err]        exponent: '0x10001',
+2025-11-26T11:52:52.040380063Z [err]    },
+2025-11-26T11:52:52.040385227Z [err]        pubkey: <Buffer 30 82 02 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 02 0f 00 30 82 02 0a 02 82 02 01 00 a2 ff 18 a8 51 b6 87 a0 3c fc d4 d3 06 c7 ad 5c 92 ... 500 more bytes>,
+2025-11-26T11:52:52.040388073Z [err]    [Symbol(kMessage)]: "Hostname/IP does not match certificate's altnames: Host: roundhouse.proxy.rlwy.net. is not in the cert's altnames: DNS:*.up.railway.app"
+2025-11-26T11:52:52.040392200Z [err]        valid_from: 'Oct  6 16:07:50 2025 GMT',
+2025-11-26T11:52:52.040397596Z [err]  }
+2025-11-26T11:52:52.040399992Z [err]        valid_to: 'Jan  4 16:07:49 2026 GMT',
+2025-11-26T11:52:52.040404461Z [err]        fingerprint: '13:D9:3A:04:CB:01:E7:D5:0F:88:1B:AA:37:95:69:DB:83:9F:AA:EE',
+2025-11-26T11:52:52.040408696Z [err]        fingerprint256: '4E:E4:AD:B2:CF:F9:E4:7C:44:B4:A7:2F:C2:C1:34:58:4C:22:5C:A0:4F:FA:C2:8E:DE:02:77:63:67:F6:1C:F1',
+2025-11-26T11:52:52.040413318Z [err]        fingerprint512: 'B9:21:13:F5:1A:F3:34:72:D3:A4:76:46:EB:2E:6D:3A:D1:1C:E5:BC:6A:06:B0:C4:AE:BE:53:BE:07:0D:FD:50:D0:36:86:9A:DE:45:4A:12:08:D3:FD:CC:8D:9B:EE:92:B8:A6:F6:30:C8:FB:2D:33:7A:67:73:23:39:73:7F:DA',
+2025-11-26T11:52:52.040417592Z [err]        ext_key_usage: [Array],
+2025-11-26T11:52:52.040421909Z [err]        serialNumber: '061C067BB5EE06F3113CE6690BE9B50F603D',
+2025-11-26T11:52:52.040426162Z [err]        raw: <Buffer 30 82 05 fc 30 82 04 e4 a0 03 02 01 02 02 12 06 1c 06 7b b5 ee 06 f3 11 3c e6 69 0b e9 b5 0f 60 3d 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 33 ... 1486 more bytes>,

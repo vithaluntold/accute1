@@ -1,12 +1,6 @@
-import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
-import { Pool as PgPool } from 'pg';
-import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
-import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
-import ws from 'ws';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
-
-// Configure Neon for WebSocket connections (works better with Railway proxy)
-neonConfig.webSocketConstructor = ws;
 
 // DEPLOYMENT FIX: Don't throw at module load time - allow server to start even without DATABASE_URL
 function getDatabaseUrl(): string {
@@ -21,23 +15,25 @@ function getDatabaseUrl(): string {
 // Detect if we're in production (Railway, etc.) or development (Replit)
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Use Neon serverless driver for production (handles Railway proxy better)
-// Use standard pg for development (faster for local/Replit connections)
-let _pool: NeonPool | PgPool | null = null;
-let _db: ReturnType<typeof drizzleNeon> | ReturnType<typeof drizzlePg> | null = null;
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzle> | null = null;
 
 function createPool() {
   const dbUrl = getDatabaseUrl();
   
   if (isProduction) {
-    // Production: Use Neon serverless driver with WebSocket
-    // This handles Railway's proxy TLS termination much better
-    console.log('🔌 Initializing Neon serverless pool (production mode)...');
-    const pool = new NeonPool({ 
+    // Production (Railway): Use pg driver with SSL but skip certificate verification
+    // Railway's proxy uses a certificate that doesn't match the hostname
+    console.log('🔌 Initializing pg pool (production mode - SSL no verify)...');
+    const pool = new Pool({ 
       connectionString: dbUrl,
-      max: 3, // Minimal connections for serverless
-      idleTimeoutMillis: 5000,
+      max: 3, // Keep pool small for Railway
+      idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 30000,
+      // Critical: Skip SSL certificate verification for Railway proxy
+      ssl: {
+        rejectUnauthorized: false
+      }
     });
     
     pool.on('error', (err) => {
@@ -46,9 +42,9 @@ function createPool() {
     
     return pool;
   } else {
-    // Development: Use standard pg driver
+    // Development: Use standard pg driver without SSL
     console.log('🔌 Initializing pg pool (development mode)...');
-    const pool = new PgPool({ 
+    const pool = new Pool({ 
       connectionString: dbUrl,
       max: 10,
       idleTimeoutMillis: 30000,
@@ -63,16 +59,12 @@ function createPool() {
   }
 }
 
-function createDrizzle(pool: NeonPool | PgPool) {
-  if (isProduction) {
-    return drizzleNeon({ client: pool as NeonPool, schema });
-  } else {
-    return drizzlePg({ client: pool as PgPool, schema });
-  }
+function createDrizzle(pool: Pool) {
+  return drizzle({ client: pool, schema });
 }
 
 // Lazy initialization with Proxy pattern
-export const pool = new Proxy({} as NeonPool | PgPool, {
+export const pool = new Proxy({} as Pool, {
   get(target, prop) {
     if (!_pool) {
       _pool = createPool();
@@ -82,7 +74,7 @@ export const pool = new Proxy({} as NeonPool | PgPool, {
   }
 });
 
-export const db = new Proxy({} as ReturnType<typeof drizzleNeon>, {
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(target, prop) {
     if (!_db) {
       if (!_pool) {
