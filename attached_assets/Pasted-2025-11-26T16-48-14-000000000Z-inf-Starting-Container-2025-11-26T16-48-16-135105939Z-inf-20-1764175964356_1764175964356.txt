@@ -1,0 +1,124 @@
+2025-11-26T16:48:14.000000000Z [inf]  Starting Container
+2025-11-26T16:48:16.135105939Z [inf]  
+2025-11-26T16:48:16.135111128Z [inf]  > rest-express@1.0.0 start
+2025-11-26T16:48:16.135295362Z [inf]  > NODE_ENV=production node dist/start.js
+2025-11-26T16:48:16.135306998Z [inf]  
+2025-11-26T16:48:18.189046393Z [inf]  🚀 [START] Server entry point loaded
+2025-11-26T16:48:18.189058354Z [inf]  🔧 [START] NODE_ENV: production
+2025-11-26T16:48:18.189064151Z [inf]  🔧 [START] PORT: 5000
+2025-11-26T16:48:18.189073171Z [inf]  🔧 [START] DATABASE_URL exists: true
+2025-11-26T16:48:18.189079428Z [inf]  🔧 [START] JWT_SECRET exists: true
+2025-11-26T16:48:18.189085978Z [inf]  🔧 [START] SESSION_SECRET exists: true
+2025-11-26T16:48:18.189091862Z [inf]  🔧 [START] ENCRYPTION_KEY exists: true
+2025-11-26T16:48:18.189098101Z [inf]  🔧 [START] Loading server module...
+2025-11-26T16:48:18.189103592Z [inf]  ✅ [START] Server module loaded successfully
+2025-11-26T16:48:18.189109410Z [inf]  🚀 Starting server in production mode...
+2025-11-26T16:48:18.189115220Z [inf]     Port: 5000, Host: 0.0.0.0
+2025-11-26T16:48:18.189120966Z [inf]  ✅ Server listening on 0.0.0.0:5000
+2025-11-26T16:48:18.189126598Z [inf]     Health endpoint ready at /api/health
+2025-11-26T16:48:18.189132926Z [inf]  🔧 [Background] Registering routes...
+2025-11-26T16:48:18.189273305Z [inf]  🔐 Encryption service initialized successfully
+2025-11-26T16:48:18.189281577Z [inf]  [PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)
+2025-11-26T16:48:18.189286217Z [inf]  ✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)
+2025-11-26T16:48:18.202081259Z [inf]  ✅ [START] Server started successfully
+2025-11-26T16:48:18.211408969Z [inf]  ✅ SSE Agent routes registered
+2025-11-26T16:48:18.211416041Z [inf]  ✅ SSE Roundtable routes registered
+2025-11-26T16:48:18.211420183Z [inf]  ✅ [Background] Routes registered
+2025-11-26T16:48:18.211424987Z [inf]  🔧 Setting up lazy WebSocket loader...
+2025-11-26T16:48:18.211430469Z [inf]  ✅ Lazy WebSocket loader ready
+2025-11-26T16:48:18.211435212Z [inf]  ✅ [Background] WebSocket ready
+2025-11-26T16:48:18.211439868Z [inf]  🔧 [Background] Connecting to database...
+2025-11-26T16:48:18.211443766Z [inf]  🔌 Initializing pg pool (production mode - Railway optimized)...
+2025-11-26T16:48:18.211447668Z [inf]  ✅ Database pool initialized
+2025-11-26T16:48:19.458044728Z [inf]  🔗 New database connection established
+2025-11-26T16:48:19.460256205Z [inf]  🔗 New database connection established
+2025-11-26T16:48:20.180538708Z [inf]  ✅ Database connection verified (attempt 1)
+2025-11-26T16:48:20.180544355Z [inf]  ✅ [Background] Database connected (attempt 1)
+2025-11-26T16:48:20.180549383Z [inf]  🔧 [Background] Running system initialization...
+2025-11-26T16:48:20.180553967Z [inf]  🔧 Initializing system...
+2025-11-26T16:48:20.180560326Z [inf]  🔐 Validating encryption key consistency...
+2025-11-26T16:48:20.180565240Z [inf]  🔧 Initializing Drizzle ORM...
+2025-11-26T16:48:20.180569596Z [inf]  ✅ Drizzle ORM initialized
+2025-11-26T16:48:20.411516397Z [inf]  ✅ [KeyGuard] Encryption key verified - matches stored fingerprint
+2025-11-26T16:48:20.411528169Z [inf]  ✅ Encryption key verified
+2025-11-26T16:48:20.595969494Z [inf]  ✓ System roles exist (including Owner), checking permissions...
+2025-11-26T16:48:20.595975914Z [inf]  📝 Creating system roles and permissions...
+2025-11-26T16:48:21.569255583Z [inf]  📋 Bulk upserting 178 permissions...
+2025-11-26T16:48:22.399579556Z [inf]    ✓ Processed 50/178 permissions
+2025-11-26T16:48:22.399589240Z [inf]    ✓ Processed 100/178 permissions
+2025-11-26T16:48:22.399594974Z [inf]    ✓ Processed 150/178 permissions
+2025-11-26T16:48:22.407880247Z [inf]    ✓ Processed 178/178 permissions
+2025-11-26T16:48:22.407887136Z [inf]  ✓ All 178 permissions upserted
+2025-11-26T16:48:22.407894107Z [inf]  🔐 Assigning permissions to roles using bulk operations...
+2025-11-26T16:48:23.329256457Z [inf]    ✓ Super Admin already has all required permissions
+2025-11-26T16:48:23.329262862Z [inf]    ✓ Owner already has all required permissions
+2025-11-26T16:48:23.329270612Z [inf]    ✓ Admin already has all required permissions
+2025-11-26T16:48:23.329276883Z [inf]    ✓ Employee already has all required permissions
+2025-11-26T16:48:23.329287843Z [inf]    ✓ Client already has all required permissions
+2025-11-26T16:48:23.329295611Z [inf]  ✅ All role permissions assigned
+2025-11-26T16:48:24.299262195Z [inf]  📦 Migrating 1 contacts to client_contacts junction table...
+2025-11-26T16:48:24.436507175Z [inf]  ✓ Client-contact relationships migrated successfully
+2025-11-26T16:48:24.436515133Z [inf]  🌱 Creating persistent seed accounts...
+2025-11-26T16:48:26.629031922Z [inf]  Note: LLM config will be created after onboarding service initializes
+2025-11-26T16:48:26.629040907Z [inf]  ✅ Persistent seed accounts ready for roleplay
+2025-11-26T16:48:26.629047662Z [inf]  ✅ LLM Configuration Service initialized
+2025-11-26T16:48:26.629053359Z [inf]  🤖 Initializing AI Agent Foundry...
+2025-11-26T16:48:26.629059132Z [inf]  Initializing Agent Registry...
+2025-11-26T16:48:26.629065270Z [inf]  Loaded agent: Cadence (cadence)
+2025-11-26T16:48:27.412385730Z [inf]  Loaded agent: Echo (echo)
+2025-11-26T16:48:27.422324331Z [inf]  Loaded agent: Forma (forma)
+2025-11-26T16:48:27.822512722Z [inf]  Loaded agent: Luca (luca)
+2025-11-26T16:48:28.388083636Z [inf]  Loaded agent: Lynk (lynk)
+2025-11-26T16:48:28.620465084Z [inf]  Loaded agent: OmniSpectra (omnispectra)
+2025-11-26T16:48:29.369276188Z [inf]  Loaded agent: Parity AI (parity)
+2025-11-26T16:48:29.403342544Z [inf]  Loaded agent: Radar (radar)
+2025-11-26T16:48:29.809490094Z [inf]  Loaded agent: Relay (relay)
+2025-11-26T16:48:30.437630868Z [inf]  Loaded agent: Scribe (scribe)
+2025-11-26T16:48:30.610341838Z [inf]  Loaded agent: Trace (trace)
+2025-11-26T16:48:31.389562308Z [inf]  [STATIC AGENT LOADER] Registering routes for: lynk
+2025-11-26T16:48:31.389563252Z [inf]  ✅ ML Analysis Queue Worker started
+2025-11-26T16:48:31.389566505Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: forma
+2025-11-26T16:48:31.389568986Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: echo
+2025-11-26T16:48:31.389578674Z [inf]  [STATIC AGENT LOADER] Registering routes for: luca
+2025-11-26T16:48:31.389579090Z [inf]  ✅ ML analysis queue worker started
+2025-11-26T16:48:31.389582140Z [inf]  [STATIC AGENT LOADER] Registering routes for: forma
+2025-11-26T16:48:31.389590954Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: luca
+2025-11-26T16:48:31.389592233Z [inf]  ✅ System initialized successfully
+2025-11-26T16:48:31.389595427Z [inf]  [STATIC AGENT LOADER] Registering 11 agents...
+2025-11-26T16:48:31.389596486Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: lynk
+2025-11-26T16:48:31.389604637Z [inf]  ✅ [Background] System initialized
+2025-11-26T16:48:31.389615575Z [inf]  🔧 [Background] Registering agent routes...
+2025-11-26T16:48:31.389617526Z [inf]  [STATIC AGENT LOADER] Registering routes for: cadence
+2025-11-26T16:48:31.389627246Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: cadence
+2025-11-26T16:48:31.389634798Z [inf]  [STATIC AGENT LOADER] Registering routes for: echo
+2025-11-26T16:48:31.389704147Z [inf]  Agent Registry initialized with 11 agents
+2025-11-26T16:48:31.389710629Z [inf]  ✅ Agent Foundry initialized successfully
+2025-11-26T16:48:31.389717306Z [inf]  ⏰ Initializing recurring scheduler service...
+2025-11-26T16:48:31.389723405Z [inf]  Starting recurring scheduler (checking every 5 minutes)...
+2025-11-26T16:48:31.389729469Z [inf]  ✅ Recurring scheduler service started
+2025-11-26T16:48:31.389735232Z [inf]  🧠 Initializing ML analysis queue worker...
+2025-11-26T16:48:31.389741527Z [inf]  🔧 Starting ML Analysis Queue Worker...
+2025-11-26T16:48:31.391928309Z [inf]  [STATIC AGENT LOADER] Registering routes for: omnispectra
+2025-11-26T16:48:31.391934468Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: omnispectra
+2025-11-26T16:48:31.391941110Z [inf]  [STATIC AGENT LOADER] Registering routes for: parity
+2025-11-26T16:48:31.391947218Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: parity
+2025-11-26T16:48:31.391952890Z [inf]  [STATIC AGENT LOADER] Registering routes for: radar
+2025-11-26T16:48:31.391958865Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: radar
+2025-11-26T16:48:31.391965024Z [inf]  [STATIC AGENT LOADER] Registering routes for: relay
+2025-11-26T16:48:31.391970469Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: relay
+2025-11-26T16:48:31.391976730Z [inf]  [STATIC AGENT LOADER] Registering routes for: trace
+2025-11-26T16:48:31.391983160Z [inf]  [Trace Agent] Routes registered
+2025-11-26T16:48:31.391988982Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: trace
+2025-11-26T16:48:31.391995152Z [inf]  [STATIC AGENT LOADER] Registering routes for: scribe
+2025-11-26T16:48:31.392006160Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: scribe
+2025-11-26T16:48:31.392011935Z [inf]  [STATIC AGENT LOADER] ✅ All 11 agents registered successfully
+2025-11-26T16:48:31.392017737Z [inf]  ✅ [Background] 11 agent routes registered
+2025-11-26T16:48:31.392023283Z [inf]  [EventTriggers] Loading triggers from database...
+2025-11-26T16:48:31.392029269Z [inf]  No recurring schedules due for processing
+2025-11-26T16:48:31.397828503Z [inf]  [EventTriggers] Loaded 0 active triggers from database
+2025-11-26T16:48:31.397834661Z [inf]  ✅ [Background] Automation triggers loaded
+2025-11-26T16:48:31.397842009Z [inf]  Starting automation scheduler...
+2025-11-26T16:48:31.397847963Z [inf]  ✅ [Background] Scheduler started
+2025-11-26T16:48:31.397853096Z [inf]  ✅ [Background] Static files ready
+2025-11-26T16:48:31.397859884Z [inf]  ✅ [Background] Uploads ready
+2025-11-26T16:48:31.397865091Z [inf]  🎉 [Background] All initialization complete!
