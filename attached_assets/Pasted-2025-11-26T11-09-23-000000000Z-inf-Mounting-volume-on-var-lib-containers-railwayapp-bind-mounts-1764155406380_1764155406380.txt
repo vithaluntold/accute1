@@ -1,0 +1,18 @@
+2025-11-26T11:09:23.000000000Z [inf]  Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/6bccdf26-75fd-40e0-92eb-e18d1273e0a8/vol_14w8qeeogve11xq8
+2025-11-26T11:09:24.000000000Z [inf]  Starting Container
+2025-11-26T11:09:25.166684031Z [inf]  Certificate will not expire
+2025-11-26T11:09:25.166742037Z [inf]  
+2025-11-26T11:09:25.166749209Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-11-26T11:09:25.166750377Z [inf]  PostgreSQL Database directory appears to contain a database; Skipping initialization
+2025-11-26T11:09:25.166757985Z [inf]  
+2025-11-26T11:09:25.166762076Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  listening on IPv6 address "::", port 5432
+2025-11-26T11:09:25.166769872Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  starting PostgreSQL 17.7 (Debian 17.7-3.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2025-11-26T11:09:25.167053089Z [err]  2025-11-26 11:09:24.386 UTC [6] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-11-26T11:09:25.167060659Z [err]  2025-11-26 11:09:24.400 UTC [29] LOG:  database system was interrupted; last known up at 2025-11-26 11:03:44 UTC
+2025-11-26T11:09:25.167069469Z [err]  2025-11-26 11:09:24.826 UTC [29] LOG:  database system was not properly shut down; automatic recovery in progress
+2025-11-26T11:09:25.167069602Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  redo starts at 0/197EEB8
+2025-11-26T11:09:25.167076870Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  invalid record length at 0/197EEF0: expected at least 24, got 0
+2025-11-26T11:09:25.167083859Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  redo done at 0/197EEB8 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2025-11-26T11:09:25.172364057Z [err]  2025-11-26 11:09:24.857 UTC [27] LOG:  checkpoint starting: end-of-recovery immediate wait
+2025-11-26T11:09:25.172382886Z [err]  2025-11-26 11:09:24.893 UTC [27] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.004 s, total=0.040 s; sync files=2, longest=0.003 s, average=0.002 s; distance=0 kB, estimate=0 kB; lsn=0/197EEF0, redo lsn=0/197EEF0
+2025-11-26T11:09:25.172549008Z [err]  2025-11-26 11:09:24.900 UTC [6] LOG:  database system is ready to accept connections
