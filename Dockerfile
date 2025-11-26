@@ -3,8 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies for native modules
-RUN apk add --no-cache python3 make g++ openssl
+# Install dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++ openssl libc6-compat
 
 # Copy package files
 COPY package*.json ./
@@ -24,8 +24,9 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install openssl for bcrypt and other native modules
-RUN apk add --no-cache openssl
+# Install runtime dependencies for native modules
+# libc6-compat is needed for bcrypt and other native modules on Alpine
+RUN apk add --no-cache openssl libc6-compat
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -41,12 +42,12 @@ COPY --from=builder /app/public ./public
 # Copy uploads directory structure
 RUN mkdir -p uploads
 
-# Set environment
+# Set production environment
+# NOTE: PORT is set by Railway dynamically - do not hardcode
 ENV NODE_ENV=production
-ENV PORT=5000
 
-# Expose port
+# Expose the port (Railway sets PORT dynamically)
 EXPOSE 5000
 
-# Start the application using the runtime entry point
+# Start the application
 CMD ["node", "dist/start.js"]
