@@ -144,7 +144,15 @@ import {
 import { setupLazyWebSocketLoader, cleanupLazyWebSockets } from "./websocket-lazy-loader";
 import path from "path";
 import fs from "fs";
+import http from "http";
 import { fileURLToPath } from "url";
+// Static imports for production bundling (esbuild requires static imports)
+import { pool } from "./db";
+import { registerAllAgentRoutes, getAvailableAgents } from "./agents-static";
+import { registerAgentSessionRoutes } from "./agent-sessions";
+import { getEventTriggersEngine } from "./event-triggers";
+import { storage } from "./storage";
+import { schedulerService } from "./scheduler-service";
 
 // Node ESM compatible directory resolution (works in production after bundling)
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -302,8 +310,7 @@ export async function startServer() {
   console.log(`   Port: ${port}, Host: ${host}`);
   
   // CRITICAL FOR RAILWAY: Start HTTP server IMMEDIATELY with minimal health endpoint
-  const { createServer } = await import('http');
-  const httpServer = createServer(app);
+  const httpServer = http.createServer(app);
   
   // Register health endpoint FIRST - before any other routes
   app.get('/api/health', (req, res) => {
@@ -342,7 +349,6 @@ export async function startServer() {
       
       // Database warmup with retry
       console.log('🔧 [Background] Connecting to database...');
-      const { pool } = await import('./db');
       let dbConnected = false;
       
       for (let attempt = 1; attempt <= 15; attempt++) {
@@ -375,8 +381,6 @@ export async function startServer() {
       
       // Register agent routes
       console.log('🔧 [Background] Registering agent routes...');
-      const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
-      const { registerAgentSessionRoutes } = await import("./agent-sessions");
       const agentSlugs = getAvailableAgents();
       registerAllAgentRoutes(agentSlugs, app);
       for (const slug of agentSlugs) {
@@ -386,8 +390,6 @@ export async function startServer() {
       
       // Load automation triggers
       try {
-        const { getEventTriggersEngine } = await import('./event-triggers');
-        const { storage } = await import('./storage');
         const eventEngine = getEventTriggersEngine(storage);
         await eventEngine.loadTriggersFromDatabase();
         console.log('✅ [Background] Automation triggers loaded');
@@ -397,7 +399,6 @@ export async function startServer() {
       
       // Start scheduler
       try {
-        const { schedulerService } = await import('./scheduler-service');
         schedulerService.start();
         console.log('✅ [Background] Scheduler started');
       } catch (e) {
