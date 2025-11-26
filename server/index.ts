@@ -293,7 +293,8 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+// Export startServer function - called by start.ts at runtime only
+export async function startServer() {
   const port = parseInt(process.env.PORT || '5000', 10);
   const host = '0.0.0.0';
   
@@ -301,12 +302,10 @@ app.use((req, res, next) => {
   console.log(`   Port: ${port}, Host: ${host}`);
   
   // CRITICAL FOR RAILWAY: Start HTTP server IMMEDIATELY with minimal health endpoint
-  // This MUST happen before ANY other work to pass health checks
   const { createServer } = await import('http');
   const httpServer = createServer(app);
   
   // Register health endpoint FIRST - before any other routes
-  // This MUST respond immediately for Railway health checks
   app.get('/api/health', (req, res) => {
     const envError = (global as any).__envValidationError;
     res.status(200).json({ 
@@ -326,8 +325,7 @@ app.use((req, res, next) => {
     }).on('error', reject);
   });
   
-  // ALL heavy work happens AFTER server is listening
-  // This runs in background - does NOT block health checks
+  // ALL heavy work happens AFTER server is listening (background)
   (async () => {
     try {
       console.log('🔧 [Background] Registering routes...');
@@ -444,5 +442,15 @@ app.use((req, res, next) => {
       setInitializationStatus(false, errorMsg);
     }
   })();
-  
-})();
+}
+
+// Detect if this is build time (esbuild) or runtime
+// During esbuild bundling, process.argv[1] contains 'esbuild'
+// At runtime, it contains the actual script path
+const isBuildTime = process.argv[1]?.includes('esbuild') || 
+                    process.argv.some(arg => arg.includes('esbuild'));
+
+// Only start server at runtime, NOT during esbuild bundling
+if (!isBuildTime) {
+  startServer();
+}
