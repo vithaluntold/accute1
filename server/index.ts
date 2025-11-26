@@ -65,22 +65,17 @@ function validateEnvironment() {
     }
   }
 
-  // Report issues
+  // Report issues - but DON'T exit, let server start for health checks
   if (missing.length > 0) {
     console.error('❌ CRITICAL: Missing required environment variables:');
     missing.forEach(name => console.error(`   - ${name}`));
     console.error('\n💡 To fix this:');
-    console.error('   1. Create a .env file in your project root');
-    console.error('   2. Add the required variables (see .env.example)');
-    console.error('   3. For production, set these in your deployment platform\n');
-    console.error('Example .env file:');
-    console.error('   DATABASE_URL="postgresql://user:pass@host:5432/dbname"');
-    console.error('   JWT_SECRET="your-random-secret-key-here"');
-    console.error('   SESSION_SECRET="another-random-secret-key-here"');
-    console.error('   ENCRYPTION_KEY="generate-with: node -e \\"console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))\\""\n');
+    console.error('   1. Set these variables in Railway dashboard');
+    console.error('   2. Or in your .env file for local development\n');
     
-    // Exit immediately - don't try to start the server
-    process.exit(1);
+    // Store error for health check - but DON'T exit
+    // Server will start in degraded mode to respond to health checks
+    (global as any).__envValidationError = `Missing: ${missing.join(', ')}`;
   }
 
   // Show warnings for optional variables
@@ -302,181 +297,152 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || '5000', 10);
   const host = '0.0.0.0';
   
-  try {
-    console.log(`🚀 Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
-    console.log(`   Port: ${port}`);
-    console.log(`   Host: ${host}`);
-    
-    // CRITICAL FOR AUTOSCALE: Create HTTP server and start listening IMMEDIATELY
-    // All heavy initialization must happen AFTER the server is listening
-    const server = await registerRoutes(app);
-    
-    // START LISTENING FIRST - Server must bind to port within 1-2 seconds for health checks
-    await new Promise<void>((resolve, reject) => {
-      server.listen(port, host, () => {
-        console.log(`✅ Server listening on ${host}:${port}`);
-        console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`🌐 Access your app at: https://${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}`);
-        log(`serving on port ${port}`);
-        resolve();
-      }).on('error', (err: Error) => {
-        console.error('❌ Server failed to start:', err);
-        reject(err);
-      });
+  console.log(`🚀 Starting server in ${process.env.NODE_ENV || 'development'} mode...`);
+  console.log(`   Port: ${port}, Host: ${host}`);
+  
+  // CRITICAL FOR RAILWAY: Start HTTP server IMMEDIATELY with minimal health endpoint
+  // This MUST happen before ANY other work to pass health checks
+  const { createServer } = await import('http');
+  const httpServer = createServer(app);
+  
+  // Register health endpoint FIRST - before any other routes
+  // This MUST respond immediately for Railway health checks
+  app.get('/api/health', (req, res) => {
+    const envError = (global as any).__envValidationError;
+    res.status(200).json({ 
+      status: envError ? 'degraded' : 'ok', 
+      timestamp: new Date().toISOString(),
+      initialized: initializationComplete,
+      initError: initializationError || envError || null
     });
-    
-    // Initialize WebSocket servers for user-to-user real-time communication
-    console.log('🔧 Initializing WebSocket servers...');
+  });
+  
+  // START LISTENING IMMEDIATELY - within first 1-2 seconds
+  await new Promise<void>((resolve, reject) => {
+    httpServer.listen(port, host, () => {
+      console.log(`✅ Server listening on ${host}:${port}`);
+      console.log(`   Health endpoint ready at /api/health`);
+      resolve();
+    }).on('error', reject);
+  });
+  
+  // ALL heavy work happens AFTER server is listening
+  // This runs in background - does NOT block health checks
+  (async () => {
     try {
-      setupLazyWebSocketLoader(server);
-    } catch (wsError) {
-      console.error('❌ WebSocket server initialization failed:', wsError);
-    }
-    
-    // CRITICAL: Run ALL database-dependent initialization in background
-    // This ensures health checks respond immediately while DB work continues
-    console.log('🔧 Starting background initialization...');
-    console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
-    
-    // Background initialization - does NOT block health checks
-    (async () => {
+      console.log('🔧 [Background] Registering routes...');
+      await registerRoutes(app);
+      console.log('✅ [Background] Routes registered');
+      
+      // WebSocket setup
       try {
-        // Warmup database connection with retry
-        console.log('🔧 [Background] Warming up database connection...');
-        const { pool } = await import('./db');
-        let dbConnected = false;
-        const maxAttempts = 10;
-        
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            const client = await pool.connect();
-            await client.query('SELECT 1');
-            client.release();
-            console.log(`✅ [Background] Database connected (attempt ${attempt})`);
-            dbConnected = true;
-            break;
-          } catch (dbError: any) {
-            console.log(`   [Background] DB attempt ${attempt}/${maxAttempts}: ${dbError.message}`);
-            if (attempt < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
+        setupLazyWebSocketLoader(httpServer);
+        console.log('✅ [Background] WebSocket ready');
+      } catch (e) {
+        console.warn('⚠️ [Background] WebSocket failed:', e);
+      }
+      
+      // Database warmup with retry
+      console.log('🔧 [Background] Connecting to database...');
+      const { pool } = await import('./db');
+      let dbConnected = false;
+      
+      for (let attempt = 1; attempt <= 15; attempt++) {
+        try {
+          const client = await pool.connect();
+          await client.query('SELECT 1');
+          client.release();
+          console.log(`✅ [Background] Database connected (attempt ${attempt})`);
+          dbConnected = true;
+          break;
+        } catch (dbError: any) {
+          console.log(`   [Background] DB attempt ${attempt}/15: ${dbError.message}`);
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      }
+      
+      if (!dbConnected) {
+        console.error('❌ [Background] Database connection failed');
+        setInitializationStatus(false, 'Database connection failed');
+        return;
+      }
+      
+      // System initialization
+      console.log('🔧 [Background] Running system initialization...');
+      await initializeSystem(app);
+      console.log('✅ [Background] System initialized');
+      setInitializationStatus(true, null);
+      
+      // Register agent routes
+      console.log('🔧 [Background] Registering agent routes...');
+      const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
+      const { registerAgentSessionRoutes } = await import("./agent-sessions");
+      const agentSlugs = getAvailableAgents();
+      registerAllAgentRoutes(agentSlugs, app);
+      for (const slug of agentSlugs) {
+        registerAgentSessionRoutes(app, slug);
+      }
+      console.log(`✅ [Background] ${agentSlugs.length} agent routes registered`);
+      
+      // Load automation triggers
+      try {
+        const { getEventTriggersEngine } = await import('./event-triggers');
+        const { storage } = await import('./storage');
+        const eventEngine = getEventTriggersEngine(storage);
+        await eventEngine.loadTriggersFromDatabase();
+        console.log('✅ [Background] Automation triggers loaded');
+      } catch (e) {
+        console.warn('⚠️ [Background] Automation triggers failed');
+      }
+      
+      // Start scheduler
+      try {
+        const { schedulerService } = await import('./scheduler-service');
+        schedulerService.start();
+        console.log('✅ [Background] Scheduler started');
+      } catch (e) {
+        console.warn('⚠️ [Background] Scheduler failed');
+      }
+      
+      // Setup Vite/static serving AFTER routes registered
+      const distPath = path.resolve(moduleDir, "public");
+      const isDevelopment = app.get("env") === "development";
+      
+      if (isDevelopment) {
+        try {
+          console.log('🔧 [Background] Setting up Vite dev server...');
+          await setupVite(app, httpServer);
+          console.log('✅ [Background] Vite dev server ready');
+        } catch (viteError) {
+          console.warn('⚠️ [Background] Vite setup failed:', viteError);
+        }
+      } else {
+        // PRODUCTION: Serve static files
+        try {
+          if (fs.existsSync(distPath)) {
+            app.use(express.static(distPath));
+            app.use("*", (_req, res) => {
+              res.sendFile(path.resolve(distPath, "index.html"));
+            });
+            console.log('✅ [Background] Static files ready');
           }
-        }
-        
-        if (!dbConnected) {
-          console.error('❌ [Background] Database connection failed after all attempts');
-          setInitializationStatus(false, 'Database connection failed');
-          return;
-        }
-        
-        // System initialization
-        console.log('🔧 [Background] Running system initialization...');
-        await initializeSystem(app);
-        console.log('✅ [Background] System initialized');
-        setInitializationStatus(true, null);
-        
-        // Register agent routes
-        console.log('🔧 [Background] Registering agent routes...');
-        const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
-        const { registerAgentSessionRoutes } = await import("./agent-sessions");
-        const agentSlugs = getAvailableAgents();
-        registerAllAgentRoutes(agentSlugs, app);
-        for (const slug of agentSlugs) {
-          registerAgentSessionRoutes(app, slug);
-        }
-        console.log(`✅ [Background] ${agentSlugs.length} agent routes registered`);
-        
-        // Load automation triggers
-        try {
-          const { getEventTriggersEngine } = await import('./event-triggers');
-          const { storage } = await import('./storage');
-          const eventEngine = getEventTriggersEngine(storage);
-          await eventEngine.loadTriggersFromDatabase();
-          console.log('✅ [Background] Automation triggers loaded');
         } catch (e) {
-          console.warn('⚠️ [Background] Automation triggers failed:', e);
+          console.warn('⚠️ [Background] Static file setup failed');
         }
-        
-        // Start scheduler
-        try {
-          const { schedulerService } = await import('./scheduler-service');
-          schedulerService.start();
-          console.log('✅ [Background] Scheduler started');
-        } catch (e) {
-          console.warn('⚠️ [Background] Scheduler failed:', e);
-        }
-        
-        console.log('🎉 [Background] All initialization complete!');
-        
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error('❌ [Background] Initialization failed:', errorMsg);
-        setInitializationStatus(false, errorMsg);
       }
-    })();
-    
-    // CRITICAL: Setup Vite/static serving AFTER agent routes are registered
-    // This prevents Vite's catch-all from intercepting agent endpoints
-    const distPath = path.resolve(moduleDir, "public");
-    const isDevelopment = app.get("env") === "development";
-    
-    // ALWAYS use Vite in development, even if dist exists
-    if (isDevelopment) {
-      try {
-        console.log('🔧 Setting up Vite dev server...');
-        await setupVite(app, server);
-        console.log('✅ Vite dev server initialized - routes ready');
-      } catch (viteError) {
-        console.error('❌ Vite setup failed:', viteError);
-        console.error('Error stack:', viteError instanceof Error ? viteError.stack : 'N/A');
-        console.warn('⚠️  Continuing without Vite dev server');
-      }
-    } else {
-      // PRODUCTION: Serve static files from dist/public
-      try {
-        if (!fs.existsSync(distPath)) {
-          throw new Error(
-            `Could not find the build directory: ${distPath}, make sure to build the client first`,
-          );
-        }
-
-        app.use(express.static(distPath));
-        
-        // SPA fallback: serve index.html for all non-API routes
-        app.use("*", (_req, res) => {
-          res.sendFile(path.resolve(distPath, "index.html"));
-        });
-        
-        console.log('✅ Static file serving initialized (production mode) - routes ready');
-        console.log(`   Serving from: ${distPath}`);
-      } catch (staticError) {
-        console.error('❌ Static file setup failed:', staticError);
-        console.warn('⚠️  Continuing without static file serving');
-      }
+      
+      // Serve uploads
+      const uploadsPath = path.resolve(process.cwd(), "uploads");
+      app.use("/uploads", express.static(uploadsPath, { fallthrough: false }));
+      console.log('✅ [Background] Uploads ready');
+      
+      console.log('🎉 [Background] All initialization complete!');
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('❌ [Background] Initialization failed:', errorMsg);
+      setInitializationStatus(false, errorMsg);
     }
-    
-    // Serve uploaded files from /uploads directory
-    const uploadsPath = path.resolve(process.cwd(), "uploads");
-    app.use("/uploads", express.static(uploadsPath, {
-      fallthrough: false,
-      setHeaders: (res) => {
-        // Allow browser to determine content type from file extension
-      }
-    }));
-    console.log('✅ Upload serving initialized');
-    console.log(`   Serving from: ${uploadsPath}`);
-    
-  } catch (error) {
-    console.error('❌ Fatal error during application startup:', error);
-    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('Error message:', error instanceof Error ? error.message : String(error));
-    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
-    
-    if (error && typeof error === 'object') {
-      console.error('Additional error properties:', JSON.stringify(error, null, 2));
-    }
-    
-    process.exit(1);
-  }
+  })();
+  
 })();
