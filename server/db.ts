@@ -51,12 +51,26 @@ function createPool() {
     return pool;
   } else {
     console.log('🔌 Initializing pg pool (development mode)...');
-    const pool = new Pool({ 
+    
+    // Check if using Railway/external database (requires SSL)
+    const requiresSSL = dbUrl.includes('railway.app') || 
+                        dbUrl.includes('rlwy.net') || 
+                        dbUrl.includes('neon.tech');
+    
+    const poolConfig: PoolConfig = { 
       connectionString: dbUrl,
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 30000,
-    });
+    };
+    
+    // Add SSL for external databases
+    if (requiresSSL) {
+      console.log('🔒 SSL enabled for external database');
+      poolConfig.ssl = { rejectUnauthorized: false };
+    }
+    
+    const pool = new Pool(poolConfig);
     
     pool.on('error', (err) => {
       console.error('💥 Database pool error:', err.message);
