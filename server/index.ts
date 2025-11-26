@@ -121,7 +121,17 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 UNHANDLED PROMISE REJECTION at:', promise);
   console.error('Reason:', reason);
-  process.exit(1);
+  // In production, log but don't crash for database timeouts or connection errors
+  // This allows the app to recover from temporary network issues
+  const reasonStr = String(reason);
+  if (process.env.NODE_ENV === 'production' && 
+      (reasonStr.includes('ECONNRESET') || 
+       reasonStr.includes('timeout') || 
+       reasonStr.includes('Connection terminated'))) {
+    console.warn('⚠️ Non-fatal database error - app will continue running');
+  } else {
+    process.exit(1);
+  }
 });
 
 import express, { type Request, Response, NextFunction } from "express";
@@ -335,9 +345,11 @@ app.use((req, res, next) => {
     console.log(`   AZURE_OPENAI_API_KEY: ${process.env.AZURE_OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
     
     // Warmup database connection before system initialization
+    // Use shorter timeouts in production to pass health checks faster
     console.log('🔧 Warming up database connection...');
     const { pool } = await import('./db');
-    for (let attempt = 1; attempt <= 5; attempt++) {
+    const maxAttempts = process.env.NODE_ENV === 'production' ? 3 : 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const client = await pool.connect();
         await client.query('SELECT 1');
@@ -345,13 +357,13 @@ app.use((req, res, next) => {
         console.log(`✅ Database connection verified (attempt ${attempt})`);
         break;
       } catch (dbError: any) {
-        console.log(`   Database warmup attempt ${attempt}/5 failed: ${dbError.message}`);
-        if (attempt < 5) {
-          const waitTime = Math.min(1000 * attempt, 3000);
+        console.log(`   Database warmup attempt ${attempt}/${maxAttempts} failed: ${dbError.message}`);
+        if (attempt < maxAttempts) {
+          const waitTime = process.env.NODE_ENV === 'production' ? 500 : Math.min(1000 * attempt, 3000);
           console.log(`   Retrying in ${waitTime}ms...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         } else {
-          console.warn('⚠️ Database warmup failed after 5 attempts - continuing anyway');
+          console.warn('⚠️ Database warmup failed - continuing anyway (app can recover later)');
         }
       }
     }

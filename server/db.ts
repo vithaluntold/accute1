@@ -24,15 +24,15 @@ function createPool() {
     
     const poolConfig: PoolConfig = { 
       connectionString: dbUrl,
-      // Railway-optimized settings
-      max: 5,                        // Small pool for serverless
-      min: 1,                        // Keep at least 1 connection
-      idleTimeoutMillis: 30000,      // 30 seconds idle timeout
-      connectionTimeoutMillis: 30000, // 30 seconds to connect
+      // Production-optimized settings for Railway + Neon
+      max: 10,                       // Slightly larger pool
+      min: 2,                        // Keep 2 warm connections
+      idleTimeoutMillis: 20000,      // 20 seconds idle timeout
+      connectionTimeoutMillis: 5000, // 5 seconds to connect (fast fail for health checks)
       allowExitOnIdle: false,        // Don't exit when idle
-      // Critical: Skip SSL certificate verification for Railway proxy
+      // SSL required for both Railway proxy and Neon
       ssl: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false    // Works with both Railway proxy and Neon
       }
     };
     
