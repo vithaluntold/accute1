@@ -70,6 +70,46 @@ NODE_ENV=production npm run build
 
 **Files:** `server/key-rotation.ts`, `server/llm-service.ts`, `server/encryption-key-guard.ts`
 
+### Enterprise Encryption System (November 26, 2025) ✅
+**Purpose:** Adds enterprise-grade encryption with Azure Key Vault, HSM-backed keys, envelope encryption, and tamper-proof audit trails.
+
+**Architecture:**
+- **KEK (Key Encryption Key):** Stored in Azure Key Vault (HSM-backed RSA-4096)
+- **DEK (Data Encryption Key):** Generated locally (AES-256-GCM), wrapped by KEK
+- **Envelope Encryption:** Data encrypted with DEK, DEK wrapped with KEK, stored together
+
+**Key Components:**
+| Component | File | Purpose |
+|-----------|------|---------|
+| Azure Key Vault Client | `server/azure-keyvault.ts` | HSM-backed key operations (wrap/unwrap/sign/verify) |
+| Envelope Encryption | `server/envelope-encryption.ts` | KEK/DEK hierarchy, domain-scoped encryption |
+| Split-Knowledge Approvals | `server/split-knowledge.ts` | Dual-approval workflow for sensitive operations |
+| Crypto Audit Trail | `server/crypto-audit.ts` | Tamper-proof logging with SHA-512 hash chains |
+
+**Database Tables:**
+- `kek_registry` - Key Encryption Keys (HSM references)
+- `dek_registry` - Data Encryption Keys (wrapped materials)
+- `crypto_audit_log` - Hash-chained audit entries with digital signatures
+- `key_operation_approvals` - Split-knowledge approval requests
+- `key_operation_approval_votes` - Dual-approval votes
+- `key_vault_config` - Azure Key Vault configurations
+
+**API Endpoints:**
+- `GET /api/encryption/enterprise/status` - Get encryption system status
+- `POST /api/encryption/enterprise/configure-vault` - Configure Azure Key Vault
+- `POST /api/encryption/enterprise/kek/create` - Create KEK (optional dual-approval)
+- `POST /api/encryption/enterprise/kek/:id/rotate` - Rotate KEK (optional dual-approval)
+- `GET /api/encryption/enterprise/approvals/pending` - Get pending approvals
+- `POST /api/encryption/enterprise/approvals/:id/vote` - Vote on approval
+- `POST /api/encryption/enterprise/approvals/:id/execute` - Execute approved operation
+- `GET /api/encryption/enterprise/audit` - Query audit logs
+- `GET /api/encryption/enterprise/audit/verify` - Verify audit log integrity
+- `POST /api/encryption/enterprise/audit/export` - Export audit logs
+
+**Fallback Mode:** When Azure Key Vault is not configured, the system uses local ENCRYPTION_KEY for DEK wrapping (development mode).
+
+**Compliance:** PCI DSS (key management audit), SOC 2 (security event logging), GDPR (data processing records)
+
 ### Scheduler Service Fix ✅
 - **Problem:** "isNotNull is not defined" error every few seconds in scheduler service
 - **Fix:** Added missing `isNotNull` import from drizzle-orm in `server/storage.ts`

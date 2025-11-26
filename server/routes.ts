@@ -4110,6 +4110,508 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     }
   });
 
+  // ==================== Enterprise Encryption API ====================
+  
+  // Get enterprise encryption status
+  app.get("/api/encryption/enterprise/status", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { getKeyVaultClient } = await import('./azure-keyvault');
+      const { getEnvelopeEncryptionService } = await import('./envelope-encryption');
+      
+      const vaultClient = getKeyVaultClient();
+      const envelopeService = getEnvelopeEncryptionService();
+      
+      let vaultHealth = { healthy: false, latencyMs: 0, error: 'Not configured' };
+      if (vaultClient) {
+        vaultHealth = await vaultClient.healthCheck();
+      }
+      
+      // Get KEK registry stats
+      const keks = await db.select().from(schema.kekRegistry).where(eq(schema.kekRegistry.isActive, true));
+      const deks = await db.select({ count: sql<number>`count(*)` }).from(schema.dekRegistry);
+      
+      // Verify audit log integrity
+      const integrityResult = await envelopeService.verifyAuditLogIntegrity();
+      
+      res.json({
+        keyVault: {
+          configured: !!vaultClient,
+          ...vaultHealth
+        },
+        kekRegistry: {
+          activeKeys: keks.length,
+          keys: keks.map(k => ({
+            id: k.id,
+            keyName: k.keyName,
+            purpose: k.purpose,
+            status: k.status,
+            nextRotationAt: k.nextRotationAt
+          }))
+        },
+        dekRegistry: {
+          totalKeys: deks[0]?.count || 0
+        },
+        auditLog: integrityResult
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Configure Azure Key Vault
+  app.post("/api/encryption/enterprise/configure-vault", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can configure Key Vault" });
+      }
+      
+      const { name, vaultUrl, authMethod, tenantId, clientId, clientSecret } = req.body;
+      
+      if (!name || !vaultUrl) {
+        return res.status(400).json({ error: "Name and vaultUrl are required" });
+      }
+      
+      // Encrypt client secret if provided
+      let clientSecretEncrypted: string | null = null;
+      if (clientSecret) {
+        clientSecretEncrypted = encrypt(clientSecret);
+      }
+      
+      // Save configuration
+      const [config] = await db.insert(schema.keyVaultConfig).values({
+        name,
+        vaultUrl,
+        authMethod: authMethod || 'managed_identity',
+        tenantId,
+        clientId,
+        clientSecretEncrypted,
+        createdBy: req.user!.id,
+        isActive: true
+      }).returning();
+      
+      // Test connection
+      const { AzureKeyVaultClient } = await import('./azure-keyvault');
+      const testClient = new AzureKeyVaultClient({
+        vaultUrl,
+        authMethod: authMethod || 'managed_identity',
+        tenantId,
+        clientId,
+        clientSecret
+      });
+      
+      const connected = await testClient.initialize();
+      
+      // Update health status
+      await db.update(schema.keyVaultConfig)
+        .set({
+          lastHealthCheck: new Date(),
+          healthStatus: connected ? 'healthy' : 'unhealthy'
+        })
+        .where(eq(schema.keyVaultConfig.id, config.id));
+      
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "configure", "key_vault", config.id, { vaultUrl }, req);
+      
+      res.json({
+        success: true,
+        configId: config.id,
+        connected,
+        message: connected ? 'Key Vault configured successfully' : 'Configuration saved but connection failed'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Create a new KEK (requires split-knowledge approval)
+  app.post("/api/encryption/enterprise/kek/create", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can create KEKs" });
+      }
+      
+      const { keyName, purpose, keySize, expiresInDays, requireApproval } = req.body;
+      
+      if (!keyName || !purpose) {
+        return res.status(400).json({ error: "keyName and purpose are required" });
+      }
+      
+      if (requireApproval) {
+        // Create split-knowledge approval request
+        const { getSplitKnowledgeService } = await import('./split-knowledge');
+        const splitService = getSplitKnowledgeService();
+        
+        const approval = await splitService.createApprovalRequest({
+          operationType: 'create_kek',
+          operationPayload: { keyName, purpose, keySize, expiresInDays },
+          requiredApprovals: 2,
+          initiatedBy: req.user!.id
+        });
+        
+        await logActivity(req.user!.id, req.user!.organizationId || undefined, "request_approval", "kek", approval.id, { operationType: 'create_kek', keyName }, req);
+        
+        return res.json({
+          success: true,
+          requiresApproval: true,
+          approvalId: approval.id,
+          message: `KEK creation requires ${approval.requiredApprovals} approvals. Share approval ID with other administrators.`
+        });
+      }
+      
+      // Direct creation (no approval required)
+      const { getKeyVaultClient } = await import('./azure-keyvault');
+      const vaultClient = getKeyVaultClient();
+      
+      if (!vaultClient) {
+        return res.status(400).json({ error: "Key Vault not configured. Configure Key Vault first." });
+      }
+      
+      // Get vault config
+      const [vaultConfig] = await db.select().from(schema.keyVaultConfig).where(eq(schema.keyVaultConfig.isActive, true)).limit(1);
+      if (!vaultConfig) {
+        return res.status(400).json({ error: "No active Key Vault configuration found" });
+      }
+      
+      // Create key in Key Vault
+      const expiresOn = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : undefined;
+      const keyInfo = await vaultClient.createKey(keyName, { keySize: keySize || 4096, expiresOn });
+      
+      // Register in database
+      const [kek] = await db.insert(schema.kekRegistry).values({
+        keyName,
+        keyVersion: keyInfo.version,
+        vaultUrl: vaultConfig.vaultUrl,
+        algorithm: 'RSA-OAEP-256',
+        keyType: 'master',
+        purpose,
+        status: 'active',
+        isActive: true,
+        rotationSchedule: '90d',
+        nextRotationAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        createdBy: req.user!.id
+      }).returning();
+      
+      // Audit log
+      const { getCryptoAuditService } = await import('./crypto-audit');
+      const auditService = getCryptoAuditService();
+      await auditService.logOperation('create', 'kek', 'key_encryption_key', {
+        resourceId: kek.id,
+        kekId: kek.id,
+        actorUserId: req.user!.id,
+        actorIpAddress: req.ip,
+        metadata: { keyName, purpose }
+      });
+      
+      await logActivity(req.user!.id, req.user!.organizationId || undefined, "create", "kek", kek.id, { keyName, purpose }, req);
+      
+      res.json({
+        success: true,
+        kek: {
+          id: kek.id,
+          keyName: kek.keyName,
+          keyVersion: kek.keyVersion,
+          purpose: kek.purpose,
+          status: kek.status,
+          nextRotationAt: kek.nextRotationAt
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Rotate a KEK (requires split-knowledge approval)
+  app.post("/api/encryption/enterprise/kek/:kekId/rotate", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { kekId } = req.params;
+      const { requireApproval } = req.body;
+      
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can rotate KEKs" });
+      }
+      
+      // Get KEK
+      const [kek] = await db.select().from(schema.kekRegistry).where(eq(schema.kekRegistry.id, kekId)).limit(1);
+      if (!kek) {
+        return res.status(404).json({ error: "KEK not found" });
+      }
+      
+      if (requireApproval) {
+        const { getSplitKnowledgeService } = await import('./split-knowledge');
+        const splitService = getSplitKnowledgeService();
+        
+        const approval = await splitService.createApprovalRequest({
+          operationType: 'rotate_kek',
+          operationPayload: { kekId, keyName: kek.keyName },
+          requiredApprovals: 2,
+          initiatedBy: req.user!.id
+        });
+        
+        return res.json({
+          success: true,
+          requiresApproval: true,
+          approvalId: approval.id,
+          message: `KEK rotation requires ${approval.requiredApprovals} approvals.`
+        });
+      }
+      
+      // Direct rotation
+      const { getKeyVaultClient } = await import('./azure-keyvault');
+      const vaultClient = getKeyVaultClient();
+      
+      if (!vaultClient) {
+        return res.status(400).json({ error: "Key Vault not configured" });
+      }
+      
+      const newKeyInfo = await vaultClient.rotateKey(kek.keyName);
+      
+      // Update registry
+      await db.update(schema.kekRegistry)
+        .set({
+          keyVersion: newKeyInfo.version,
+          lastRotatedAt: new Date(),
+          nextRotationAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date()
+        })
+        .where(eq(schema.kekRegistry.id, kekId));
+      
+      // Re-wrap all DEKs using this KEK
+      const { getEnvelopeEncryptionService } = await import('./envelope-encryption');
+      const envelopeService = getEnvelopeEncryptionService();
+      
+      const deks = await db.select().from(schema.dekRegistry).where(eq(schema.dekRegistry.kekId, kekId));
+      let rewrapped = 0;
+      for (const dek of deks) {
+        try {
+          await envelopeService.rotateDEKs(dek.domain, kekId, req.user!.id);
+          rewrapped++;
+        } catch (err) {
+          console.error(`Failed to re-wrap DEK ${dek.id}:`, err);
+        }
+      }
+      
+      // Audit log
+      const { getCryptoAuditService } = await import('./crypto-audit');
+      const auditService = getCryptoAuditService();
+      await auditService.logOperation('rotate', 'kek', 'key_encryption_key', {
+        resourceId: kekId,
+        kekId,
+        actorUserId: req.user!.id,
+        actorIpAddress: req.ip,
+        metadata: { oldVersion: kek.keyVersion, newVersion: newKeyInfo.version, deksRewrapped: rewrapped }
+      });
+      
+      res.json({
+        success: true,
+        kek: {
+          id: kekId,
+          keyName: kek.keyName,
+          oldVersion: kek.keyVersion,
+          newVersion: newKeyInfo.version,
+          deksRewrapped: rewrapped
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get pending approval requests
+  app.get("/api/encryption/enterprise/approvals/pending", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { getSplitKnowledgeService } = await import('./split-knowledge');
+      const splitService = getSplitKnowledgeService();
+      
+      const approvals = await splitService.getPendingApprovals(req.user!.id);
+      
+      res.json({ approvals });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Vote on an approval request
+  app.post("/api/encryption/enterprise/approvals/:approvalId/vote", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { approvalId } = req.params;
+      const { vote, reason } = req.body;
+      
+      if (!vote || !['approve', 'reject'].includes(vote)) {
+        return res.status(400).json({ error: "Vote must be 'approve' or 'reject'" });
+      }
+      
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can vote on approvals" });
+      }
+      
+      const { getSplitKnowledgeService } = await import('./split-knowledge');
+      const splitService = getSplitKnowledgeService();
+      
+      const result = await splitService.vote(
+        approvalId,
+        req.user!.id,
+        vote,
+        reason,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Execute an approved operation
+  app.post("/api/encryption/enterprise/approvals/:approvalId/execute", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { approvalId } = req.params;
+      
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can execute approved operations" });
+      }
+      
+      const { getSplitKnowledgeService } = await import('./split-knowledge');
+      const { getKeyVaultClient } = await import('./azure-keyvault');
+      
+      const splitService = getSplitKnowledgeService();
+      const vaultClient = getKeyVaultClient();
+      
+      const approval = await splitService.getApprovalRequest(approvalId);
+      if (!approval) {
+        return res.status(404).json({ error: "Approval request not found" });
+      }
+      
+      const result = await splitService.execute(approvalId, req.user!.id, async (payload) => {
+        switch (approval.operationType) {
+          case 'create_kek': {
+            if (!vaultClient) throw new Error('Key Vault not configured');
+            const [vaultConfig] = await db.select().from(schema.keyVaultConfig).where(eq(schema.keyVaultConfig.isActive, true)).limit(1);
+            
+            const expiresOn = payload.expiresInDays ? new Date(Date.now() + payload.expiresInDays * 24 * 60 * 60 * 1000) : undefined;
+            const keyInfo = await vaultClient.createKey(payload.keyName, { keySize: payload.keySize || 4096, expiresOn });
+            
+            const [kek] = await db.insert(schema.kekRegistry).values({
+              keyName: payload.keyName,
+              keyVersion: keyInfo.version,
+              vaultUrl: vaultConfig!.vaultUrl,
+              algorithm: 'RSA-OAEP-256',
+              keyType: 'master',
+              purpose: payload.purpose,
+              status: 'active',
+              isActive: true,
+              createdBy: req.user!.id
+            }).returning();
+            
+            return { kekId: kek.id, keyName: kek.keyName };
+          }
+          
+          case 'rotate_kek': {
+            if (!vaultClient) throw new Error('Key Vault not configured');
+            const newKeyInfo = await vaultClient.rotateKey(payload.keyName);
+            
+            await db.update(schema.kekRegistry)
+              .set({ keyVersion: newKeyInfo.version, lastRotatedAt: new Date(), updatedAt: new Date() })
+              .where(eq(schema.kekRegistry.id, payload.kekId));
+            
+            return { keyName: payload.keyName, newVersion: newKeyInfo.version };
+          }
+          
+          default:
+            throw new Error(`Unknown operation type: ${approval.operationType}`);
+        }
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get crypto audit logs
+  app.get("/api/encryption/enterprise/audit", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { operation, operationType, resourceType, resourceId, actorUserId, startDate, endDate, limit, offset } = req.query;
+      
+      const { getCryptoAuditService } = await import('./crypto-audit');
+      const auditService = getCryptoAuditService();
+      
+      const logs = await auditService.query({
+        operation: operation as string,
+        operationType: operationType as string,
+        resourceType: resourceType as string,
+        resourceId: resourceId as string,
+        actorUserId: actorUserId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+        offset: offset ? parseInt(offset as string) : 0
+      });
+      
+      res.json({ logs });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Verify audit log integrity
+  app.get("/api/encryption/enterprise/audit/verify", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { getCryptoAuditService } = await import('./crypto-audit');
+      const auditService = getCryptoAuditService();
+      
+      const report = await auditService.verifyIntegrity();
+      
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Export audit logs for archival
+  app.post("/api/encryption/enterprise/audit/export", requireAuth, requirePermission("settings.manage"), async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate } = req.body;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      
+      const user = await storage.getUser(req.user!.id);
+      const role = user?.roleId ? await storage.getRole(user.roleId) : null;
+      
+      if (role?.name !== 'Super Admin' && role?.name !== 'Owner') {
+        return res.status(403).json({ error: "Only Super Admin or Owner can export audit logs" });
+      }
+      
+      const { getCryptoAuditService } = await import('./crypto-audit');
+      const auditService = getCryptoAuditService();
+      
+      const exportData = await auditService.exportForArchival(
+        new Date(startDate),
+        new Date(endDate)
+      );
+      
+      res.json(exportData);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Health check endpoint for all LLM configurations and agents
   app.get("/api/agents/health", requireAuth, async (req: Request, res: Response) => {
     try {
