@@ -1,0 +1,178 @@
+2025-11-26T17:17:08.000000000Z [inf]  Starting Container
+2025-11-26T17:17:10.306969914Z [inf]  
+2025-11-26T17:17:10.306977655Z [inf]  > rest-express@1.0.0 start
+2025-11-26T17:17:10.306984173Z [inf]  > NODE_ENV=production node dist/start.js
+2025-11-26T17:17:10.306989595Z [inf]  
+2025-11-26T17:17:13.176207681Z [inf]  🔐 Encryption service initialized successfully
+2025-11-26T17:17:13.176217173Z [inf]  [PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)
+2025-11-26T17:17:13.200347469Z [inf]  ✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)
+2025-11-26T17:17:13.200356140Z [inf]  🚀 [START] Server entry point loaded
+2025-11-26T17:17:13.200362248Z [inf]  🔧 [START] NODE_ENV: production
+2025-11-26T17:17:13.200371291Z [inf]  🔧 [START] PORT: 5000
+2025-11-26T17:17:13.200377049Z [inf]  🔧 [START] DATABASE_URL exists: true
+2025-11-26T17:17:13.200382765Z [inf]  🔧 [START] JWT_SECRET exists: true
+2025-11-26T17:17:13.200390023Z [inf]  🔧 [START] SESSION_SECRET exists: true
+2025-11-26T17:17:13.200395166Z [inf]  🔧 [START] ENCRYPTION_KEY exists: true
+2025-11-26T17:17:13.200400083Z [inf]  🔧 [START] Loading server module...
+2025-11-26T17:17:13.200406165Z [inf]  ✅ [START] Server module loaded successfully
+2025-11-26T17:17:13.200412596Z [inf]  🚀 Starting server in production mode...
+2025-11-26T17:17:13.200418998Z [inf]     Port: 5000, Host: 0.0.0.0
+2025-11-26T17:17:13.225425798Z [inf]  ✅ Server listening on 0.0.0.0:5000
+2025-11-26T17:17:13.225435136Z [inf]     Health endpoint ready at /api/health
+2025-11-26T17:17:13.225441217Z [inf]  🔧 [Background] Registering routes...
+2025-11-26T17:17:13.296663354Z [inf]  ✅ [START] Server started successfully
+2025-11-26T17:17:13.323247946Z [inf]  ✅ SSE Agent routes registered
+2025-11-26T17:17:13.340359651Z [inf]  ✅ SSE Roundtable routes registered
+2025-11-26T17:17:13.340365314Z [inf]  ✅ [Background] Routes registered
+2025-11-26T17:17:13.340369916Z [inf]  🔧 Setting up lazy WebSocket loader...
+2025-11-26T17:17:13.340374279Z [inf]  ✅ Lazy WebSocket loader ready
+2025-11-26T17:17:13.340379442Z [inf]  ✅ [Background] WebSocket ready
+2025-11-26T17:17:13.340386263Z [inf]  🔧 [Background] Connecting to database...
+2025-11-26T17:17:13.340390453Z [inf]  🔌 Initializing pg pool (production mode - Railway optimized)...
+2025-11-26T17:17:13.340394543Z [inf]  ✅ Database pool initialized
+2025-11-26T17:17:13.415134373Z [inf]  5:17:13 PM [express] GET /api/health 200 in 7ms :: {"status":"ok","timestamp":"2025-11-26T17:17:13.0…
+2025-11-26T17:17:14.145699543Z [inf]  🔗 New database connection established
+2025-11-26T17:17:14.145709586Z [inf]  🔗 New database connection established
+2025-11-26T17:17:14.145716858Z [inf]  ✅ Database connection verified (attempt 1)
+2025-11-26T17:17:14.145722791Z [inf]  ✅ [Background] Database connected (attempt 1)
+2025-11-26T17:17:14.145728894Z [inf]  🔧 [Background] Running system initialization...
+2025-11-26T17:17:14.145735048Z [inf]  🔧 Initializing system...
+2025-11-26T17:17:14.145740859Z [inf]  🔐 Validating encryption key consistency...
+2025-11-26T17:17:14.145747155Z [inf]  🔧 Initializing Drizzle ORM...
+2025-11-26T17:17:14.145754761Z [inf]  ✅ Drizzle ORM initialized
+2025-11-26T17:17:15.271172893Z [inf]  ✅ [KeyGuard] Encryption key verified - matches stored fingerprint
+2025-11-26T17:17:15.271181945Z [inf]  ✅ Encryption key verified
+2025-11-26T17:17:15.271187589Z [inf]  ✓ System roles exist (including Owner), checking permissions...
+2025-11-26T17:17:15.271192754Z [inf]  📝 Creating system roles and permissions...
+2025-11-26T17:17:16.497908290Z [inf]  📋 Bulk upserting 178 permissions...
+2025-11-26T17:17:16.497919810Z [inf]    ✓ Processed 50/178 permissions
+2025-11-26T17:17:16.771578864Z [inf]    ✓ Processed 100/178 permissions
+2025-11-26T17:17:17.166332552Z [inf]    ✓ Processed 150/178 permissions
+2025-11-26T17:17:17.447962127Z [inf]    ✓ Processed 178/178 permissions
+2025-11-26T17:17:17.447967110Z [inf]  ✓ All 178 permissions upserted
+2025-11-26T17:17:17.447971522Z [inf]  🔐 Assigning permissions to roles using bulk operations...
+2025-11-26T17:17:17.857944230Z [inf]    ✓ Super Admin already has all required permissions
+2025-11-26T17:17:17.857993089Z [inf]    ✓ Owner already has all required permissions
+2025-11-26T17:17:17.858000859Z [inf]    ✓ Admin already has all required permissions
+2025-11-26T17:17:17.858007367Z [inf]    ✓ Employee already has all required permissions
+2025-11-26T17:17:17.858013240Z [inf]    ✓ Client already has all required permissions
+2025-11-26T17:17:17.858019376Z [inf]  ✅ All role permissions assigned
+2025-11-26T17:17:19.304750537Z [inf]  📦 Migrating 1 contacts to client_contacts junction table...
+2025-11-26T17:17:19.428431099Z [inf]  ✓ Client-contact relationships migrated successfully
+2025-11-26T17:17:19.428438470Z [inf]  🌱 Creating persistent seed accounts...
+2025-11-26T17:17:21.514719801Z [inf]  Note: LLM config will be created after onboarding service initializes
+2025-11-26T17:17:21.514727357Z [inf]  ✅ Persistent seed accounts ready for roleplay
+2025-11-26T17:17:21.514733105Z [inf]  ✅ LLM Configuration Service initialized
+2025-11-26T17:17:21.514738382Z [inf]  🤖 Initializing AI Agent Foundry...
+2025-11-26T17:17:21.514743561Z [inf]  Initializing Agent Registry...
+2025-11-26T17:17:21.514748419Z [inf]  Loaded agent: Cadence (cadence)
+2025-11-26T17:17:22.086386488Z [inf]  Loaded agent: Echo (echo)
+2025-11-26T17:17:22.614907127Z [inf]  Loaded agent: Forma (forma)
+2025-11-26T17:17:22.614914042Z [inf]  Loaded agent: Luca (luca)
+2025-11-26T17:17:23.362436918Z [inf]  Loaded agent: Lynk (lynk)
+2025-11-26T17:17:23.638381869Z [inf]  Loaded agent: OmniSpectra (omnispectra)
+2025-11-26T17:17:23.980355023Z [inf]  Loaded agent: Parity AI (parity)
+2025-11-26T17:17:24.847446514Z [inf]  Loaded agent: Radar (radar)
+2025-11-26T17:17:24.847455960Z [inf]  Loaded agent: Relay (relay)
+2025-11-26T17:17:25.130288976Z [inf]  Loaded agent: Scribe (scribe)
+2025-11-26T17:17:25.675967761Z [inf]  Loaded agent: Trace (trace)
+2025-11-26T17:17:25.901067792Z [inf]  Agent Registry initialized with 11 agents
+2025-11-26T17:17:25.901081939Z [inf]  ✅ Agent Foundry initialized successfully
+2025-11-26T17:17:25.901101924Z [inf]  ⏰ Initializing recurring scheduler service...
+2025-11-26T17:17:25.901120059Z [inf]  Starting recurring scheduler (checking every 5 minutes)...
+2025-11-26T17:17:25.901128107Z [inf]  ✅ Recurring scheduler service started
+2025-11-26T17:17:25.901136320Z [inf]  🧠 Initializing ML analysis queue worker...
+2025-11-26T17:17:25.912840281Z [inf]  🔧 Starting ML Analysis Queue Worker...
+2025-11-26T17:17:26.364984925Z [inf]  ✅ ML Analysis Queue Worker started
+2025-11-26T17:17:26.364995301Z [inf]  ✅ ML analysis queue worker started
+2025-11-26T17:17:26.365020996Z [inf]  ✅ System initialized successfully
+2025-11-26T17:17:26.365029143Z [inf]  ✅ [Background] System initialized
+2025-11-26T17:17:26.365035494Z [inf]  🔧 [Background] Registering agent routes...
+2025-11-26T17:17:26.365048258Z [inf]  [STATIC AGENT LOADER] Registering 11 agents...
+2025-11-26T17:17:26.365054320Z [inf]  [STATIC AGENT LOADER] Registering routes for: cadence
+2025-11-26T17:17:26.365060110Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: cadence
+2025-11-26T17:17:26.365072046Z [inf]  [STATIC AGENT LOADER] Registering routes for: echo
+2025-11-26T17:17:26.365082079Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: echo
+2025-11-26T17:17:26.365088348Z [inf]  [STATIC AGENT LOADER] Registering routes for: forma
+2025-11-26T17:17:26.365095162Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: forma
+2025-11-26T17:17:26.365102106Z [inf]  [STATIC AGENT LOADER] Registering routes for: luca
+2025-11-26T17:17:26.365108755Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: luca
+2025-11-26T17:17:26.365115133Z [inf]  [STATIC AGENT LOADER] Registering routes for: lynk
+2025-11-26T17:17:26.365121977Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: lynk
+2025-11-26T17:17:26.365129165Z [inf]  [STATIC AGENT LOADER] Registering routes for: omnispectra
+2025-11-26T17:17:26.365144600Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: omnispectra
+2025-11-26T17:17:26.365152792Z [inf]  [STATIC AGENT LOADER] Registering routes for: parity
+2025-11-26T17:17:26.365159584Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: parity
+2025-11-26T17:17:26.365166798Z [inf]  [STATIC AGENT LOADER] Registering routes for: radar
+2025-11-26T17:17:26.379461915Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: radar
+2025-11-26T17:17:26.379468522Z [inf]  [STATIC AGENT LOADER] Registering routes for: relay
+2025-11-26T17:17:26.379473651Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: relay
+2025-11-26T17:17:26.379477664Z [inf]  [STATIC AGENT LOADER] Registering routes for: trace
+2025-11-26T17:17:26.379481463Z [inf]  [Trace Agent] Routes registered
+2025-11-26T17:17:26.379494229Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: trace
+2025-11-26T17:17:26.379498587Z [inf]  [STATIC AGENT LOADER] Registering routes for: scribe
+2025-11-26T17:17:26.379505054Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: scribe
+2025-11-26T17:17:26.379509071Z [inf]  [STATIC AGENT LOADER] ✅ All 11 agents registered successfully
+2025-11-26T17:17:26.379513505Z [inf]  ✅ [Background] 11 agent routes registered
+2025-11-26T17:17:26.379519863Z [inf]  [EventTriggers] Loading triggers from database...
+2025-11-26T17:17:26.379523667Z [inf]  No recurring schedules due for processing
+2025-11-26T17:17:26.784324031Z [inf]  [EventTriggers] Loaded 0 active triggers from database
+2025-11-26T17:17:26.784336498Z [inf]  ✅ [Background] Automation triggers loaded
+2025-11-26T17:17:26.784353463Z [inf]  Starting automation scheduler...
+2025-11-26T17:17:26.784362503Z [inf]  ✅ [Background] Scheduler started
+2025-11-26T17:17:26.784370493Z [inf]  ✅ [Background] Static files ready
+2025-11-26T17:17:26.784379469Z [inf]  ✅ [Background] Uploads ready
+2025-11-26T17:17:26.784386644Z [inf]  🎉 [Background] All initialization complete!
+2025-11-26T17:22:32.431286385Z [inf]  No recurring schedules due for processing
+2025-11-26T17:27:27.911660859Z [inf]  No recurring schedules due for processing
+2025-11-26T17:31:54.146038927Z [inf]  5:31:44 PM [express] POST /api/auth/register-admin 401 in 2ms :: {"error":"Authentication required"}
+2025-11-26T17:32:00.659953243Z [inf]  5:32:00 PM [express] POST /api/auth/register-admin 401 in 1ms :: {"error":"Authentication required"}
+2025-11-26T17:32:30.418273936Z [inf]  No recurring schedules due for processing
+2025-11-26T17:33:42.227409503Z [inf]  5:33:35 PM [express] POST /api/auth/forgot-password 200 in 294ms :: {"message":"If an account exists…
+2025-11-26T17:34:23.582046927Z [inf]  5:34:19 PM [express] POST /api/auth/forgot-password 200 in 198ms :: {"message":"If an account exists…
+2025-11-26T17:36:34.898912380Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T17:36:34.898919794Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-11-26T17:36:34.898925815Z [err]      at async MLAnalysisQueueService.claimJobs (file:///app/dist/start.js:11378:25)
+2025-11-26T17:36:34.898931799Z [err]      at async MLAnalysisQueueService.processNextBatch (file:///app/dist/start.js:11350:24)
+2025-11-26T17:36:34.898937979Z [err]      at async Timeout._onTimeout (file:///app/dist/start.js:11310:13)
+2025-11-26T17:36:34.898944338Z [inf]  🔑 [LOGIN] Password verification result: true
+2025-11-26T17:36:34.898950955Z [inf]  ✓ [LOGIN] Account is active
+2025-11-26T17:36:34.898957502Z [inf]  📧 [LOGIN] Email verified: false Legacy user: true
+2025-11-26T17:36:34.898964517Z [inf]  ✓ [LOGIN] Auto-verifying legacy user: david@technova.com
+2025-11-26T17:36:34.898972231Z [inf]  🔐 [LOGIN] MFA enabled: false
+2025-11-26T17:36:34.898978821Z [inf]  5:36:33 PM [express] POST /api/auth/login 200 in 2062ms :: {"user":{"id":"2d25c2b3-0af2-4497-8e7f-f2…
+2025-11-26T17:36:34.899077050Z [inf]  🔐 [LOGIN] Attempt for email: david@technova.com
+2025-11-26T17:36:34.899083305Z [inf]  🔐 [LOGIN] Password provided: true Length: 10
+2025-11-26T17:36:34.899092219Z [inf]  ✓ [LOGIN] User found: 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 HasPassword: true PasswordLength: 60
+2025-11-26T17:36:34.899098647Z [err]  ❌ Error processing job batch: Error: Connection terminated unexpectedly
+2025-11-26T17:36:36.030249793Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:36.030256607Z [inf]  5:36:35 PM [express] GET /api/user/workspaces 403 in 1006ms :: {"error":"Access denied: You do not h…
+2025-11-26T17:36:36.030263622Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.131052365Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.164365391Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.164377518Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.220714575Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.220719577Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.231703656Z [inf]  🔗 New database connection established
+2025-11-26T17:36:36.244739976Z [inf]  🔗 New database connection established
+2025-11-26T17:36:37.081273666Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.081391426Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.081409850Z [inf]  5:36:36 PM [express] GET /api/users/me 403 in 2262ms :: {"error":"Access denied: You do not have acc…
+2025-11-26T17:36:37.081484822Z [inf]  5:36:36 PM [express] GET /api/client-portal/stats 403 in 2185ms :: {"error":"Access denied: You do n…
+2025-11-26T17:36:37.108394979Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.120344077Z [inf]  5:36:36 PM [express] GET /api/notifications/unread-count 403 in 2215ms :: {"error":"Access denied: Y…
+2025-11-26T17:36:37.120355363Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.120363440Z [inf]  5:36:36 PM [express] GET /api/llm-configurations 403 in 2211ms :: {"error":"Access denied: You do no…
+2025-11-26T17:36:37.174969779Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.174980452Z [inf]  5:36:36 PM [express] GET /api/client-portal/tasks 403 in 2237ms :: {"error":"Access denied: You do n…
+2025-11-26T17:36:37.186291534Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.186303822Z [inf]  5:36:36 PM [express] GET /api/notifications 403 in 2236ms :: {"error":"Access denied: You do not hav…
+2025-11-26T17:36:37.186310972Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.186316778Z [inf]  5:36:36 PM [express] GET /api/client-portal/documents 403 in 2245ms :: {"error":"Access denied: You …
+2025-11-26T17:36:37.224001649Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:36:37.224011485Z [inf]  5:36:36 PM [express] GET /api/organizations/54be99cc-7362-4f47-bdf1-dbb539a00c90 403 in 2259ms :: {"…
+2025-11-26T17:37:07.622321952Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:37:07.622328413Z [inf]  5:37:03 PM [express] GET /api/client-portal/tasks 403 in 1010ms :: {"error":"Access denied: You do n…
+2025-11-26T17:37:07.622334312Z [err]  [SECURITY] User 2d25c2b3-0af2-4497-8e7f-f210bd581dc3 attempted to access organization 54be99cc-7362-4f47-bdf1-dbb539a00c90 without membership
+2025-11-26T17:37:07.622340808Z [inf]  5:37:05 PM [express] GET /api/client-portal/forms 403 in 1009ms :: {"error":"Access denied: You do n…
+2025-11-26T17:37:27.446198819Z [inf]  No recurring schedules due for processing

@@ -117,6 +117,7 @@ export class MLAnalysisQueueService {
 
   /**
    * Process next batch of jobs (limited concurrency)
+   * Handles connection termination gracefully for Railway/cloud deployments
    */
   private async processNextBatch(): Promise<void> {
     this.isProcessing = true;
@@ -147,8 +148,22 @@ export class MLAnalysisQueueService {
       console.log(
         `✅ Completed ${successCount}/${jobs.length} ML analysis jobs`
       );
-    } catch (error) {
-      console.error("❌ Error processing job batch:", error);
+    } catch (error: any) {
+      // Handle connection termination gracefully (Railway/cloud DB connections)
+      const errorMessage = error?.message || String(error);
+      const isConnectionError = 
+        errorMessage.includes('Connection terminated') ||
+        errorMessage.includes('connection reset') ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('Connection refused');
+      
+      if (isConnectionError) {
+        // Suppress verbose logging for connection errors - these auto-recover
+        console.warn("⚠️  ML Queue: DB connection interrupted, will retry next cycle");
+      } else {
+        console.error("❌ Error processing job batch:", error);
+      }
     } finally {
       this.isProcessing = false;
     }

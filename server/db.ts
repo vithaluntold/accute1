@@ -26,8 +26,8 @@ function createPool() {
       connectionString: dbUrl,
       // Production-optimized settings for Railway + Neon
       max: 10,                       // Slightly larger pool
-      min: 2,                        // Keep 2 warm connections
-      idleTimeoutMillis: 20000,      // 20 seconds idle timeout
+      min: 1,                        // Keep 1 warm connection (reduced for Railway)
+      idleTimeoutMillis: 10000,      // 10 seconds idle timeout (Railway terminates long idle)
       connectionTimeoutMillis: 5000, // 5 seconds to connect (fast fail for health checks)
       allowExitOnIdle: false,        // Don't exit when idle
       // SSL required for both Railway proxy and Neon
@@ -38,9 +38,17 @@ function createPool() {
     
     const pool = new Pool(poolConfig);
     
-    // Handle pool errors gracefully
+    // Handle pool errors gracefully - connection termination is expected in cloud
     pool.on('error', (err) => {
-      console.error('💥 Database pool error:', err.message);
+      const errorMsg = err.message || '';
+      // Suppress verbose logging for expected connection resets
+      if (errorMsg.includes('Connection terminated') || 
+          errorMsg.includes('ECONNRESET') ||
+          errorMsg.includes('connection reset')) {
+        // Silent recovery - pool will auto-reconnect on next query
+      } else {
+        console.error('💥 Database pool error:', err.message);
+      }
       // Don't crash - let the pool recover
     });
     
