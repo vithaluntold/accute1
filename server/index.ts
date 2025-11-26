@@ -362,6 +362,7 @@ export async function startServer() {
       if (!dbConnected) {
         console.error('❌ [Background] Database connection failed');
         setInitializationStatus(false, 'Database connection failed');
+        setLocalInitStatus(false, 'Database connection failed');
         return;
       }
       
@@ -370,6 +371,7 @@ export async function startServer() {
       await initializeSystem(app);
       console.log('✅ [Background] System initialized');
       setInitializationStatus(true, null);
+      setLocalInitStatus(true, null);
       
       // Register agent routes
       console.log('🔧 [Background] Registering agent routes...');
@@ -440,17 +442,23 @@ export async function startServer() {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('❌ [Background] Initialization failed:', errorMsg);
       setInitializationStatus(false, errorMsg);
+      setLocalInitStatus(false, errorMsg);
     }
   })();
 }
 
-// Detect if this is build time (esbuild) or runtime
-// During esbuild bundling, process.argv[1] contains 'esbuild'
-// At runtime, it contains the actual script path
-const isBuildTime = process.argv[1]?.includes('esbuild') || 
-                    process.argv.some(arg => arg.includes('esbuild'));
+// Initialization tracking - shared with start.ts
+let initializationComplete = false;
+let initializationError: string | null = null;
 
-// Only start server at runtime, NOT during esbuild bundling
-if (!isBuildTime) {
-  startServer();
+export function getInitializationStatus() {
+  return { complete: initializationComplete, error: initializationError };
 }
+
+export function setLocalInitStatus(complete: boolean, error: string | null) {
+  initializationComplete = complete;
+  initializationError = error;
+}
+
+// NOTE: startServer() is called by server/start.ts at runtime only.
+// This file is bundled by esbuild but should NOT auto-execute.

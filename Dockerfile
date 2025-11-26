@@ -48,5 +48,5 @@ ENV PORT=5000
 # Expose port
 EXPOSE 5000
 
-# Start the application
-CMD ["npm", "run", "start"]
+# Start the application using the runtime entry point
+CMD ["node", "dist/start.js"]
