@@ -281,7 +281,7 @@ export default function ReportBuilder() {
                     <SelectValue placeholder="Custom Report" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Custom Report</SelectItem>
+                    <SelectItem value="_custom">Custom Report</SelectItem>
                     {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
@@ -404,7 +404,7 @@ export default function ReportBuilder() {
                     <SelectValue placeholder="No grouping" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Grouping</SelectItem>
+                    <SelectItem value="_none">No Grouping</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
                     <SelectItem value="month">Month</SelectItem>
                     <SelectItem value="assignedTo">Assigned To</SelectItem>

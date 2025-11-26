@@ -367,7 +367,7 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {clients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
@@ -387,7 +387,7 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {projects?.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
@@ -408,7 +408,7 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="_none">None</SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.fullName || user.email}

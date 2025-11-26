@@ -480,7 +480,7 @@ export default function Automation() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">Any workflow</SelectItem>
+                            <SelectItem value="_any">Any workflow</SelectItem>
                             {workflows.map((workflow) => (
                               <SelectItem key={workflow.id} value={workflow.id}>
                                 {workflow.name}
@@ -507,7 +507,7 @@ export default function Automation() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Any stage</SelectItem>
+                              <SelectItem value="_any">Any stage</SelectItem>
                               {stages.map((stage: any) => (
                                 <SelectItem key={stage.id} value={stage.id}>
                                   {stage.name}
@@ -535,7 +535,7 @@ export default function Automation() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Any step</SelectItem>
+                              <SelectItem value="_any">Any step</SelectItem>
                               {scopedSteps.map((step: any) => (
                                 <SelectItem key={step.id} value={step.id}>
                                   {step.name}
@@ -634,7 +634,7 @@ export default function Automation() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="_none">None</SelectItem>
                                 {targetSteps.map((step: any) => (
                                   <SelectItem key={step.id} value={step.id}>
                                     {step.name}
