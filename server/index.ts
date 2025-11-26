@@ -326,108 +326,95 @@ app.use((req, res, next) => {
     });
     
     // Initialize WebSocket servers for user-to-user real-time communication
-    // Team Chat and Live Chat use lazy loading (initialize on first connection)
-    // Roundtable uses SSE (Server-Sent Events) for real-time collaboration
     console.log('🔧 Initializing WebSocket servers...');
     try {
       setupLazyWebSocketLoader(server);
     } catch (wsError) {
       console.error('❌ WebSocket server initialization failed:', wsError);
-      console.warn('⚠️  Continuing without WebSocket support');
     }
     
-    // CRITICAL: Initialize system FIRST to ensure agents are ready
-    // This blocks until AI agents and LLM configs are initialized
-    console.log('🔧 Starting system initialization...');
+    // CRITICAL: Run ALL database-dependent initialization in background
+    // This ensures health checks respond immediately while DB work continues
+    console.log('🔧 Starting background initialization...');
     console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET (length: ' + process.env.DATABASE_URL.length + ')' : 'NOT SET'}`);
-    console.log(`   ENCRYPTION_KEY: ${process.env.ENCRYPTION_KEY ? 'SET (length: ' + process.env.ENCRYPTION_KEY.length + ')' : 'NOT SET'}`);
-    console.log(`   AZURE_OPENAI_API_KEY: ${process.env.AZURE_OPENAI_API_KEY ? 'SET' : 'NOT SET'}`);
+    console.log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
     
-    // Warmup database connection before system initialization
-    // Use shorter timeouts in production to pass health checks faster
-    console.log('🔧 Warming up database connection...');
-    const { pool } = await import('./db');
-    const maxAttempts = process.env.NODE_ENV === 'production' ? 3 : 5;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Background initialization - does NOT block health checks
+    (async () => {
       try {
-        const client = await pool.connect();
-        await client.query('SELECT 1');
-        client.release();
-        console.log(`✅ Database connection verified (attempt ${attempt})`);
-        break;
-      } catch (dbError: any) {
-        console.log(`   Database warmup attempt ${attempt}/${maxAttempts} failed: ${dbError.message}`);
-        if (attempt < maxAttempts) {
-          const waitTime = process.env.NODE_ENV === 'production' ? 500 : Math.min(1000 * attempt, 3000);
-          console.log(`   Retrying in ${waitTime}ms...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        } else {
-          console.warn('⚠️ Database warmup failed - continuing anyway (app can recover later)');
+        // Warmup database connection with retry
+        console.log('🔧 [Background] Warming up database connection...');
+        const { pool } = await import('./db');
+        let dbConnected = false;
+        const maxAttempts = 10;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            const client = await pool.connect();
+            await client.query('SELECT 1');
+            client.release();
+            console.log(`✅ [Background] Database connected (attempt ${attempt})`);
+            dbConnected = true;
+            break;
+          } catch (dbError: any) {
+            console.log(`   [Background] DB attempt ${attempt}/${maxAttempts}: ${dbError.message}`);
+            if (attempt < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
         }
-      }
-    }
-    
-    try {
-      await initializeSystem(app);
-      console.log('✅ System initialized successfully');
-      setInitializationStatus(true, null);
-      
-      // NOW register agent routes AFTER agents are initialized but BEFORE Vite
-      // This ensures routes exist before Vite's catch-all middleware
-      console.log('🔧 Registering AI agent routes (AFTER initialization)...');
-      try {
+        
+        if (!dbConnected) {
+          console.error('❌ [Background] Database connection failed after all attempts');
+          setInitializationStatus(false, 'Database connection failed');
+          return;
+        }
+        
+        // System initialization
+        console.log('🔧 [Background] Running system initialization...');
+        await initializeSystem(app);
+        console.log('✅ [Background] System initialized');
+        setInitializationStatus(true, null);
+        
+        // Register agent routes
+        console.log('🔧 [Background] Registering agent routes...');
         const { registerAllAgentRoutes, getAvailableAgents } = await import("./agents-static.js");
         const { registerAgentSessionRoutes } = await import("./agent-sessions");
         const agentSlugs = getAvailableAgents();
-        
-        console.log(`📋 Registering ${agentSlugs.length} agent routes...`);
         registerAllAgentRoutes(agentSlugs, app);
-        
-        // Register session routes for all agents
-        console.log(`📋 Registering session routes for ${agentSlugs.length} agents...`);
         for (const slug of agentSlugs) {
           registerAgentSessionRoutes(app, slug);
         }
+        console.log(`✅ [Background] ${agentSlugs.length} agent routes registered`);
         
-        console.log('✅ Agent routes registered successfully');
-      } catch (agentError) {
-        console.error('❌ CRITICAL: Failed to register agent routes:', agentError);
-        throw new Error(`Agent registration failed: ${agentError}`);
+        // Load automation triggers
+        try {
+          const { getEventTriggersEngine } = await import('./event-triggers');
+          const { storage } = await import('./storage');
+          const eventEngine = getEventTriggersEngine(storage);
+          await eventEngine.loadTriggersFromDatabase();
+          console.log('✅ [Background] Automation triggers loaded');
+        } catch (e) {
+          console.warn('⚠️ [Background] Automation triggers failed:', e);
+        }
+        
+        // Start scheduler
+        try {
+          const { schedulerService } = await import('./scheduler-service');
+          schedulerService.start();
+          console.log('✅ [Background] Scheduler started');
+        } catch (e) {
+          console.warn('⚠️ [Background] Scheduler failed:', e);
+        }
+        
+        console.log('🎉 [Background] All initialization complete!');
+        
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('❌ [Background] Initialization failed:', errorMsg);
+        setInitializationStatus(false, errorMsg);
       }
-    } catch (initError) {
-      const errorMsg = initError instanceof Error ? initError.message : String(initError);
-      console.error('❌ System initialization failed:', initError);
-      console.error('Stack trace:', initError instanceof Error ? initError.stack : 'N/A');
-      setInitializationStatus(false, errorMsg);
-      console.warn('⚠️  Server running with limited functionality');
-    }
-    
-    console.log('🎉 System initialization complete!');
-    
-    // Load automation triggers from database into memory
-    console.log('🔧 Loading automation triggers from database...');
-    try {
-      const { getEventTriggersEngine } = await import('./event-triggers');
-      const { storage } = await import('./storage');
-      const eventEngine = getEventTriggersEngine(storage);
-      await eventEngine.loadTriggersFromDatabase();
-      console.log('✅ Automation triggers loaded successfully');
-    } catch (triggerError) {
-      console.error('❌ Failed to load automation triggers:', triggerError);
-      console.warn('⚠️  Continuing without automation triggers - they can be created via API');
-    }
-    
-    // Start automation scheduler for time-based triggers
-    console.log('🔧 Starting automation scheduler...');
-    try {
-      const { schedulerService } = await import('./scheduler-service');
-      schedulerService.start();
-      console.log('✅ Automation scheduler started successfully');
-    } catch (schedulerError) {
-      console.error('❌ Failed to start scheduler:', schedulerError);
-      console.warn('⚠️  Continuing without scheduler - time-based triggers will not execute');
-    }
+    })();
     
     // CRITICAL: Setup Vite/static serving AFTER agent routes are registered
     // This prevents Vite's catch-all from intercepting agent endpoints

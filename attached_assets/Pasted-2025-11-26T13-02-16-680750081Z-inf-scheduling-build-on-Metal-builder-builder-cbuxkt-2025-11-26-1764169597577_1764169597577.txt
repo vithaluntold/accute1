@@ -1,0 +1,83 @@
+2025-11-26T13:02:16.680750081Z [inf]  scheduling build on Metal builder "builder-cbuxkt"
+2025-11-26T13:02:37.324428261Z [inf]  [snapshot] received sha256:51a35891f13c6d78b66e9c65a08e86405ec6d43470f934585cea048122eb1ca4 md5:9a05c2e789be8896cf7d2b16f3d54f40
+2025-11-26T13:02:37.324582613Z [inf]  [snapshot] receiving snapshot, complete 75 MB [took 17.054909862s]
+2025-11-26T13:02:37.682348055Z [inf]  [snapshot] analyzing snapshot, complete 75 MB [took 304.597862ms]
+2025-11-26T13:02:41.448633063Z [inf]  [snapshot] uploading snapshot, complete 75 MB [took 3.766453881s]
+2025-11-26T13:02:43.070165731Z [inf]  scheduling build on Metal builder "builder-pojtuv"
+2025-11-26T13:02:45.427180906Z [inf]  fetched snapshot sha256:51a35891f13c6d78b66e9c65a08e86405ec6d43470f934585cea048122eb1ca4 (75 MB bytes)
+2025-11-26T13:02:45.427277137Z [inf]  fetching snapshot
+2025-11-26T13:02:46.251217851Z [inf]  unpacking archive
+2025-11-26T13:02:46.798627242Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T13:02:46.798637572Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T13:02:46.799069972Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T13:02:46.942761409Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T13:02:46.978985051Z [inf]  [internal] load metadata for docker.io/library/node:20-alpine
+2025-11-26T13:02:47.101950739Z [inf]  [internal] load metadata for docker.io/library/node:20-alpine
+2025-11-26T13:02:47.102833980Z [inf]  [internal] load .dockerignore
+2025-11-26T13:02:47.102929900Z [inf]  [internal] load .dockerignore
+2025-11-26T13:02:47.103271250Z [inf]  [internal] load .dockerignore
+2025-11-26T13:02:47.293073537Z [inf]  [internal] load .dockerignore
+2025-11-26T13:02:47.333156582Z [inf]  [production 6/9] COPY --from=builder /app/package*.json ./
+2025-11-26T13:02:47.333161332Z [inf]  [production 5/9] COPY --from=builder /app/node_modules ./node_modules
+2025-11-26T13:02:47.333162362Z [inf]  [production 4/9] COPY --from=builder /app/dist ./dist
+2025-11-26T13:02:47.333162932Z [inf]  [builder 7/7] RUN npm run build
+2025-11-26T13:02:47.333163812Z [inf]  [builder 6/7] COPY . .
+2025-11-26T13:02:47.333164142Z [inf]  [production 8/9] COPY --from=builder /app/public ./public
+2025-11-26T13:02:47.333164442Z [inf]  [builder 4/7] COPY package*.json ./
+2025-11-26T13:02:47.333165172Z [inf]  [internal] load build context
+2025-11-26T13:02:47.333165672Z [inf]  [builder 3/7] RUN apk add --no-cache python3 make g++ openssl
+2025-11-26T13:02:47.333166382Z [inf]  [production 3/9] RUN apk add --no-cache openssl
+2025-11-26T13:02:47.333166722Z [inf]  [builder 2/7] WORKDIR /app
+2025-11-26T13:02:47.333167032Z [inf]  [production 7/9] COPY --from=builder /app/agents ./agents
+2025-11-26T13:02:47.333167442Z [inf]  [production 9/9] RUN mkdir -p uploads
+2025-11-26T13:02:47.333168132Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T13:02:47.333171252Z [inf]  [builder 5/7] RUN npm ci --prefer-offline
+2025-11-26T13:02:47.333500962Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T13:02:47.333510722Z [inf]  [internal] load build context
+2025-11-26T13:02:47.345429943Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T13:02:47.346508794Z [inf]  [internal] load build context
+2025-11-26T13:02:48.016245283Z [inf]  [internal] load build context
+2025-11-26T13:02:48.080049039Z [inf]  [builder 2/7] WORKDIR /app
+2025-11-26T13:02:48.080053099Z [inf]  [production 3/9] RUN apk add --no-cache openssl
+2025-11-26T13:02:48.080053559Z [inf]  [builder 3/7] RUN apk add --no-cache python3 make g++ openssl
+2025-11-26T13:02:48.080053779Z [inf]  [builder 4/7] COPY package*.json ./
+2025-11-26T13:02:48.080053929Z [inf]  [builder 5/7] RUN npm ci --prefer-offline
+2025-11-26T13:02:48.080054069Z [inf]  [builder 6/7] COPY . .
+2025-11-26T13:02:48.080054209Z [inf]  [builder 7/7] RUN npm run build
+2025-11-26T13:02:48.080054349Z [inf]  [production 4/9] COPY --from=builder /app/dist ./dist
+2025-11-26T13:02:48.080054479Z [inf]  [production 5/9] COPY --from=builder /app/node_modules ./node_modules
+2025-11-26T13:02:48.080054619Z [inf]  [production 6/9] COPY --from=builder /app/package*.json ./
+2025-11-26T13:02:48.080054759Z [inf]  [production 7/9] COPY --from=builder /app/agents ./agents
+2025-11-26T13:02:48.080054899Z [inf]  [production 8/9] COPY --from=builder /app/public ./public
+2025-11-26T13:02:48.080055039Z [inf]  [production 9/9] RUN mkdir -p uploads
+2025-11-26T13:02:48.082810181Z [inf]  exporting to docker image format
+2025-11-26T13:02:49.172540249Z [inf]  exporting to docker image format
+2025-11-26T13:02:49.214734476Z [inf]  containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6NTEzNTU4MmNmZThkYTc1MzE4MDU5ZmJkNTQ3NjAzMmVkM2M3NTViZjNhMWU4Y2IxNDJmNDIxZTM5Nzg2Y2RhNyIsInNpemUiOjI1NzcsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNS0xMS0yNlQxMzowMjo0OFoifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+2025-11-26T13:02:49.214741676Z [inf]  containerimage.config.digest: sha256:afc8856f44f352fd1d72b0678091fd002ea64f43778b334f228363da31683109
+2025-11-26T13:02:49.214743616Z [inf]  containerimage.digest: sha256:5135582cfe8da75318059fbd5476032ed3c755bf3a1e8cb142f421e39786cda7
+2025-11-26T13:02:55.299652046Z [inf]  image push done
+2025-11-26T13:03:27.478547452Z [inf]  
+2025-11-26T13:03:27.478664299Z [inf]  [35m====================
+Starting Healthcheck
+====================
+[0m
+2025-11-26T13:03:27.478669397Z [inf]  [37mPath: /api/health[0m
+2025-11-26T13:03:27.478672441Z [inf]  [37mRetry window: 5m0s[0m
+2025-11-26T13:03:27.478674332Z [inf]  
+2025-11-26T13:03:31.697720368Z [inf]  [93mAttempt #1 failed with service unavailable. Continuing to retry for 4m55s[0m
+2025-11-26T13:03:32.771298061Z [inf]  [93mAttempt #2 failed with service unavailable. Continuing to retry for 4m54s[0m
+2025-11-26T13:03:34.848888789Z [inf]  [93mAttempt #3 failed with service unavailable. Continuing to retry for 4m52s[0m
+2025-11-26T13:03:38.926804712Z [inf]  [93mAttempt #4 failed with service unavailable. Continuing to retry for 4m48s[0m
+2025-11-26T13:03:47.002113527Z [inf]  [93mAttempt #5 failed with service unavailable. Continuing to retry for 4m40s[0m
+2025-11-26T13:04:03.202470415Z [inf]  [93mAttempt #6 failed with service unavailable. Continuing to retry for 4m24s[0m
+2025-11-26T13:04:33.312611830Z [inf]  [93mAttempt #7 failed with service unavailable. Continuing to retry for 3m54s[0m
+2025-11-26T13:05:03.465577963Z [inf]  [93mAttempt #8 failed with service unavailable. Continuing to retry for 3m24s[0m
+2025-11-26T13:05:33.544637741Z [inf]  [93mAttempt #9 failed with service unavailable. Continuing to retry for 2m53s[0m
+2025-11-26T13:06:03.622922913Z [inf]  [93mAttempt #10 failed with service unavailable. Continuing to retry for 2m23s[0m
+2025-11-26T13:06:33.697150634Z [inf]  [93mAttempt #11 failed with service unavailable. Continuing to retry for 1m53s[0m
+2025-11-26T13:07:03.781780443Z [inf]  [93mAttempt #12 failed with service unavailable. Continuing to retry for 1m23s[0m
+2025-11-26T13:07:33.859190085Z [inf]  [93mAttempt #13 failed with service unavailable. Continuing to retry for 53s[0m
+2025-11-26T13:08:03.948627463Z [inf]  [93mAttempt #14 failed with service unavailable. Continuing to retry for 23s[0m
+2025-11-26T13:08:04.040893979Z [inf]  
+2025-11-26T13:08:04.041089470Z [inf]  [91m1/1 replicas never became healthy![0m
+2025-11-26T13:08:04.041094846Z [inf]  [91mHealthcheck failed![0m
