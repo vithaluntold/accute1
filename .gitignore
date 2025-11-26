@@ -4,3 +4,34 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment files (add your own .env for local development)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor directories
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+
+# Uploads (user-generated content)
+uploads/*
+!uploads/.gitkeep
+
+# Test files
+coverage/
+.nyc_output/
+
+# Replit specific (optional - remove if you want to keep replit config)
+.replit
+replit.nix
