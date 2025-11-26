@@ -1,6 +1,6 @@
 /**
  * Runtime entry point for the server.
- * Separated from index.ts to prevent build-time execution.
+ * Uses static imports so esbuild can bundle everything together.
  */
 
 // EARLY LOGGING - before any imports that might fail
@@ -12,14 +12,15 @@ console.log('🔧 [START] JWT_SECRET exists:', !!process.env.JWT_SECRET);
 console.log('🔧 [START] SESSION_SECRET exists:', !!process.env.SESSION_SECRET);
 console.log('🔧 [START] ENCRYPTION_KEY exists:', !!process.env.ENCRYPTION_KEY);
 
-// Import and start server
 console.log('🔧 [START] Loading server module...');
 
-import('./index.js')
-  .then((module) => {
-    console.log('✅ [START] Server module loaded successfully');
-    return module.startServer();
-  })
+// Static import - esbuild will bundle this
+import { startServer } from './index.js';
+
+console.log('✅ [START] Server module loaded successfully');
+
+// Start the server
+startServer()
   .then(() => {
     console.log('✅ [START] Server started successfully');
   })
