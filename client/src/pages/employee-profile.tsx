@@ -595,65 +595,67 @@ export default function EmployeeProfile() {
                 </div>
 
                 {/* Phone with Verification */}
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="countryCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Country Code <span className="text-destructive">*</span></FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          data-testid="select-country-code"
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select country code" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {COUNTRY_CODES.map(({ code, country }) => (
-                              <SelectItem key={code} value={code}>
-                                {code} ({country})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <div className="flex gap-2">
-                          <FormControl>
-                            <Input {...field} placeholder="1234567890" data-testid="input-phone" />
-                          </FormControl>
-                          <Button
-                            type="button"
-                            variant={currentUser?.phoneVerified ? "outline" : "default"}
-                            onClick={() => setShowPhoneVerification(true)}
-                            data-testid="button-verify-phone"
+                <div className="space-y-2">
+                  <FormLabel>Phone Number <span className="text-destructive">*</span></FormLabel>
+                  <div className="flex gap-2">
+                    <FormField
+                      control={form.control}
+                      name="countryCode"
+                      render={({ field }) => (
+                        <FormItem className="w-[140px] shrink-0">
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            data-testid="select-country-code"
                           >
-                            <Phone className="h-4 w-4 mr-2" />
-                            {currentUser?.phoneVerified ? "Verified" : "Verify"}
-                          </Button>
-                        </div>
-                        {currentUser?.phoneVerified && (
-                          <FormDescription className="text-green-600">
-                            ✓ Verified on {new Date(currentUser.phoneVerifiedAt).toLocaleDateString()}
-                          </FormDescription>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="+1" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {COUNTRY_CODES.map(({ code, country }) => (
+                                <SelectItem key={code} value={code}>
+                                  {code} ({country})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input {...field} placeholder="1234567890" data-testid="input-phone" />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant={currentUser?.phoneVerified ? "outline" : "default"}
+                              onClick={() => setShowPhoneVerification(true)}
+                              className="shrink-0"
+                              data-testid="button-verify-phone"
+                            >
+                              <Phone className="h-4 w-4 mr-2" />
+                              {currentUser?.phoneVerified ? "Verified" : "Verify"}
+                            </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {currentUser?.phoneVerified && (
+                    <p className="text-sm text-green-600">
+                      ✓ Verified on {new Date(currentUser.phoneVerifiedAt).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
 
                 <Separator />
