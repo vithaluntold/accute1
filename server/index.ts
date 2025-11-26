@@ -185,7 +185,12 @@ app.use(express.urlencoded({ extended: false }));
 
 // SECURITY: HTTPS Enforcement in Production for API routes only
 // Prevents man-in-the-middle attacks on payment data
+// EXEMPT: Health endpoint must work over HTTP for Railway/cloud provider internal healthchecks
 app.use('/api', (req, res, next) => {
+  // Health endpoint must always work (internal healthchecks use HTTP)
+  if (req.path === '/api/health' || req.path === '/health') {
+    return next();
+  }
   if (process.env.NODE_ENV === 'production' && !req.secure && req.get('x-forwarded-proto') !== 'https') {
     return res.status(403).json({ 
       error: 'HTTPS required for secure payment processing',
@@ -199,6 +204,10 @@ app.use('/api', (req, res, next) => {
 // Protects against XSS, clickjacking, MIME sniffing, and other attacks
 // Only applied to /api/* routes to avoid interfering with Vite dev server
 app.use('/api', (req, res, next) => {
+  // Health endpoint gets minimal headers for fast healthcheck responses
+  if (req.path === '/api/health' || req.path === '/health') {
+    return next();
+  }
   // Prevent MIME type sniffing
   res.setHeader('X-Content-Type-Options', 'nosniff');
   
