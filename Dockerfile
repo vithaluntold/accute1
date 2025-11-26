@@ -32,6 +32,15 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
+# Copy agents directory (required for Agent Registry at runtime)
+COPY --from=builder /app/agents ./agents
+
+# Copy public assets
+COPY --from=builder /app/public ./public
+
+# Copy uploads directory structure
+RUN mkdir -p uploads
+
 # Set environment
 ENV NODE_ENV=production
 ENV PORT=5000
