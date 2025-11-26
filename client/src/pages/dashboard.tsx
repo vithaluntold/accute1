@@ -155,19 +155,21 @@ export default function Dashboard() {
 
       {/* 21-Day Onboarding Banner for New Users */}
       {showOnboardingBanner && (
-        <Card className="border-primary bg-gradient-to-r from-[#e5a660]/10 to-[#d76082]/10" data-testid="card-onboarding-banner">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="flex gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Rocket className="h-6 w-6 text-primary" />
+        <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-primary/5 via-card to-primary/10" data-testid="card-onboarding-banner">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-primary/15 to-transparent rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-primary/10 to-transparent rounded-full translate-y-1/2 -translate-x-1/3 blur-xl" />
+          <CardHeader className="pb-4 relative z-10">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex gap-4 items-start">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-md">
+                  <Rocket className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <div>
-                  <CardTitle className="flex items-center gap-2">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                     Start Your 21-Day Journey
-                    <Sparkles className="h-4 w-4 text-primary" />
+                    <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                   </CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardDescription>
                     Complete daily tasks, earn points, unlock features, and master Accute in just 3 weeks!
                   </CardDescription>
                 </div>
@@ -175,6 +177,7 @@ export default function Dashboard() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="shrink-0"
                 onClick={dismissOnboardingBanner}
                 data-testid="button-dismiss-onboarding-banner"
               >
@@ -182,14 +185,14 @@ export default function Dashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="flex gap-3">
+          <CardContent className="flex flex-wrap gap-3 relative z-10">
             <Link href="/onboarding">
-              <Button data-testid="button-start-onboarding" className="gap-2">
+              <Button data-testid="button-start-onboarding" className="gap-2 shadow-sm">
                 <Rocket className="h-4 w-4" />
                 Begin Your Journey
               </Button>
             </Link>
-            <Button variant="outline" onClick={dismissOnboardingBanner} data-testid="button-maybe-later">
+            <Button variant="secondary" onClick={dismissOnboardingBanner} data-testid="button-maybe-later">
               Maybe Later
             </Button>
           </CardContent>
