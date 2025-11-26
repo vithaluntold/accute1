@@ -11003,7 +11003,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
             message: `You have received a new proposal: ${existing.title || existing.proposalNumber}`,
             type: "info",
             relatedResource: "proposal",
-            relatedResourceId: existing.id,userId
+            relatedResourceId: existing.id
           });
         }
       }
@@ -15213,7 +15213,7 @@ Remember: You are a guide, not a data collector. All sensitive information goes 
       const [users, assignments, tasks, timeEntries, resourceAllocations] = await Promise.all([
         storage.getUsersByOrganization(req.user!.organizationId),
         storage.getWorkflowAssignmentsByOrganization(req.user!.organizationId),
-        db.select().from(schema.assignmentTasks).where(eq(schema.assignmentTasks.organizationId, req.user!.organizationId)),
+        db.select().from(schema.assignmentWorkflowTasks).where(eq(schema.assignmentWorkflowTasks.organizationId, req.user!.organizationId)),
         db.select().from(schema.timeEntries).where(eq(schema.timeEntries.organizationId, req.user!.organizationId)),
         // Get current resource allocations
         // CRITICAL: endDate is DATE type (midnight), compare with start of day to include full day

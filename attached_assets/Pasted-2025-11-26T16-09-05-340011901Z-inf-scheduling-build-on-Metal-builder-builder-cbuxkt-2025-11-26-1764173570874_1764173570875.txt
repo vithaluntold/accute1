@@ -1,0 +1,613 @@
+2025-11-26T16:09:05.340011901Z [inf]  scheduling build on Metal builder "builder-cbuxkt"
+2025-11-26T16:09:34.532218864Z [inf]  [snapshot] received sha256:75821399c0db635113d7435eaa5d9fe738e3dd2ba3f5578c9434f43f1635fe06 md5:c9a1ab784a7ec004c29be9226b1ea379
+2025-11-26T16:09:34.532418904Z [inf]  [snapshot] receiving snapshot, complete 75 MB [took 25.147099018s]
+2025-11-26T16:09:34.882874233Z [inf]  [snapshot] analyzing snapshot, complete 75 MB [took 344.654401ms]
+2025-11-26T16:09:37.204661595Z [inf]  [snapshot] uploading snapshot, complete 75 MB [took 2.321988084s]
+2025-11-26T16:09:38.589456474Z [inf]  scheduling build on Metal builder "builder-pojtuv"
+2025-11-26T16:09:40.907329195Z [inf]  fetched snapshot sha256:75821399c0db635113d7435eaa5d9fe738e3dd2ba3f5578c9434f43f1635fe06 (75 MB bytes)
+2025-11-26T16:09:40.907426175Z [inf]  fetching snapshot
+2025-11-26T16:09:41.752707508Z [inf]  unpacking archive
+2025-11-26T16:09:42.220411939Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T16:09:42.220456709Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T16:09:42.220648909Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T16:09:42.478202826Z [inf]  [internal] load build definition from Dockerfile
+2025-11-26T16:09:42.526884019Z [inf]  [internal] load metadata for docker.io/library/node:20-alpine
+2025-11-26T16:09:43.047621827Z [inf]  [internal] load metadata for docker.io/library/node:20-alpine
+2025-11-26T16:09:43.048663467Z [inf]  [internal] load .dockerignore
+2025-11-26T16:09:43.048680017Z [inf]  [internal] load .dockerignore
+2025-11-26T16:09:43.049069218Z [inf]  [internal] load .dockerignore
+2025-11-26T16:09:43.240784546Z [inf]  [internal] load .dockerignore
+2025-11-26T16:09:43.280612291Z [inf]  [production 6/9] COPY --from=builder /app/package*.json ./
+2025-11-26T16:09:43.280616841Z [inf]  [production 5/9] COPY --from=builder /app/node_modules ./node_modules
+2025-11-26T16:09:43.280617451Z [inf]  [production 4/9] COPY --from=builder /app/dist ./dist
+2025-11-26T16:09:43.280617931Z [inf]  [builder 7/7] RUN npm run build
+2025-11-26T16:09:43.280618401Z [inf]  [builder 6/7] COPY . .
+2025-11-26T16:09:43.280618861Z [inf]  [production 8/9] COPY --from=builder /app/public ./public
+2025-11-26T16:09:43.280619321Z [inf]  [builder 4/7] COPY package*.json ./
+2025-11-26T16:09:43.280619771Z [inf]  [internal] load build context
+2025-11-26T16:09:43.280620251Z [inf]  [builder 3/7] RUN apk add --no-cache python3 make g++ openssl libc6-compat
+2025-11-26T16:09:43.280620721Z [inf]  [production 3/9] RUN apk add --no-cache openssl libc6-compat
+2025-11-26T16:09:43.280621271Z [inf]  [builder 2/7] WORKDIR /app
+2025-11-26T16:09:43.280621741Z [inf]  [production 7/9] COPY --from=builder /app/agents ./agents
+2025-11-26T16:09:43.280622301Z [inf]  [production 9/9] RUN mkdir -p uploads
+2025-11-26T16:09:43.280625371Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T16:09:43.280625921Z [inf]  [builder 5/7] RUN npm ci --prefer-offline
+2025-11-26T16:09:43.280841552Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T16:09:43.281222572Z [inf]  [internal] load build context
+2025-11-26T16:09:43.297395236Z [inf]  [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:16858294071a56ffd4cce9f17b57136cc39e41507b40e245b4f8e906f7a19463
+2025-11-26T16:09:43.298526277Z [inf]  [builder 2/7] WORKDIR /app
+2025-11-26T16:09:43.298528107Z [inf]  [internal] load build context
+2025-11-26T16:09:43.298810697Z [inf]  [builder 3/7] RUN apk add --no-cache python3 make g++ openssl libc6-compat
+2025-11-26T16:09:43.298902497Z [inf]  [production 3/9] RUN apk add --no-cache openssl libc6-compat
+2025-11-26T16:09:43.604327306Z [inf]  fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+
+2025-11-26T16:09:43.619022009Z [inf]  fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/APKINDEX.tar.gz
+
+2025-11-26T16:09:43.698289108Z [inf]  fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+
+2025-11-26T16:09:43.702846192Z [inf]  fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/x86_64/APKINDEX.tar.gz
+
+2025-11-26T16:09:44.005653189Z [inf]  [internal] load build context
+2025-11-26T16:09:44.016865788Z [inf]  (1/4) Installing musl-obstack (1.2.3-r2)
+
+2025-11-26T16:09:44.038892698Z [inf]  (2/4) Installing libucontext (1.3.2-r0)
+
+2025-11-26T16:09:44.04078688Z [inf]  (3/4) Installing gcompat (1.1.0-r4)
+
+2025-11-26T16:09:44.043837722Z [inf]  (4/4) Installing openssl (3.5.4-r0)
+
+2025-11-26T16:09:44.053680521Z [inf]  Executing busybox-1.37.0-r19.trigger
+
+2025-11-26T16:09:44.078029612Z [inf]  OK: 11 MiB in 22 packages
+
+2025-11-26T16:09:44.096082018Z [inf]  (1/33) Installing libstdc++-dev (14.2.0-r6)
+
+2025-11-26T16:09:44.419776303Z [inf]  (2/33) Installing jansson (2.14.1-r0)
+
+2025-11-26T16:09:44.423652726Z [inf]  (3/33) Installing zstd-libs (1.5.7-r0)
+
+2025-11-26T16:09:44.432405314Z [inf]  (4/33) Installing binutils (2.44-r3)
+
+2025-11-26T16:09:44.67859514Z [inf]  (5/33) Installing libgomp (14.2.0-r6)
+
+2025-11-26T16:09:44.758546481Z [inf]  (6/33) Installing libatomic (14.2.0-r6)
+
+2025-11-26T16:09:44.770985102Z [inf]  (7/33) Installing gmp (6.3.0-r3)
+
+2025-11-26T16:09:44.781335331Z [inf]  (8/33) Installing isl26 (0.26-r1)
+
+2025-11-26T16:09:44.812386148Z [inf]  (9/33) Installing mpfr4 (4.2.1_p1-r0)
+
+2025-11-26T16:09:44.82542563Z [inf]  (10/33) Installing mpc1 (1.3.1-r1)
+
+2025-11-26T16:09:44.830823304Z [inf]  (11/33) Installing gcc (14.2.0-r6)
+
+2025-11-26T16:09:45.404738909Z [inf]  [production 3/9] RUN apk add --no-cache openssl libc6-compat
+2025-11-26T16:09:45.707217645Z [inf]  (12/33) Installing musl-dev (1.2.5-r10)
+
+2025-11-26T16:09:45.766262946Z [inf]  (13/33) Installing g++ (14.2.0-r6)
+
+2025-11-26T16:09:45.995242568Z [inf]  (14/33) Installing musl-obstack (1.2.3-r2)
+
+2025-11-26T16:09:45.997191989Z [inf]  (15/33) Installing libucontext (1.3.2-r0)
+
+2025-11-26T16:09:45.999132281Z [inf]  (16/33) Installing gcompat (1.1.0-r4)
+
+2025-11-26T16:09:46.002274004Z [inf]  (17/33) Installing make (4.4.1-r3)
+
+2025-11-26T16:09:46.006542898Z [inf]  (18/33) Installing openssl (3.5.4-r0)
+
+2025-11-26T16:09:46.014032624Z [inf]  (19/33) Installing libbz2 (1.0.8-r6)
+
+2025-11-26T16:09:46.016084626Z [inf]  (20/33) Installing libexpat (2.7.3-r0)
+
+2025-11-26T16:09:46.01969318Z [inf]  (21/33) Installing libffi (3.4.8-r0)
+
+2025-11-26T16:09:46.022829882Z [inf]  (22/33) Installing gdbm (1.24-r0)
+
+2025-11-26T16:09:46.026758546Z [inf]  (23/33) Installing xz-libs (5.8.1-r0)
+
+2025-11-26T16:09:46.033048071Z [inf]  (24/33) Installing mpdecimal (4.0.1-r0)
+
+2025-11-26T16:09:46.039164977Z [inf]  (25/33) Installing ncurses-terminfo-base (6.5_p20250503-r0)
+
+2025-11-26T16:09:46.048943565Z [inf]  (26/33) Installing libncursesw (6.5_p20250503-r0)
+
+2025-11-26T16:09:46.056659682Z [inf]  (27/33) Installing libpanelw (6.5_p20250503-r0)
+
+2025-11-26T16:09:46.058829744Z [inf]  (28/33) Installing readline (8.2.13-r1)
+
+2025-11-26T16:09:46.06568659Z [inf]  (29/33) Installing sqlite-libs (3.49.2-r1)
+
+2025-11-26T16:09:46.092177803Z [inf]  (30/33) Installing python3 (3.12.12-r0)
+
+2025-11-26T16:09:46.266532077Z [inf]  (31/33) Installing python3-pycache-pyc0 (3.12.12-r0)
+
+2025-11-26T16:09:46.368974107Z [inf]  (32/33) Installing pyc (3.12.12-r0)
+(33/33) Installing python3-pyc (3.12.12-r0)
+
+2025-11-26T16:09:46.369445487Z [inf]  Executing busybox-1.37.0-r19.trigger
+
+2025-11-26T16:09:46.389288644Z [inf]  OK: 271 MiB in 51 packages
+
+2025-11-26T16:09:47.066730290Z [inf]  [builder 3/7] RUN apk add --no-cache python3 make g++ openssl libc6-compat
+2025-11-26T16:09:47.112939170Z [inf]  [builder 4/7] COPY package*.json ./
+2025-11-26T16:09:47.491591603Z [inf]  [builder 4/7] COPY package*.json ./
+2025-11-26T16:09:47.525738933Z [inf]  [builder 5/7] RUN npm ci --prefer-offline
+2025-11-26T16:09:49.222856685Z [inf]  npm warn ERESOLVE overriding peer dependency
+
+2025-11-26T16:09:49.223324726Z [inf]  npm warn While resolving: vite@7.2.2
+npm warn Found: @types/node@20.16.11
+npm warn node_modules/@types/node
+npm warn   dev @types/node@"20.16.11" from the root project
+npm warn   38 more (@jest/console, @jest/core, @jest/environment, ...)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional @types/node@"^20.19.0 || >=22.12.0" from vite@7.2.2
+npm warn node_modules/vitest/node_modules/vite
+npm warn   vite@"^6.0.0 || ^7.0.0" from vitest@4.0.9
+npm warn   node_modules/vitest
+npm warn   1 more (@vitest/mocker)
+npm warn
+npm warn Conflicting peer dependency: @types/node@24.10.1
+npm warn node_modules/@types/node
+npm warn   peerOptional @types/node@"^20.19.0 || >=22.12.0" from vite@7.2.2
+npm warn   node_modules/vitest/node_modules/vite
+npm warn     vite@"^6.0.0 || ^7.0.0" from vitest@4.0.9
+npm warn     node_modules/vitest
+npm warn     1 more (@vitest/mocker)
+
+2025-11-26T16:09:52.428150014Z [inf]  npm warn deprecated querystring@0.2.1: The querystring API is considered Legacy. new code should use the URLSearchParams API instead.
+
+2025-11-26T16:09:52.997269284Z [inf]  npm warn deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+
+2025-11-26T16:09:53.694532837Z [inf]  npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+
+2025-11-26T16:09:53.711555812Z [inf]  npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+2025-11-26T16:09:53.714750715Z [inf]  npm warn deprecated har-validator@5.1.5: this library is no longer supported
+
+2025-11-26T16:09:54.560456228Z [inf]  npm warn deprecated build-url@1.3.3: This package is no longer maintained
+
+2025-11-26T16:09:55.853244475Z [inf]  npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+
+2025-11-26T16:09:55.884064882Z [inf]  npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+
+2025-11-26T16:09:56.348907701Z [inf]  npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+
+2025-11-26T16:09:56.589756252Z [inf]  npm warn deprecated uuid@3.4.0: Please upgrade  to version 7 or higher.  Older versions may use Math.random() in certain circumstances, which is known to be problematic.  See https://v8.dev/blog/math-random for details.
+
+2025-11-26T16:10:06.310720159Z [inf]  
+added 1265 packages, and audited 1266 packages in 18s
+
+232 packages are looking for funding
+  run `npm fund` for details
+
+2025-11-26T16:10:06.336559701Z [inf]  
+12 vulnerabilities (7 moderate, 3 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+
+2025-11-26T16:10:06.337743302Z [inf]  npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.6.4
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.4
+npm notice To update run: npm install -g npm@11.6.4
+npm notice
+
+2025-11-26T16:10:08.960248118Z [inf]  [builder 5/7] RUN npm ci --prefer-offline
+2025-11-26T16:10:09.003413636Z [inf]  [builder 6/7] COPY . .
+2025-11-26T16:10:10.209024636Z [inf]  [builder 6/7] COPY . .
+2025-11-26T16:10:10.255771687Z [inf]  [builder 7/7] RUN npm run build
+2025-11-26T16:10:10.731989906Z [inf]  
+> rest-express@1.0.0 build
+> rm -rf dist && vite build && esbuild server/start.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+
+
+2025-11-26T16:10:11.036181783Z [inf]  vite v5.4.21 building for production...
+
+2025-11-26T16:10:11.102650581Z [inf]  transforming...
+
+2025-11-26T16:10:13.208821263Z [inf]  
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+2025-11-26T16:10:25.94415407Z [inf]  ✓ 4705 modules transformed.
+
+2025-11-26T16:10:27.066266466Z [inf]  rendering chunks...
+
+2025-11-26T16:10:27.560852581Z [inf]  computing gzip size...
+
+2025-11-26T16:10:27.708750811Z [inf]  ../dist/public/index.html                                                                3.87 kB │ gzip:   1.24 kB
+../dist/public/assets/FinACEverse Transparent symbol (1)_1763884273845-DUjk4bpq.png     85.41 kB
+../dist/public/assets/Accute Transparent symbol_1761505804713-i2bUd-1a.png             119.49 kB
+../dist/public/assets/Luca Transparent symbol (1)_1761720299435-D9e7OOzJ.png           219.30 kB
+../dist/public/assets/Golden_swan_mangala_chihna_6c23300a-l5rI0NfU.png                 360.95 kB
+
+2025-11-26T16:10:27.709528952Z [inf]  ../dist/public/assets/Golden_double_spiral_chihna_fb7a0937-D27U0hVu.png                375.66 kB
+../dist/public/assets/Golden_spiral_mangala_chihna_7c8c1b8a-CME8gL5x.png               469.86 kB
+../dist/public/assets/Golden_flame_mangala_chihna_20cfce30-9ZwCGAFR.png              1,157.07 kB
+
+2025-11-26T16:10:27.712794815Z [inf]  ../dist/public/assets/calendar-view-DxzzN9QP.css                                        10.93 kB │ gzip:   2.50 kB
+../dist/public/assets/style-BZV40eAE.css                                                15.85 kB │ gzip:   2.66 kB
+../dist/public/assets/index-C5dIaeVq.css                                               142.36 kB │ gzip:  21.67 kB
+
+2025-11-26T16:10:27.713091115Z [inf]  ../dist/public/assets/subDays-CQv3iBPj.js                                                0.09 kB │ gzip:   0.10 kB
+../dist/public/assets/LucaAgent-BAfuRM9l.js                                              0.10 kB │ gzip:   0.11 kB
+../dist/public/assets/isSameDay-D4POhmhD.js                                              0.12 kB │ gzip:   0.13 kB
+../dist/public/assets/startOfMonth-DZQYgXSi.js                                           0.13 kB │ gzip:   0.13 kB
+../dist/public/assets/addDays-BVB_AlWX.js                                                0.15 kB │ gzip:   0.15 kB
+../dist/public/assets/skeleton-DnYZBqP-.js                                               0.17 kB │ gzip:   0.16 kB
+../dist/public/assets/differenceInCalendarDays-CxJuiyJW.js                               0.21 kB │ gzip:   0.18 kB
+../dist/public/assets/addMonths-73tDjTUy.js                                              0.29 kB │ gzip:   0.22 kB
+../dist/public/assets/chevron-left-Q03BYqH3.js                                           0.30 kB │ gzip:   0.25 kB
+../dist/public/assets/play-CwRoAuMN.js                                                   0.30 kB │ gzip:   0.25 kB
+../dist/public/assets/BarChart-CkFxVE9v.js                                               0.32 kB │ gzip:   0.23 kB
+../dist/public/assets/filter-owUZhI_y.js                                                 0.33 kB │ gzip:   0.26 kB
+../dist/public/assets/arrow-right-Bh_Y4GDg.js                                            0.33 kB │ gzip:   0.26 kB
+
+2025-11-26T16:10:27.713107805Z [inf]  ../dist/public/assets/arrow-left-C4UFDtiV.js                                             0.33 kB │ gzip:   0.26 kB
+
+2025-11-26T16:10:27.713552795Z [inf]  ../dist/public/assets/ban-B3XMzTbi.js                                                    0.34 kB │ gzip:   0.27 kB
+../dist/public/assets/circle-check-HP16wcmp.js                                           0.34 kB │ gzip:   0.27 kB
+../dist/public/assets/reply-DeDO0VNQ.js                                                  0.35 kB │ gzip:   0.28 kB
+../dist/public/assets/circle-check-big-7I0JbcRb.js                                       0.36 kB │ gzip:   0.28 kB
+../dist/public/assets/info-BgPLZ2oo.js                                                   0.37 kB │ gzip:   0.28 kB
+
+2025-11-26T16:10:27.713576655Z [inf]  ../dist/public/assets/circle-x-BU96Qe22.js                                               0.37 kB │ gzip:   0.28 kB
+../dist/public/assets/lock-lVIdEYjm.js                                                   0.38 kB │ gzip:   0.29 kB
+../dist/public/assets/star-PdQTEi3q.js                                                   0.38 kB │ gzip:   0.29 kB
+../dist/public/assets/file-BjGaVeVM.js                                                   0.39 kB │ gzip:   0.28 kB
+../dist/public/assets/target-DA-04fTY.js                                                 0.39 kB │ gzip:   0.26 kB
+
+2025-11-26T16:10:27.713709356Z [inf]  ../dist/public/assets/copy-PIpeQnRi.js                                                   0.40 kB │ gzip:   0.31 kB
+../dist/public/assets/link-2-CcEs9eRu.js                                                 0.41 kB │ gzip:   0.31 kB
+../dist/public/assets/camera-AQymeB9W.js                                                 0.42 kB │ gzip:   0.31 kB
+../dist/public/assets/shopping-bag-PzNenGnt.js                                           0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/external-link-n5rbKtyE.js                                          0.42 kB │ gzip:   0.30 kB
+
+2025-11-26T16:10:27.71855413Z [inf]  ../dist/public/assets/eye-Bqndtwhs.js                                                    0.42 kB │ gzip:   0.30 kB
+../dist/public/assets/map-pin-D7Vjvlfa.js                                                0.42 kB │ gzip:   0.32 kB
+../dist/public/assets/archive-DbWUlofj.js                                                0.42 kB │ gzip:   0.31 kB
+../dist/public/assets/upload-B1jKVaZG.js                                                 0.43 kB │ gzip:   0.32 kB
+../dist/public/assets/monitor-CzJNqiJI.js                                                0.43 kB │ gzip:   0.31 kB
+../dist/public/assets/key-BKLmx3IK.js                                                    0.43 kB │ gzip:   0.32 kB
+../dist/public/assets/triangle-alert-B0lBgJAi.js                                         0.43 kB │ gzip:   0.31 kB
+../dist/public/assets/file-check-CGlMVNBo.js                                             0.43 kB │ gzip:   0.30 kB
+
+2025-11-26T16:10:27.71857945Z [inf]  ../dist/public/assets/chart-no-axes-column-increasing-DPBdiORX.js                        0.44 kB │ gzip:   0.30 kB
+../dist/public/assets/mic-y7pQqsBL.js                                                    0.44 kB │ gzip:   0.32 kB
+../dist/public/assets/award-Dw96XOcI.js                                                  0.44 kB │ gzip:   0.33 kB
+../dist/public/assets/pencil-CO2q8fUM.js                                                 0.45 kB │ gzip:   0.33 kB
+
+2025-11-26T16:10:27.71868512Z [inf]  ../dist/public/assets/book-open-nZswT-Xn.js                                              0.45 kB │ gzip:   0.31 kB
+../dist/public/assets/layout-template-CRPmEY6P.js                                        0.45 kB │ gzip:   0.30 kB
+../dist/public/assets/hash-CpcVODsu.js                                                   0.47 kB │ gzip:   0.30 kB
+../dist/public/assets/user-plus-BE0_x-RZ.js                                              0.48 kB │ gzip:   0.33 kB
+../dist/public/assets/defineProperty--4TR5jkP.js                                         0.48 kB │ gzip:   0.33 kB
+../dist/public/assets/square-pen-Da7HSN-R.js                                             0.49 kB │ gzip:   0.34 kB
+../dist/public/assets/refresh-cw-Clr3Xxk6.js                                             0.49 kB │ gzip:   0.33 kB
+../dist/public/assets/ticket-C8yb5i-P.js                                                 0.49 kB │ gzip:   0.32 kB
+../dist/public/assets/save-BBLCHidP.js                                                   0.50 kB │ gzip:   0.33 kB
+../dist/public/assets/server-BLOvjXde.js                                                 0.51 kB │ gzip:   0.32 kB
+
+2025-11-26T16:10:27.71869675Z [inf]  ../dist/public/assets/differenceInDays-BH77gfas.js                                       0.52 kB │ gzip:   0.30 kB
+../dist/public/assets/share-2-DsWkKTVj.js                                                0.52 kB │ gzip:   0.33 kB
+
+2025-11-26T16:10:27.71870138Z [inf]  ../dist/public/assets/webhook-BIH9ulUc.js                                                0.52 kB │ gzip:   0.37 kB
+
+2025-11-26T16:10:27.71877718Z [inf]  ../dist/public/assets/key-round-C70TLECW.js                                              0.52 kB │ gzip:   0.36 kB
+../dist/public/assets/crown-DGiA_uuX.js                                                  0.53 kB │ gzip:   0.36 kB
+../dist/public/assets/grip-vertical-BH2TYVAx.js                                          0.53 kB │ gzip:   0.30 kB
+../dist/public/assets/phone-2I_ft-yR.js                                                  0.56 kB │ gzip:   0.36 kB
+../dist/public/assets/not-found-CFC2Uoac.js                                              0.59 kB │ gzip:   0.34 kB
+
+2025-11-26T16:10:27.71879049Z [inf]  ../dist/public/assets/eye-off-CeI9RNiq.js                                                0.60 kB │ gzip:   0.38 kB
+
+2025-11-26T16:10:27.71886992Z [inf]  ../dist/public/assets/sparkles-7E9k-wQY.js                                               0.68 kB │ gzip:   0.40 kB
+../dist/public/assets/zoom-out-W8ck5W4_.js                                               0.84 kB │ gzip:   0.33 kB
+../dist/public/assets/brain-g_B5Z4qd.js                                                  0.90 kB │ gzip:   0.46 kB
+../dist/public/assets/alert-W9TW_518.js                                                  0.91 kB │ gzip:   0.47 kB
+../dist/public/assets/gradient-hero-BtLu5pD4.js                                          1.07 kB │ gzip:   0.50 kB
+
+2025-11-26T16:10:27.71912074Z [inf]  ../dist/public/assets/finaceverse-branding-C7TyWBDV.js                                   1.15 kB │ gzip:   0.56 kB
+
+2025-11-26T16:10:27.71934778Z [inf]  ../dist/public/assets/agent-todo-list-CBZQBLuM.js                                        1.17 kB │ gzip:   0.55 kB
+../dist/public/assets/kycUtils-BBM0H-UU.js                                               1.29 kB │ gzip:   0.62 kB
+../dist/public/assets/slicedToArray-DXyAX8Qd.js                                          1.33 kB │ gzip:   0.72 kB
+../dist/public/assets/table-Dug0qFG8.js                                                  1.49 kB │ gzip:   0.52 kB
+../dist/public/assets/form-ConJn5Qx.js                                                   1.71 kB │ gzip:   0.74 kB
+
+2025-11-26T16:10:27.71936671Z [inf]  ../dist/public/assets/forgot-password-Dnrs0jcK.js                                        2.19 kB │ gzip:   1.08 kB
+../dist/public/assets/form-preview-oqiPsH80.js                                           2.38 kB │ gzip:   1.08 kB
+../dist/public/assets/profitability-view-DE9l12Tq.js                                     2.43 kB │ gzip:   0.91 kB
+../dist/public/assets/switch-BuboKfeY.js                                                 2.45 kB │ gzip:   1.23 kB
+
+2025-11-26T16:10:27.719404701Z [inf]  ../dist/public/assets/verify-email-B-cLD8q-.js                                           2.54 kB │ gzip:   1.07 kB
+../dist/public/assets/create-workspace-BWVPvuAS.js                                       2.93 kB │ gzip:   1.22 kB
+
+2025-11-26T16:10:27.71941551Z [inf]  ../dist/public/assets/tabs-C_3tqLue.js                                                   3.20 kB │ gzip:   1.35 kB
+../dist/public/assets/reset-password-CbngQRne.js                                         3.22 kB │ gzip:   1.32 kB
+
+2025-11-26T16:10:27.719445601Z [inf]  ../dist/public/assets/progress-CvhQkto1.js                                               3.32 kB │ gzip:   1.57 kB
+../dist/public/assets/set-password-DQYxjiFs.js                                           3.63 kB │ gzip:   1.55 kB
+../dist/public/assets/skill-based-assignee-selector-CxhBia5t.js                          3.68 kB │ gzip:   1.35 kB
+
+2025-11-26T16:10:27.719521201Z [inf]  ../dist/public/assets/checkbox-Bmm3Kee1.js                                               3.84 kB │ gzip:   1.70 kB
+../dist/public/assets/radio-group-BnWd_FC4.js                                            3.95 kB │ gzip:   1.79 kB
+../dist/public/assets/signatures-Bzg1wwwx.js                                             4.29 kB │ gzip:   1.61 kB
+../dist/public/assets/chart-Bu99hagt.js                                                  4.57 kB │ gzip:   1.93 kB
+
+2025-11-26T16:10:27.71953547Z [inf]  ../dist/public/assets/agent-detail-AOTLadii.js                                           4.61 kB │ gzip:   1.56 kB
+../dist/public/assets/help-BJxOZymL.js                                                   4.69 kB │ gzip:   1.70 kB
+
+2025-11-26T16:10:27.71960503Z [inf]  ../dist/public/assets/alert-dialog-CU0aapB1.js                                           4.89 kB │ gzip:   1.80 kB
+../dist/public/assets/invoices-BD8ES6_A.js                                               4.98 kB │ gzip:   1.75 kB
+
+2025-11-26T16:10:27.719629401Z [inf]  ../dist/public/assets/my-forms-ojkEfh45.js                                               5.00 kB │ gzip:   1.26 kB
+../dist/public/assets/roundtable-tpqZwsJY.js                                             5.14 kB │ gzip:   1.91 kB
+
+2025-11-26T16:10:27.719690871Z [inf]  ../dist/public/assets/public-form-BEc7mzvt.js                                            5.59 kB │ gzip:   2.07 kB
+../dist/public/assets/manager-dashboard-KOvlIOe6.js                                      5.61 kB │ gzip:   1.67 kB
+../dist/public/assets/my-tasks-DDhykMi4.js                                               5.61 kB │ gzip:   1.49 kB
+../dist/public/assets/users-Ci00ARsA.js                                                  5.68 kB │ gzip:   1.72 kB
+
+2025-11-26T16:10:27.719712751Z [inf]  ../dist/public/assets/my-signatures-BYCJxBxr.js                                          5.74 kB │ gzip:   1.37 kB
+../dist/public/assets/OmniSpectra-CeaNd2Z9.js                                            5.80 kB │ gzip:   2.17 kB
+
+2025-11-26T16:10:27.719735221Z [inf]  ../dist/public/assets/calendar-B9i82C2C.js                                               5.91 kB │ gzip:   2.20 kB
+../dist/public/assets/marketplace-published-CYFnF8Ci.js                                  5.91 kB │ gzip:   2.07 kB
+../dist/public/assets/action-center-Dfd9KM7U.js                                          5.98 kB │ gzip:   1.92 kB
+
+2025-11-26T16:10:27.719796551Z [inf]  ../dist/public/assets/organizations-DM4dx821.js                                          6.00 kB │ gzip:   1.95 kB
+
+2025-11-26T16:10:27.719986441Z [inf]  ../dist/public/assets/time-tracking-BqZ3edOO.js                                          6.10 kB │ gzip:   1.94 kB
+../dist/public/assets/features-DI_VvKp1.js                                               6.18 kB │ gzip:   2.38 kB
+../dist/public/assets/about-DSLOGrpz.js                                                  6.30 kB │ gzip:   2.39 kB
+../dist/public/assets/data-table-D4J2Pa5L.js                                             6.33 kB │ gzip:   2.38 kB
+../dist/public/assets/unified-inbox-CsXCIrqr.js                                          6.50 kB │ gzip:   2.18 kB
+../dist/public/assets/tags-Br19fh93.js                                                   6.56 kB │ gzip:   2.40 kB
+../dist/public/assets/scheduled-reports-CPm6HVGN.js                                      6.78 kB │ gzip:   2.17 kB
+
+2025-11-26T16:10:27.720037991Z [inf]  ../dist/public/assets/dashboard-BaRas2Wq.js                                              6.78 kB │ gzip:   1.54 kB
+../dist/public/assets/form-submissions-DdeMMHQJ.js                                       6.78 kB │ gzip:   2.43 kB
+../dist/public/assets/contact-DU03MO-0.js                                                6.84 kB │ gzip:   1.92 kB
+../dist/public/assets/teams-6U51E7FD.js                                                  6.85 kB │ gzip:   2.12 kB
+../dist/public/assets/executive-dashboard-C-3DxA3g.js                                    6.93 kB │ gzip:   2.16 kB
+
+2025-11-26T16:10:27.720067821Z [inf]  ../dist/public/assets/timeline-view-BxZXPhpN.js                                          7.01 kB │ gzip:   2.15 kB
+../dist/public/assets/marketplace-create--uJ57x9n.js                                     7.14 kB │ gzip:   2.24 kB
+
+2025-11-26T16:10:27.720104011Z [inf]  ../dist/public/assets/forecasting-CmVNAmjB.js                                            7.32 kB │ gzip:   2.54 kB
+../dist/public/assets/subscription-pricing-B6g0vZfu.js                                   7.33 kB │ gzip:   2.66 kB
+../dist/public/assets/messages-D4dGlw3t.js                                               7.61 kB │ gzip:   2.46 kB
+
+2025-11-26T16:10:27.720108871Z [inf]  ../dist/public/assets/kanban-DkYdHeyj.js                                                 7.61 kB │ gzip:   2.65 kB
+../dist/public/assets/gantt-view-DIjODmfu.js                                             7.72 kB │ gzip:   2.68 kB
+
+2025-11-26T16:10:27.720113771Z [inf]  ../dist/public/assets/login-CumGcpPB.js                                                  8.04 kB │ gzip:   2.82 kB
+
+2025-11-26T16:10:27.720175301Z [inf]  ../dist/public/assets/client-payment-portal-DkjF-ezA.js                                  8.16 kB │ gzip:   2.48 kB
+../dist/public/assets/messages-aaTN6jZW.js                                               8.36 kB │ gzip:   2.61 kB
+../dist/public/assets/security-We8m1cQB.js                                               8.45 kB │ gzip:   2.58 kB
+../dist/public/assets/my-document-requests-CQeYGiCK.js                                   8.45 kB │ gzip:   2.58 kB
+../dist/public/assets/automated-invoicing-DufxMH4N.js                                    8.47 kB │ gzip:   2.44 kB
+
+2025-11-26T16:10:27.720199401Z [inf]  ../dist/public/assets/Radar-Djj-7-7d.js                                                  8.66 kB │ gzip:   2.80 kB
+../dist/public/assets/team-hierarchy-BllIicJn.js                                         8.87 kB │ gzip:   2.98 kB
+../dist/public/assets/admin-dashboard-Cx8hx9ss.js                                        9.12 kB │ gzip:   1.76 kB
+
+2025-11-26T16:10:27.720229071Z [inf]  ../dist/public/assets/payment-gateway-config-Bl4QXaEQ.js                                 9.21 kB │ gzip:   2.71 kB
+../dist/public/assets/value-DqH_WevB.js                                                  9.37 kB │ gzip:   4.00 kB
+../dist/public/assets/skills-management-kUAv6iKw.js                                      9.55 kB │ gzip:   3.03 kB
+
+2025-11-26T16:10:27.720269451Z [inf]  ../dist/public/assets/email-accounts-xdsYzvl9.js                                         9.55 kB │ gzip:   2.98 kB
+../dist/public/assets/resource-allocation-r-1BOgPT.js                                    9.59 kB │ gzip:   2.78 kB
+../dist/public/assets/privacy-BXWzSNzs.js                                                9.65 kB │ gzip:   2.92 kB
+
+2025-11-26T16:10:27.720274301Z [inf]  ../dist/public/assets/documents-CE1L_Qpl.js                                              9.67 kB │ gzip:   3.18 kB
+
+2025-11-26T16:10:27.720350941Z [inf]  ../dist/public/assets/message-templates-Dwhw_lwC.js                                      9.74 kB │ gzip:   3.07 kB
+../dist/public/assets/subscription-select-GjeezStx.js                                    9.88 kB │ gzip:   3.10 kB
+
+2025-11-26T16:10:27.720629902Z [inf]  ../dist/public/assets/roles-bLfl4k0O.js                                                  9.95 kB │ gzip:   3.22 kB
+../dist/public/assets/video-conferencing-BNZ9iZu4.js                                     9.95 kB │ gzip:   3.06 kB
+../dist/public/assets/workload-view-BgLaHRuJ.js                                         10.12 kB │ gzip:   2.30 kB
+../dist/public/assets/agent-health-DPVmNO8k.js                                          10.20 kB │ gzip:   2.45 kB
+../dist/public/assets/inbox-DljlYEI0.js                                                 10.25 kB │ gzip:   2.87 kB
+../dist/public/assets/contacts-DlO8nmD-.js                                              10.50 kB │ gzip:   3.11 kB
+../dist/public/assets/projects-CiHsZVoc.js                                              10.51 kB │ gzip:   3.01 kB
+../dist/public/assets/team-detail-Djhf3OrG.js                                           10.58 kB │ gzip:   3.52 kB
+../dist/public/assets/workflows-DFkWtXad.js                                             11.01 kB │ gzip:   2.91 kB
+../dist/public/assets/folders-BhvsajoS.js                                               11.06 kB │ gzip:   3.70 kB
+../dist/public/assets/live-chat-Beo_b2sg.js                                             11.15 kB │ gzip:   3.67 kB
+
+2025-11-26T16:10:27.720638402Z [inf]  ../dist/public/assets/LineChart-yg_ahHE2.js                                             11.17 kB │ gzip:   4.31 kB
+../dist/public/assets/payment-collect-0auC7ZaJ.js                                       11.29 kB │ gzip:   3.39 kB
+../dist/public/assets/project-detail-Dnyn1m3z.js                                        11.54 kB │ gzip:   3.62 kB
+
+2025-11-26T16:10:27.720678542Z [inf]  ../dist/public/assets/pricing-regions-IzJaAEMJ.js                                       11.68 kB │ gzip:   3.45 kB
+../dist/public/assets/terms-BJywaQRm.js                                                 11.71 kB │ gzip:   3.74 kB
+../dist/public/assets/team-D9Di_xK4.js                                                  11.84 kB │ gzip:   3.32 kB
+
+2025-11-26T16:10:27.720694851Z [inf]  ../dist/public/assets/RelayAgent-C_UsMxq_.js                                            12.03 kB │ gzip:   3.71 kB
+../dist/public/assets/report-builder-D2wPKoM_.js                                        12.16 kB │ gzip:   3.37 kB
+../dist/public/assets/analytics-WcPDARKJ.js                                             12.18 kB │ gzip:   2.94 kB
+
+2025-11-26T16:10:27.720738011Z [inf]  ../dist/public/assets/my-documents-BH6tEeB-.js                                          12.22 kB │ gzip:   4.24 kB
+../dist/public/assets/EchoAgent-DTbc1EKO.js                                             12.29 kB │ gzip:   3.96 kB
+../dist/public/assets/ScribeAgent-BRvCi1qT.js                                           12.35 kB │ gzip:   3.98 kB
+
+2025-11-26T16:10:27.720914492Z [inf]  ../dist/public/assets/tickets-jyUsUiTS.js                                               12.47 kB │ gzip:   3.11 kB
+../dist/public/assets/register-CqP3MF7j.js                                              12.57 kB │ gzip:   2.85 kB
+../dist/public/assets/platform-settings-DTyTJXKq.js                                     12.62 kB │ gzip:   3.34 kB
+../dist/public/assets/marketplace-Cmh9mQyc.js                                           12.84 kB │ gzip:   2.95 kB
+
+2025-11-26T16:10:27.720964782Z [inf]  ../dist/public/assets/coupons-C60fVki0.js                                               12.85 kB │ gzip:   3.67 kB
+../dist/public/assets/format-JNwbgvZF.js                                                12.94 kB │ gzip:   3.45 kB
+../dist/public/assets/payments-B1v5NqbY.js                                              13.12 kB │ gzip:   3.68 kB
+../dist/public/assets/assignments-BnAPIWq1.js                                           13.52 kB │ gzip:   3.53 kB
+../dist/public/assets/ai-agents-D4FAZeD9.js                                             14.29 kB │ gzip:   4.12 kB
+../dist/public/assets/subscription-plans-DZ9thxkl.js                                    14.85 kB │ gzip:   3.72 kB
+
+2025-11-26T16:10:27.720993212Z [inf]  ../dist/public/assets/assignment-detail-Dmlds3eg.js                                     15.08 kB │ gzip:   4.46 kB
+../dist/public/assets/roundtable-detail-_QuQoTig.js                                     15.21 kB │ gzip:   4.38 kB
+../dist/public/assets/clients-C3S4Wh9-.js                                               15.37 kB │ gzip:   4.59 kB
+
+2025-11-26T16:10:27.721095542Z [inf]  ../dist/public/assets/personality-profiling-CMpZgmwB.js                                 15.56 kB │ gzip:   4.24 kB
+
+2025-11-26T16:10:27.721268552Z [inf]  ../dist/public/assets/subscriptions-PH6Mr1zG.js                                         15.74 kB │ gzip:   3.90 kB
+../dist/public/assets/kyc-verification-DU8xNXLs.js                                      16.49 kB │ gzip:   3.61 kB
+../dist/public/assets/form-builder-Jbr5tUNp.js                                          16.57 kB │ gzip:   4.94 kB
+
+2025-11-26T16:10:27.721283732Z [inf]  ../dist/public/assets/submission-detail-Hg7loXZq.js                                     16.76 kB │ gzip:   4.42 kB
+../dist/public/assets/subscription-analytics-C774uCRV.js                                16.77 kB │ gzip:   3.06 kB
+../dist/public/assets/agent-foundry-VWr_qogA.js                                         16.86 kB │ gzip:   4.17 kB
+
+2025-11-26T16:10:27.721346412Z [inf]  ../dist/public/assets/proposals-D20gTO4K.js                                             16.95 kB │ gzip:   4.67 kB
+../dist/public/assets/landing-D-vpDe8d.js                                               16.96 kB │ gzip:   4.45 kB
+../dist/public/assets/onboarding-DuleHsA7.js                                            17.26 kB │ gzip:   4.56 kB
+../dist/public/assets/document-requests-_zLMpR6i.js                                     17.67 kB │ gzip:   4.41 kB
+../dist/public/assets/tag-selector-IABZZF7X.js                                          18.20 kB │ gzip:   6.50 kB
+../dist/public/assets/email-templates-bU2dqQqc.js                                       18.74 kB │ gzip:   5.24 kB
+
+2025-11-26T16:10:27.721376962Z [inf]  ../dist/public/assets/FormaAgent-yRp0_Fq8.js                                            18.86 kB │ gzip:   5.92 kB
+../dist/public/assets/personality-profile-CXetqiCo.js                                   18.90 kB │ gzip:   5.39 kB
+../dist/public/assets/organization-settings-CxIOde3-.js                                 19.14 kB │ gzip:   4.95 kB
+
+2025-11-26T16:10:27.721469952Z [inf]  ../dist/public/assets/CadenceAgent-UX2K-NSQ.js                                          19.50 kB │ gzip:   5.75 kB
+../dist/public/assets/ParityAgent-oJg02FB1.js                                           20.69 kB │ gzip:   6.18 kB
+../dist/public/assets/dashboard-CI55zkOb.js                                             20.72 kB │ gzip:   4.23 kB
+../dist/public/assets/mobile-apps-DX9eFkrX.js                                           21.06 kB │ gzip:   5.46 kB
+../dist/public/assets/purify.es-B6FQ9oRL.js                                             22.57 kB │ gzip:   8.74 kB
+../dist/public/assets/client-onboarding-OInkwMcq.js                                     22.65 kB │ gzip:   6.31 kB
+
+2025-11-26T16:10:27.721485512Z [inf]  ../dist/public/assets/findIndex-C69mO-Av.js                                             23.45 kB │ gzip:   9.87 kB
+../dist/public/assets/pricing-management-DHIGkBil.js                                    25.14 kB │ gzip:   4.38 kB
+
+2025-11-26T16:10:27.721591632Z [inf]  ../dist/public/assets/form-analytics-BUfr5AKE.js                                        25.47 kB │ gzip:   8.70 kB
+../dist/public/assets/conditional-logic-g5OqcDRw.js                                     25.74 kB │ gzip:   7.75 kB
+../dist/public/assets/PieChart-DHb35Hte.js                                              25.96 kB │ gzip:   7.03 kB
+
+2025-11-26T16:10:27.721623892Z [inf]  ../dist/public/assets/automation-BuQ2ZUy2.js                                            26.06 kB │ gzip:   6.75 kB
+../dist/public/assets/resizable-0MwhN5dt.js                                             27.62 kB │ gzip:   9.70 kB
+
+2025-11-26T16:10:27.721689832Z [inf]  ../dist/public/assets/workflow-builder-EaMjumX5.js                                      29.03 kB │ gzip:   6.67 kB
+../dist/public/assets/agent-integration-guide-BbqKNBeT.js                               29.19 kB │ gzip:   5.42 kB
+
+2025-11-26T16:10:27.721742032Z [inf]  ../dist/public/assets/index.esm-wh2MKdge.js                                             30.63 kB │ gzip:  11.22 kB
+../dist/public/assets/team-chat-BslyVv_R.js                                             33.87 kB │ gzip:   9.17 kB
+
+2025-11-26T16:10:27.721756523Z [inf]  ../dist/public/assets/calendar-Cg3uQpXX.js                                              34.41 kB │ gzip:  10.94 kB
+
+2025-11-26T16:10:27.721768532Z [inf]  ../dist/public/assets/employee-profile-BuADnuwS.js                                      34.42 kB │ gzip:   8.76 kB
+
+2025-11-26T16:10:27.721815763Z [inf]  ../dist/public/assets/settings-Ci2Xf6c6.js                                              36.48 kB │ gzip:   8.89 kB
+../dist/public/assets/form-renderer-CXw4IX34.js                                         41.69 kB │ gzip:  12.07 kB
+
+2025-11-26T16:10:27.721864843Z [inf]  ../dist/public/assets/workflow-detail-Dn4ELKTl.js                                       42.81 kB │ gzip:   9.47 kB
+
+2025-11-26T16:10:27.722086743Z [inf]  ../dist/public/assets/sortable.esm-IUu2WkXe.js                                          50.12 kB │ gzip:  16.59 kB
+../dist/public/assets/types-DUy2MMVl.js                                                 60.81 kB │ gzip:  14.64 kB
+../dist/public/assets/forms-C4DEdG_u.js                                                 70.15 kB │ gzip:  21.24 kB
+../dist/public/assets/index.es-D0i3ieMj.js                                             150.09 kB │ gzip:  51.34 kB
+
+2025-11-26T16:10:27.722102783Z [inf]  ../dist/public/assets/calendar-view-BzTPSgGD.js                                        154.83 kB │ gzip:  47.73 kB
+../dist/public/assets/style-DOzzjKXs.js                                                169.24 kB │ gzip:  54.17 kB
+../dist/public/assets/schema-jg--C5rO.js                                               191.05 kB │ gzip:  36.86 kB
+
+2025-11-26T16:10:27.722159523Z [inf]  ../dist/public/assets/html2canvas.esm-CBrSDip1.js                                      201.42 kB │ gzip:  48.03 kB
+../dist/public/assets/generateCategoricalChart-B1tdnDBe.js                             341.36 kB │ gzip:  89.33 kB
+../dist/public/assets/index-D3bt-JSD.js                                                676.34 kB │ gzip: 202.66 kB
+
+2025-11-26T16:10:27.722198663Z [inf]  ../dist/public/assets/export-utils-Bx50wXn0.js                                         707.86 kB │ gzip: 233.04 kB
+
+2025-11-26T16:10:27.722372413Z [inf]  
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+2025-11-26T16:10:27.723384994Z [inf]  ✓ built in 16.66s
+
+2025-11-26T16:10:28.360056334Z [inf]  ▲ [WARNING] Calling "pdfParse" will crash at run-time because it's an import namespace object, not a function [call-import-namespace]
+
+    server/file-parser-service.ts:49:35:
+      49 │ ...   metadata.pages = (await (pdfParse as any)(fileBuffer)).numpa...
+         ╵                                ~~~~~~~~
+
+  Consider changing "pdfParse" to a default import instead:
+
+    server/file-parser-service.ts:1:7:
+      1 │ import * as pdfParse from "pdf-parse";
+        │        ~~~~~~~~~~~~~
+        ╵        pdfParse
+
+  Make sure to enable TypeScript's "esModuleInterop" setting so that TypeScript's type checker generates an error when you try to do this. You can read more about this setting here: https://www.typescriptlang.org/tsconfig#esModuleInterop
+
+
+2025-11-26T16:10:28.420852627Z [inf]  ▲ [WARNING] Duplicate key "userId" in object literal [duplicate-object-key]
+
+    server/routes.ts:11006:43:
+      11006 │             relatedResourceId: existing.id,userId
+            ╵                                            ~~~~~~
+
+  The original key "userId" is here:
+
+    server/routes.ts:11001:12:
+      11001 │             userId: client.userId,
+            ╵             ~~~~~~
+
+
+2025-11-26T16:10:28.441143485Z [inf]  ▲ [WARNING] Import "assignmentTasks" will always be undefined because there is no matching export in "shared/schema.ts" [import-is-undefined]
+
+    server/routes.ts:15216:32:
+      15216 │ ...b.select().from(schema.assignmentTasks).where(eq(schema.assi...
+            ╵                           ~~~~~~~~~~~~~~~
+
+
+2025-11-26T16:10:28.490604039Z [inf]  3 warnings
+
+  dist/start.js  2.3mb ⚠️
+
+⚡ Done in 143ms
+
+2025-11-26T16:10:28.693551447Z [inf]  [builder 7/7] RUN npm run build
+2025-11-26T16:10:37.449064164Z [inf]  [production 4/9] COPY --from=builder /app/dist ./dist
+2025-11-26T16:10:38.137674010Z [inf]  [production 4/9] COPY --from=builder /app/dist ./dist
+2025-11-26T16:10:38.209061243Z [inf]  [production 5/9] COPY --from=builder /app/node_modules ./node_modules
+2025-11-26T16:10:46.498176310Z [inf]  [production 5/9] COPY --from=builder /app/node_modules ./node_modules
+2025-11-26T16:10:46.539723807Z [inf]  [production 6/9] COPY --from=builder /app/package*.json ./
+2025-11-26T16:10:48.063212506Z [inf]  [production 6/9] COPY --from=builder /app/package*.json ./
+2025-11-26T16:10:48.102842741Z [inf]  [production 7/9] COPY --from=builder /app/agents ./agents
+2025-11-26T16:10:48.452560318Z [inf]  [production 7/9] COPY --from=builder /app/agents ./agents
+2025-11-26T16:10:48.493549014Z [inf]  [production 8/9] COPY --from=builder /app/public ./public
+2025-11-26T16:10:48.825121486Z [inf]  [production 8/9] COPY --from=builder /app/public ./public
+2025-11-26T16:10:48.872169767Z [inf]  [production 9/9] RUN mkdir -p uploads
+2025-11-26T16:10:49.397478939Z [inf]  [production 9/9] RUN mkdir -p uploads
+2025-11-26T16:10:49.446058252Z [inf]  exporting to docker image format
+2025-11-26T16:11:00.246122127Z [inf]  exporting to docker image format
+2025-11-26T16:11:00.798167992Z [inf]  containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6OGQ4MjRmNjIzMjJmOWNhZmVjY2Q4ZjEzMmFkMDQ1M2E5ZDE5ZTNhMDE2NjQ4NzQ1YTBhNDA1ZjI2MmE4YTQzMiIsInNpemUiOjI1NzcsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNS0xMS0yNlQxNjoxMDo1OVoifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+2025-11-26T16:11:00.798184522Z [inf]  containerimage.config.digest: sha256:aa2830897328a569ebca87f0c02f90f35acaf664539e87a9db9173ad3bb736d3
+2025-11-26T16:11:00.798187272Z [inf]  containerimage.digest: sha256:8d824f62322f9cafeccd8f132ad0453a9d19e3a016648745a0a405f262a8a432
+2025-11-26T16:11:15.280735185Z [inf]  image push 76.5%
+2025-11-26T16:11:29.739412947Z [inf]  image push done
+2025-11-26T16:11:29.739554216Z [inf]  image push 99.9%
+2025-11-26T16:12:11.239208545Z [inf]  
+2025-11-26T16:12:11.239330665Z [inf]  [35m====================
+Starting Healthcheck
+====================
+[0m
+2025-11-26T16:12:11.239335008Z [inf]  [37mPath: /api/health[0m
+2025-11-26T16:12:11.239337245Z [inf]  [37mRetry window: 5m0s[0m
+2025-11-26T16:12:11.239339467Z [inf]  
+2025-11-26T16:12:15.453516285Z [inf]  [93mAttempt #1 failed with service unavailable. Continuing to retry for 4m55s[0m
+2025-11-26T16:12:16.528868592Z [inf]  [93mAttempt #2 failed with service unavailable. Continuing to retry for 4m54s[0m
+2025-11-26T16:12:18.611446554Z [inf]  [93mAttempt #3 failed with service unavailable. Continuing to retry for 4m52s[0m
