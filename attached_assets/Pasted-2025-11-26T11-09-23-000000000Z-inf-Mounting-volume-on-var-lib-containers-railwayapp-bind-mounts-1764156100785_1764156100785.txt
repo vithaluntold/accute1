@@ -1,0 +1,61 @@
+2025-11-26T11:09:23.000000000Z [inf]  Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/6bccdf26-75fd-40e0-92eb-e18d1273e0a8/vol_14w8qeeogve11xq8
+2025-11-26T11:09:24.000000000Z [inf]  Starting Container
+2025-11-26T11:09:25.166684031Z [inf]  Certificate will not expire
+2025-11-26T11:09:25.166742037Z [inf]  
+2025-11-26T11:09:25.166749209Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-11-26T11:09:25.166750377Z [inf]  PostgreSQL Database directory appears to contain a database; Skipping initialization
+2025-11-26T11:09:25.166757985Z [inf]  
+2025-11-26T11:09:25.166762076Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  listening on IPv6 address "::", port 5432
+2025-11-26T11:09:25.166769872Z [err]  2025-11-26 11:09:24.375 UTC [6] LOG:  starting PostgreSQL 17.7 (Debian 17.7-3.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2025-11-26T11:09:25.167053089Z [err]  2025-11-26 11:09:24.386 UTC [6] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-11-26T11:09:25.167060659Z [err]  2025-11-26 11:09:24.400 UTC [29] LOG:  database system was interrupted; last known up at 2025-11-26 11:03:44 UTC
+2025-11-26T11:09:25.167069469Z [err]  2025-11-26 11:09:24.826 UTC [29] LOG:  database system was not properly shut down; automatic recovery in progress
+2025-11-26T11:09:25.167069602Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  redo starts at 0/197EEB8
+2025-11-26T11:09:25.167076870Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  invalid record length at 0/197EEF0: expected at least 24, got 0
+2025-11-26T11:09:25.167083859Z [err]  2025-11-26 11:09:24.846 UTC [29] LOG:  redo done at 0/197EEB8 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2025-11-26T11:09:25.172364057Z [err]  2025-11-26 11:09:24.857 UTC [27] LOG:  checkpoint starting: end-of-recovery immediate wait
+2025-11-26T11:09:25.172382886Z [err]  2025-11-26 11:09:24.893 UTC [27] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.004 s, total=0.040 s; sync files=2, longest=0.003 s, average=0.002 s; distance=0 kB, estimate=0 kB; lsn=0/197EEF0, redo lsn=0/197EEF0
+2025-11-26T11:09:25.172549008Z [err]  2025-11-26 11:09:24.900 UTC [6] LOG:  database system is ready to accept connections
+2025-11-26T11:13:54.360275397Z [err]  		"is_default" boolean DEFAULT false NOT NULL,
+2025-11-26T11:13:54.360283782Z [err]  		"is_test_mode" boolean DEFAULT false NOT NULL,
+2025-11-26T11:13:54.360290875Z [err]  		"webhook_secret" text,
+2025-11-26T11:13:54.360297653Z [err]  		"webhook_token" text DEFAULT encode(gen_random_bytes(32), 'hex') NOT NULL,
+2025-11-26T11:13:54.360304899Z [err]  		"webhook_request_count" integer DEFAULT 0 NOT NULL,
+2025-11-26T11:13:54.360316345Z [err]  		"created_by" varchar NOT NULL,
+2025-11-26T11:13:54.360321952Z [err]  		"gateway" text NOT NULL,
+2025-11-26T11:13:54.360327706Z [err]  		"created_at" timestamp DEFAULT now() NOT NULL,
+2025-11-26T11:13:54.360331310Z [err]  		"nickname" text,
+2025-11-26T11:13:54.360337473Z [err]  2025-11-26 11:13:49.324 UTC [37] ERROR:  function gen_random_bytes(integer) does not exist at character 452
+2025-11-26T11:13:54.360338440Z [err]  		"updated_at" timestamp DEFAULT now() NOT NULL,
+2025-11-26T11:13:54.360342205Z [err]  		"last_webhook_at" timestamp,
+2025-11-26T11:13:54.360342662Z [err]  		"credentials" jsonb NOT NULL,
+2025-11-26T11:13:54.360347178Z [err]  2025-11-26 11:13:49.324 UTC [37] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2025-11-26T11:13:54.360353808Z [err]  		"last_used_at" timestamp,
+2025-11-26T11:13:54.360354808Z [err]  2025-11-26 11:13:49.324 UTC [37] STATEMENT:  CREATE TABLE "payment_gateway_configs" (
+2025-11-26T11:13:54.360356048Z [err]  		"config" jsonb DEFAULT '{}'::jsonb,
+2025-11-26T11:13:54.360363465Z [err]  		"id" varchar PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+2025-11-26T11:13:54.360365454Z [err]  		"total_transactions" integer DEFAULT 0 NOT NULL,
+2025-11-26T11:13:54.360367506Z [err]  		"is_active" boolean DEFAULT true NOT NULL,
+2025-11-26T11:13:54.360372827Z [err]  		"organization_id" varchar NOT NULL,
+2025-11-26T11:13:54.360376122Z [err]  		"total_volume" numeric(15, 2) DEFAULT 0 NOT NULL,
+2025-11-26T11:13:55.363238972Z [err]  		CONSTRAINT "payment_gateway_configs_webhook_token_unique" UNIQUE("webhook_token"),
+2025-11-26T11:13:55.363243251Z [err]  		CONSTRAINT "payment_gateway_configs_webhook_token_idx" UNIQUE("webhook_token")
+2025-11-26T11:13:55.363639012Z [err]  	);
+2025-11-26T11:13:59.570848682Z [err]  2025-11-26 11:13:58.691 UTC [37] ERROR:  relation "payment_gateway_configs" does not exist
+2025-11-26T11:13:59.570856830Z [err]  2025-11-26 11:13:58.691 UTC [37] STATEMENT:  ALTER TABLE "payment_gateway_configs" ADD CONSTRAINT "payment_gateway_configs_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;
+2025-11-26T11:13:59.570865563Z [err]  2025-11-26 11:13:58.710 UTC [37] ERROR:  relation "payment_gateway_configs" does not exist
+2025-11-26T11:13:59.570874129Z [err]  2025-11-26 11:13:58.710 UTC [37] STATEMENT:  ALTER TABLE "payment_gateway_configs" ADD CONSTRAINT "payment_gateway_configs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+2025-11-26T11:13:59.570882612Z [err]  2025-11-26 11:13:58.887 UTC [37] ERROR:  relation "public.payment_gateway_configs" does not exist
+2025-11-26T11:13:59.570892546Z [err]  2025-11-26 11:13:58.887 UTC [37] STATEMENT:  ALTER TABLE "payments" ADD CONSTRAINT "payments_gateway_config_id_payment_gateway_configs_id_fk" FOREIGN KEY ("gateway_config_id") REFERENCES "public"."payment_gateway_configs"("id") ON DELETE no action ON UPDATE no action;
+2025-11-26T11:14:04.092900042Z [err]  2025-11-26 11:14:03.579 UTC [37] ERROR:  relation "public.payment_gateway_configs" does not exist
+2025-11-26T11:14:04.092936711Z [err]  2025-11-26 11:14:03.579 UTC [37] STATEMENT:  ALTER TABLE "webhook_events" ADD CONSTRAINT "webhook_events_gateway_config_id_payment_gateway_configs_id_fk" FOREIGN KEY ("gateway_config_id") REFERENCES "public"."payment_gateway_configs"("id") ON DELETE cascade ON UPDATE no action;
+2025-11-26T11:14:10.130677789Z [err]  2025-11-26 11:14:08.765 UTC [37] ERROR:  relation "payment_gateway_configs" does not exist
+2025-11-26T11:14:10.130684846Z [err]  2025-11-26 11:14:08.765 UTC [37] STATEMENT:  CREATE INDEX "payment_gateway_configs_org_idx" ON "payment_gateway_configs" USING btree ("organization_id");
+2025-11-26T11:14:10.130692169Z [err]  2025-11-26 11:14:08.784 UTC [37] ERROR:  relation "payment_gateway_configs" does not exist
+2025-11-26T11:14:10.130698776Z [err]  2025-11-26 11:14:08.784 UTC [37] STATEMENT:  CREATE INDEX "payment_gateway_configs_gateway_idx" ON "payment_gateway_configs" USING btree ("gateway");
+2025-11-26T11:14:10.130727508Z [err]  2025-11-26 11:14:08.803 UTC [37] ERROR:  relation "payment_gateway_configs" does not exist
+2025-11-26T11:14:10.130735451Z [err]  2025-11-26 11:14:08.803 UTC [37] STATEMENT:  CREATE INDEX "payment_gateway_configs_default_idx" ON "payment_gateway_configs" USING btree ("is_default");
+2025-11-26T11:14:28.964681189Z [err]  2025-11-26 11:14:24.993 UTC [27] LOG:  checkpoint starting: time
+2025-11-26T11:15:29.505594615Z [err]  2025-11-26 11:15:21.075 UTC [27] LOG:  checkpoint complete: wrote 558 buffers (3.4%); 0 WAL file(s) added, 0 removed, 1 recycled; write=55.649 s, sync=0.383 s, total=56.083 s; sync files=1042, longest=0.034 s, average=0.001 s; distance=6727 kB, estimate=6727 kB; lsn=0/20C9F50, redo lsn=0/2010E40
+2025-11-26T11:19:28.587644808Z [err]  2025-11-26 11:19:28.558 UTC [27] LOG:  checkpoint complete: wrote 44 buffers (0.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=4.318 s, sync=0.012 s, total=4.387 s; sync files=16, longest=0.008 s, average=0.001 s; distance=752 kB, estimate=6130 kB; lsn=0/20CCFC8, redo lsn=0/20CCF70
+2025-11-26T11:19:28.587671233Z [err]  2025-11-26 11:19:24.171 UTC [27] LOG:  checkpoint starting: time
