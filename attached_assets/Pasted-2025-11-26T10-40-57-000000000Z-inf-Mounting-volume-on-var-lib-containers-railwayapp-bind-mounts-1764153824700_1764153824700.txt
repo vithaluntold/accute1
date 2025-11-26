@@ -1,0 +1,26 @@
+2025-11-26T10:40:57.000000000Z [inf]  Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/4a1b1004-68bd-46f1-bbf9-5fce7c1b049b/vol_14w8qeeogve11xq8
+2025-11-26T10:40:58.000000000Z [inf]  Starting Container
+2025-11-26T10:40:58.734549451Z [err]  2025-11-26 10:40:58.695 UTC [27] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.004 s, total=0.037 s; sync files=2, longest=0.002 s, average=0.002 s; distance=0 kB, estimate=0 kB; lsn=0/19592E0, redo lsn=0/19592E0
+2025-11-26T10:40:58.734645589Z [err]  2025-11-26 10:40:58.215 UTC [6] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-11-26T10:40:58.734655493Z [inf]  Certificate will not expire
+2025-11-26T10:40:58.734673007Z [err]  2025-11-26 10:40:58.229 UTC [29] LOG:  database system was interrupted; last known up at 2025-11-26 10:36:23 UTC
+2025-11-26T10:40:58.734673098Z [inf]  
+2025-11-26T10:40:58.734693455Z [inf]  PostgreSQL Database directory appears to contain a database; Skipping initialization
+2025-11-26T10:40:58.734693968Z [err]  2025-11-26 10:40:58.647 UTC [29] LOG:  database system was not properly shut down; automatic recovery in progress
+2025-11-26T10:40:58.734713170Z [inf]  
+2025-11-26T10:40:58.734714948Z [err]  2025-11-26 10:40:58.658 UTC [29] LOG:  redo starts at 0/19592A8
+2025-11-26T10:40:58.734730057Z [err]  2025-11-26 10:40:58.658 UTC [29] LOG:  invalid record length at 0/19592E0: expected at least 24, got 0
+2025-11-26T10:40:58.734744679Z [err]  2025-11-26 10:40:58.207 UTC [6] LOG:  starting PostgreSQL 17.7 (Debian 17.7-3.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2025-11-26T10:40:58.734745093Z [err]  2025-11-26 10:40:58.658 UTC [29] LOG:  redo done at 0/19592A8 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2025-11-26T10:40:58.734762464Z [err]  2025-11-26 10:40:58.664 UTC [27] LOG:  checkpoint starting: end-of-recovery immediate wait
+2025-11-26T10:40:58.734768031Z [err]  2025-11-26 10:40:58.207 UTC [6] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-11-26T10:40:58.734780720Z [err]  2025-11-26 10:40:58.207 UTC [6] LOG:  listening on IPv6 address "::", port 5432
+2025-11-26T10:40:58.739995842Z [err]  2025-11-26 10:40:58.703 UTC [6] LOG:  database system is ready to accept connections
+2025-11-26T10:42:09.771513573Z [err]  	      SELECT COUNT(*) as count FROM llm_configurations WHERE api_key_encrypted IS NOT NULL
+2025-11-26T10:42:09.771528986Z [err]  	    
+2025-11-26T10:42:09.771538689Z [err]  2025-11-26 10:42:02.554 UTC [34] ERROR:  relation "roles" does not exist at character 115
+2025-11-26T10:42:09.771562403Z [err]  2025-11-26 10:42:02.554 UTC [34] STATEMENT:  select "id", "name", "description", "scope", "is_system_role", "organization_id", "created_at", "updated_at" from "roles" where "roles"."is_system_role" = $1
+2025-11-26T10:42:09.771576175Z [err]  2025-11-26 10:42:02.647 UTC [35] ERROR:  relation "automation_triggers" does not exist at character 443
+2025-11-26T10:42:09.771590241Z [err]  2025-11-26 10:42:02.647 UTC [35] STATEMENT:  select "id", "organization_id", "name", "description", "event", "conditions", "condition_edges", "workflow_id", "stage_id", "step_id", "actions", "auto_advance_enabled", "auto_advance_target_stage_id", "auto_advance_target_step_id", "is_scheduled", "schedule_type", "cron_expression", "schedule_time", "due_date_offset", "last_executed", "next_execution", "enabled", "is_executing", "locked_at", "created_by", "created_at", "updated_at" from "automation_triggers" order by "automation_triggers"."created_at" desc
+2025-11-26T10:42:09.771702415Z [err]  2025-11-26 10:42:02.454 UTC [33] ERROR:  relation "llm_configurations" does not exist at character 38
+2025-11-26T10:42:09.771721751Z [err]  2025-11-26 10:42:02.454 UTC [33] STATEMENT:  
