@@ -1,0 +1,126 @@
+2025-11-26T12:50:28.000000000Z [inf]  Starting Container
+2025-11-26T12:50:32.668806796Z [inf]  
+2025-11-26T12:50:32.668813693Z [inf]  > rest-express@1.0.0 start
+2025-11-26T12:50:32.668820050Z [inf]  > NODE_ENV=production node dist/index.js
+2025-11-26T12:50:32.668827889Z [inf]  
+2025-11-26T12:50:34.615077316Z [inf]  🔐 Encryption service initialized successfully
+2025-11-26T12:50:34.615083055Z [inf]  [PaymentGatewayFactory] Cache cleared on startup (handles credential rotation & schema migrations)
+2025-11-26T12:50:34.615089403Z [inf]  ✅ [SECURITY] P0 authentication rate limiting enabled (login endpoint)
+2025-11-26T12:50:34.615096481Z [inf]  🚀 Starting server in production mode...
+2025-11-26T12:50:34.615103252Z [inf]     Port: 5000
+2025-11-26T12:50:34.615109729Z [inf]     Host: 0.0.0.0
+2025-11-26T12:50:34.615115836Z [inf]  ✅ SSE Agent routes registered
+2025-11-26T12:50:34.615123200Z [inf]  ✅ SSE Roundtable routes registered
+2025-11-26T12:50:34.615131597Z [inf]  ✅ Server listening on 0.0.0.0:5000
+2025-11-26T12:50:34.615138794Z [inf]     Environment: production
+2025-11-26T12:50:34.615145577Z [inf]  🌐 Access your app at: https://localhost:5000
+2025-11-26T12:50:34.615154473Z [inf]  12:50:34 PM [express] serving on port 5000
+2025-11-26T12:50:34.615162620Z [inf]  🔧 Initializing WebSocket servers...
+2025-11-26T12:50:34.615169211Z [inf]  🔧 Setting up lazy WebSocket loader...
+2025-11-26T12:50:34.615176487Z [inf]  ✅ Lazy WebSocket loader ready
+2025-11-26T12:50:34.615183047Z [inf]  🔧 Starting system initialization...
+2025-11-26T12:50:34.615189446Z [inf]     NODE_ENV: production
+2025-11-26T12:50:34.615200248Z [inf]     DATABASE_URL: SET (length: 94)
+2025-11-26T12:50:34.615207600Z [inf]     ENCRYPTION_KEY: SET (length: 44)
+2025-11-26T12:50:34.615219314Z [inf]     AZURE_OPENAI_API_KEY: NOT SET
+2025-11-26T12:50:34.615226663Z [inf]  🔧 Warming up database connection...
+2025-11-26T12:50:34.615233455Z [inf]  🔌 Initializing pg pool (production mode - Railway optimized)...
+2025-11-26T12:50:34.615241030Z [inf]  ✅ Database pool initialized
+2025-11-26T12:50:34.615248407Z [inf]     Database warmup attempt 1/5 failed: read ECONNRESET
+2025-11-26T12:50:34.615256030Z [inf]     Retrying in 1000ms...
+2025-11-26T12:50:35.996842241Z [err]  ⚠️ Connection attempt 1/3 failed: read ECONNRESET
+2025-11-26T12:50:35.996848983Z [inf]     Retrying in 2000ms...
+2025-11-26T12:50:35.996856791Z [inf]     Database warmup attempt 2/5 failed: read ECONNRESET
+2025-11-26T12:50:35.996863885Z [inf]     Retrying in 2000ms...
+2025-11-26T12:50:37.262065267Z [err]  ⚠️ Connection attempt 2/3 failed: read ECONNRESET
+2025-11-26T12:50:37.262072753Z [inf]     Retrying in 4000ms...
+2025-11-26T12:50:38.469566793Z [inf]     Database warmup attempt 3/5 failed: read ECONNRESET
+2025-11-26T12:50:38.469573261Z [inf]     Retrying in 3000ms...
+2025-11-26T12:50:41.557335751Z [err]  ⚠️ Connection attempt 3/3 failed: read ECONNRESET
+2025-11-26T12:50:41.557347219Z [err]  ❌ All database connection attempts failed
+2025-11-26T12:50:41.557358273Z [err]  ⚠️ Initial connection test failed - queries may fail until connection is established
+2025-11-26T12:50:41.557369190Z [inf]     Database warmup attempt 4/5 failed: read ECONNRESET
+2025-11-26T12:50:41.557380153Z [inf]     Retrying in 3000ms...
+2025-11-26T12:50:43.831612467Z [inf]     Database warmup attempt 5/5 failed: Connection terminated unexpectedly
+2025-11-26T12:50:43.831619720Z [err]  ⚠️ Database warmup failed after 5 attempts - continuing anyway
+2025-11-26T12:50:43.831627834Z [inf]  🔧 Initializing system...
+2025-11-26T12:50:43.831640823Z [inf]  🔐 Validating encryption key consistency...
+2025-11-26T12:50:43.831648081Z [inf]  🔧 Initializing Drizzle ORM...
+2025-11-26T12:50:43.831655776Z [inf]  ✅ Drizzle ORM initialized
+2025-11-26T12:51:15.030167852Z [err]  [KeyGuard] Error during validation: Error: timeout exceeded when trying to connect
+2025-11-26T12:51:15.030175124Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:51:15.030183023Z [err]      at async executeWithRetry (file:///app/dist/index.js:53166:14)
+2025-11-26T12:51:15.030191445Z [err]      at async validateEncryptionKeyConsistency (file:///app/dist/index.js:53198:5)
+2025-11-26T12:51:15.030199774Z [err]      at async initializeSystem (file:///app/dist/index.js:53510:28)
+2025-11-26T12:51:15.030210402Z [err]      at async file:///app/dist/index.js:55654:7
+2025-11-26T12:51:15.030218455Z [inf]  🔐 First run: Encryption key fingerprint registered
+2025-11-26T12:51:45.917937478Z [err]  ❌ System initialization failed: Error: timeout exceeded when trying to connect
+2025-11-26T12:51:45.917960196Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:51:45.917967213Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:51:45.917976745Z [err]      at async initializeSystem (file:///app/dist/index.js:53520:27)
+2025-11-26T12:51:45.917986908Z [err]      at async file:///app/dist/index.js:55654:7
+2025-11-26T12:51:45.918020856Z [inf]  ✅ System initialized successfully
+2025-11-26T12:51:45.918029597Z [inf]  🔧 Registering AI agent routes (AFTER initialization)...
+2025-11-26T12:51:45.918038554Z [inf]  📋 Registering 11 agent routes...
+2025-11-26T12:51:45.918047290Z [inf]  [STATIC AGENT LOADER] Registering 11 agents...
+2025-11-26T12:51:45.918062142Z [inf]  [STATIC AGENT LOADER] Registering routes for: cadence
+2025-11-26T12:51:45.918075380Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: cadence
+2025-11-26T12:51:45.918082323Z [inf]  [STATIC AGENT LOADER] Registering routes for: echo
+2025-11-26T12:51:45.918089139Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: echo
+2025-11-26T12:51:45.918095956Z [inf]  [STATIC AGENT LOADER] Registering routes for: forma
+2025-11-26T12:51:45.918113666Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: forma
+2025-11-26T12:51:45.918127791Z [inf]  [STATIC AGENT LOADER] Registering routes for: luca
+2025-11-26T12:51:45.918136085Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: luca
+2025-11-26T12:51:45.918144294Z [inf]  [STATIC AGENT LOADER] Registering routes for: lynk
+2025-11-26T12:51:45.918152146Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: lynk
+2025-11-26T12:51:45.918159781Z [inf]  [STATIC AGENT LOADER] Registering routes for: omnispectra
+2025-11-26T12:51:45.918166770Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: omnispectra
+2025-11-26T12:51:47.008018988Z [inf]  [STATIC AGENT LOADER] Registering routes for: trace
+2025-11-26T12:51:47.008043673Z [inf]  [Trace Agent] Routes registered
+2025-11-26T12:51:47.008058870Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: trace
+2025-11-26T12:51:47.008068438Z [inf]  [STATIC AGENT LOADER] Registering routes for: scribe
+2025-11-26T12:51:47.008076400Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: scribe
+2025-11-26T12:51:47.008084551Z [inf]  [STATIC AGENT LOADER] ✅ All 11 agents registered successfully
+2025-11-26T12:51:47.008092210Z [inf]  📋 Registering session routes for 11 agents...
+2025-11-26T12:51:47.008099288Z [inf]  ✅ Agent routes registered successfully
+2025-11-26T12:51:47.008107635Z [inf]  🎉 System initialization complete!
+2025-11-26T12:51:47.008116145Z [inf]  🔧 Loading automation triggers from database...
+2025-11-26T12:51:47.008165393Z [inf]  [EventTriggers] Loading triggers from database...
+2025-11-26T12:51:47.008518149Z [inf]  [STATIC AGENT LOADER] Registering routes for: parity
+2025-11-26T12:51:47.008523234Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: parity
+2025-11-26T12:51:47.008529933Z [inf]  [STATIC AGENT LOADER] Registering routes for: radar
+2025-11-26T12:51:47.008536388Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: radar
+2025-11-26T12:51:47.008542019Z [inf]  [STATIC AGENT LOADER] Registering routes for: relay
+2025-11-26T12:51:47.008547434Z [inf]  [STATIC AGENT LOADER] ✅ Successfully registered: relay
+2025-11-26T12:52:17.476015279Z [err]  [EventTriggers] Failed to load triggers from database: Error: timeout exceeded when trying to connect
+2025-11-26T12:52:17.476024754Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:52:17.476031040Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:52:17.476037593Z [err]      at async DbStorage.getAllAutomationTriggers (file:///app/dist/index.js:5994:16)
+2025-11-26T12:52:17.476044928Z [err]      at async EventTriggersEngine.loadTriggersFromDatabase (file:///app/dist/index.js:23917:28)
+2025-11-26T12:52:17.476050702Z [err]      at async file:///app/dist/index.js:55686:7
+2025-11-26T12:52:17.476108275Z [err]  ❌ Failed to load automation triggers: Error: timeout exceeded when trying to connect
+2025-11-26T12:52:17.476117266Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:52:17.476123626Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:52:17.476131355Z [err]      at async DbStorage.getAllAutomationTriggers (file:///app/dist/index.js:5994:16)
+2025-11-26T12:52:17.476139717Z [err]      at async EventTriggersEngine.loadTriggersFromDatabase (file:///app/dist/index.js:23917:28)
+2025-11-26T12:52:17.476150062Z [err]      at async file:///app/dist/index.js:55686:7
+2025-11-26T12:52:17.476158385Z [err]  ⚠️  Continuing without automation triggers - they can be created via API
+2025-11-26T12:52:17.476166535Z [inf]  🔧 Starting automation scheduler...
+2025-11-26T12:52:17.476172177Z [inf]  Starting automation scheduler...
+2025-11-26T12:52:17.476177518Z [inf]  ✅ Automation scheduler started successfully
+2025-11-26T12:52:17.476183335Z [inf]  ✅ Static file serving initialized (production mode) - routes ready
+2025-11-26T12:52:17.476189702Z [inf]     Serving from: /app/dist/public
+2025-11-26T12:52:17.476196909Z [inf]  ✅ Upload serving initialized
+2025-11-26T12:52:18.527728016Z [inf]     Serving from: /app/uploads
+2025-11-26T12:53:52.318605013Z [err]  Scheduler error: Error: timeout exceeded when trying to connect
+2025-11-26T12:53:52.318611878Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:53:52.318618368Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:53:52.318624768Z [err]      at async DbStorage.getScheduledTriggersDueForExecution (file:///app/dist/index.js:6019:16)
+2025-11-26T12:53:52.318631288Z [err]      at async _SchedulerService.checkAndExecuteTriggers (file:///app/dist/index.js:27650:26)
+2025-11-26T12:53:52.318638849Z [err]      at async Timeout._onTimeout (file:///app/dist/index.js:27635:13)
+2025-11-26T12:54:44.077351017Z [err]  Scheduler error: Error: timeout exceeded when trying to connect
+2025-11-26T12:54:44.077357529Z [err]      at /app/node_modules/pg-pool/index.js:45:11
+2025-11-26T12:54:44.077365210Z [err]      at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2025-11-26T12:54:44.077376900Z [err]      at async DbStorage.getScheduledTriggersDueForExecution (file:///app/dist/index.js:6019:16)
+2025-11-26T12:54:44.077384879Z [err]      at async _SchedulerService.checkAndExecuteTriggers (file:///app/dist/index.js:27650:26)
+2025-11-26T12:54:44.077392555Z [err]      at async Timeout._onTimeout (file:///app/dist/index.js:27635:13)
