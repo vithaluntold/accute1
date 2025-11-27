@@ -3,14 +3,24 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 
 function getDatabaseUrl(): string {
-  // Use DATABASE_URL for Railway database (primary database)
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      "DATABASE_URL must be set. Please configure your Railway database connection.",
-    );
+  // Priority 1: Use Replit's built-in PostgreSQL database (PGHOST/PGPORT/etc.)
+  // These are automatically provided by Replit when PostgreSQL is provisioned
+  if (process.env.PGHOST && process.env.PGPORT && process.env.PGUSER && 
+      process.env.PGPASSWORD && process.env.PGDATABASE) {
+    const replitDbUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
+    console.log(`🔌 Using Replit built-in PostgreSQL database`);
+    return replitDbUrl;
   }
-  console.log(`🔌 Using Railway database`);
-  return process.env.DATABASE_URL;
+  
+  // Priority 2: Use DATABASE_URL if set (Railway, Neon, or other external database)
+  if (process.env.DATABASE_URL) {
+    console.log(`🔌 Using external database (DATABASE_URL)`);
+    return process.env.DATABASE_URL;
+  }
+  
+  throw new Error(
+    "No database configuration found. Either provision Replit's PostgreSQL or set DATABASE_URL.",
+  );
 }
 
 // Track which connection source we're using
@@ -43,11 +53,10 @@ function createPool(): Pool {
     allowExitOnIdle: isProduction ? false : true,
   };
   
-  // SSL configuration for Railway
-  // Railway's regular postgres image doesn't support SSL
-  // Only the postgres-ssl image supports SSL connections
+  // SSL configuration based on database provider
   const isRailwayProxy = dbUrl.includes('.proxy.rlwy.net') || dbUrl.includes('railway.internal');
-  const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:') || dbUrl.includes('@helium:');
+  const isReplitDb = dbUrl.includes('@helium:') || dbUrl.includes('/heliumdb');
+  const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:');
   const isNeonDb = dbUrl.includes('neon.tech');
   
   if (isNeonDb) {
@@ -56,12 +65,16 @@ function createPool(): Pool {
     poolConfig.ssl = {
       rejectUnauthorized: false,
     };
-  } else if (requiresNoSSL || isLocalhost || isRailwayProxy) {
-    // Railway proxy with regular postgres image - no SSL
-    console.log('🔓 SSL disabled (Railway proxy / local database)');
+  } else if (requiresNoSSL || isLocalhost || isReplitDb) {
+    // Replit built-in database or local - no SSL needed
+    console.log('🔓 SSL disabled (Replit / local database)');
+    poolConfig.ssl = false;
+  } else if (isRailwayProxy) {
+    // Railway proxy - try without SSL first (regular postgres image doesn't support it)
+    console.log('🔓 SSL disabled for Railway proxy');
     poolConfig.ssl = false;
   } else {
-    // Default: try SSL with self-signed cert acceptance
+    // Default for cloud databases: try SSL with self-signed cert acceptance
     console.log('🔒 SSL enabled with self-signed cert acceptance');
     poolConfig.ssl = {
       rejectUnauthorized: false,
