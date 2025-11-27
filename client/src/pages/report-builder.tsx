@@ -80,15 +80,12 @@ export default function ReportBuilder() {
   // Execute report server-side
   const executeReportMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/reports/execute", {
-        method: "POST",
-        body: {
-          dataSource,
-          filters,
-          groupBy,
-        },
+      const response = await apiRequest("POST", "/api/reports/execute", {
+        dataSource,
+        filters,
+        groupBy,
       });
-      return response as ReportResult;
+      return await response.json() as ReportResult;
     },
     onSuccess: (data) => {
       setReportResults(data);

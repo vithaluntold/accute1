@@ -159,15 +159,9 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormData & { attendees?: any[] }) => {
       if (event) {
-        return await apiRequest(`/api/events/${event.id}`, {
-          method: "PATCH",
-          body: data,
-        });
+        return await apiRequest("PATCH", `/api/events/${event.id}`, data);
       } else {
-        return await apiRequest("/api/events", {
-          method: "POST",
-          body: data,
-        });
+        return await apiRequest("POST", "/api/events", data);
       }
     },
     onSuccess: () => {

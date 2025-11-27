@@ -50,13 +50,10 @@ export default function AutomatedInvoicing() {
   // Create invoice mutation
   const createMutation = useMutation({
     mutationFn: async (data: typeof newInvoice) => {
-      return await apiRequest("/api/invoices", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          amount: parseFloat(data.amount),
-          status: "draft",
-        }),
+      return await apiRequest("POST", "/api/invoices", {
+        ...data,
+        amount: parseFloat(data.amount),
+        status: "draft",
       });
     },
     onSuccess: () => {
@@ -73,9 +70,7 @@ export default function AutomatedInvoicing() {
   // Send invoice mutation
   const sendMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      return await apiRequest(`/api/invoices/${invoiceId}/send`, {
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/invoices/${invoiceId}/send`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });

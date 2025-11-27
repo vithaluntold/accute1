@@ -69,9 +69,7 @@ export default function EmailInbox() {
   // Mark as read mutation
   const markAsReadMutation = useMutation({
     mutationFn: async (messageId: string) => {
-      return await apiRequest(`/api/email-messages/${messageId}/read`, {
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/email-messages/${messageId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-messages"] });
@@ -97,12 +95,9 @@ export default function EmailInbox() {
 
   const handleComposeSend = async () => {
     try {
-      await apiRequest("/api/email-messages/send", {
-        method: "POST",
-        body: JSON.stringify({
-          accountId: selectedAccount,
-          ...composeData,
-        }),
+      await apiRequest("POST", "/api/email-messages/send", {
+        accountId: selectedAccount,
+        ...composeData,
       });
       toast({ title: "Success", description: "Email sent successfully" });
       setShowCompose(false);

@@ -124,11 +124,8 @@ export default function PaymentCollect() {
         items: data.items,
       };
 
-      return await apiRequest("/api/invoices", {
-        method: "POST",
-        body: JSON.stringify(invoiceData),
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await apiRequest("POST", "/api/invoices", invoiceData);
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
@@ -159,9 +156,7 @@ export default function PaymentCollect() {
   // Send invoice email mutation
   const sendInvoiceMutation = useMutation({
     mutationFn: async (invoiceId: string) => {
-      return await apiRequest(`/api/invoices/${invoiceId}/send`, {
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/invoices/${invoiceId}/send`);
     },
     onSuccess: () => {
       toast({

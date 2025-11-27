@@ -201,11 +201,8 @@ export default function PaymentsPage() {
   // Payment Methods Mutations
   const setupPaymentMethodMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("/api/payment-methods/setup", {
-        method: "POST",
-        body: JSON.stringify({ amount: 100 }), // ₹1 verification
-      });
-      return response;
+      const response = await apiRequest("POST", "/api/payment-methods/setup", { amount: 100 });
+      return response.json();
     },
     onSuccess: (data) => {
       loadRazorpayScript(() => {
@@ -229,10 +226,7 @@ export default function PaymentsPage() {
       razorpay_signature: string;
       nickname?: string;
     }) => {
-      return await apiRequest("/api/payment-methods/save", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/payment-methods/save", data);
     },
     onSuccess: () => {
       toast({

@@ -98,7 +98,7 @@ export default function SkillsManagement() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: z.output<typeof formSchema>) =>
-      apiRequest("/api/skills", "POST", data),
+      apiRequest("POST", "/api/skills", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/skills"] });
       queryClient.invalidateQueries({ queryKey: ["/api/skills/stats"] });
@@ -117,7 +117,7 @@ export default function SkillsManagement() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<z.output<typeof formSchema>> }) =>
-      apiRequest(`/api/skills/${id}`, "PATCH", data),
+      apiRequest("PATCH", `/api/skills/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/skills"] });
       queryClient.invalidateQueries({ queryKey: ["/api/skills/stats"] });

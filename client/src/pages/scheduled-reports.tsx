@@ -47,7 +47,7 @@ export default function ScheduledReportsPage() {
   });
 
   const createReportMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/scheduled-reports", "POST", data),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/scheduled-reports", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduled-reports"] });
       setShowNewReport(false);
@@ -59,7 +59,7 @@ export default function ScheduledReportsPage() {
 
   const updateReportMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/scheduled-reports/${id}`, "PATCH", data),
+      apiRequest("PATCH", `/api/scheduled-reports/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduled-reports"] });
       toast({ title: "Report updated successfully" });
@@ -68,7 +68,7 @@ export default function ScheduledReportsPage() {
   });
 
   const deleteReportMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/scheduled-reports/${id}`, "DELETE"),
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/scheduled-reports/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/scheduled-reports"] });
       toast({ title: "Report deleted successfully" });

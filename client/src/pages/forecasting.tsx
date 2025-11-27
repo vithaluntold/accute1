@@ -51,7 +51,7 @@ export default function ForecastingPage() {
 
   // Create model mutation
   const createModelMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/forecasting/models", "POST", data),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/forecasting/models", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forecasting/models"] });
       setShowNewModel(false);
@@ -63,7 +63,7 @@ export default function ForecastingPage() {
 
   // Run forecast mutation
   const runForecastMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/forecasting/runs", "POST", data),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/forecasting/runs", data),
     onSuccess: (run: ForecastingRun) => {
       setSelectedRun(run.id);
       toast({ title: "Forecast started", description: "Generating predictions..." });

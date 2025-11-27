@@ -72,19 +72,17 @@ export default function SubscriptionPricing() {
       const amount = basePrice * parseFloat(region.priceMultiplier) * 100; // Convert to paise/cents
 
       // Create Razorpay order
-      const order = await apiRequest("/api/razorpay/orders/create", {
-        method: "POST",
-        body: JSON.stringify({
-          amount: Math.round(amount),
-          currency: region.currency,
-          receipt: `receipt_${Date.now()}`,
-          notes: {
-            planId,
-            billingCycle,
-            regionCode: region.code,
-          },
-        }),
+      const response = await apiRequest("POST", "/api/razorpay/orders/create", {
+        amount: Math.round(amount),
+        currency: region.currency,
+        receipt: `receipt_${Date.now()}`,
+        notes: {
+          planId,
+          billingCycle,
+          regionCode: region.code,
+        },
       });
+      const order = await response.json();
 
       return { order, plan, region };
     },
@@ -131,13 +129,10 @@ export default function SubscriptionPricing() {
       order_id: order.id,
       handler: async function (response: any) {
         try {
-          await apiRequest("/api/razorpay/verify-payment", {
-            method: "POST",
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
+          await apiRequest("POST", "/api/razorpay/verify-payment", {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
           });
 
           toast({

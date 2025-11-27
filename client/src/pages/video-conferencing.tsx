@@ -60,7 +60,7 @@ export default function VideoConferencingPage() {
   });
 
   const createMeetingMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/meetings", "POST", data),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/meetings", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/meetings"] });
       setShowNewMeeting(false);
@@ -71,7 +71,7 @@ export default function VideoConferencingPage() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async (provider: string) => apiRequest(`/api/oauth/${provider}`, "DELETE"),
+    mutationFn: async (provider: string) => apiRequest("DELETE", `/api/oauth/${provider}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/oauth/connections"] });
       toast({ title: "Provider disconnected successfully" });

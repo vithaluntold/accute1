@@ -180,7 +180,7 @@ export default function ProposalsPage() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: ProposalFormValues) => apiRequest("/api/proposals", "POST", data),
+    mutationFn: (data: ProposalFormValues) => apiRequest("POST", "/api/proposals", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals", orgId] });
       toast({ title: "Success", description: "Proposal created successfully" });
@@ -199,7 +199,7 @@ export default function ProposalsPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<ProposalFormValues> }) =>
-      apiRequest(`/api/proposals/${id}`, "PUT", data),
+      apiRequest("PUT", `/api/proposals/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals", orgId] });
       toast({ title: "Success", description: "Proposal updated successfully" });

@@ -60,10 +60,8 @@ export default function ClientPortalMessages() {
   // Create new conversation mutation
   const createConversationMutation = useMutation({
     mutationFn: async (subject: string) => {
-      return await apiRequest("/api/client-portal/conversations", {
-        method: "POST",
-        body: JSON.stringify({ subject }),
-      });
+      const response = await apiRequest("POST", "/api/client-portal/conversations", { subject });
+      return response.json();
     },
     onSuccess: (newConversation) => {
       queryClient.invalidateQueries({ queryKey: ["/api/client-portal/conversations"] });
@@ -87,10 +85,7 @@ export default function ClientPortalMessages() {
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async ({ conversationId, content }: { conversationId: string; content: string }) => {
-      return await apiRequest(`/api/client-portal/conversations/${conversationId}/messages`, {
-        method: "POST",
-        body: JSON.stringify({ content }),
-      });
+      return await apiRequest("POST", `/api/client-portal/conversations/${conversationId}/messages`, { content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/client-portal/conversations", selectedConversationId, "messages"] });
