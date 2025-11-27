@@ -3,23 +3,24 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 
 function getDatabaseUrl(): string {
-  // Priority 1: Use Replit's built-in PostgreSQL database (PGHOST/PGPORT/etc.)
-  // These are automatically provided by Replit when PostgreSQL is provisioned
-  if (process.env.PGHOST && process.env.PGPORT && process.env.PGUSER && 
-      process.env.PGPASSWORD && process.env.PGDATABASE) {
-    const replitDbUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
-    console.log(`🔌 Using Replit built-in PostgreSQL database`);
-    return replitDbUrl;
-  }
-  
-  // Priority 2: Use DATABASE_URL if set (Railway, Neon, or other external database)
+  // Priority 1: Always use DATABASE_URL if provided (Railway, Neon, Supabase, etc.)
+  // Railway automatically sets this with proper sslmode
   if (process.env.DATABASE_URL) {
-    console.log(`🔌 Using external database (DATABASE_URL)`);
+    console.log(`🔌 Using DATABASE_URL`);
     return process.env.DATABASE_URL;
   }
   
+  // Priority 2: Build URL from individual PG* vars (Replit fallback)
+  // Only if DATABASE_URL is not set
+  if (process.env.PGHOST && process.env.PGPORT && process.env.PGUSER && 
+      process.env.PGPASSWORD && process.env.PGDATABASE) {
+    const dbUrl = `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
+    console.log(`🔌 Using PostgreSQL from environment variables`);
+    return dbUrl;
+  }
+  
   throw new Error(
-    "No database configuration found. Either provision Replit's PostgreSQL or set DATABASE_URL.",
+    "No database configuration found. Set DATABASE_URL environment variable.",
   );
 }
 
@@ -42,7 +43,6 @@ function createPool(): Pool {
   const requiresNoSSL = dbUrl.includes('sslmode=disable');
   
   console.log(`🔌 Initializing pg pool (${isProduction ? 'production' : 'development'} mode)...`);
-  console.log(`   Provider: Railway`);
   
   const poolConfig: PoolConfig = { 
     connectionString: dbUrl,
@@ -54,28 +54,17 @@ function createPool(): Pool {
   };
   
   // SSL configuration based on database provider
-  const isRailwayProxy = dbUrl.includes('.proxy.rlwy.net') || dbUrl.includes('railway.internal');
-  const isReplitDb = dbUrl.includes('@helium:') || dbUrl.includes('/heliumdb');
+  const isReplitLocal = dbUrl.includes('@helium:') || dbUrl.includes('/heliumdb');
   const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:');
-  const isNeonDb = dbUrl.includes('neon.tech');
   
-  if (isNeonDb) {
-    // Neon requires SSL
-    console.log('🔒 SSL enabled for Neon database');
-    poolConfig.ssl = {
-      rejectUnauthorized: false,
-    };
-  } else if (requiresNoSSL || isLocalhost || isReplitDb) {
-    // Replit built-in database or local - no SSL needed
-    console.log('🔓 SSL disabled (Replit / local database)');
-    poolConfig.ssl = false;
-  } else if (isRailwayProxy) {
-    // Railway proxy - try without SSL first (regular postgres image doesn't support it)
-    console.log('🔓 SSL disabled for Railway proxy');
+  if (requiresNoSSL || isLocalhost || isReplitLocal) {
+    // Local development or Replit's internal database - no SSL needed
+    console.log('🔓 SSL disabled (local database)');
     poolConfig.ssl = false;
   } else {
-    // Default for cloud databases: try SSL with self-signed cert acceptance
-    console.log('🔒 SSL enabled with self-signed cert acceptance');
+    // Cloud databases (Railway, Neon, Supabase, etc.) - use SSL with self-signed cert acceptance
+    // Railway uses self-signed certificates, so rejectUnauthorized must be false
+    console.log('🔒 SSL enabled (cloud database)');
     poolConfig.ssl = {
       rejectUnauthorized: false,
     };
