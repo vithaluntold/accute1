@@ -23663,6 +23663,333 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // ============================================================================
+  // AI EMPLOYEE ONBOARDING - JURISDICTION & DOCUMENT ROUTES
+  // ============================================================================
+
+  // Get all active jurisdictions
+  app.get("/api/jurisdictions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const jurisdictions = await storage.getJurisdictions();
+      res.json(jurisdictions);
+    } catch (error: any) {
+      console.error("[Jurisdictions] Failed to fetch:", error);
+      res.status(500).json({ error: "Failed to fetch jurisdictions" });
+    }
+  });
+
+  // Get document requirements by jurisdiction code
+  app.get("/api/jurisdictions/:code/requirements", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { code } = req.params;
+      const { employeeType } = req.query;
+      
+      const requirements = await storage.getDocumentRequirementsByCode(
+        code, 
+        employeeType as string | undefined
+      );
+      
+      res.json(requirements);
+    } catch (error: any) {
+      console.error("[Jurisdictions] Failed to fetch requirements:", error);
+      res.status(500).json({ error: "Failed to fetch document requirements" });
+    }
+  });
+
+  // Get all document types
+  app.get("/api/document-types", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { category } = req.query;
+      
+      if (category) {
+        const documentTypes = await storage.getDocumentTypesByCategory(category as string);
+        res.json(documentTypes);
+      } else {
+        const documentTypes = await storage.getDocumentTypes();
+        res.json(documentTypes);
+      }
+    } catch (error: any) {
+      console.error("[DocumentTypes] Failed to fetch:", error);
+      res.status(500).json({ error: "Failed to fetch document types" });
+    }
+  });
+
+  // Get employee documents for current user
+  app.get("/api/employee-documents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId || 
+        (await storage.getUserOrganizations(userId))[0]?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "No organization found" });
+      }
+      
+      const documents = await storage.getEmployeeDocumentsByUserAndOrg(userId, organizationId);
+      res.json(documents);
+    } catch (error: any) {
+      console.error("[EmployeeDocuments] Failed to fetch:", error);
+      res.status(500).json({ error: "Failed to fetch employee documents" });
+    }
+  });
+
+  // Upload employee document
+  app.post("/api/employee-documents", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId || 
+        (await storage.getUserOrganizations(userId))[0]?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "No organization found" });
+      }
+      
+      const { documentTypeId, fileName, fileUrl, fileSize, mimeType, jurisdictionId, documentNumber, expirationDate, notes } = req.body;
+      
+      if (!documentTypeId || !fileName || !fileUrl) {
+        return res.status(400).json({ error: "Missing required fields: documentTypeId, fileName, fileUrl" });
+      }
+      
+      const document = await storage.createEmployeeDocument({
+        userId,
+        organizationId,
+        documentTypeId,
+        jurisdictionId: jurisdictionId || null,
+        fileName,
+        fileUrl,
+        fileSize: fileSize || null,
+        mimeType: mimeType || null,
+        documentNumber: documentNumber || null,
+        expirationDate: expirationDate ? new Date(expirationDate) : null,
+        notes: notes || null,
+        status: 'pending',
+      });
+      
+      res.status(201).json(document);
+    } catch (error: any) {
+      console.error("[EmployeeDocuments] Failed to create:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Update employee document
+  app.patch("/api/employee-documents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      
+      // Verify ownership
+      const existing = await storage.getEmployeeDocument(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      if (existing.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to update this document" });
+      }
+      
+      const { status, verificationNotes, fileName, fileUrl, documentNumber, expirationDate, notes } = req.body;
+      
+      const document = await storage.updateEmployeeDocument(id, {
+        ...(status && { status }),
+        ...(verificationNotes && { verificationNotes }),
+        ...(fileName && { fileName }),
+        ...(fileUrl && { fileUrl }),
+        ...(documentNumber && { documentNumber }),
+        ...(expirationDate && { expirationDate: new Date(expirationDate) }),
+        ...(notes && { notes }),
+      });
+      
+      res.json(document);
+    } catch (error: any) {
+      console.error("[EmployeeDocuments] Failed to update:", error);
+      res.status(500).json({ error: "Failed to update document" });
+    }
+  });
+
+  // Delete employee document
+  app.delete("/api/employee-documents/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user!.id;
+      
+      // Verify ownership
+      const existing = await storage.getEmployeeDocument(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      if (existing.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to delete this document" });
+      }
+      
+      await storage.deleteEmployeeDocument(id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("[EmployeeDocuments] Failed to delete:", error);
+      res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+
+  // Get employee onboarding progress
+  app.get("/api/employee-onboarding/progress", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId || 
+        (await storage.getUserOrganizations(userId))[0]?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "No organization found" });
+      }
+      
+      let progress = await storage.getEmployeeOnboardingProgress(userId, organizationId);
+      
+      // Create progress record if it doesn't exist
+      if (!progress) {
+        progress = await storage.createEmployeeOnboardingProgress({
+          userId,
+          organizationId,
+          status: 'pending',
+          totalSteps: 0,
+          completedSteps: 0,
+          percentComplete: 0,
+          documentsRequired: [],
+          documentsSubmitted: [],
+          aiRecommendations: null,
+        });
+      }
+      
+      res.json(progress);
+    } catch (error: any) {
+      console.error("[EmployeeOnboarding] Failed to fetch progress:", error);
+      res.status(500).json({ error: "Failed to fetch onboarding progress" });
+    }
+  });
+
+  // Update employee onboarding progress
+  app.patch("/api/employee-onboarding/progress", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId || 
+        (await storage.getUserOrganizations(userId))[0]?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "No organization found" });
+      }
+      
+      let progress = await storage.getEmployeeOnboardingProgress(userId, organizationId);
+      
+      if (!progress) {
+        return res.status(404).json({ error: "Onboarding progress not found" });
+      }
+      
+      const updatedProgress = await storage.updateEmployeeOnboardingProgress(progress.id, req.body);
+      res.json(updatedProgress);
+    } catch (error: any) {
+      console.error("[EmployeeOnboarding] Failed to update progress:", error);
+      res.status(500).json({ error: "Failed to update onboarding progress" });
+    }
+  });
+
+  // Get employee onboarding chat sessions
+  app.get("/api/employee-onboarding/chat/sessions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const sessions = await storage.getEmployeeOnboardingChatSessionsByUser(userId);
+      res.json(sessions);
+    } catch (error: any) {
+      console.error("[EmployeeOnboardingChat] Failed to fetch sessions:", error);
+      res.status(500).json({ error: "Failed to fetch chat sessions" });
+    }
+  });
+
+  // Create employee onboarding chat session
+  app.post("/api/employee-onboarding/chat/sessions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const organizationId = req.user!.organizationId || 
+        (await storage.getUserOrganizations(userId))[0]?.organizationId;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: "No organization found" });
+      }
+      
+      const session = await storage.createEmployeeOnboardingChatSession({
+        userId,
+        organizationId,
+        title: req.body.title || 'New Onboarding Session',
+        status: 'active',
+        context: req.body.context || {},
+      });
+      
+      res.status(201).json(session);
+    } catch (error: any) {
+      console.error("[EmployeeOnboardingChat] Failed to create session:", error);
+      res.status(500).json({ error: "Failed to create chat session" });
+    }
+  });
+
+  // Get chat messages for a session
+  app.get("/api/employee-onboarding/chat/sessions/:sessionId/messages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const userId = req.user!.id;
+      
+      // Verify ownership
+      const session = await storage.getEmployeeOnboardingChatSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to access this session" });
+      }
+      
+      const messages = await storage.getEmployeeOnboardingChatMessages(sessionId);
+      res.json(messages);
+    } catch (error: any) {
+      console.error("[EmployeeOnboardingChat] Failed to fetch messages:", error);
+      res.status(500).json({ error: "Failed to fetch chat messages" });
+    }
+  });
+
+  // Send message in employee onboarding chat (with AI response)
+  app.post("/api/employee-onboarding/chat/sessions/:sessionId/messages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const userId = req.user!.id;
+      const { content } = req.body;
+      
+      if (!content) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+      
+      // Verify ownership
+      const session = await storage.getEmployeeOnboardingChatSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      if (session.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to access this session" });
+      }
+      
+      // Save user message
+      const userMessage = await storage.createEmployeeOnboardingChatMessage({
+        sessionId,
+        role: 'user',
+        content,
+      });
+      
+      // Update session
+      await storage.updateEmployeeOnboardingChatSession(sessionId, {
+        messageCount: (session.messageCount || 0) + 1,
+      });
+      
+      // Return user message (AI response will be streamed via SSE)
+      res.status(201).json(userMessage);
+    } catch (error: any) {
+      console.error("[EmployeeOnboardingChat] Failed to send message:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
   // ==================== SSE AGENT STREAM ROUTES ====================
   registerSSEAgentRoutes(app);
 
