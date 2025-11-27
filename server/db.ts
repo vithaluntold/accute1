@@ -1,34 +1,15 @@
 import { Pool, PoolConfig } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
-import * as tls from 'tls';
 
 function getDatabaseUrl(): string {
-  // Check for Replit's built-in database (uses PGHOST, PGPORT, PGUSER, etc.)
-  if (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE) {
-    const pgHost = process.env.PGHOST;
-    const pgPort = process.env.PGPORT || '5432';
-    const pgUser = process.env.PGUSER;
-    const pgPassword = process.env.PGPASSWORD;
-    const pgDatabase = process.env.PGDATABASE;
-    
-    // Build URL correctly: omit colon when no password
-    let localUrl: string;
-    if (pgPassword) {
-      localUrl = `postgresql://${pgUser}:${pgPassword}@${pgHost}:${pgPort}/${pgDatabase}`;
-    } else {
-      localUrl = `postgresql://${pgUser}@${pgHost}:${pgPort}/${pgDatabase}`;
-    }
-    console.log(`🔌 Using Replit local database: ${pgHost}:${pgPort}/${pgDatabase}`);
-    return localUrl;
-  }
-  
-  // Fallback to DATABASE_URL for external databases
+  // Use DATABASE_URL for Railway database (primary database)
   if (!process.env.DATABASE_URL) {
     throw new Error(
-      "DATABASE_URL must be set. Did you forget to provision a database?",
+      "DATABASE_URL must be set. Please configure your Railway database connection.",
     );
   }
+  console.log(`🔌 Using Railway database`);
   return process.env.DATABASE_URL;
 }
 
@@ -43,23 +24,15 @@ let _db: ReturnType<typeof drizzle> | null = null;
 function createPool(): Pool {
   const dbUrl = getDatabaseUrl();
   
-  // Check if using Replit local database (hostname "helium" or similar local names)
-  const isReplitLocal = dbUrl.includes('@helium:') || dbUrl.includes('@localhost:');
+  // Railway database configuration
+  isUsingLocalDb = false;
   
-  // Detect external cloud database providers
-  const isNeon = dbUrl.includes('neon.tech');
-  const isRailway = dbUrl.includes('railway.app') || dbUrl.includes('rlwy.net') || dbUrl.includes('proxy.rlwy') || dbUrl.includes('gondola');
-  const isCloudDB = !isReplitLocal && (isNeon || isRailway);
-  
-  // Track connection type
-  isUsingLocalDb = isReplitLocal;
+  // Check if URL contains sslmode parameter
+  const hasSSLParam = dbUrl.includes('sslmode=');
+  const requiresNoSSL = dbUrl.includes('sslmode=disable');
   
   console.log(`🔌 Initializing pg pool (${isProduction ? 'production' : 'development'} mode)...`);
-  if (isReplitLocal) {
-    console.log(`   Using Replit local database (no SSL required)`);
-  } else if (isCloudDB) {
-    console.log(`   Provider detected: ${isNeon ? 'Neon' : 'Railway'}`);
-  }
+  console.log(`   Provider: Railway`);
   
   const poolConfig: PoolConfig = { 
     connectionString: dbUrl,
@@ -70,26 +43,20 @@ function createPool(): Pool {
     allowExitOnIdle: isProduction ? false : true,
   };
   
-  // SSL configuration: all non-local connections require TLS
-  if (!isReplitLocal) {
-    console.log('🔒 SSL enabled for external database');
+  // SSL configuration for Railway
+  // Detect if this is a local database (no SSL needed) or external (Railway)
+  const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:') || dbUrl.includes('@helium:');
+  
+  if (requiresNoSSL || isLocalhost) {
+    console.log('🔓 SSL disabled (local database or sslmode=disable)');
+    poolConfig.ssl = false;
+  } else {
+    console.log('🔒 SSL enabled for Railway database');
     // Railway's proxy uses self-signed certs that require rejectUnauthorized: false
-    // All other providers (Neon, Azure, RDS, Supabase, etc.) use strict TLS
-    if (isRailway) {
-      // Railway's proxy terminates TLS and presents self-signed certs
-      poolConfig.ssl = {
-        rejectUnauthorized: false,
-      };
-      console.log('   Railway proxy detected - using relaxed SSL');
-    } else {
-      // Default: strict TLS for all other providers (Neon, Azure, RDS, Supabase, etc.)
-      poolConfig.ssl = true;
-      if (isNeon) {
-        console.log('   Neon detected - using strict SSL');
-      } else {
-        console.log('   External provider detected - using strict SSL');
-      }
-    }
+    poolConfig.ssl = {
+      rejectUnauthorized: false,
+    };
+    console.log('   Railway proxy - using relaxed SSL');
   }
   
   const pool = new Pool(poolConfig);
