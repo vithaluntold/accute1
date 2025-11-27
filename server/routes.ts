@@ -614,6 +614,23 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
           slug,
         });
         organization = await storage.createOrganization(orgData);
+        
+        // ✅ Auto-create 21-day trial subscription for new organizations
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + 21); // 21 days from now
+        
+        await db.insert(schema.platformSubscriptions).values({
+          id: crypto.randomUUID(),
+          organizationId: organization.id,
+          planId: null, // No specific plan during trial - full access
+          status: 'active',
+          isTrialing: true,
+          trialEndsAt,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: trialEndsAt,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
       }
 
       // Get client role by default
@@ -1849,6 +1866,23 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
         slug,
       });
       const organization = await storage.createOrganization(orgData);
+
+      // ✅ Auto-create 21-day trial subscription for new organizations
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 21); // 21 days from now
+      
+      await db.insert(schema.platformSubscriptions).values({
+        id: crypto.randomUUID(),
+        organizationId: organization.id,
+        planId: null, // No specific plan during trial - full access
+        status: 'active',
+        isTrialing: true,
+        trialEndsAt,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: trialEndsAt,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       const adminRole = await storage.getRoleByName("Admin");
       if (!adminRole) {

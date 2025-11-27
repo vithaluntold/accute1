@@ -42,6 +42,18 @@ export async function hasFeatureAccess(
     // Get organization's active subscription
     const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
     
+    // ✅ TRIAL: Check if user is in 21-day trial period (full access to everything)
+    if (subscription?.isTrialing && subscription?.trialEndsAt) {
+      const trialEnd = new Date(subscription.trialEndsAt);
+      if (trialEnd > new Date()) {
+        console.info('[Feature Gating] TRIAL_ACCESS: User in trial period has full access', {
+          ...context,
+          trialEndsAt: subscription.trialEndsAt
+        });
+        return true; // Trial users get full access to all features
+      }
+    }
+    
     if (!subscription) {
       // TELEMETRY: Quota denial (no subscription)
       console.info('[Feature Gating] QUOTA_DENIAL: No subscription', context);
@@ -127,6 +139,24 @@ export async function checkResourceLimit(
     }
 
     const subscription = await storage.getActiveSubscriptionByOrganization(organizationId);
+    
+    // ✅ TRIAL: Check if user is in 21-day trial period (unlimited limits)
+    if (subscription?.isTrialing && subscription?.trialEndsAt) {
+      const trialEnd = new Date(subscription.trialEndsAt);
+      if (trialEnd > new Date()) {
+        console.info('[Feature Gating] TRIAL_ACCESS: User in trial period has unlimited limits', {
+          organizationId,
+          resource,
+          trialEndsAt: subscription.trialEndsAt
+        });
+        return {
+          allowed: true,
+          limit: Infinity,
+          current: 0,
+          available: Infinity
+        };
+      }
+    }
     
     // Get current usage using real-time tracking
     const usage = await UsageTrackingService.getOrganizationUsage(organizationId);
