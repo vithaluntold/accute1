@@ -44,14 +44,25 @@ function createPool(): Pool {
   };
   
   // SSL configuration for Railway
+  // Railway's regular postgres image doesn't support SSL
+  // Only the postgres-ssl image supports SSL connections
+  const isRailwayProxy = dbUrl.includes('.proxy.rlwy.net') || dbUrl.includes('railway.internal');
   const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:') || dbUrl.includes('@helium:');
+  const isNeonDb = dbUrl.includes('neon.tech');
   
-  if (requiresNoSSL || isLocalhost) {
-    console.log('🔓 SSL disabled (local database)');
+  if (isNeonDb) {
+    // Neon requires SSL
+    console.log('🔒 SSL enabled for Neon database');
+    poolConfig.ssl = {
+      rejectUnauthorized: false,
+    };
+  } else if (requiresNoSSL || isLocalhost || isRailwayProxy) {
+    // Railway proxy with regular postgres image - no SSL
+    console.log('🔓 SSL disabled (Railway proxy / local database)');
     poolConfig.ssl = false;
   } else {
-    // Railway requires SSL with rejectUnauthorized: false for their proxy
-    console.log('🔒 SSL enabled for Railway database');
+    // Default: try SSL with self-signed cert acceptance
+    console.log('🔒 SSL enabled with self-signed cert acceptance');
     poolConfig.ssl = {
       rejectUnauthorized: false,
     };
