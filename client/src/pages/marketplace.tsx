@@ -17,7 +17,9 @@ import {
   Check,
   Loader2,
   ShoppingBag,
-  Bot
+  Bot,
+  Mail,
+  MessageSquare
 } from "lucide-react";
 import { GradientHero } from "@/components/gradient-hero";
 
@@ -25,7 +27,7 @@ interface MarketplaceItem {
   id: string;
   name: string;
   description: string;
-  category: 'document_template' | 'form_template' | 'pipeline_template';
+  category: 'document_template' | 'form_template' | 'pipeline_template' | 'email_template' | 'message_template';
   type: string;
   pricingModel: 'free' | 'one_time' | 'subscription';
   price: string;
@@ -74,7 +76,7 @@ interface AgentInstallation {
 
 export default function Marketplace() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<'document_template' | 'form_template' | 'pipeline_template' | 'ai_agents'>('ai_agents');
+  const [activeTab, setActiveTab] = useState<'document_template' | 'form_template' | 'pipeline_template' | 'email_template' | 'message_template' | 'ai_agents'>('ai_agents');
   const [installingItemId, setInstallingItemId] = useState<string | null>(null);
   const [uninstallingItemId, setUninstallingItemId] = useState<string | null>(null);
   const [installingAgentSlug, setInstallingAgentSlug] = useState<string | null>(null);
@@ -273,6 +275,10 @@ export default function Marketplace() {
         return <FileCheck className="h-5 w-5" />;
       case 'pipeline_template':
         return <Workflow className="h-5 w-5" />;
+      case 'email_template':
+        return <Mail className="h-5 w-5" />;
+      case 'message_template':
+        return <MessageSquare className="h-5 w-5" />;
       case 'ai_agents':
         return <Bot className="h-5 w-5" />;
       default:
@@ -581,6 +587,8 @@ export default function Marketplace() {
   const documentItems = filterItems('document_template');
   const formItems = filterItems('form_template');
   const pipelineItems = filterItems('pipeline_template');
+  const emailItems = filterItems('email_template');
+  const messageItems = filterItems('message_template');
   const filteredAgents = filterAgents();
 
   return (
@@ -625,6 +633,14 @@ export default function Marketplace() {
           <TabsTrigger value="pipeline_template" data-testid="tab-pipelines">
             <Workflow className="h-4 w-4 mr-2" />
             Pipelines ({pipelineItems.length})
+          </TabsTrigger>
+          <TabsTrigger value="email_template" data-testid="tab-emails">
+            <Mail className="h-4 w-4 mr-2" />
+            Emails ({emailItems.length})
+          </TabsTrigger>
+          <TabsTrigger value="message_template" data-testid="tab-messages">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Messages ({messageItems.length})
           </TabsTrigger>
         </TabsList>
 
@@ -676,6 +692,38 @@ export default function Marketplace() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {pipelineItems.map(renderItemCard)}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="email_template" className="space-y-4">
+          {emailItems.length === 0 ? (
+            <div className="text-center py-12">
+              <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No email templates found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Email templates help you create professional client communications
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {emailItems.map(renderItemCard)}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="message_template" className="space-y-4">
+          {messageItems.length === 0 ? (
+            <div className="text-center py-12">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">No message templates found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Quick message templates for efficient client communication
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {messageItems.map(renderItemCard)}
             </div>
           )}
         </TabsContent>
