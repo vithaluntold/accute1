@@ -5902,3 +5902,255 @@ export const insertAutomationTriggerSchema = createInsertSchema(automationTrigge
 });
 export type InsertAutomationTrigger = z.infer<typeof insertAutomationTriggerSchema>;
 export type AutomationTrigger = typeof automationTriggers.$inferSelect;
+
+// =============================================================================
+// AI EMPLOYEE PROFILE & JURISDICTION-BASED DOCUMENT VERIFICATION
+// =============================================================================
+
+// Jurisdictions (Countries/States with specific document requirements)
+export const jurisdictions = pgTable("jurisdictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 10 }).notNull().unique(), // ISO 3166-1 alpha-2 or state codes like "US-CA"
+  name: text("name").notNull(),
+  type: text("type").notNull().default("country"), // 'country', 'state', 'region'
+  parentCode: varchar("parent_code", { length: 10 }), // For states: parent country code
+  currency: varchar("currency", { length: 3 }),
+  taxAuthority: text("tax_authority"), // e.g., "IRS", "HMRC", "Income Tax Department"
+  employmentLawUrl: text("employment_law_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  metadata: jsonb("metadata"), // Additional jurisdiction-specific data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  codeIdx: index("jurisdictions_code_idx").on(table.code),
+  parentIdx: index("jurisdictions_parent_idx").on(table.parentCode),
+}));
+
+// Document Types (Global catalog of document types)
+export const documentTypes = pgTable("document_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(), // e.g., "PAN", "SSN", "PASSPORT", "AADHAAR"
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // 'identity', 'tax', 'address', 'employment', 'banking', 'education'
+  validationRules: jsonb("validation_rules"), // Regex patterns, format rules, etc.
+  exampleFormat: text("example_format"), // e.g., "XXXXX0000X" for PAN
+  acceptedFileTypes: text("accepted_file_types").array().default(sql`ARRAY['application/pdf', 'image/jpeg', 'image/png']::text[]`),
+  maxFileSizeMb: integer("max_file_size_mb").default(10),
+  isGlobal: boolean("is_global").notNull().default(false), // Passport is global, SSN is not
+  aiVerifiable: boolean("ai_verifiable").notNull().default(true), // Can AI help verify this document?
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  codeIdx: index("document_types_code_idx").on(table.code),
+  categoryIdx: index("document_types_category_idx").on(table.category),
+}));
+
+// Jurisdiction Document Requirements (Maps required documents to jurisdictions)
+export const jurisdictionDocumentRequirements = pgTable("jurisdiction_document_requirements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jurisdictionId: varchar("jurisdiction_id").notNull().references(() => jurisdictions.id, { onDelete: 'cascade' }),
+  documentTypeId: varchar("document_type_id").notNull().references(() => documentTypes.id, { onDelete: 'cascade' }),
+  isRequired: boolean("is_required").notNull().default(true),
+  isMandatory: boolean("is_mandatory").notNull().default(false), // Cannot proceed without this
+  priority: integer("priority").notNull().default(1), // Display order
+  validityPeriodDays: integer("validity_period_days"), // Some documents expire
+  notes: text("notes"), // Jurisdiction-specific notes about this document
+  alternativeDocumentIds: text("alternative_document_ids").array(), // Alternative acceptable documents
+  employeeTypes: text("employee_types").array().default(sql`ARRAY['full_time', 'part_time', 'contractor']::text[]`), // Which employee types need this
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  jurisdictionIdx: index("jdr_jurisdiction_idx").on(table.jurisdictionId),
+  documentTypeIdx: index("jdr_document_type_idx").on(table.documentTypeId),
+  uniqueReq: unique("jdr_unique").on(table.jurisdictionId, table.documentTypeId),
+}));
+
+// Employee Documents (Track all documents uploaded by employees)
+export const employeeDocuments = pgTable("employee_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: 'cascade' }),
+  documentTypeId: varchar("document_type_id").notNull().references(() => documentTypes.id),
+  jurisdictionId: varchar("jurisdiction_id").references(() => jurisdictions.id),
+  
+  // Document details
+  documentNumber: text("document_number"), // Encrypted if sensitive
+  documentName: text("document_name"), // User-friendly name
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  
+  // Validity
+  issueDate: timestamp("issue_date"),
+  expiryDate: timestamp("expiry_date"),
+  issuingAuthority: text("issuing_authority"),
+  
+  // Verification
+  status: text("status").notNull().default("pending"), // 'pending', 'in_review', 'verified', 'rejected', 'expired'
+  verificationMethod: text("verification_method"), // 'manual', 'ai_assisted', 'api_verified'
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  
+  // AI Analysis
+  aiConfidenceScore: numeric("ai_confidence_score"), // 0-100
+  aiExtractedData: jsonb("ai_extracted_data"), // Data extracted by AI from document
+  aiVerificationNotes: text("ai_verification_notes"),
+  
+  // Audit
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  version: integer("version").notNull().default(1), // For document updates
+  previousVersionId: varchar("previous_version_id"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("employee_docs_user_idx").on(table.userId),
+  orgIdx: index("employee_docs_org_idx").on(table.organizationId),
+  docTypeIdx: index("employee_docs_type_idx").on(table.documentTypeId),
+  statusIdx: index("employee_docs_status_idx").on(table.status),
+}));
+
+// Employee Onboarding Progress (Track AI-guided onboarding steps)
+export const employeeOnboardingProgress = pgTable("employee_onboarding_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: 'cascade' }),
+  jurisdictionId: varchar("jurisdiction_id").references(() => jurisdictions.id),
+  
+  // Progress tracking
+  currentStep: text("current_step").notNull().default("personal_info"), // 'personal_info', 'contact', 'documents', 'tax_forms', 'banking', 'complete'
+  completedSteps: text("completed_steps").array().default(sql`ARRAY[]::text[]`),
+  completionPercentage: integer("completion_percentage").notNull().default(0),
+  
+  // Document checklist status
+  requiredDocuments: jsonb("required_documents"), // List of required document IDs for this jurisdiction
+  submittedDocuments: jsonb("submitted_documents"), // Document ID -> status mapping
+  pendingDocuments: text("pending_documents").array().default(sql`ARRAY[]::text[]`),
+  
+  // AI Interaction
+  lastAiInteractionAt: timestamp("last_ai_interaction_at"),
+  aiRecommendations: jsonb("ai_recommendations"), // AI suggestions for next steps
+  aiChatSessionId: varchar("ai_chat_session_id"), // Reference to chat with AI assistant
+  
+  // Status
+  status: text("status").notNull().default("in_progress"), // 'not_started', 'in_progress', 'pending_review', 'complete'
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("emp_onboarding_user_idx").on(table.userId),
+  orgIdx: index("emp_onboarding_org_idx").on(table.organizationId),
+  statusIdx: index("emp_onboarding_status_idx").on(table.status),
+  uniqueUserOrg: unique("emp_onboarding_user_org_unique").on(table.userId, table.organizationId),
+}));
+
+// AI Employee Onboarding Chat Sessions
+export const employeeOnboardingChatSessions = pgTable("employee_onboarding_chat_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: 'cascade' }),
+  jurisdictionId: varchar("jurisdiction_id").references(() => jurisdictions.id),
+  
+  title: text("title").default("Employee Onboarding"),
+  status: text("status").notNull().default("active"), // 'active', 'completed', 'archived'
+  
+  // Context for AI
+  employeeType: text("employee_type").default("full_time"), // 'full_time', 'part_time', 'contractor'
+  currentContext: jsonb("current_context"), // What the AI knows about this employee's onboarding
+  
+  messageCount: integer("message_count").notNull().default(0),
+  lastMessageAt: timestamp("last_message_at"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("emp_onboarding_chat_user_idx").on(table.userId),
+  orgIdx: index("emp_onboarding_chat_org_idx").on(table.organizationId),
+}));
+
+// AI Employee Onboarding Chat Messages
+export const employeeOnboardingChatMessages = pgTable("employee_onboarding_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => employeeOnboardingChatSessions.id, { onDelete: 'cascade' }),
+  
+  role: text("role").notNull(), // 'user', 'assistant', 'system'
+  content: text("content").notNull(),
+  
+  // AI metadata
+  tokensUsed: integer("tokens_used"),
+  modelUsed: text("model_used"),
+  
+  // For document-related messages
+  relatedDocumentId: varchar("related_document_id").references(() => employeeDocuments.id),
+  relatedDocumentType: varchar("related_document_type"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sessionIdx: index("emp_onboarding_msg_session_idx").on(table.sessionId),
+  createdAtIdx: index("emp_onboarding_msg_created_idx").on(table.createdAt),
+}));
+
+// Insert schemas and types for jurisdiction tables
+export const insertJurisdictionSchema = createInsertSchema(jurisdictions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertJurisdiction = z.infer<typeof insertJurisdictionSchema>;
+export type Jurisdiction = typeof jurisdictions.$inferSelect;
+
+export const insertDocumentTypeSchema = createInsertSchema(documentTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDocumentType = z.infer<typeof insertDocumentTypeSchema>;
+export type DocumentType = typeof documentTypes.$inferSelect;
+
+export const insertJurisdictionDocumentRequirementSchema = createInsertSchema(jurisdictionDocumentRequirements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertJurisdictionDocumentRequirement = z.infer<typeof insertJurisdictionDocumentRequirementSchema>;
+export type JurisdictionDocumentRequirement = typeof jurisdictionDocumentRequirements.$inferSelect;
+
+export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  uploadedAt: true,
+});
+export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
+export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
+
+export const insertEmployeeOnboardingProgressSchema = createInsertSchema(employeeOnboardingProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmployeeOnboardingProgress = z.infer<typeof insertEmployeeOnboardingProgressSchema>;
+export type EmployeeOnboardingProgress = typeof employeeOnboardingProgress.$inferSelect;
+
+export const insertEmployeeOnboardingChatSessionSchema = createInsertSchema(employeeOnboardingChatSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmployeeOnboardingChatSession = z.infer<typeof insertEmployeeOnboardingChatSessionSchema>;
+export type EmployeeOnboardingChatSession = typeof employeeOnboardingChatSessions.$inferSelect;
+
+export const insertEmployeeOnboardingChatMessageSchema = createInsertSchema(employeeOnboardingChatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEmployeeOnboardingChatMessage = z.infer<typeof insertEmployeeOnboardingChatMessageSchema>;
+export type EmployeeOnboardingChatMessage = typeof employeeOnboardingChatMessages.$inferSelect;
