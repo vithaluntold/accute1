@@ -210,12 +210,10 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </section>
 
       {/* Stats Section */}
-      <section className="py-12 border-y bg-muted/30 relative -mt-16 z-20">
+      <section className="py-12 border-y bg-card">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {stats.map((stat, index) => (
