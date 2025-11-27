@@ -1,8 +1,29 @@
 import { Pool, PoolConfig } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
+import * as tls from 'tls';
 
 function getDatabaseUrl(): string {
+  // Check for Replit's built-in database (uses PGHOST, PGPORT, PGUSER, etc.)
+  if (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE) {
+    const pgHost = process.env.PGHOST;
+    const pgPort = process.env.PGPORT || '5432';
+    const pgUser = process.env.PGUSER;
+    const pgPassword = process.env.PGPASSWORD;
+    const pgDatabase = process.env.PGDATABASE;
+    
+    // Build URL correctly: omit colon when no password
+    let localUrl: string;
+    if (pgPassword) {
+      localUrl = `postgresql://${pgUser}:${pgPassword}@${pgHost}:${pgPort}/${pgDatabase}`;
+    } else {
+      localUrl = `postgresql://${pgUser}@${pgHost}:${pgPort}/${pgDatabase}`;
+    }
+    console.log(`🔌 Using Replit local database: ${pgHost}:${pgPort}/${pgDatabase}`);
+    return localUrl;
+  }
+  
+  // Fallback to DATABASE_URL for external databases
   if (!process.env.DATABASE_URL) {
     throw new Error(
       "DATABASE_URL must be set. Did you forget to provision a database?",
@@ -11,81 +32,86 @@ function getDatabaseUrl(): string {
   return process.env.DATABASE_URL;
 }
 
+// Track which connection source we're using
+let isUsingLocalDb = false;
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
-function createPool() {
+function createPool(): Pool {
   const dbUrl = getDatabaseUrl();
   
-  if (isProduction) {
-    console.log('🔌 Initializing pg pool (production mode - Railway optimized)...');
-    
-    const poolConfig: PoolConfig = { 
-      connectionString: dbUrl,
-      // Production-optimized settings for Railway + Neon
-      max: 10,                       // Slightly larger pool
-      min: 1,                        // Keep 1 warm connection (reduced for Railway)
-      idleTimeoutMillis: 10000,      // 10 seconds idle timeout (Railway terminates long idle)
-      connectionTimeoutMillis: 5000, // 5 seconds to connect (fast fail for health checks)
-      allowExitOnIdle: false,        // Don't exit when idle
-      // SSL required for both Railway proxy and Neon
-      ssl: {
-        rejectUnauthorized: false    // Works with both Railway proxy and Neon
-      }
-    };
-    
-    const pool = new Pool(poolConfig);
-    
-    // Handle pool errors gracefully - connection termination is expected in cloud
-    pool.on('error', (err) => {
-      const errorMsg = err.message || '';
-      // Suppress verbose logging for expected connection resets
-      if (errorMsg.includes('Connection terminated') || 
-          errorMsg.includes('ECONNRESET') ||
-          errorMsg.includes('connection reset')) {
-        // Silent recovery - pool will auto-reconnect on next query
-      } else {
-        console.error('💥 Database pool error:', err.message);
-      }
-      // Don't crash - let the pool recover
-    });
-    
-    pool.on('connect', () => {
-      console.log('🔗 New database connection established');
-    });
-    
-    return pool;
-  } else {
-    console.log('🔌 Initializing pg pool (development mode)...');
-    
-    // Check if using Railway/external database (requires SSL)
-    const requiresSSL = dbUrl.includes('railway.app') || 
-                        dbUrl.includes('rlwy.net') || 
-                        dbUrl.includes('neon.tech');
-    
-    const poolConfig: PoolConfig = { 
-      connectionString: dbUrl,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 30000,
-    };
-    
-    // Add SSL for external databases
-    if (requiresSSL) {
-      console.log('🔒 SSL enabled for external database');
-      poolConfig.ssl = { rejectUnauthorized: false };
-    }
-    
-    const pool = new Pool(poolConfig);
-    
-    pool.on('error', (err) => {
-      console.error('💥 Database pool error:', err.message);
-    });
-    
-    return pool;
+  // Check if using Replit local database (hostname "helium" or similar local names)
+  const isReplitLocal = dbUrl.includes('@helium:') || dbUrl.includes('@localhost:');
+  
+  // Detect external cloud database providers
+  const isNeon = dbUrl.includes('neon.tech');
+  const isRailway = dbUrl.includes('railway.app') || dbUrl.includes('rlwy.net') || dbUrl.includes('proxy.rlwy') || dbUrl.includes('gondola');
+  const isCloudDB = !isReplitLocal && (isNeon || isRailway);
+  
+  // Track connection type
+  isUsingLocalDb = isReplitLocal;
+  
+  console.log(`🔌 Initializing pg pool (${isProduction ? 'production' : 'development'} mode)...`);
+  if (isReplitLocal) {
+    console.log(`   Using Replit local database (no SSL required)`);
+  } else if (isCloudDB) {
+    console.log(`   Provider detected: ${isNeon ? 'Neon' : 'Railway'}`);
   }
+  
+  const poolConfig: PoolConfig = { 
+    connectionString: dbUrl,
+    max: isProduction ? 10 : 10,
+    min: isProduction ? 1 : 0,
+    idleTimeoutMillis: isProduction ? 10000 : 30000,
+    connectionTimeoutMillis: isProduction ? 5000 : 30000,
+    allowExitOnIdle: isProduction ? false : true,
+  };
+  
+  // SSL configuration: all non-local connections require TLS
+  if (!isReplitLocal) {
+    console.log('🔒 SSL enabled for external database');
+    // Railway's proxy uses self-signed certs that require rejectUnauthorized: false
+    // All other providers (Neon, Azure, RDS, Supabase, etc.) use strict TLS
+    if (isRailway) {
+      // Railway's proxy terminates TLS and presents self-signed certs
+      poolConfig.ssl = {
+        rejectUnauthorized: false,
+      };
+      console.log('   Railway proxy detected - using relaxed SSL');
+    } else {
+      // Default: strict TLS for all other providers (Neon, Azure, RDS, Supabase, etc.)
+      poolConfig.ssl = true;
+      if (isNeon) {
+        console.log('   Neon detected - using strict SSL');
+      } else {
+        console.log('   External provider detected - using strict SSL');
+      }
+    }
+  }
+  
+  const pool = new Pool(poolConfig);
+  
+  // Handle pool errors gracefully
+  pool.on('error', (err) => {
+    const errorMsg = err.message || '';
+    // Suppress verbose logging for expected connection resets
+    if (errorMsg.includes('Connection terminated') || 
+        errorMsg.includes('ECONNRESET') ||
+        errorMsg.includes('connection reset')) {
+      // Silent recovery - pool will auto-reconnect on next query
+    } else {
+      console.error('💥 Database pool error:', err.message);
+    }
+  });
+  
+  pool.on('connect', () => {
+    console.log('🔗 New database connection established');
+  });
+  
+  return pool;
 }
 
 function createDrizzle(pool: Pool) {
@@ -123,35 +149,57 @@ function initializePool(): Pool {
     
     // Test connection in background (don't block)
     if (isProduction) {
-      testConnection(_pool).then(success => {
-        if (!success) {
-          console.error('⚠️ Initial connection test failed - queries may fail until connection is established');
-        }
+      testConnection(_pool).catch(() => {
+        console.warn('⚠️ Initial connection test failed - pool will retry on demand');
       });
     }
   }
   return _pool;
 }
 
-// Lazy initialization with Proxy pattern
-export const pool = new Proxy({} as Pool, {
-  get(target, prop) {
-    const p = initializePool();
-    return (p as any)[prop];
+// Initialize drizzle with pool
+function initializeDb(): ReturnType<typeof drizzle> {
+  if (!_db) {
+    const pool = initializePool();
+    _db = createDrizzle(pool);
   }
-});
+  return _db;
+}
 
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
-  get(target, prop) {
-    if (!_db) {
-      const p = initializePool();
-      console.log('🔧 Initializing Drizzle ORM...');
-      _db = createDrizzle(p);
-      console.log('✅ Drizzle ORM initialized');
-    }
-    return (_db as any)[prop];
-  }
-});
+// Export pool and db instances
+export const pool = initializePool();
+export const db = initializeDb();
 
-// Export test function for health checks
+// Helper to get a fresh connection for one-off queries
+export async function getConnection() {
+  return pool.connect();
+}
+
+// Export testConnection for use in startup
 export { testConnection };
+
+// Export for raw query execution
+export async function executeRawQuery<T = any>(query: string, params: any[] = []): Promise<T[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(query, params);
+    return result.rows as T[];
+  } finally {
+    client.release();
+  }
+}
+
+// Health check
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    await executeRawQuery('SELECT 1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if using local Replit database (useful for skipping certain cloud-only features)
+export function isLocalDatabase(): boolean {
+  return isUsingLocalDb;
+}

@@ -375,43 +375,55 @@ export async function startServer() {
       }
       
       if (!dbConnected) {
-        console.error('❌ [Background] Database connection failed');
+        console.error('❌ [Background] Database connection failed - continuing with limited functionality');
         setInitializationStatus(false, 'Database connection failed');
         setLocalInitStatus(false, 'Database connection failed');
-        return;
+        // Don't return - continue with Vite setup for frontend development
       }
       
-      // System initialization
-      console.log('🔧 [Background] Running system initialization...');
-      await initializeSystem(app);
-      console.log('✅ [Background] System initialized');
-      setInitializationStatus(true, null);
-      setLocalInitStatus(true, null);
-      
-      // Register agent routes
-      console.log('🔧 [Background] Registering agent routes...');
-      const agentSlugs = getAvailableAgents();
-      registerAllAgentRoutes(agentSlugs, app);
-      for (const slug of agentSlugs) {
-        registerAgentSessionRoutes(app, slug);
-      }
-      console.log(`✅ [Background] ${agentSlugs.length} agent routes registered`);
-      
-      // Load automation triggers
-      try {
-        const eventEngine = getEventTriggersEngine(storage);
-        await eventEngine.loadTriggersFromDatabase();
-        console.log('✅ [Background] Automation triggers loaded');
-      } catch (e) {
-        console.warn('⚠️ [Background] Automation triggers failed');
-      }
-      
-      // Start scheduler
-      try {
-        schedulerService.start();
-        console.log('✅ [Background] Scheduler started');
-      } catch (e) {
-        console.warn('⚠️ [Background] Scheduler failed');
+      // System initialization (may fail without database)
+      if (dbConnected) {
+        try {
+          console.log('🔧 [Background] Running system initialization...');
+          await initializeSystem(app);
+          console.log('✅ [Background] System initialized');
+          setInitializationStatus(true, null);
+          setLocalInitStatus(true, null);
+        } catch (e) {
+          console.warn('⚠️ [Background] System initialization failed:', e);
+        }
+        
+        // Register agent routes
+        try {
+          console.log('🔧 [Background] Registering agent routes...');
+          const agentSlugs = getAvailableAgents();
+          registerAllAgentRoutes(agentSlugs, app);
+          for (const slug of agentSlugs) {
+            registerAgentSessionRoutes(app, slug);
+          }
+          console.log(`✅ [Background] ${agentSlugs.length} agent routes registered`);
+        } catch (e) {
+          console.warn('⚠️ [Background] Agent routes registration failed:', e);
+        }
+        
+        // Load automation triggers
+        try {
+          const eventEngine = getEventTriggersEngine(storage);
+          await eventEngine.loadTriggersFromDatabase();
+          console.log('✅ [Background] Automation triggers loaded');
+        } catch (e) {
+          console.warn('⚠️ [Background] Automation triggers failed');
+        }
+        
+        // Start scheduler
+        try {
+          schedulerService.start();
+          console.log('✅ [Background] Scheduler started');
+        } catch (e) {
+          console.warn('⚠️ [Background] Scheduler failed');
+        }
+      } else {
+        console.log('⚠️ [Background] Skipping DB-dependent initialization');
       }
       
       // Setup Vite/static serving AFTER routes registered

@@ -204,19 +204,25 @@ export function AIVisualAnimation({ variant = "hero", className = "" }: AIVisual
       </svg>
 
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-[#e5a660] rounded-full animate-float-particle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`,
-              opacity: 0.3 + Math.random() * 0.4,
-            }}
-          />
-        ))}
+        {[...Array(20)].map((_, i) => {
+          // Deterministic pseudo-random positions based on index
+          const seed1 = ((i * 7919) % 100) / 100;
+          const seed2 = ((i * 6271) % 100) / 100;
+          const seed3 = ((i * 5113) % 100) / 100;
+          return (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-[#e5a660] rounded-full animate-float-particle"
+              style={{
+                left: `${seed1 * 100}%`,
+                top: `${seed2 * 100}%`,
+                animationDelay: `${seed1 * 5}s`,
+                animationDuration: `${3 + seed2 * 4}s`,
+                opacity: 0.3 + seed3 * 0.4,
+              }}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -282,21 +288,42 @@ export function NeuralNetworkBackground({ className = "" }: { className?: string
 }
 
 export function FloatingParticles({ count = 30, className = "" }: { count?: number; className?: string }) {
+  // Use deterministic positions based on index to avoid hydration mismatch
+  const particles = [...Array(count)].map((_, i) => {
+    // Pseudo-random but deterministic values based on index
+    const seed1 = ((i * 7919) % 100) / 100; // Prime number for distribution
+    const seed2 = ((i * 6271) % 100) / 100;
+    const seed3 = ((i * 5113) % 100) / 100;
+    
+    return {
+      size: 2 + seed1 * 4,
+      left: seed2 * 100,
+      top: seed3 * 100,
+      delay: (i * 0.3) % 8,
+      duration: 5 + seed1 * 10,
+      opacity: 0.2 + seed2 * 0.4,
+    };
+  });
+
   return (
-    <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-      {[...Array(count)].map((_, i) => (
+    <div 
+      className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+      data-testid="floating-particles-container"
+    >
+      {particles.map((particle, i) => (
         <div
           key={i}
           className="absolute rounded-full animate-float-particle"
+          data-testid={`floating-particle-${i}`}
           style={{
-            width: `${2 + Math.random() * 4}px`,
-            height: `${2 + Math.random() * 4}px`,
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
             background: i % 2 === 0 ? "#e5a660" : "#d76082",
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 8}s`,
-            animationDuration: `${5 + Math.random() * 10}s`,
-            opacity: 0.2 + Math.random() * 0.4,
+            left: `${particle.left}%`,
+            top: `${particle.top}%`,
+            animationDelay: `${particle.delay}s`,
+            animationDuration: `${particle.duration}s`,
+            opacity: particle.opacity,
           }}
         />
       ))}
@@ -358,17 +385,22 @@ export function RobotAvatar({ size = 120, className = "" }: { size?: number; cla
       </svg>
 
       <div className="absolute inset-0">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-spark"
-            style={{
-              left: `${30 + Math.random() * 40}%`,
-              top: `${20 + Math.random() * 60}%`,
-              animationDelay: `${i * 0.5}s`,
-            }}
-          />
-        ))}
+        {[...Array(6)].map((_, i) => {
+          // Deterministic positions for sparks around robot
+          const seed1 = ((i * 7919) % 40) / 100; // 0-0.4 range
+          const seed2 = ((i * 6271) % 60) / 100; // 0-0.6 range
+          return (
+            <div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full animate-spark"
+              style={{
+                left: `${30 + seed1 * 100}%`,
+                top: `${20 + seed2 * 100}%`,
+                animationDelay: `${i * 0.5}s`,
+              }}
+            />
+          );
+        })}
       </div>
     </div>
   );
