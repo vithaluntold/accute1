@@ -46,6 +46,54 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
   const [attendeesInput, setAttendeesInput] = useState("");
   const [attendees, setAttendees] = useState<Array<{ userId?: string; email?: string; name?: string; isOptional: boolean }>>([]);
 
+  // Fetch users for assignee dropdown
+  const { data: users } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+  });
+
+  // Fetch clients for client dropdown
+  const { data: clients } = useQuery<any[]>({
+    queryKey: ["/api/clients"],
+  });
+
+  // Fetch projects for project dropdown
+  const { data: projects } = useQuery<any[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const form = useForm<EventFormData>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: event ? {
+      title: event.title,
+      description: event.description || "",
+      type: event.type,
+      startTime: format(new Date(event.startTime), "yyyy-MM-dd'T'HH:mm"),
+      endTime: format(new Date(event.endTime), "yyyy-MM-dd'T'HH:mm"),
+      allDay: event.allDay || false,
+      location: event.location || "",
+      meetingUrl: event.meetingUrl || "",
+      clientId: event.clientId || "",
+      projectId: event.projectId || "",
+      assignedTo: event.assignedTo || "",
+      reminderMinutes: event.reminderMinutes || [15],
+      color: event.color || "",
+    } : {
+      title: "",
+      description: "",
+      type: "meeting",
+      startTime: defaultDate ? format(defaultDate, "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+      endTime: defaultDate ? format(new Date(defaultDate.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm") : format(new Date(Date.now() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
+      allDay: false,
+      location: "",
+      meetingUrl: "",
+      clientId: "",
+      projectId: "",
+      assignedTo: "",
+      reminderMinutes: [15],
+      color: "",
+    },
+  });
+
   // Sync attendees state when event prop changes or dialog opens
   useEffect(() => {
     if (open) {
@@ -107,54 +155,6 @@ export function CreateEventDialog({ open, onOpenChange, defaultDate, event }: Cr
       }
     }
   }, [open, event, defaultDate, form]);
-
-  // Fetch users for assignee dropdown
-  const { data: users } = useQuery<any[]>({
-    queryKey: ["/api/users"],
-  });
-
-  // Fetch clients for client dropdown
-  const { data: clients } = useQuery<any[]>({
-    queryKey: ["/api/clients"],
-  });
-
-  // Fetch projects for project dropdown
-  const { data: projects } = useQuery<any[]>({
-    queryKey: ["/api/projects"],
-  });
-
-  const form = useForm<EventFormData>({
-    resolver: zodResolver(eventFormSchema),
-    defaultValues: event ? {
-      title: event.title,
-      description: event.description || "",
-      type: event.type,
-      startTime: format(new Date(event.startTime), "yyyy-MM-dd'T'HH:mm"),
-      endTime: format(new Date(event.endTime), "yyyy-MM-dd'T'HH:mm"),
-      allDay: event.allDay || false,
-      location: event.location || "",
-      meetingUrl: event.meetingUrl || "",
-      clientId: event.clientId || "",
-      projectId: event.projectId || "",
-      assignedTo: event.assignedTo || "",
-      reminderMinutes: event.reminderMinutes || [15],
-      color: event.color || "",
-    } : {
-      title: "",
-      description: "",
-      type: "meeting",
-      startTime: defaultDate ? format(defaultDate, "yyyy-MM-dd'T'HH:mm") : format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-      endTime: defaultDate ? format(new Date(defaultDate.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm") : format(new Date(Date.now() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
-      allDay: false,
-      location: "",
-      meetingUrl: "",
-      clientId: "",
-      projectId: "",
-      assignedTo: "",
-      reminderMinutes: [15],
-      color: "",
-    },
-  });
 
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormData & { attendees?: any[] }) => {
