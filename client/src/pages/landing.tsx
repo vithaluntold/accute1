@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle, Brain, Cpu, Network, Globe, Clock, BarChart3 } from "lucide-react";
+import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle, Brain, Cpu, Network, Globe, Clock, BarChart3, Calculator, Receipt, Settings, FolderOpen, ClipboardList, UserSearch, MessageCircle, PenTool, Database, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
@@ -61,17 +61,17 @@ export default function Landing() {
     },
   ];
 
-  const aiAgents = [
-    { name: "Luca", domain: "Tax & Compliance", icon: "📊" },
-    { name: "Penny", domain: "Invoicing", icon: "💰" },
-    { name: "Cadence", domain: "Workflows", icon: "⚙️" },
-    { name: "Parity", domain: "Documents", icon: "📄" },
-    { name: "Forma", domain: "Forms", icon: "📝" },
-    { name: "Trace", domain: "HR/Recruiting", icon: "👤" },
-    { name: "Echo", domain: "Communication", icon: "💬" },
-    { name: "Scribe", domain: "Content", icon: "✍️" },
-    { name: "Nexus", domain: "Data", icon: "📈" },
-    { name: "Sentinel", domain: "Security", icon: "🛡️" },
+  const aiAgents: { name: string; domain: string; icon: LucideIcon }[] = [
+    { name: "Luca", domain: "Tax & Compliance", icon: Calculator },
+    { name: "Penny", domain: "Invoicing", icon: Receipt },
+    { name: "Cadence", domain: "Workflows", icon: Settings },
+    { name: "Parity", domain: "Documents", icon: FolderOpen },
+    { name: "Forma", domain: "Forms", icon: ClipboardList },
+    { name: "Trace", domain: "HR/Recruiting", icon: UserSearch },
+    { name: "Echo", domain: "Communication", icon: MessageCircle },
+    { name: "Scribe", domain: "Content", icon: PenTool },
+    { name: "Nexus", domain: "Data", icon: Database },
+    { name: "Sentinel", domain: "Security", icon: ShieldCheck },
   ];
 
   const stats = [
@@ -255,11 +255,14 @@ export default function Landing() {
             {aiAgents.map((agent, index) => (
               <Card 
                 key={index} 
-                className="hover-elevate futuristic-card text-center p-4 bg-card/50 backdrop-blur-sm border-white/10"
+                className="hover-elevate futuristic-card text-center p-6 bg-card/50 backdrop-blur-sm border-white/10 group"
                 data-testid={`agent-card-${agent.name.toLowerCase()}`}
               >
-                <div className="text-3xl mb-2">{agent.icon}</div>
-                <div className="font-display font-bold text-lg">{agent.name}</div>
+                <div className="h-14 w-14 mx-auto rounded-xl bg-gradient-to-br from-[#e5a660]/20 to-[#d76082]/20 flex items-center justify-center mb-3 group-hover:from-[#e5a660]/30 group-hover:to-[#d76082]/30 transition-all duration-300 relative overflow-visible">
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#e5a660]/10 to-[#d76082]/10 blur-lg group-hover:blur-xl transition-all" />
+                  <agent.icon className="h-7 w-7 relative z-10" style={{ color: '#e5a660' }} />
+                </div>
+                <div className="font-display font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">{agent.name}</div>
                 <div className="text-xs text-muted-foreground">{agent.domain}</div>
               </Card>
             ))}
