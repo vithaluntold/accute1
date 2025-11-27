@@ -7,6 +7,12 @@ import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AIVisualAnimation, FloatingParticles, NeuralNetworkBackground } from "@/components/ai-visual-animation";
+import { AnimatedCounter } from "@/components/animated-counter";
+import { TestimonialCarousel } from "@/components/testimonial-carousel";
+import { TrustedBySection } from "@/components/logo-carousel";
+import { NumberedProducts } from "@/components/numbered-products";
+import { FAQSection } from "@/components/faq-section";
+import { IndustryTabs } from "@/components/industry-tabs";
 
 export default function Landing() {
 
@@ -72,13 +78,6 @@ export default function Landing() {
     { name: "Scribe", domain: "Content", icon: PenTool },
     { name: "Nexus", domain: "Data", icon: Database },
     { name: "Sentinel", domain: "Security", icon: ShieldCheck },
-  ];
-
-  const stats = [
-    { value: "15+", label: "Hours Saved Weekly", icon: Clock },
-    { value: "10", label: "AI Agents", icon: Brain },
-    { value: "100+", label: "Permissions", icon: Shield },
-    { value: "21", label: "Day Free Trial", icon: Sparkles },
   ];
 
   const comparisonFeatures = [
@@ -212,22 +211,15 @@ export default function Landing() {
 
       </section>
 
-      {/* Stats Section */}
-      <section className="py-12 border-y bg-card">
+      {/* Stats Section - Animated Counter */}
+      <section className="py-16 border-y bg-card">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center p-6" data-testid={`stat-${index}`}>
-                <stat.icon className="h-8 w-8 mx-auto mb-3 text-[#e5a660]" />
-                <div className="text-3xl md:text-4xl font-display font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
-                  {stat.value}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
+          <AnimatedCounter />
         </div>
       </section>
+
+      {/* Trusted By - Logo Carousel */}
+      <TrustedBySection />
 
       {/* AI Agents Showcase */}
       <section id="agents" className="py-24 relative overflow-hidden">
@@ -277,6 +269,9 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Numbered Products Section */}
+      <NumberedProducts />
+
       {/* Features Grid */}
       <section id="features" className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
@@ -311,6 +306,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Industry Tabs */}
+      <IndustryTabs />
 
       {/* Use Cases */}
       <section id="use-cases" className="py-24">
@@ -531,6 +529,32 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Testimonials Section */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-30" />
+        <div className="container mx-auto px-4 relative">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <Badge className="mb-4 bg-gradient-to-r from-[#e5a660]/20 to-[#d76082]/20 border-[#e5a660]/30">
+              <Users className="h-3 w-3 mr-1" />
+              Testimonials
+            </Badge>
+            <h2 className="text-4xl font-display font-bold mb-4">
+              Our Users Love{" "}
+              <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+                Accute
+              </span>
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              See what accounting professionals are saying about their experience
+            </p>
+          </div>
+          <TestimonialCarousel />
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <FAQSection />
 
       {/* CTA */}
       <section className="py-24 relative overflow-hidden">
