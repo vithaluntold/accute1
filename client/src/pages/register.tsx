@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,8 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, Building2, UserPlus, CheckCircle2 } from "lucide-react";
+import { Loader2, Shield, Building2, UserPlus, CheckCircle2, Bot, Sparkles, Clock, Brain } from "lucide-react";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
+import { AIVisualAnimation, FloatingParticles } from "@/components/ai-visual-animation";
 
 const superAdminSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -243,11 +244,74 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <img src={logoUrl} alt="Accute Logo" className="h-12" data-testid="img-logo" />
+    <div className="min-h-screen flex">
+      {/* Left Panel - AI Visual (Hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#16213e] items-center justify-center overflow-hidden">
+        <FloatingParticles count={30} />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#e5a660]/5 via-transparent to-[#d76082]/5" />
+        
+        <div className="relative z-10 text-center px-8">
+          <AIVisualAnimation variant="sidebar" className="mx-auto mb-8" />
+          <h2 className="text-3xl font-display font-bold text-white mb-4">
+            Start Your{" "}
+            <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+              21-Day Free Trial
+            </span>
+          </h2>
+          <p className="text-white/70 max-w-md mx-auto mb-8">
+            Full access to all features. No credit card required. 
+            Experience AI-powered practice management.
+          </p>
+          
+          {/* Benefits */}
+          <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto text-left">
+            <div className="flex items-center gap-2 text-white/80 text-sm">
+              <Bot className="h-4 w-4 text-[#e5a660]" />
+              <span>10 AI Agents</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/80 text-sm">
+              <Sparkles className="h-4 w-4 text-[#d76082]" />
+              <span>All Features</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/80 text-sm">
+              <Clock className="h-4 w-4 text-[#e5a660]" />
+              <span>Save 15+ hrs/week</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/80 text-sm">
+              <Brain className="h-4 w-4 text-[#d76082]" />
+              <span>AI Psychology</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Decorative elements */}
+        <div className="absolute top-10 left-10">
+          <div className="h-20 w-20 rounded-full border border-[#e5a660]/20 animate-pulse" />
+        </div>
+        <div className="absolute bottom-20 right-10">
+          <div className="h-32 w-32 rounded-full border border-[#d76082]/20 animate-pulse" style={{ animationDelay: "1s" }} />
+        </div>
+      </div>
+
+      {/* Right Panel - Register Form */}
+      <div className="flex-1 flex items-center justify-center bg-background p-4 lg:p-8 overflow-y-auto">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-6">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <img src={logoUrl} alt="Accute" className="h-10" />
+              <span className="font-display text-2xl font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+                Accute
+              </span>
+            </Link>
+          </div>
+
+      <Card className="w-full border-0 shadow-xl lg:border">
+        <CardHeader className="text-center pb-2">
+          <div className="hidden lg:flex justify-center mb-4">
+            <Link href="/">
+              <img src={logoUrl} alt="Accute Logo" className="h-12 hover:scale-105 transition-transform" data-testid="img-logo" />
+            </Link>
           </div>
           <CardTitle className="text-2xl font-display">Join Accute</CardTitle>
           <CardDescription>
@@ -653,7 +717,7 @@ export default function Register() {
             </Form>
           )}
         </CardContent>
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex justify-center pt-2">
           <Button
             variant="ghost"
             onClick={() => setLocation("/login")}
@@ -663,6 +727,20 @@ export default function Register() {
           </Button>
         </CardFooter>
       </Card>
+      
+      {/* Footer */}
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        By registering, you agree to our{" "}
+        <Link href="/terms" className="text-[#e5a660] hover:underline">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="text-[#e5a660] hover:underline">
+          Privacy Policy
+        </Link>
+      </p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle } from "lucide-react";
+import { Check, Sparkles, Zap, Lock, Bot, Workflow, FileText, Users, TrendingUp, Shield, ArrowRight, PlayCircle, Brain, Cpu, Network, Globe, Clock, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
 import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AIVisualAnimation, FloatingParticles, NeuralNetworkBackground } from "@/components/ai-visual-animation";
 
 export default function Landing() {
 
@@ -13,32 +14,32 @@ export default function Landing() {
     {
       icon: Workflow,
       title: "Unified Workflow Engine",
-      description: "Enterprise-grade system combining visual automation AND hierarchical project management (Stages → Steps → Tasks) with AI-powered triggers",
+      description: "Enterprise-grade system combining visual automation AND hierarchical project management with AI-powered triggers",
     },
     {
       icon: Bot,
-      title: "Conversational AI Agents",
-      description: "Chat with Cadence (workflows), Parity (documents), Forma (forms) using your OpenAI, Anthropic, or Azure OpenAI API keys—with full conversation history",
+      title: "10 AI Agents",
+      description: "Specialized AI for every function: Luca (Tax), Penny (Invoicing), Cadence (Workflows), Parity (Documents), and more",
     },
     {
       icon: Shield,
       title: "PKI Digital Signatures",
-      description: "Advanced blockchain alternative: RSA-SHA256 signatures + SHA-256 hashing ensure tamper-proof, legally-binding document verification",
+      description: "RSA-SHA256 signatures + SHA-256 hashing for tamper-proof, legally-binding document verification",
     },
     {
       icon: Users,
-      title: "Multi-Role RBAC System",
-      description: "Complete SaaS-level vs tenant-level separation: Super Admin (platform), Admin/Employee/Client (organization) with 100+ granular permissions",
+      title: "Multi-Tenant RBAC",
+      description: "100+ granular permissions with complete SaaS vs tenant-level separation for enterprise security",
     },
     {
       icon: FileText,
       title: "Dynamic Form Builder",
-      description: "22 field types with secure conditional logic (expr-eval). Build tax organizers, intake forms, questionnaires with show/hide/require rules",
+      description: "22 field types with conditional logic. Build tax organizers, intake forms, questionnaires effortlessly",
     },
     {
       icon: TrendingUp,
-      title: "Role-Based Dashboards",
-      description: "Personal task stats (all users), team overview (managers with workflows.view), practice analytics (admins with reports.view)",
+      title: "AI Psychology Assessment",
+      description: "Unique personality profiling for team optimization and performance monitoring with privacy protection",
     },
   ];
 
@@ -60,22 +61,36 @@ export default function Landing() {
     },
   ];
 
-  const aiProviders = [
-    { name: "OpenAI", model: "GPT-4 Turbo" },
-    { name: "Azure OpenAI", model: "GPT-4" },
-    { name: "Anthropic", model: "Claude 3.5 Sonnet" },
+  const aiAgents = [
+    { name: "Luca", domain: "Tax & Compliance", icon: "📊" },
+    { name: "Penny", domain: "Invoicing", icon: "💰" },
+    { name: "Cadence", domain: "Workflows", icon: "⚙️" },
+    { name: "Parity", domain: "Documents", icon: "📄" },
+    { name: "Forma", domain: "Forms", icon: "📝" },
+    { name: "Trace", domain: "HR/Recruiting", icon: "👤" },
+    { name: "Echo", domain: "Communication", icon: "💬" },
+    { name: "Scribe", domain: "Content", icon: "✍️" },
+    { name: "Nexus", domain: "Data", icon: "📈" },
+    { name: "Sentinel", domain: "Security", icon: "🛡️" },
+  ];
+
+  const stats = [
+    { value: "15+", label: "Hours Saved Weekly", icon: Clock },
+    { value: "10", label: "AI Agents", icon: Brain },
+    { value: "100+", label: "Permissions", icon: Shield },
+    { value: "21", label: "Day Free Trial", icon: Sparkles },
   ];
 
   const comparisonFeatures = [
-    { feature: "AI Agent Marketplace", accute: true, taxdome: false },
-    { feature: "Multi-Provider AI (OpenAI, Azure, Anthropic)", accute: true, taxdome: false },
-    { feature: "AI Personality Profiling & Performance Monitoring", accute: true, taxdome: false },
-    { feature: "Workflow Automation", accute: true, taxdome: true },
-    { feature: "Client Portal", accute: true, taxdome: true },
-    { feature: "Document Management", accute: true, taxdome: true },
-    { feature: "Role-Based Permissions", accute: true, taxdome: true },
-    { feature: "AI-Powered Data Extraction", accute: true, taxdome: false },
-    { feature: "Predictive Analytics", accute: true, taxdome: false },
+    { feature: "AI Agent Marketplace", accute: true, traditional: false },
+    { feature: "Multi-Provider AI (OpenAI, Azure, Anthropic)", accute: true, traditional: false },
+    { feature: "AI Personality Profiling & Performance Monitoring", accute: true, traditional: false },
+    { feature: "Workflow Automation", accute: true, traditional: true },
+    { feature: "Client Portal", accute: true, traditional: true },
+    { feature: "Document Management", accute: true, traditional: true },
+    { feature: "PKI Digital Signatures", accute: true, traditional: false },
+    { feature: "Azure Key Vault Integration (HSM)", accute: true, traditional: false },
+    { feature: "Envelope Encryption (KEK/DEK)", accute: true, traditional: false },
   ];
 
   return (
@@ -94,10 +109,13 @@ export default function Landing() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
-            <a href="#features" className="text-sm hover-elevate px-3 py-2 rounded-md" data-testid="link-features">
+            <a href="#features" className="text-sm hover-elevate px-3 py-2 rounded-md hidden md:block" data-testid="link-features">
               Features
             </a>
-            <a href="#use-cases" className="text-sm hover-elevate px-3 py-2 rounded-md" data-testid="link-use-cases">
+            <a href="#agents" className="text-sm hover-elevate px-3 py-2 rounded-md hidden md:block" data-testid="link-agents">
+              AI Agents
+            </a>
+            <a href="#use-cases" className="text-sm hover-elevate px-3 py-2 rounded-md hidden md:block" data-testid="link-use-cases">
               Use Cases
             </a>
             <Button asChild variant="ghost" data-testid="button-login">
@@ -114,89 +132,152 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden gradient-hero">
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="container mx-auto px-4 py-24 relative">
-          <div className="max-w-4xl mx-auto text-center space-y-6">
-            <Badge className="bg-white/20 backdrop-blur-sm text-white border border-white/30" data-testid="badge-new">
-              <Sparkles className="h-3 w-3 mr-1" />
-              AI-Powered Accounting Automation
-            </Badge>
-            
-            <h1 className="text-5xl md:text-6xl font-display font-bold leading-tight text-white" data-testid="text-hero-title">
-              The First{" "}
-              <span className="text-white drop-shadow-lg">
-                AI-Native
-              </span>
-              <br />
-              Practice Management Platform
-            </h1>
-            
-            <p className="text-xl text-white/90 max-w-2xl mx-auto" data-testid="text-hero-description">
-              Accute combines traditional workflow tools' power with cutting-edge AI agents. 
-              Automate data entry, client communication, and compliance—saving 15+ hours per week.
-            </p>
+      {/* Hero Section - Futuristic Design */}
+      <section className="relative overflow-hidden min-h-[90vh] flex items-center">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#16213e]" />
+        <NeuralNetworkBackground className="opacity-40" />
+        <FloatingParticles count={40} />
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#e5a660]/10 via-transparent to-[#d76082]/10" />
+        
+        <div className="container mx-auto px-4 py-16 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <div className="space-y-8">
+              <Badge className="bg-white/10 backdrop-blur-sm text-white border border-white/20 px-4 py-2" data-testid="badge-new">
+                <Sparkles className="h-4 w-4 mr-2 text-[#e5a660]" />
+                AI-Native Practice Management
+              </Badge>
+              
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold leading-tight" data-testid="text-hero-title">
+                <span className="text-white">Workflows that</span>
+                <br />
+                <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent glow-text">
+                  work without you
+                </span>
+              </h1>
+              
+              <p className="text-lg md:text-xl text-white/80 max-w-xl" data-testid="text-hero-description">
+                Unlock seamless efficiency as AI takes charge of your daily tasks. 
+                10 specialized agents automate accounting workflows, saving you 15+ hours weekly.
+              </p>
 
-            <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-              <Button
-                asChild
-                size="lg"
-                className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8"
-                data-testid="button-hero-start-trial"
-              >
-                <Link href="/register">
-                  Start Free Trial
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                data-testid="button-hero-watch-demo"
-              >
-                <PlayCircle className="mr-2 h-5 w-5" />
-                Watch Demo
-              </Button>
+              <div className="flex flex-wrap items-center gap-4">
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8 py-6 shadow-lg shadow-[#e5a660]/20"
+                  data-testid="button-hero-start-trial"
+                >
+                  <Link href="/register">
+                    Start Free Trial
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm px-8 py-6"
+                  data-testid="button-hero-watch-demo"
+                >
+                  <PlayCircle className="mr-2 h-5 w-5" />
+                  Watch Demo
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 pt-4 text-sm text-white/70">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-[#e5a660] animate-pulse" />
+                  No credit card required
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-[#d76082] animate-pulse" />
+                  21-day free trial
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-[#e5a660] animate-pulse" />
+                  Cancel anytime
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 pt-8 text-sm text-white/90">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-white" />
-                No credit card required
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-white" />
-                14-day free trial
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-white" />
-                Cancel anytime
-              </div>
+            {/* Right - AI Visual Animation */}
+            <div className="flex justify-center lg:justify-end">
+              <AIVisualAnimation variant="hero" />
             </div>
           </div>
         </div>
+
+        {/* Bottom gradient fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* AI Providers Showcase */}
-      <section className="py-12 border-y bg-muted/30">
+      {/* Stats Section */}
+      <section className="py-12 border-y bg-muted/30 relative -mt-16 z-20">
         <div className="container mx-auto px-4">
-          <p className="text-center text-sm text-muted-foreground mb-6">
-            Powered by the world's leading AI providers
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-12">
-            {aiProviders.map((provider) => (
-              <div key={provider.name} className="text-center" data-testid={`provider-${provider.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                <div className="font-semibold">{provider.name}</div>
-                <div className="text-sm text-muted-foreground">{provider.model}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center p-6" data-testid={`stat-${index}`}>
+                <stat.icon className="h-8 w-8 mx-auto mb-3 text-[#e5a660]" />
+                <div className="text-3xl md:text-4xl font-display font-bold bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+                  {stat.value}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* AI Agents Showcase */}
+      <section id="agents" className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 gradient-mesh opacity-50" />
+        <div className="container mx-auto px-4 relative">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <Badge className="mb-4 bg-gradient-to-r from-[#e5a660]/20 to-[#d76082]/20 border-[#e5a660]/30">
+              <Brain className="h-3 w-3 mr-1" />
+              AI-Powered
+            </Badge>
+            <h2 className="text-4xl font-display font-bold mb-4">
+              Meet Your{" "}
+              <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+                AI Team
+              </span>
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              10 specialized AI agents, each an expert in their domain
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {aiAgents.map((agent, index) => (
+              <Card 
+                key={index} 
+                className="hover-elevate futuristic-card text-center p-4 bg-card/50 backdrop-blur-sm border-white/10"
+                data-testid={`agent-card-${agent.name.toLowerCase()}`}
+              >
+                <div className="text-3xl mb-2">{agent.icon}</div>
+                <div className="font-display font-bold text-lg">{agent.name}</div>
+                <div className="text-xs text-muted-foreground">{agent.domain}</div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="text-center mt-8">
+            <Button asChild variant="outline" className="border-[#e5a660]/30">
+              <Link href="/ai-agents">
+                <Bot className="mr-2 h-4 w-4" />
+                Explore AI Agent Marketplace
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid */}
-      <section id="features" className="py-24">
+      <section id="features" className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-4xl font-display font-bold mb-4">
@@ -212,7 +293,7 @@ export default function Landing() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="hover-elevate" data-testid={`feature-card-${index}`}>
+              <Card key={index} className="hover-elevate futuristic-card" data-testid={`feature-card-${index}`}>
                 <CardHeader>
                   <div className="h-12 w-12 rounded-md bg-gradient-to-br from-[#e5a660]/20 to-[#d76082]/20 flex items-center justify-center mb-4">
                     <feature.icon className="h-6 w-6 text-[#e5a660]" />
@@ -231,7 +312,7 @@ export default function Landing() {
       </section>
 
       {/* Use Cases */}
-      <section id="use-cases" className="py-24 bg-muted/30">
+      <section id="use-cases" className="py-24">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-4xl font-display font-bold mb-4">
@@ -244,7 +325,7 @@ export default function Landing() {
 
           <div className="grid md:grid-cols-3 gap-6">
             {useCases.map((useCase, index) => (
-              <Card key={index} data-testid={`use-case-${index}`}>
+              <Card key={index} className="futuristic-card" data-testid={`use-case-${index}`}>
                 <CardHeader>
                   <CardTitle>{useCase.title}</CardTitle>
                   <CardDescription>{useCase.description}</CardDescription>
@@ -269,7 +350,7 @@ export default function Landing() {
       </section>
 
       {/* Comparison */}
-      <section className="py-24">
+      <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-4xl font-display font-bold mb-4">
@@ -281,19 +362,19 @@ export default function Landing() {
           </div>
 
           <div className="max-w-4xl mx-auto">
-            <Card>
+            <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b">
+                      <tr className="border-b bg-muted/50">
                         <th className="text-left p-4 font-medium">Feature</th>
                         <th className="text-center p-4 font-medium">
                           <div className="flex flex-col items-center gap-1">
-                            <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent font-display">
                               Accute
                             </span>
-                            <Badge variant="outline" className="text-xs">AI-Native</Badge>
+                            <Badge variant="outline" className="text-xs border-[#e5a660]/30">AI-Native</Badge>
                           </div>
                         </th>
                         <th className="text-center p-4 font-medium text-muted-foreground">
@@ -313,7 +394,7 @@ export default function Landing() {
                             )}
                           </td>
                           <td className="p-4 text-center">
-                            {item.taxdome ? (
+                            {item.traditional ? (
                               <Check className="h-5 w-5 text-muted-foreground mx-auto" />
                             ) : (
                               <span className="text-muted-foreground">—</span>
@@ -331,11 +412,13 @@ export default function Landing() {
       </section>
 
       {/* Security */}
-      <section className="py-24 bg-muted/30">
+      <section className="py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <Shield className="h-16 w-16 text-[#e5a660] mx-auto mb-4" />
+              <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#e5a660]/20 to-[#d76082]/20 flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-10 w-10 text-[#e5a660]" />
+              </div>
               <h2 className="text-3xl font-display font-bold mb-4">
                 Enterprise-Grade Security
               </h2>
@@ -345,11 +428,35 @@ export default function Landing() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <Card className="border-2 border-[#e5a660]/30">
+              <Card className="border-2 border-[#e5a660]/30 futuristic-card">
                 <CardHeader>
                   <Badge className="w-fit bg-gradient-to-r from-[#e5a660] to-[#d76082] text-white border-0 mb-2">
-                    Beyond Blockchain
+                    Enterprise
                   </Badge>
+                  <CardTitle className="text-lg">Azure Key Vault + HSM</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>HSM-backed Key Encryption Keys (KEK)</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Envelope encryption with DEK/KEK hierarchy</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Split-knowledge dual-approval for key operations</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
+                    <span>Hash-chained tamper-proof audit logs</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="futuristic-card">
+                <CardHeader>
                   <CardTitle className="text-lg">PKI Digital Signatures</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
@@ -363,47 +470,23 @@ export default function Landing() {
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Legally-binding signatures (eIDAS, ESIGN Act compliant)</span>
+                    <span>Legally-binding signatures (eIDAS, ESIGN Act)</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Real-time verification endpoint detects tampering instantly</span>
+                    <span>Real-time verification detects tampering instantly</span>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Data Encryption</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>AES-256-GCM encryption for LLM API keys (ENCRYPTION_KEY)</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Organization-isolated encryption keys</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Encrypted document storage with AES-256-CBC</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>TLS 1.3 for data in transit</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
+              <Card className="futuristic-card">
                 <CardHeader>
                   <CardTitle className="text-lg">Enterprise RBAC</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Platform vs Tenant role separation (prevents privilege escalation)</span>
+                    <span>Platform vs Tenant role separation</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
@@ -411,35 +494,35 @@ export default function Landing() {
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>JWT authentication with bcrypt (10 rounds) password hashing</span>
+                    <span>JWT + bcrypt (10 rounds) + MFA authentication</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Multi-tenant isolation with organization-scoped queries</span>
+                    <span>Multi-tenant isolation with organization-scoped RLS</span>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="futuristic-card">
                 <CardHeader>
-                  <CardTitle className="text-lg">Audit & Compliance</CardTitle>
+                  <CardTitle className="text-lg">Compliance Ready</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Comprehensive activity logs (user, IP, timestamp, action)</span>
+                    <span>SOC 2 Type II ready infrastructure</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>Document signature audit trail with signed timestamps</span>
+                    <span>GDPR/CCPA compliant data handling</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>GDPR/CCPA compliant data handling and privacy controls</span>
+                    <span>PCI DSS key management audit trail</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-[#e5a660] mt-0.5 flex-shrink-0" />
-                    <span>SOC 2 Type II ready infrastructure and controls</span>
+                    <span>Complete activity logging (user, IP, timestamp)</span>
                   </div>
                 </CardContent>
               </Card>
@@ -449,41 +532,44 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="py-24">
-        <div className="container mx-auto px-4">
-          <Card className="bg-gradient-to-br from-[#e5a660]/10 via-transparent to-[#d76082]/10 border-0">
-            <CardContent className="p-12 text-center">
-              <h2 className="text-4xl font-display font-bold mb-4">
-                Ready to Transform Your Practice?
-              </h2>
-              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Join forward-thinking accounting firms using AI to automate workflows, 
-                delight clients, and grow revenue
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-4">
-                <Link href="/register">
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#16213e]" />
+        <FloatingParticles count={25} />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-4xl md:text-5xl font-display font-bold mb-6 text-white">
+              Ready to Transform Your Practice?
+            </h2>
+            <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto">
+              Join forward-thinking accounting firms using AI to automate workflows, 
+              delight clients, and grow revenue
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
               <Button
+                asChild
                 size="lg"
-                className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8"
+                className="bg-gradient-to-r from-[#e5a660] to-[#d76082] text-lg px-8 py-6 shadow-lg shadow-[#e5a660]/20"
                 data-testid="button-cta-start"
               >
+                <Link href="/register">
                   Start Free Trial
-                <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
               </Button>
-            </Link>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  data-testid="button-cta-contact"
-                >
-                  Schedule Demo
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground mt-6">
-                Questions? Email us at hello@accute.ai or call (555) 123-4567
-              </p>
-            </CardContent>
-          </Card>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 px-8 py-6"
+                data-testid="button-cta-contact"
+              >
+                Schedule Demo
+              </Button>
+            </div>
+            <p className="text-sm text-white/60 mt-8">
+              Questions? Email us at hello@accute.ai
+            </p>
+          </div>
         </div>
       </section>
 
