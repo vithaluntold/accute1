@@ -114,6 +114,25 @@ NODE_ENV=production npm run build
 - **Problem:** "isNotNull is not defined" error every few seconds in scheduler service
 - **Fix:** Added missing `isNotNull` import from drizzle-orm in `server/storage.ts`
 
+### Marketplace & Automation Enhancements (November 27, 2025) ✅
+**Enhanced Marketplace:**
+- Added Email Templates and Message Templates tabs with Mail/MessageSquare icons
+- Extended MarketplaceItem interface with `email_template` and `message_template` categories
+- Admin marketplace create page supports publishing templates via AI agents (Scribe for email, Echo for message)
+
+**Tag-Aware Automation System:**
+- Enhanced visual condition builder with tag-related operators: `contains_any`, `contains_all`, `in`, `is_empty`, `is_not_empty`
+- Added condition fields for `client_tags`, `document_tags`, `task_tags` enabling tag-based automation triggers
+- 6 pre-built automation templates with one-click apply: VIP Client Priority, Tax Return Routing, Urgent Escalation, etc.
+
+**Visual Condition Builder UX:**
+- Added MiniMap navigation for complex condition flows
+- Snap-to-grid alignment for cleaner node positioning
+- Enhanced empty state guidance with keyboard shortcut hints
+- Fixed state synchronization: implemented `dispatchAndEmit` helper to ensure drag/drop changes persist correctly (eliminated double-hydration bug)
+
+**Files:** `client/src/pages/marketplace.tsx`, `client/src/components/visual-trigger-builder.tsx`, `client/src/pages/automation.tsx`
+
 ### Build Error Fixes (November 23, 2025) - PRODUCTION READY ✅
 1. **Logo Asset References** - Fixed 6 marketing pages (terms, privacy, contact, security, about, features) to use existing Accute logo instead of missing logo.png
 2. **Organization Field Consistency** - Fixed "No Workspace Selected" error with fallback pattern across 5 frontend files + 1 backend route
