@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { User, Shield, Upload, CheckCircle, XCircle, AlertCircle, Phone, Camera } from "lucide-react";
+import { User, Shield, Upload, CheckCircle, XCircle, AlertCircle, Phone, Camera, Globe, FileText, MessageSquare, Send, Loader2, FileCheck, Clock, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SkillsExpertiseTab } from "@/components/profile/skills-expertise-tab";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAgentSSE } from "@/hooks/use-agent-sse";
 
 // Common country codes for phone numbers
 const COUNTRY_CODES = [
@@ -96,6 +101,45 @@ const kycFormSchema = z.object({
 
 type KycFormData = z.infer<typeof kycFormSchema>;
 
+interface Jurisdiction {
+  id: string;
+  code: string;
+  name: string;
+  region: string;
+  isActive: boolean;
+}
+
+interface DocumentRequirement {
+  id: string;
+  documentTypeId: string;
+  documentType: {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+    description: string;
+  };
+  isRequired: boolean;
+  priority: number;
+  validationRules: any;
+  displayOrder: number;
+  employeeTypes: string[];
+}
+
+interface EmployeeDocument {
+  id: string;
+  documentTypeId: string;
+  documentType: {
+    id: string;
+    code: string;
+    name: string;
+    category: string;
+  };
+  status: string;
+  fileName: string;
+  uploadedAt: string;
+}
+
 export default function EmployeeProfile() {
   const { toast } = useToast();
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
@@ -103,9 +147,34 @@ export default function EmployeeProfile() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpId, setOtpId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedJurisdiction, setSelectedJurisdiction] = useState<string>("");
+  const [onboardMessage, setOnboardMessage] = useState("");
 
   const { data: currentUser, isLoading } = useQuery<any>({
     queryKey: ["/api/users/me"],
+  });
+
+  const { data: jurisdictions = [] } = useQuery<Jurisdiction[]>({
+    queryKey: ["/api/jurisdictions"],
+  });
+
+  const { data: requirements = [], isLoading: requirementsLoading, isError: requirementsError } = useQuery<DocumentRequirement[]>({
+    queryKey: ["/api/jurisdictions", selectedJurisdiction.toLowerCase(), "requirements"],
+    enabled: !!selectedJurisdiction,
+  });
+
+  const { data: submittedDocuments = [] } = useQuery<EmployeeDocument[]>({
+    queryKey: ["/api/employee-documents"],
+  });
+
+  const {
+    messages: onboardMessages,
+    isStreaming: onboardStreaming,
+    sendMessage: sendOnboardMessage,
+  } = useAgentSSE({
+    agentSlug: "onboard",
+    userId: currentUser?.id,
+    organizationId: currentUser?.organizationId,
   });
 
   const form = useForm<KycFormData>({
@@ -464,6 +533,7 @@ export default function EmployeeProfile() {
         <Tabs defaultValue="profile" data-testid="tabs-employee-profile">
           <TabsList>
             <TabsTrigger value="profile" data-testid="tab-profile">Profile Details</TabsTrigger>
+            <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding Documents</TabsTrigger>
             <TabsTrigger value="skills" data-testid="tab-skills">Skills & Expertise</TabsTrigger>
           </TabsList>
 
@@ -923,6 +993,360 @@ export default function EmployeeProfile() {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="onboarding" className="mt-6">
+            {/* Onboarding Documents with AI Assistant */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Document Checklist - Left Column */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Jurisdiction Selection */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="h-5 w-5" />
+                      Select Your Jurisdiction
+                    </CardTitle>
+                    <CardDescription>
+                      Choose your country/region to see the specific documents required for your onboarding
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4">
+                      <Select 
+                        value={selectedJurisdiction} 
+                        onValueChange={setSelectedJurisdiction}
+                      >
+                        <SelectTrigger className="w-[280px]" data-testid="select-jurisdiction">
+                          <SelectValue placeholder="Select your country/region..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {jurisdictions.map((j) => (
+                            <SelectItem key={j.id} value={j.code} data-testid={`option-jurisdiction-${j.code}`}>
+                              {j.name} ({j.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      {selectedJurisdiction && requirements.length > 0 && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-[140px]">
+                            <Progress 
+                              value={(() => {
+                                const requiredDocs = requirements.filter(r => r.isRequired);
+                                if (!requiredDocs.length) return 100;
+                                const submittedDocIds = new Set(submittedDocuments.map(d => d.documentTypeId));
+                                const completed = requiredDocs.filter(r => submittedDocIds.has(r.documentTypeId)).length;
+                                return Math.round((completed / requiredDocs.length) * 100);
+                              })()} 
+                              className="h-2" 
+                              data-testid="progress-onboarding-docs"
+                            />
+                          </div>
+                          <span className="text-sm font-medium">
+                            {(() => {
+                              const requiredDocs = requirements.filter(r => r.isRequired);
+                              if (!requiredDocs.length) return "100%";
+                              const submittedDocIds = new Set(submittedDocuments.map(d => d.documentTypeId));
+                              const completed = requiredDocs.filter(r => submittedDocIds.has(r.documentTypeId)).length;
+                              return `${Math.round((completed / requiredDocs.length) * 100)}%`;
+                            })()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Document Checklist */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Required Documents
+                    </CardTitle>
+                    <CardDescription>
+                      {selectedJurisdiction 
+                        ? `Documents required for ${jurisdictions.find(j => j.code === selectedJurisdiction)?.name || selectedJurisdiction}`
+                        : "Select a jurisdiction above to see required documents"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedJurisdiction ? (
+                      requirementsLoading ? (
+                        <Alert>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <AlertDescription>
+                            Loading document requirements...
+                          </AlertDescription>
+                        </Alert>
+                      ) : requirementsError ? (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Failed to load requirements. Please try again.
+                          </AlertDescription>
+                        </Alert>
+                      ) : requirements.length === 0 ? (
+                        <Alert>
+                          <AlertDescription>
+                            No document requirements found for this jurisdiction.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <div className="space-y-3">
+                          {requirements.sort((a, b) => a.priority - b.priority).map((req, idx) => {
+                            const submitted = submittedDocuments.find(d => d.documentTypeId === req.documentTypeId);
+                            const status = submitted?.status || "pending";
+                            
+                            return (
+                              <div 
+                                key={req.id} 
+                                className="flex items-center justify-between p-4 rounded-lg border hover-elevate"
+                                data-testid={`card-document-req-${idx}`}
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{req.documentType.name}</span>
+                                    {req.isRequired && (
+                                      <Badge variant="destructive" className="text-xs">Required</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {req.documentType.description || `Category: ${req.documentType.category}`}
+                                  </p>
+                                </div>
+                                <div className="ml-4">
+                                  {status === "verified" && (
+                                    <Badge variant="default" className="bg-green-500">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Verified
+                                    </Badge>
+                                  )}
+                                  {status === "pending" && (
+                                    <Badge variant="secondary">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      Pending Upload
+                                    </Badge>
+                                  )}
+                                  {status === "submitted" && (
+                                    <Badge variant="outline">
+                                      <FileCheck className="h-3 w-3 mr-1" />
+                                      Under Review
+                                    </Badge>
+                                  )}
+                                  {status === "rejected" && (
+                                    <Badge variant="destructive">
+                                      <AlertCircle className="h-3 w-3 mr-1" />
+                                      Rejected
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <Globe className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="font-medium mb-2">Select Your Jurisdiction</h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          Choose your country or region above to see the specific compliance documents required for employee onboarding in your location.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Quick Stats */}
+                {selectedJurisdiction && requirements.length > 0 && (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                          <div className="text-2xl font-bold text-primary">
+                            {requirements.length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Total Documents</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-red-500">
+                            {requirements.filter(r => r.isRequired).length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Required</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-green-500">
+                            {submittedDocuments.filter(d => d.status === 'verified').length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Verified</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-amber-500">
+                            {requirements.filter(r => r.isRequired).length - submittedDocuments.filter(d => 
+                              requirements.find(r => r.isRequired && r.documentTypeId === d.documentTypeId)
+                            ).length}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Pending</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* AI Assistant - Right Column */}
+              <div className="lg:col-span-1">
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" />
+                      Onboard AI Assistant
+                    </CardTitle>
+                    <CardDescription>
+                      Ask about document requirements and compliance
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
+                    <ScrollArea className="flex-1 pr-4 min-h-[300px]">
+                      <div className="space-y-4">
+                        {onboardMessages.length === 0 && (
+                          <Alert>
+                            <Sparkles className="h-4 w-4" />
+                            <AlertDescription>
+                              Hi! I'm your onboarding assistant. I can help you understand:
+                              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                                <li>Required documents for your region</li>
+                                <li>Compliance requirements</li>
+                                <li>How to prepare documents</li>
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {onboardMessages.map((msg, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`rounded-lg p-3 max-w-[90%] ${
+                                msg.role === "user"
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted"
+                              }`}
+                              data-testid={`onboard-message-${idx}`}
+                            >
+                              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {onboardStreaming && (
+                          <div className="flex justify-start">
+                            <div className="bg-muted rounded-lg p-3">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-sm">Thinking...</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    {/* Quick Questions */}
+                    {onboardMessages.length === 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setOnboardMessage("What documents do I need?")}
+                          data-testid="button-quick-docs"
+                        >
+                          What docs needed?
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setOnboardMessage("How long will onboarding take?")}
+                          data-testid="button-quick-timeline"
+                        >
+                          Timeline?
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Input Area */}
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={onboardMessage}
+                        onChange={(e) => setOnboardMessage(e.target.value)}
+                        placeholder="Ask about documents..."
+                        className="min-h-[50px] resize-none flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            if (onboardMessage.trim()) {
+                              const context = {
+                                jurisdiction: selectedJurisdiction ? {
+                                  code: selectedJurisdiction,
+                                  name: jurisdictions.find(j => j.code === selectedJurisdiction)?.name || "",
+                                  requirements: requirements.map(r => ({
+                                    documentTypeName: r.documentType.name,
+                                    documentTypeCode: r.documentType.code,
+                                    isRequired: r.isRequired,
+                                    priority: r.priority,
+                                    description: r.documentType.description,
+                                  })),
+                                } : undefined,
+                                submittedDocuments: submittedDocuments.map(d => d.documentType.name),
+                              };
+                              sendOnboardMessage(onboardMessage, context);
+                              setOnboardMessage("");
+                            }
+                          }
+                        }}
+                        data-testid="textarea-onboard-input"
+                      />
+                      <Button
+                        onClick={() => {
+                          if (onboardMessage.trim()) {
+                            const context = {
+                              jurisdiction: selectedJurisdiction ? {
+                                code: selectedJurisdiction,
+                                name: jurisdictions.find(j => j.code === selectedJurisdiction)?.name || "",
+                                requirements: requirements.map(r => ({
+                                  documentTypeName: r.documentType.name,
+                                  documentTypeCode: r.documentType.code,
+                                  isRequired: r.isRequired,
+                                  priority: r.priority,
+                                  description: r.documentType.description,
+                                })),
+                              } : undefined,
+                              submittedDocuments: submittedDocuments.map(d => d.documentType.name),
+                            };
+                            sendOnboardMessage(onboardMessage, context);
+                            setOnboardMessage("");
+                          }
+                        }}
+                        disabled={onboardStreaming || !onboardMessage.trim()}
+                        className="px-3"
+                        data-testid="button-send-onboard"
+                      >
+                        {onboardStreaming ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="skills" className="mt-6">
