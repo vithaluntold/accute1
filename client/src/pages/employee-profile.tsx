@@ -664,19 +664,21 @@ export default function EmployeeProfile() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">KYC Information</h3>
 
-                  <FormField
-                    control={form.control}
-                    name="dateOfBirth"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date of Birth</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-dob" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="dateOfBirth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Date of Birth</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-dob" className="max-w-[200px]" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -737,7 +739,7 @@ export default function EmployeeProfile() {
                     )}
                   />
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <FormField
                       control={form.control}
                       name="city"
@@ -779,21 +781,21 @@ export default function EmployeeProfile() {
                         </FormItem>
                       )}
                     />
-                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="country"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Country</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-country" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Country</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-country" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
@@ -872,50 +874,52 @@ export default function EmployeeProfile() {
               </p>
             </div>
 
-            <div>
-              <Label>ID Proof (PAN Card, Passport, Driver's License, etc.)</Label>
-              <div className="mt-2">
-                <Input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => handleFileUpload(e, 'idDocument')}
-                  disabled={uploadDocumentMutation.isPending}
-                  data-testid="input-id-proof"
-                  className="cursor-pointer"
-                />
-              </div>
-              {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'idDocument' && (
-                <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
-              )}
-              {currentUser?.idDocumentUrl && (
-                <div className="flex items-center gap-2 mt-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <Label>ID Proof (PAN Card, Passport, Driver's License, etc.)</Label>
+                <div className="mt-2">
+                  <Input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e, 'idDocument')}
+                    disabled={uploadDocumentMutation.isPending}
+                    data-testid="input-id-proof"
+                    className="cursor-pointer"
+                  />
                 </div>
-              )}
-            </div>
+                {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'idDocument' && (
+                  <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
+                )}
+                {currentUser?.idDocumentUrl && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+                  </div>
+                )}
+              </div>
 
-            <div>
-              <Label>Address Proof (Utility Bill, Bank Statement, etc.)</Label>
-              <div className="mt-2">
-                <Input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => handleFileUpload(e, 'addressProof')}
-                  disabled={uploadDocumentMutation.isPending}
-                  data-testid="input-address-proof"
-                  className="cursor-pointer"
-                />
-              </div>
-              {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'addressProof' && (
-                <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
-              )}
-              {currentUser?.addressProofUrl && (
-                <div className="flex items-center gap-2 mt-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+              <div>
+                <Label>Address Proof (Utility Bill, Bank Statement, etc.)</Label>
+                <div className="mt-2">
+                  <Input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e, 'addressProof')}
+                    disabled={uploadDocumentMutation.isPending}
+                    data-testid="input-address-proof"
+                    className="cursor-pointer"
+                  />
                 </div>
-              )}
+                {uploadDocumentMutation.isPending && uploadDocumentMutation.variables?.documentType === 'addressProof' && (
+                  <p className="text-sm text-muted-foreground mt-1">Uploading...</p>
+                )}
+                {currentUser?.addressProofUrl && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">Document uploaded and saved ✓</p>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
