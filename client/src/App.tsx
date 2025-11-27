@@ -38,6 +38,8 @@ import { LucaChatWidget } from "@/components/luca-chat-widget";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMobileDetect } from "@/hooks/use-mobile-detect";
+import { CommandPalette } from "@/components/command-palette";
+import { AuthProvider } from "@/lib/auth-context";
 import { lazy, Suspense, useState } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -1313,10 +1315,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="accute-theme">
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <CommandPalette />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

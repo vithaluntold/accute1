@@ -1,3 +1,5 @@
+import { dispatchAuthChange } from "./auth-context";
+
 export function getToken(): string | null {
   return localStorage.getItem("token");
 }
@@ -15,11 +17,13 @@ export function getUser(): any | null {
 export function setAuth(token: string, user: any) {
   localStorage.setItem("token", token);
   localStorage.setItem("user", JSON.stringify(user));
+  dispatchAuthChange();
 }
 
 export function clearAuth() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  dispatchAuthChange();
 }
 
 export function isAuthenticated(): boolean {
