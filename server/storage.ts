@@ -755,6 +755,44 @@ export interface IStorage {
   getAllAgentAvailability(): Promise<schema.AgentAvailability[]>;
   updateAgentAvailability(userId: string, availability: Partial<schema.InsertAgentAvailability>): Promise<schema.AgentAvailability | undefined>;
   getAvailableAgents(): Promise<schema.AgentAvailability[]>;
+  
+  // Jurisdictions & Document Requirements (AI Employee Onboarding)
+  getJurisdictions(): Promise<schema.Jurisdiction[]>;
+  getJurisdiction(id: string): Promise<schema.Jurisdiction | undefined>;
+  getJurisdictionByCode(code: string): Promise<schema.Jurisdiction | undefined>;
+  
+  // Document Types
+  getDocumentTypes(): Promise<schema.DocumentType[]>;
+  getDocumentType(id: string): Promise<schema.DocumentType | undefined>;
+  getDocumentTypeByCode(code: string): Promise<schema.DocumentType | undefined>;
+  getDocumentTypesByCategory(category: string): Promise<schema.DocumentType[]>;
+  
+  // Jurisdiction Document Requirements
+  getDocumentRequirementsByJurisdiction(jurisdictionId: string, employeeType?: string): Promise<(schema.JurisdictionDocumentRequirement & { documentType: schema.DocumentType })[]>;
+  getDocumentRequirementsByCode(jurisdictionCode: string, employeeType?: string): Promise<(schema.JurisdictionDocumentRequirement & { documentType: schema.DocumentType })[]>;
+  
+  // Employee Documents
+  createEmployeeDocument(document: schema.InsertEmployeeDocument): Promise<schema.EmployeeDocument>;
+  getEmployeeDocument(id: string): Promise<schema.EmployeeDocument | undefined>;
+  getEmployeeDocumentsByUser(userId: string): Promise<(schema.EmployeeDocument & { documentType: schema.DocumentType })[]>;
+  getEmployeeDocumentsByUserAndOrg(userId: string, organizationId: string): Promise<(schema.EmployeeDocument & { documentType: schema.DocumentType })[]>;
+  updateEmployeeDocument(id: string, document: Partial<schema.InsertEmployeeDocument>): Promise<schema.EmployeeDocument | undefined>;
+  deleteEmployeeDocument(id: string): Promise<void>;
+  
+  // Employee Onboarding Progress
+  getEmployeeOnboardingProgress(userId: string, organizationId: string): Promise<schema.EmployeeOnboardingProgress | undefined>;
+  createEmployeeOnboardingProgress(progress: schema.InsertEmployeeOnboardingProgress): Promise<schema.EmployeeOnboardingProgress>;
+  updateEmployeeOnboardingProgress(id: string, progress: Partial<schema.InsertEmployeeOnboardingProgress>): Promise<schema.EmployeeOnboardingProgress | undefined>;
+  
+  // Employee Onboarding Chat Sessions
+  createEmployeeOnboardingChatSession(session: schema.InsertEmployeeOnboardingChatSession): Promise<schema.EmployeeOnboardingChatSession>;
+  getEmployeeOnboardingChatSession(id: string): Promise<schema.EmployeeOnboardingChatSession | undefined>;
+  getEmployeeOnboardingChatSessionsByUser(userId: string): Promise<schema.EmployeeOnboardingChatSession[]>;
+  updateEmployeeOnboardingChatSession(id: string, session: Partial<schema.InsertEmployeeOnboardingChatSession>): Promise<schema.EmployeeOnboardingChatSession | undefined>;
+  
+  // Employee Onboarding Chat Messages
+  createEmployeeOnboardingChatMessage(message: schema.InsertEmployeeOnboardingChatMessage): Promise<schema.EmployeeOnboardingChatMessage>;
+  getEmployeeOnboardingChatMessages(sessionId: string): Promise<schema.EmployeeOnboardingChatMessage[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -5700,6 +5738,211 @@ export class DbStorage implements IStorage {
         )
       )
       .orderBy(schema.agentAvailability.currentChatCount);
+  }
+
+  // =============================================================================
+  // AI EMPLOYEE ONBOARDING - JURISDICTION & DOCUMENT METHODS
+  // =============================================================================
+
+  async getJurisdictions(): Promise<schema.Jurisdiction[]> {
+    return await db.select().from(schema.jurisdictions)
+      .where(eq(schema.jurisdictions.isActive, true))
+      .orderBy(schema.jurisdictions.name);
+  }
+
+  async getJurisdiction(id: string): Promise<schema.Jurisdiction | undefined> {
+    const result = await db.select().from(schema.jurisdictions)
+      .where(eq(schema.jurisdictions.id, id));
+    return result[0];
+  }
+
+  async getJurisdictionByCode(code: string): Promise<schema.Jurisdiction | undefined> {
+    const result = await db.select().from(schema.jurisdictions)
+      .where(eq(schema.jurisdictions.code, code));
+    return result[0];
+  }
+
+  async getDocumentTypes(): Promise<schema.DocumentType[]> {
+    return await db.select().from(schema.documentTypes)
+      .where(eq(schema.documentTypes.isActive, true))
+      .orderBy(schema.documentTypes.name);
+  }
+
+  async getDocumentType(id: string): Promise<schema.DocumentType | undefined> {
+    const result = await db.select().from(schema.documentTypes)
+      .where(eq(schema.documentTypes.id, id));
+    return result[0];
+  }
+
+  async getDocumentTypeByCode(code: string): Promise<schema.DocumentType | undefined> {
+    const result = await db.select().from(schema.documentTypes)
+      .where(eq(schema.documentTypes.code, code));
+    return result[0];
+  }
+
+  async getDocumentTypesByCategory(category: string): Promise<schema.DocumentType[]> {
+    return await db.select().from(schema.documentTypes)
+      .where(and(
+        eq(schema.documentTypes.category, category),
+        eq(schema.documentTypes.isActive, true)
+      ))
+      .orderBy(schema.documentTypes.name);
+  }
+
+  async getDocumentRequirementsByJurisdiction(
+    jurisdictionId: string, 
+    employeeType?: string
+  ): Promise<(schema.JurisdictionDocumentRequirement & { documentType: schema.DocumentType })[]> {
+    const result = await db.select({
+      ...Object.fromEntries(
+        Object.keys(schema.jurisdictionDocumentRequirements).map(key => 
+          [key, schema.jurisdictionDocumentRequirements[key as keyof typeof schema.jurisdictionDocumentRequirements]]
+        )
+      ),
+      documentType: schema.documentTypes
+    })
+      .from(schema.jurisdictionDocumentRequirements)
+      .innerJoin(schema.documentTypes, eq(schema.jurisdictionDocumentRequirements.documentTypeId, schema.documentTypes.id))
+      .where(and(
+        eq(schema.jurisdictionDocumentRequirements.jurisdictionId, jurisdictionId),
+        eq(schema.jurisdictionDocumentRequirements.isActive, true)
+      ))
+      .orderBy(schema.jurisdictionDocumentRequirements.priority);
+    
+    if (employeeType) {
+      return result.filter((r: any) => 
+        r.employeeTypes?.includes(employeeType) || r.employeeTypes?.includes('all')
+      ) as any;
+    }
+    return result as any;
+  }
+
+  async getDocumentRequirementsByCode(
+    jurisdictionCode: string, 
+    employeeType?: string
+  ): Promise<(schema.JurisdictionDocumentRequirement & { documentType: schema.DocumentType })[]> {
+    const jurisdiction = await this.getJurisdictionByCode(jurisdictionCode);
+    if (!jurisdiction) return [];
+    return this.getDocumentRequirementsByJurisdiction(jurisdiction.id, employeeType);
+  }
+
+  async createEmployeeDocument(document: schema.InsertEmployeeDocument): Promise<schema.EmployeeDocument> {
+    const result = await db.insert(schema.employeeDocuments).values(document).returning();
+    return result[0];
+  }
+
+  async getEmployeeDocument(id: string): Promise<schema.EmployeeDocument | undefined> {
+    const result = await db.select().from(schema.employeeDocuments)
+      .where(eq(schema.employeeDocuments.id, id));
+    return result[0];
+  }
+
+  async getEmployeeDocumentsByUser(userId: string): Promise<(schema.EmployeeDocument & { documentType: schema.DocumentType })[]> {
+    const result = await db.select({
+      ...Object.fromEntries(
+        Object.keys(schema.employeeDocuments).map(key => 
+          [key, schema.employeeDocuments[key as keyof typeof schema.employeeDocuments]]
+        )
+      ),
+      documentType: schema.documentTypes
+    })
+      .from(schema.employeeDocuments)
+      .innerJoin(schema.documentTypes, eq(schema.employeeDocuments.documentTypeId, schema.documentTypes.id))
+      .where(eq(schema.employeeDocuments.userId, userId))
+      .orderBy(desc(schema.employeeDocuments.uploadedAt));
+    return result as any;
+  }
+
+  async getEmployeeDocumentsByUserAndOrg(
+    userId: string, 
+    organizationId: string
+  ): Promise<(schema.EmployeeDocument & { documentType: schema.DocumentType })[]> {
+    const result = await db.select({
+      ...Object.fromEntries(
+        Object.keys(schema.employeeDocuments).map(key => 
+          [key, schema.employeeDocuments[key as keyof typeof schema.employeeDocuments]]
+        )
+      ),
+      documentType: schema.documentTypes
+    })
+      .from(schema.employeeDocuments)
+      .innerJoin(schema.documentTypes, eq(schema.employeeDocuments.documentTypeId, schema.documentTypes.id))
+      .where(and(
+        eq(schema.employeeDocuments.userId, userId),
+        eq(schema.employeeDocuments.organizationId, organizationId)
+      ))
+      .orderBy(desc(schema.employeeDocuments.uploadedAt));
+    return result as any;
+  }
+
+  async updateEmployeeDocument(id: string, document: Partial<schema.InsertEmployeeDocument>): Promise<schema.EmployeeDocument | undefined> {
+    const result = await db.update(schema.employeeDocuments)
+      .set({ ...document, updatedAt: new Date() })
+      .where(eq(schema.employeeDocuments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteEmployeeDocument(id: string): Promise<void> {
+    await db.delete(schema.employeeDocuments).where(eq(schema.employeeDocuments.id, id));
+  }
+
+  async getEmployeeOnboardingProgress(userId: string, organizationId: string): Promise<schema.EmployeeOnboardingProgress | undefined> {
+    const result = await db.select().from(schema.employeeOnboardingProgress)
+      .where(and(
+        eq(schema.employeeOnboardingProgress.userId, userId),
+        eq(schema.employeeOnboardingProgress.organizationId, organizationId)
+      ));
+    return result[0];
+  }
+
+  async createEmployeeOnboardingProgress(progress: schema.InsertEmployeeOnboardingProgress): Promise<schema.EmployeeOnboardingProgress> {
+    const result = await db.insert(schema.employeeOnboardingProgress).values(progress).returning();
+    return result[0];
+  }
+
+  async updateEmployeeOnboardingProgress(id: string, progress: Partial<schema.InsertEmployeeOnboardingProgress>): Promise<schema.EmployeeOnboardingProgress | undefined> {
+    const result = await db.update(schema.employeeOnboardingProgress)
+      .set({ ...progress, updatedAt: new Date() })
+      .where(eq(schema.employeeOnboardingProgress.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createEmployeeOnboardingChatSession(session: schema.InsertEmployeeOnboardingChatSession): Promise<schema.EmployeeOnboardingChatSession> {
+    const result = await db.insert(schema.employeeOnboardingChatSessions).values(session).returning();
+    return result[0];
+  }
+
+  async getEmployeeOnboardingChatSession(id: string): Promise<schema.EmployeeOnboardingChatSession | undefined> {
+    const result = await db.select().from(schema.employeeOnboardingChatSessions)
+      .where(eq(schema.employeeOnboardingChatSessions.id, id));
+    return result[0];
+  }
+
+  async getEmployeeOnboardingChatSessionsByUser(userId: string): Promise<schema.EmployeeOnboardingChatSession[]> {
+    return await db.select().from(schema.employeeOnboardingChatSessions)
+      .where(eq(schema.employeeOnboardingChatSessions.userId, userId))
+      .orderBy(desc(schema.employeeOnboardingChatSessions.updatedAt));
+  }
+
+  async updateEmployeeOnboardingChatSession(id: string, session: Partial<schema.InsertEmployeeOnboardingChatSession>): Promise<schema.EmployeeOnboardingChatSession | undefined> {
+    const result = await db.update(schema.employeeOnboardingChatSessions)
+      .set({ ...session, updatedAt: new Date() })
+      .where(eq(schema.employeeOnboardingChatSessions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createEmployeeOnboardingChatMessage(message: schema.InsertEmployeeOnboardingChatMessage): Promise<schema.EmployeeOnboardingChatMessage> {
+    const result = await db.insert(schema.employeeOnboardingChatMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getEmployeeOnboardingChatMessages(sessionId: string): Promise<schema.EmployeeOnboardingChatMessage[]> {
+    return await db.select().from(schema.employeeOnboardingChatMessages)
+      .where(eq(schema.employeeOnboardingChatMessages.sessionId, sessionId))
+      .orderBy(schema.employeeOnboardingChatMessages.createdAt);
   }
 }
 
