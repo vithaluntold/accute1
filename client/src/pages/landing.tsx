@@ -7,9 +7,12 @@ import logoUrl from "@assets/Accute Transparent symbol_1761505804713.png";
 import { FinACEverseBranding } from "@/components/finaceverse-branding";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AIVisualAnimation, FloatingParticles, NeuralNetworkBackground } from "@/components/ai-visual-animation";
-import { AnimatedCounter } from "@/components/animated-counter";
-import { TestimonialCarousel } from "@/components/testimonial-carousel";
-import { TrustedBySection } from "@/components/logo-carousel";
+// DISABLED: Placeholder data components - see docs/disabled-ui-components.md
+// import { AnimatedCounter } from "@/components/animated-counter";
+// import { TestimonialCarousel } from "@/components/testimonial-carousel";
+// import { TrustedBySection } from "@/components/logo-carousel";
+
+// ENABLED: Factual content components
 import { NumberedProducts } from "@/components/numbered-products";
 import { FAQSection } from "@/components/faq-section";
 import { IndustryTabs } from "@/components/industry-tabs";
@@ -211,15 +214,8 @@ export default function Landing() {
 
       </section>
 
-      {/* Stats Section - Animated Counter */}
-      <section className="py-16 border-y bg-card">
-        <div className="container mx-auto px-4">
-          <AnimatedCounter />
-        </div>
-      </section>
-
-      {/* Trusted By - Logo Carousel */}
-      <TrustedBySection />
+      {/* DISABLED: Stats Section - see docs/disabled-ui-components.md */}
+      {/* DISABLED: Logo Carousel - see docs/disabled-ui-components.md */}
 
       {/* AI Agents Showcase */}
       <section id="agents" className="py-24 relative overflow-hidden">
@@ -530,28 +526,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-mesh opacity-30" />
-        <div className="container mx-auto px-4 relative">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <Badge className="mb-4 bg-gradient-to-r from-[#e5a660]/20 to-[#d76082]/20 border-[#e5a660]/30">
-              <Users className="h-3 w-3 mr-1" />
-              Testimonials
-            </Badge>
-            <h2 className="text-4xl font-display font-bold mb-4">
-              Our Users Love{" "}
-              <span className="bg-gradient-to-r from-[#e5a660] to-[#d76082] bg-clip-text text-transparent">
-                Accute
-              </span>
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              See what accounting professionals are saying about their experience
-            </p>
-          </div>
-          <TestimonialCarousel />
-        </div>
-      </section>
+      {/* DISABLED: Testimonials Section - see docs/disabled-ui-components.md */}
 
       {/* FAQ Section */}
       <FAQSection />
