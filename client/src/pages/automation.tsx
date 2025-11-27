@@ -14,9 +14,114 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit, Trash2, Zap, Power, PowerOff, Settings, Info, AlertTriangle } from "lucide-react";
+import { Plus, Edit, Trash2, Zap, Power, PowerOff, Settings, Info, AlertTriangle, Tag, FileText, Users, CheckSquare, Mail, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { VisualTriggerBuilder } from "@/components/visual-trigger-builder";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
+
+// Pre-built automation templates with tag-aware conditions
+const AUTOMATION_TEMPLATES = [
+  {
+    id: 'vip-client-notify',
+    name: 'VIP Client Priority Handling',
+    description: 'Send priority notification when document uploaded by VIP-tagged client',
+    icon: Users,
+    category: 'Client Management',
+    config: {
+      event: 'document_uploaded',
+      conditions: [
+        { field: 'client_tags', operator: 'contains_any', value: 'VIP,Premium,Priority' }
+      ],
+      actions: [
+        { type: 'send_notification', config: { title: 'VIP Client Document', message: 'A VIP client has uploaded a document requiring attention' } }
+      ],
+    }
+  },
+  {
+    id: 'tax-return-auto-assign',
+    name: 'Tax Return Auto-Assignment',
+    description: 'Automatically assign tax returns based on client jurisdiction tags',
+    icon: FileText,
+    category: 'Document Routing',
+    config: {
+      event: 'document_uploaded',
+      conditions: [
+        { field: 'document_type', operator: 'equals', value: 'tax_return' },
+        { field: 'jurisdiction', operator: 'in', value: 'usa,uk,australia' }
+      ],
+      actions: [
+        { type: 'assign_task', config: { taskName: 'Review Tax Return', userId: '' } }
+      ],
+    }
+  },
+  {
+    id: 'urgent-tag-escalation',
+    name: 'Urgent Tag Escalation',
+    description: 'Escalate tasks with urgent tags to senior staff',
+    icon: Tag,
+    category: 'Task Management',
+    config: {
+      event: 'task_completed',
+      conditions: [
+        { field: 'tags', operator: 'contains_any', value: 'Urgent,Critical,Escalate' }
+      ],
+      actions: [
+        { type: 'send_email', config: { subject: 'Urgent Task Escalation', body: 'A task with urgent priority requires immediate attention.' } }
+      ],
+    }
+  },
+  {
+    id: 'quarterly-compliance-check',
+    name: 'Quarterly Compliance Reminder',
+    description: 'Scheduled quarterly check for clients tagged as requiring compliance review',
+    icon: CheckSquare,
+    category: 'Compliance',
+    config: {
+      event: 'scheduled',
+      cronExpression: '0 9 1 */3 *',
+      conditions: [
+        { field: 'client_tags', operator: 'contains_any', value: 'Compliance,Audit,Regulated' }
+      ],
+      actions: [
+        { type: 'send_notification', config: { title: 'Quarterly Compliance Check Due', message: 'Quarterly compliance review is due for regulated clients' } }
+      ],
+    }
+  },
+  {
+    id: 'new-client-welcome',
+    name: 'New Client Welcome Sequence',
+    description: 'Send welcome email when client onboarding is completed',
+    icon: Mail,
+    category: 'Client Onboarding',
+    config: {
+      event: 'organizer_submitted',
+      conditions: [
+        { field: 'client_type', operator: 'equals', value: 'new' }
+      ],
+      actions: [
+        { type: 'send_email', config: { subject: 'Welcome to Our Firm', body: 'Thank you for completing your onboarding. We look forward to working with you.' } }
+      ],
+    }
+  },
+  {
+    id: 'high-value-invoice-alert',
+    name: 'High-Value Invoice Alert',
+    description: 'Alert when invoices over threshold are paid by tagged clients',
+    icon: Sparkles,
+    category: 'Billing',
+    config: {
+      event: 'invoice_paid',
+      conditions: [
+        { field: 'amount', operator: 'greater_than', value: '10000' },
+        { field: 'client_tags', operator: 'is_not_empty', value: '' }
+      ],
+      actions: [
+        { type: 'send_notification', config: { title: 'High-Value Invoice Paid', message: 'A high-value invoice has been paid' } }
+      ],
+    }
+  },
+];
 
 // Trigger events
 const TRIGGER_EVENTS = [
@@ -100,6 +205,7 @@ export default function Automation() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingTrigger, setEditingTrigger] = useState<AutomationTrigger | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(true);
 
   // Fetch triggers
   const { data: triggers = [], isLoading } = useQuery<AutomationTrigger[]>({
@@ -310,6 +416,36 @@ export default function Automation() {
     form.setValue('stageId', "");
     form.setValue('stepId', "");
     setSelectedStageId(undefined);
+  };
+
+  // Apply template to form
+  const applyTemplate = (template: typeof AUTOMATION_TEMPLATES[0]) => {
+    form.reset({
+      name: template.name,
+      description: template.description,
+      event: template.config.event,
+      workflowId: "",
+      stageId: "",
+      stepId: "",
+      autoAdvanceEnabled: false,
+      autoAdvanceTargetStageId: "",
+      autoAdvanceTargetStepId: "",
+      actions: template.config.actions || [],
+      cronExpression: (template.config as any).cronExpression || "",
+      dueDateOffsetDays: 0,
+      conditions: template.config.conditions.map((c, i) => ({
+        ...c,
+        id: `cond-template-${i}`,
+        x: 250,
+        y: i * 180 + 50,
+      })),
+      conditionEdges: [],
+    });
+    setCreateDialogOpen(true);
+    toast({
+      title: 'Template Applied',
+      description: `"${template.name}" loaded. Customize and save to create your trigger.`,
+    });
   };
 
   // Handle stage selection
@@ -918,6 +1054,76 @@ export default function Automation() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pre-built Templates Section */}
+      <Collapsible open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <Card>
+          <CardHeader className="pb-3">
+            <CollapsibleTrigger className="flex items-center justify-between w-full group">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Quick Start Templates</CardTitle>
+                <Badge variant="secondary" className="ml-2">
+                  {AUTOMATION_TEMPLATES.length} templates
+                </Badge>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${templatesOpen ? 'rotate-180' : ''}`} />
+            </CollapsibleTrigger>
+            <CardDescription>
+              Pre-built automation templates with tag-aware conditions. Click to customize and deploy.
+            </CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {AUTOMATION_TEMPLATES.map((template) => {
+                  const Icon = template.icon;
+                  return (
+                    <Card 
+                      key={template.id} 
+                      className="hover-elevate cursor-pointer border-dashed"
+                      onClick={() => applyTemplate(template)}
+                      data-testid={`template-card-${template.id}`}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-sm font-medium truncate" data-testid={`template-name-${template.id}`}>
+                              {template.name}
+                            </CardTitle>
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {template.category}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {template.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {TRIGGER_EVENTS.find(e => e.value === template.config.event)?.label || template.config.event}
+                          </Badge>
+                          {template.config.conditions.some(c => c.field.includes('tag')) && (
+                            <Badge variant="outline" className="text-xs">
+                              <Tag className="h-3 w-3 mr-1" />
+                              Tag-aware
+                            </Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Triggers List */}
       {isLoading ? (

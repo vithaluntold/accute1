@@ -14,14 +14,18 @@ import {
   applyNodeChanges,
   EdgeChange,
   applyEdgeChanges,
+  MiniMap,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Trash2, GitBranch, Tag, Filter, Layers, MousePointer2, HelpCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ConditionNodeData {
   id: string;
@@ -37,6 +41,12 @@ const CONDITION_FIELDS = [
   { value: 'amount', label: 'Amount' },
   { value: 'client_id', label: 'Client' },
   { value: 'due_date', label: 'Due Date' },
+  { value: 'tags', label: 'Tags' },
+  { value: 'client_tags', label: 'Client Tags' },
+  { value: 'document_type', label: 'Document Type' },
+  { value: 'client_type', label: 'Client Type' },
+  { value: 'jurisdiction', label: 'Jurisdiction' },
+  { value: 'entity_type', label: 'Entity Type' },
 ];
 
 const OPERATORS = [
@@ -46,6 +56,12 @@ const OPERATORS = [
   { value: 'less_than', label: 'Less Than' },
   { value: 'contains', label: 'Contains' },
   { value: 'starts_with', label: 'Starts With' },
+  { value: 'contains_any', label: 'Contains Any (Tags)' },
+  { value: 'contains_all', label: 'Contains All (Tags)' },
+  { value: 'not_contains', label: 'Does Not Contain' },
+  { value: 'is_empty', label: 'Is Empty' },
+  { value: 'is_not_empty', label: 'Is Not Empty' },
+  { value: 'in', label: 'In List' },
 ];
 
 interface ConditionNodeProps {
@@ -55,34 +71,75 @@ interface ConditionNodeProps {
 }
 
 function ConditionNode({ data, onDelete, onChange }: ConditionNodeProps) {
+  const isTagField = data.field.includes('tag');
+  const fieldLabel = CONDITION_FIELDS.find(f => f.value === data.field)?.label || data.field;
+  const operatorLabel = OPERATORS.find(o => o.value === data.operator)?.label || data.operator;
+  
   return (
-    <Card className="min-w-[300px]" data-testid={`condition-node-${data.id}`}>
-      <Handle type="target" position={Position.Top} />
-      <CardHeader className="p-3 pb-2">
+    <Card className="min-w-[320px] shadow-lg border-2 hover:border-primary/50 transition-colors" data-testid={`condition-node-${data.id}`}>
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        className="!bg-primary !w-3 !h-3 !border-2 !border-background"
+      />
+      <CardHeader className="p-3 pb-2 bg-muted/30">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm">Condition</CardTitle>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onDelete(data.id)}
-            data-testid="button-delete-condition"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Condition</CardTitle>
+            {isTagField && (
+              <Badge variant="secondary" className="text-xs">
+                <Tag className="h-3 w-3 mr-1" />
+                Tag
+              </Badge>
+            )}
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => onDelete(data.id)}
+                  data-testid="button-delete-condition"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete condition</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardHeader>
-      <CardContent className="p-3 pt-0 space-y-2">
+      <CardContent className="p-3 pt-2 space-y-3">
         <div>
-          <Label className="text-xs">Field</Label>
+          <Label className="text-xs text-muted-foreground">Field</Label>
           <Select
             value={data.field}
             onValueChange={(value) => onChange(data.id, { field: value })}
           >
-            <SelectTrigger className="h-8" data-testid="select-condition-field">
-              <SelectValue />
+            <SelectTrigger className="h-8 mt-1" data-testid="select-condition-field">
+              <SelectValue placeholder="Select field" />
             </SelectTrigger>
             <SelectContent>
-              {CONDITION_FIELDS.map((field) => (
+              <div className="text-xs text-muted-foreground px-2 py-1">Basic Fields</div>
+              {CONDITION_FIELDS.filter(f => !f.value.includes('tag') && !f.value.includes('type')).map((field) => (
+                <SelectItem key={field.value} value={field.value}>
+                  {field.label}
+                </SelectItem>
+              ))}
+              <div className="text-xs text-muted-foreground px-2 py-1 border-t mt-1 pt-1">
+                <Tag className="h-3 w-3 inline mr-1" />
+                Tag Fields
+              </div>
+              {CONDITION_FIELDS.filter(f => f.value.includes('tag')).map((field) => (
+                <SelectItem key={field.value} value={field.value}>
+                  {field.label}
+                </SelectItem>
+              ))}
+              <div className="text-xs text-muted-foreground px-2 py-1 border-t mt-1 pt-1">Type Fields</div>
+              {CONDITION_FIELDS.filter(f => f.value.includes('type') && !f.value.includes('tag')).map((field) => (
                 <SelectItem key={field.value} value={field.value}>
                   {field.label}
                 </SelectItem>
@@ -91,16 +148,32 @@ function ConditionNode({ data, onDelete, onChange }: ConditionNodeProps) {
           </Select>
         </div>
         <div>
-          <Label className="text-xs">Operator</Label>
+          <Label className="text-xs text-muted-foreground">Operator</Label>
           <Select
             value={data.operator}
             onValueChange={(value) => onChange(data.id, { operator: value })}
           >
-            <SelectTrigger className="h-8" data-testid="select-condition-operator">
-              <SelectValue />
+            <SelectTrigger className="h-8 mt-1" data-testid="select-condition-operator">
+              <SelectValue placeholder="Select operator" />
             </SelectTrigger>
             <SelectContent>
-              {OPERATORS.map((op) => (
+              <div className="text-xs text-muted-foreground px-2 py-1">Comparison</div>
+              {OPERATORS.filter(o => ['equals', 'not_equals', 'greater_than', 'less_than'].includes(o.value)).map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+              <div className="text-xs text-muted-foreground px-2 py-1 border-t mt-1 pt-1">Text Matching</div>
+              {OPERATORS.filter(o => ['contains', 'starts_with', 'not_contains'].includes(o.value)).map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+              <div className="text-xs text-muted-foreground px-2 py-1 border-t mt-1 pt-1">
+                <Tag className="h-3 w-3 inline mr-1" />
+                Tag Operations
+              </div>
+              {OPERATORS.filter(o => ['contains_any', 'contains_all', 'in', 'is_empty', 'is_not_empty'].includes(o.value)).map((op) => (
                 <SelectItem key={op.value} value={op.value}>
                   {op.label}
                 </SelectItem>
@@ -109,17 +182,33 @@ function ConditionNode({ data, onDelete, onChange }: ConditionNodeProps) {
           </Select>
         </div>
         <div>
-          <Label className="text-xs">Value</Label>
+          <Label className="text-xs text-muted-foreground">Value</Label>
           <Input
-            className="h-8"
+            className="h-8 mt-1"
             value={data.value}
             onChange={(e) => onChange(data.id, { value: e.target.value })}
-            placeholder="Enter value"
+            placeholder={isTagField ? "tag1, tag2, tag3" : "Enter value"}
             data-testid="input-condition-value"
           />
+          {isTagField && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Separate multiple tags with commas
+            </p>
+          )}
+        </div>
+        
+        <div className="text-xs bg-muted/50 rounded p-2 mt-2">
+          <span className="text-muted-foreground">Rule: </span>
+          <span className="font-medium">{fieldLabel}</span>
+          <span className="text-muted-foreground"> {operatorLabel.toLowerCase()} </span>
+          <span className="font-medium">{data.value || '...'}</span>
         </div>
       </CardContent>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle 
+        type="source" 
+        position={Position.Bottom}
+        className="!bg-primary !w-3 !h-3 !border-2 !border-background"
+      />
     </Card>
   );
 }
@@ -244,13 +333,30 @@ export function VisualTriggerBuilder({ conditions, conditionEdges = [], onChange
     onChange(updatedConditions, updatedEdges);
   }, [onChange]);
 
+  // Helper to compute new state and emit to parent in one step
+  const dispatchAndEmit = useCallback((action: GraphAction) => {
+    const newState = graphReducer(stateRef.current, action);
+    dispatch(action);
+    stateRef.current = newState;
+    emitToParent(newState);
+  }, [emitToParent]);
+
+  // Track state ref for dispatchAndEmit
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Hydrate from props
   useEffect(() => {
     const snapshot = JSON.stringify({ conditions, conditionEdges });
     if (snapshot !== prevSnapshotRef.current) {
       isHydratingRef.current = true;
-      const newState = graphReducer(state, { type: 'HYDRATE', conditions, edges: conditionEdges });
-      dispatch({ type: 'HYDRATE', conditions, edges: conditionEdges });
+      
+      const action: GraphAction = { type: 'HYDRATE', conditions, edges: conditionEdges };
+      const newState = graphReducer(stateRef.current, action);
+      dispatch(action);
+      stateRef.current = newState;
       prevSnapshotRef.current = snapshot;
       
       // Persist IDs if generated
@@ -260,47 +366,34 @@ export function VisualTriggerBuilder({ conditions, conditionEdges = [], onChange
       
       isHydratingRef.current = false;
     }
-  }, [JSON.stringify({ conditions, conditionEdges })]);
-
-  // Handlers dispatch ONCE, then use updated state ref
-  const stateRef = useRef(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  }, [JSON.stringify({ conditions, conditionEdges }), emitToParent]);
 
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     if (isHydratingRef.current) return;
-    dispatch({ type: 'NODE_CHANGES', changes });
-    // Wait for state update, then emit
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'NODE_CHANGES', changes });
+  }, [dispatchAndEmit]);
 
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     if (isHydratingRef.current) return;
-    dispatch({ type: 'EDGE_CHANGES', changes });
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'EDGE_CHANGES', changes });
+  }, [dispatchAndEmit]);
 
   const handleConnect = useCallback((connection: Connection) => {
     if (isHydratingRef.current) return;
-    dispatch({ type: 'CONNECT', connection });
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'CONNECT', connection });
+  }, [dispatchAndEmit]);
 
   const handleAddNode = useCallback(() => {
-    dispatch({ type: 'ADD_NODE' });
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'ADD_NODE' });
+  }, [dispatchAndEmit]);
 
   const handleDeleteNode = useCallback((id: string) => {
-    dispatch({ type: 'DELETE_NODE', id });
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'DELETE_NODE', id });
+  }, [dispatchAndEmit]);
 
   const handleNodeDataChange = useCallback((id: string, updates: any) => {
-    dispatch({ type: 'UPDATE_NODE_DATA', id, updates });
-    setTimeout(() => emitToParent(stateRef.current), 0);
-  }, [emitToParent]);
+    dispatchAndEmit({ type: 'UPDATE_NODE_DATA', id, updates });
+  }, [dispatchAndEmit]);
 
   const wrappedNodeTypes = useMemo(() => ({
     condition: (props: any) => (
@@ -308,22 +401,82 @@ export function VisualTriggerBuilder({ conditions, conditionEdges = [], onChange
     ),
   }), [handleDeleteNode, handleNodeDataChange]);
 
+  const hasConditions = state.nodes.length > 0;
+  const hasConnections = state.edges.length > 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h3 className="text-sm font-medium">Visual Condition Builder</h3>
-          <p className="text-xs text-muted-foreground">
-            Drag conditions to reorder, connect nodes to create logic flow
+          <div className="flex items-center gap-2">
+            <GitBranch className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-medium">Visual Condition Builder</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Build complex conditions with AND/OR logic. Connect nodes to create conditional flows.
           </p>
         </div>
-        <Button onClick={handleAddNode} size="sm" variant="outline" data-testid="button-add-condition">
-          <Plus className="h-3 w-3 mr-1" />
-          Add Condition
-        </Button>
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs">
+                <div className="space-y-2 text-xs">
+                  <p><strong>Tips:</strong></p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Drag nodes to reposition them</li>
+                    <li>Connect nodes by dragging from bottom handle to top handle</li>
+                    <li>Connected nodes create AND logic</li>
+                    <li>Use tag fields for dynamic filtering</li>
+                  </ul>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <Button onClick={handleAddNode} size="sm" data-testid="button-add-condition">
+            <Plus className="h-3 w-3 mr-1" />
+            Add Condition
+          </Button>
+        </div>
       </div>
 
-      <div className="h-[400px] border rounded-md bg-background">
+      <div className="flex items-center gap-2 text-xs">
+        <Badge variant={hasConditions ? "default" : "outline"} className="gap-1">
+          <Layers className="h-3 w-3" />
+          {state.nodes.length} condition{state.nodes.length !== 1 ? 's' : ''}
+        </Badge>
+        <Badge variant={hasConnections ? "default" : "outline"} className="gap-1">
+          <GitBranch className="h-3 w-3" />
+          {state.edges.length} connection{state.edges.length !== 1 ? 's' : ''}
+        </Badge>
+      </div>
+
+      <div className="h-[450px] border rounded-lg bg-muted/20 relative overflow-hidden">
+        {!hasConditions && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <Card className="p-6 text-center bg-background/95 pointer-events-auto shadow-lg">
+              <Filter className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <h4 className="font-medium mb-2">No Conditions Yet</h4>
+              <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                Add conditions to filter when this automation should trigger. 
+                Use tags for dynamic client-based filtering.
+              </p>
+              <Button onClick={handleAddNode} data-testid="button-add-first-condition">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Condition
+              </Button>
+            </Card>
+          </div>
+        )}
+        
         <ReactFlow
           nodes={state.nodes}
           edges={state.edges}
@@ -332,10 +485,30 @@ export function VisualTriggerBuilder({ conditions, conditionEdges = [], onChange
           onConnect={handleConnect}
           nodeTypes={wrappedNodeTypes}
           fitView
+          snapToGrid
+          snapGrid={[15, 15]}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: true,
+            style: { strokeWidth: 2 }
+          }}
           data-testid="react-flow-canvas"
         >
-          <Controls />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          <Controls className="!bg-background !border !shadow-sm" />
+          <Background variant={BackgroundVariant.Dots} gap={15} size={1} className="!bg-transparent" />
+          {hasConditions && (
+            <MiniMap 
+              className="!bg-background !border !shadow-sm"
+              nodeColor={() => 'hsl(var(--primary))'}
+              maskColor="hsl(var(--muted) / 0.5)"
+            />
+          )}
+          <Panel position="bottom-left" className="!m-2">
+            <div className="bg-background/90 border rounded px-2 py-1 text-xs text-muted-foreground flex items-center gap-2">
+              <MousePointer2 className="h-3 w-3" />
+              Drag to move • Scroll to zoom • Connect handles for AND logic
+            </div>
+          </Panel>
         </ReactFlow>
       </div>
     </div>
