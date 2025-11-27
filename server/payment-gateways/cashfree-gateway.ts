@@ -67,9 +67,10 @@ export class CashfreeGateway extends BasePaymentGateway {
         paymentUrl: orderData.payments?.url,
         amount: request.amount,
         currency: request.currency || 'INR',
-        status: this.normalizeStatus(orderData.order_status || 'ACTIVE'),
+        status: this.normalizeCashfreeOrderStatus(orderData.order_status || 'ACTIVE'),
         metadata: {
           cfOrderId: orderData.cf_order_id,
+          orderId: request.orderId, // Store merchant order ID for reference
           orderToken: orderData.order_token,
           paymentSessionId: orderData.payment_session_id,
         },
@@ -82,41 +83,50 @@ export class CashfreeGateway extends BasePaymentGateway {
 
   async getPaymentStatus(orderId: string): Promise<PaymentStatus> {
     try {
-      const response = await this.cashfree.PGOrderFetchPayments("2023-08-01", orderId);
+      // Cashfree SDK uses merchant order_id for fetching orders (not cf_order_id)
+      // First fetch the order to get the cf_order_id
+      const orderResponse = await this.cashfree.PGFetchOrder("2023-08-01", orderId);
+      const order = orderResponse.data;
       
-      if (!response.data || response.data.length === 0) {
-        // No payments yet, check order status
-        const orderResponse = await this.cashfree.PGFetchOrder("2023-08-01", orderId);
-        const order = orderResponse.data;
-        
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`);
+      }
+
+      // Fetch payments using merchant order_id
+      const paymentsResponse = await this.cashfree.PGOrderFetchPayments("2023-08-01", orderId);
+      
+      if (!paymentsResponse.data || paymentsResponse.data.length === 0) {
+        // No payments yet, return order status
         return {
           orderId: orderId,
-          gatewayOrderId: order?.cf_order_id?.toString() || orderId,
-          status: this.normalizeStatus(order?.order_status || 'ACTIVE'),
-          amount: order?.order_amount || 0,
-          currency: order?.order_currency || 'INR',
-          metadata: { orderDetails: order },
+          gatewayOrderId: order.cf_order_id?.toString() || orderId,
+          status: this.normalizeCashfreeOrderStatus(order.order_status || 'ACTIVE'),
+          amount: order.order_amount || 0,
+          currency: order.order_currency || 'INR',
+          metadata: { 
+            cfOrderId: order.cf_order_id,
+            orderStatus: order.order_status,
+          },
         };
       }
 
-      // Get the latest payment
-      const payment = response.data[response.data.length - 1];
+      // Get the latest successful payment, or the most recent one
+      const payments = paymentsResponse.data;
+      const successfulPayment = payments.find((p: any) => p.payment_status === 'SUCCESS');
+      const payment = successfulPayment || payments[payments.length - 1];
       
       return {
         orderId: orderId,
-        gatewayOrderId: payment.cf_order_id?.toString() || orderId,
+        gatewayOrderId: order.cf_order_id?.toString() || orderId,
         gatewayPaymentId: payment.cf_payment_id?.toString(),
         status: this.normalizeCashfreePaymentStatus(payment.payment_status || ''),
         amount: payment.payment_amount || 0,
         currency: payment.payment_currency || 'INR',
         paidAt: payment.payment_completion_time ? new Date(payment.payment_completion_time) : undefined,
         failureReason: payment.payment_message,
-        paymentMethod: payment.payment_method?.card?.channel || 
-                       payment.payment_method?.upi?.channel ||
-                       payment.payment_method?.netbanking?.channel ||
-                       payment.payment_method?.wallet?.channel ||
-                       'unknown',
+        paymentMethod: this.extractPaymentMethod(payment.payment_method),
         metadata: {
+          cfOrderId: order.cf_order_id,
           cfPaymentId: payment.cf_payment_id,
           paymentGroup: payment.payment_group,
           bankReference: payment.bank_reference,
@@ -131,12 +141,38 @@ export class CashfreeGateway extends BasePaymentGateway {
 
   async refundPayment(request: RefundRequest): Promise<RefundResponse> {
     try {
-      // First get the order to find the cf_order_id
-      const orderId = request.paymentId; // paymentId here is the order_id
+      // Request format: paymentId should be "orderId:cfPaymentId" or just "orderId"
+      // If cfPaymentId is needed, it should be in request.notes or we fetch it
+      const parts = request.paymentId.split(':');
+      const orderId = parts[0];
+      let cfPaymentId = parts[1];
+
+      // Validate amount - Cashfree requires a positive refund amount
+      if (!request.amount || request.amount <= 0) {
+        throw new Error('Refund amount must be a positive number');
+      }
+
+      // If no cfPaymentId provided, fetch the successful payment for this order
+      if (!cfPaymentId) {
+        const paymentsResponse = await this.cashfree.PGOrderFetchPayments("2023-08-01", orderId);
+        const payments = paymentsResponse.data || [];
+        const successfulPayment = payments.find((p: any) => p.payment_status === 'SUCCESS');
+        
+        if (!successfulPayment) {
+          throw new Error('No successful payment found for this order to refund');
+        }
+        cfPaymentId = successfulPayment.cf_payment_id?.toString();
+      }
+
+      if (!cfPaymentId) {
+        throw new Error('Cashfree payment ID (cf_payment_id) is required for refund');
+      }
+
+      const refundId = `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const refundRequest = {
-        refund_amount: request.amount || 0,
-        refund_id: `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        refund_amount: request.amount,
+        refund_id: refundId,
         refund_note: request.reason || 'Refund requested',
       };
 
@@ -149,9 +185,9 @@ export class CashfreeGateway extends BasePaymentGateway {
       const refund = response.data;
       
       return {
-        refundId: refund.cf_refund_id?.toString() || refundRequest.refund_id,
-        status: this.normalizeRefundStatus(refund.refund_status || ''),
-        amount: refund.refund_amount || request.amount || 0,
+        refundId: refund.cf_refund_id?.toString() || refundId,
+        status: this.normalizeCashfreeRefundStatus(refund.refund_status || ''),
+        amount: refund.refund_amount || request.amount,
         currency: refund.refund_currency || 'INR',
         processedAt: refund.processed_at ? new Date(refund.processed_at) : undefined,
       };
@@ -214,8 +250,49 @@ export class CashfreeGateway extends BasePaymentGateway {
     };
   }
 
+  // Helper to extract payment method from Cashfree's nested structure
+  private extractPaymentMethod(paymentMethod: any): string {
+    if (!paymentMethod) return 'unknown';
+    
+    if (paymentMethod.card) {
+      return `card:${paymentMethod.card.card_network || 'card'}`;
+    }
+    if (paymentMethod.upi) {
+      return `upi:${paymentMethod.upi.upi_id || 'upi'}`;
+    }
+    if (paymentMethod.netbanking) {
+      return `netbanking:${paymentMethod.netbanking.netbanking_bank_code || 'bank'}`;
+    }
+    if (paymentMethod.wallet) {
+      return `wallet:${paymentMethod.wallet.channel || 'wallet'}`;
+    }
+    if (paymentMethod.paylater) {
+      return `paylater:${paymentMethod.paylater.channel || 'paylater'}`;
+    }
+    if (paymentMethod.emi) {
+      return `emi:${paymentMethod.emi.emi_bank || 'emi'}`;
+    }
+    
+    return 'unknown';
+  }
+
+  // Helper method to normalize Cashfree order status
+  private normalizeCashfreeOrderStatus(status: string): PaymentStatus['status'] {
+    const normalizedStatus = status.toUpperCase();
+    const statusMap: Record<string, PaymentStatus['status']> = {
+      'ACTIVE': 'pending',
+      'PAID': 'paid',
+      'EXPIRED': 'cancelled',
+      'TERMINATED': 'cancelled',
+      'PARTIALLY_PAID': 'processing',
+    };
+    
+    return statusMap[normalizedStatus] || 'pending';
+  }
+
   // Helper method to normalize Cashfree payment status
   private normalizeCashfreePaymentStatus(status: string): PaymentStatus['status'] {
+    const normalizedStatus = status.toUpperCase();
     const statusMap: Record<string, PaymentStatus['status']> = {
       'SUCCESS': 'paid',
       'PAID': 'paid',
@@ -227,11 +304,12 @@ export class CashfreeGateway extends BasePaymentGateway {
       'VOID': 'cancelled',
     };
     
-    return statusMap[status.toUpperCase()] || 'pending';
+    return statusMap[normalizedStatus] || 'pending';
   }
 
   // Helper method to normalize refund status
-  private normalizeRefundStatus(status: string): RefundResponse['status'] {
+  private normalizeCashfreeRefundStatus(status: string): RefundResponse['status'] {
+    const normalizedStatus = status.toUpperCase();
     const statusMap: Record<string, RefundResponse['status']> = {
       'SUCCESS': 'processed',
       'PROCESSED': 'processed',
@@ -241,7 +319,7 @@ export class CashfreeGateway extends BasePaymentGateway {
       'FAILED': 'failed',
     };
     
-    return statusMap[status.toUpperCase()] || 'pending';
+    return statusMap[normalizedStatus] || 'pending';
   }
 
   // Additional method: Fetch all payments for an order
@@ -268,7 +346,7 @@ export class CashfreeGateway extends BasePaymentGateway {
       
       return {
         refundId: refund.cf_refund_id?.toString() || refundId,
-        status: this.normalizeRefundStatus(refund.refund_status || ''),
+        status: this.normalizeCashfreeRefundStatus(refund.refund_status || ''),
         amount: refund.refund_amount || 0,
         currency: refund.refund_currency || 'INR',
         processedAt: refund.processed_at ? new Date(refund.processed_at) : undefined,
