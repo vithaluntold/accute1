@@ -84,7 +84,8 @@ export function SsoConfigSection() {
   });
 
   const hasPermission = (currentUser as any)?.role?.name === "Admin" || 
-                        (currentUser as any)?.role?.name === "Super Admin";
+                        (currentUser as any)?.role?.name === "Super Admin" ||
+                        (currentUser as any)?.role?.name === "Owner";
 
   // Get roles for auto-provision default role selector
   const { data: roles = [] } = useQuery<any[]>({
