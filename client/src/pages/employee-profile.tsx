@@ -168,7 +168,7 @@ export default function EmployeeProfile() {
   });
 
   const {
-    messages: onboardMessages,
+    messages: onboardMessages = [],
     isStreaming: onboardStreaming,
     sendMessage: sendOnboardMessage,
   } = useAgentSSE({
