@@ -44,19 +44,17 @@ function createPool(): Pool {
   };
   
   // SSL configuration for Railway
-  // Detect if this is a local database (no SSL needed) or external (Railway)
   const isLocalhost = dbUrl.includes('@localhost:') || dbUrl.includes('@127.0.0.1:') || dbUrl.includes('@helium:');
   
   if (requiresNoSSL || isLocalhost) {
-    console.log('🔓 SSL disabled (local database or sslmode=disable)');
+    console.log('🔓 SSL disabled (local database)');
     poolConfig.ssl = false;
   } else {
+    // Railway requires SSL with rejectUnauthorized: false for their proxy
     console.log('🔒 SSL enabled for Railway database');
-    // Railway's proxy uses self-signed certs that require rejectUnauthorized: false
     poolConfig.ssl = {
       rejectUnauthorized: false,
     };
-    console.log('   Railway proxy - using relaxed SSL');
   }
   
   const pool = new Pool(poolConfig);
