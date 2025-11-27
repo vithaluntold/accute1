@@ -8,47 +8,348 @@ import {
   type RefundResponse,
   type WebhookVerificationResult,
 } from './base-gateway';
+import crypto from 'crypto';
+
+// Cashfree SDK imports
+import { Cashfree } from 'cashfree-pg';
 
 export class CashfreeGateway extends BasePaymentGateway {
+  private cashfree: typeof Cashfree;
+
   constructor(config: PaymentGatewayConfig) {
     super(config);
     
-    throw new Error(
-      'Cashfree integration not yet implemented. To enable Cashfree:\n' +
-      '1. Install package: npm install cashfree-pg\n' +
-      '2. Implement the Cashfree SDK integration in this file\n' +
-      '3. Add CASHFREE_CLIENT_ID and CASHFREE_CLIENT_SECRET to environment variables\n' +
-      '4. Refer to: https://github.com/cashfree/cashfree-pg-sdk-nodejs'
-    );
+    // Initialize Cashfree SDK
+    Cashfree.XClientId = config.apiKey;
+    Cashfree.XClientSecret = config.apiSecret;
+    Cashfree.XEnvironment = config.environment === 'production' 
+      ? Cashfree.Environment.PRODUCTION 
+      : Cashfree.Environment.SANDBOX;
+    
+    this.cashfree = Cashfree;
   }
 
   get gatewayName(): string {
     return 'cashfree';
   }
 
-  async createOrder(_request: CreateOrderRequest): Promise<CreateOrderResponse> {
-    throw new Error('Cashfree integration not implemented');
+  async createOrder(request: CreateOrderRequest): Promise<CreateOrderResponse> {
+    try {
+      const orderRequest = {
+        order_id: request.orderId,
+        order_amount: request.amount,
+        order_currency: request.currency || 'INR',
+        customer_details: {
+          customer_id: request.customer.id || `cust_${Date.now()}`,
+          customer_name: request.customer.name,
+          customer_email: request.customer.email,
+          customer_phone: request.customer.phone || '',
+        },
+        order_meta: {
+          return_url: request.returnUrl || '',
+          notify_url: request.notifyUrl || '',
+          payment_methods: null, // Allow all payment methods
+        },
+        order_note: request.description || '',
+      };
+
+      const response = await this.cashfree.PGCreateOrder("2023-08-01", orderRequest);
+      
+      if (!response.data) {
+        throw new Error('Failed to create Cashfree order: No response data');
+      }
+
+      const orderData = response.data;
+      
+      return {
+        gatewayOrderId: orderData.cf_order_id?.toString() || request.orderId,
+        sessionId: orderData.payment_session_id,
+        paymentUrl: orderData.payments?.url,
+        amount: request.amount,
+        currency: request.currency || 'INR',
+        status: this.normalizeStatus(orderData.order_status || 'ACTIVE'),
+        metadata: {
+          cfOrderId: orderData.cf_order_id,
+          orderToken: orderData.order_token,
+          paymentSessionId: orderData.payment_session_id,
+        },
+      };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Create order error:', error.response?.data || error.message);
+      throw new Error(`Cashfree order creation failed: ${error.response?.data?.message || error.message}`);
+    }
   }
 
-  async getPaymentStatus(_orderId: string): Promise<PaymentStatus> {
-    throw new Error('Cashfree integration not implemented');
+  async getPaymentStatus(orderId: string): Promise<PaymentStatus> {
+    try {
+      const response = await this.cashfree.PGOrderFetchPayments("2023-08-01", orderId);
+      
+      if (!response.data || response.data.length === 0) {
+        // No payments yet, check order status
+        const orderResponse = await this.cashfree.PGFetchOrder("2023-08-01", orderId);
+        const order = orderResponse.data;
+        
+        return {
+          orderId: orderId,
+          gatewayOrderId: order?.cf_order_id?.toString() || orderId,
+          status: this.normalizeStatus(order?.order_status || 'ACTIVE'),
+          amount: order?.order_amount || 0,
+          currency: order?.order_currency || 'INR',
+          metadata: { orderDetails: order },
+        };
+      }
+
+      // Get the latest payment
+      const payment = response.data[response.data.length - 1];
+      
+      return {
+        orderId: orderId,
+        gatewayOrderId: payment.cf_order_id?.toString() || orderId,
+        gatewayPaymentId: payment.cf_payment_id?.toString(),
+        status: this.normalizeCashfreePaymentStatus(payment.payment_status || ''),
+        amount: payment.payment_amount || 0,
+        currency: payment.payment_currency || 'INR',
+        paidAt: payment.payment_completion_time ? new Date(payment.payment_completion_time) : undefined,
+        failureReason: payment.payment_message,
+        paymentMethod: payment.payment_method?.card?.channel || 
+                       payment.payment_method?.upi?.channel ||
+                       payment.payment_method?.netbanking?.channel ||
+                       payment.payment_method?.wallet?.channel ||
+                       'unknown',
+        metadata: {
+          cfPaymentId: payment.cf_payment_id,
+          paymentGroup: payment.payment_group,
+          bankReference: payment.bank_reference,
+          paymentMethod: payment.payment_method,
+        },
+      };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Get payment status error:', error.response?.data || error.message);
+      throw new Error(`Cashfree payment status fetch failed: ${error.response?.data?.message || error.message}`);
+    }
   }
 
-  async refundPayment(_request: RefundRequest): Promise<RefundResponse> {
-    throw new Error('Cashfree integration not implemented');
+  async refundPayment(request: RefundRequest): Promise<RefundResponse> {
+    try {
+      // First get the order to find the cf_order_id
+      const orderId = request.paymentId; // paymentId here is the order_id
+      
+      const refundRequest = {
+        refund_amount: request.amount || 0,
+        refund_id: `refund_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        refund_note: request.reason || 'Refund requested',
+      };
+
+      const response = await this.cashfree.PGOrderCreateRefund("2023-08-01", orderId, refundRequest);
+      
+      if (!response.data) {
+        throw new Error('Failed to create refund: No response data');
+      }
+
+      const refund = response.data;
+      
+      return {
+        refundId: refund.cf_refund_id?.toString() || refundRequest.refund_id,
+        status: this.normalizeRefundStatus(refund.refund_status || ''),
+        amount: refund.refund_amount || request.amount || 0,
+        currency: refund.refund_currency || 'INR',
+        processedAt: refund.processed_at ? new Date(refund.processed_at) : undefined,
+      };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Refund error:', error.response?.data || error.message);
+      throw new Error(`Cashfree refund failed: ${error.response?.data?.message || error.message}`);
+    }
   }
 
   verifyWebhookSignature(
-    _signature: string,
-    _payload: string | Buffer,
-    _timestamp?: string
+    signature: string,
+    payload: string | Buffer,
+    timestamp?: string
   ): WebhookVerificationResult {
-    throw new Error('Cashfree integration not implemented');
+    try {
+      const webhookSecret = this.config.webhookSecret;
+      
+      if (!webhookSecret) {
+        console.warn('[CashfreeGateway] No webhook secret configured');
+        return { isValid: false };
+      }
+
+      // Cashfree webhook signature verification
+      // Format: timestamp + payload
+      const payloadString = typeof payload === 'string' ? payload : payload.toString('utf-8');
+      const signaturePayload = timestamp ? `${timestamp}${payloadString}` : payloadString;
+      
+      const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(signaturePayload)
+        .digest('base64');
+
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expectedSignature)
+      );
+
+      if (isValid) {
+        const data = JSON.parse(payloadString);
+        return {
+          isValid: true,
+          event: data.type || data.event,
+          data: data.data || data,
+        };
+      }
+
+      return { isValid: false };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Webhook verification error:', error.message);
+      return { isValid: false };
+    }
   }
 
   getCheckoutScript(): { src: string; integrity?: string } {
+    const isProduction = this.config.environment === 'production';
     return {
-      src: 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js',
+      src: isProduction 
+        ? 'https://sdk.cashfree.com/js/v3/cashfree.js'
+        : 'https://sandbox.cashfree.com/js/v3/cashfree.js',
     };
+  }
+
+  // Helper method to normalize Cashfree payment status
+  private normalizeCashfreePaymentStatus(status: string): PaymentStatus['status'] {
+    const statusMap: Record<string, PaymentStatus['status']> = {
+      'SUCCESS': 'paid',
+      'PAID': 'paid',
+      'FAILED': 'failed',
+      'CANCELLED': 'cancelled',
+      'PENDING': 'pending',
+      'NOT_ATTEMPTED': 'pending',
+      'USER_DROPPED': 'cancelled',
+      'VOID': 'cancelled',
+    };
+    
+    return statusMap[status.toUpperCase()] || 'pending';
+  }
+
+  // Helper method to normalize refund status
+  private normalizeRefundStatus(status: string): RefundResponse['status'] {
+    const statusMap: Record<string, RefundResponse['status']> = {
+      'SUCCESS': 'processed',
+      'PROCESSED': 'processed',
+      'PENDING': 'pending',
+      'ONHOLD': 'pending',
+      'CANCELLED': 'failed',
+      'FAILED': 'failed',
+    };
+    
+    return statusMap[status.toUpperCase()] || 'pending';
+  }
+
+  // Additional method: Fetch all payments for an order
+  async fetchOrderPayments(orderId: string): Promise<any[]> {
+    try {
+      const response = await this.cashfree.PGOrderFetchPayments("2023-08-01", orderId);
+      return response.data || [];
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Fetch payments error:', error.response?.data || error.message);
+      throw new Error(`Cashfree fetch payments failed: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Additional method: Get refund status
+  async getRefundStatus(orderId: string, refundId: string): Promise<RefundResponse> {
+    try {
+      const response = await this.cashfree.PGOrderFetchRefund("2023-08-01", orderId, refundId);
+      
+      if (!response.data) {
+        throw new Error('Refund not found');
+      }
+
+      const refund = response.data;
+      
+      return {
+        refundId: refund.cf_refund_id?.toString() || refundId,
+        status: this.normalizeRefundStatus(refund.refund_status || ''),
+        amount: refund.refund_amount || 0,
+        currency: refund.refund_currency || 'INR',
+        processedAt: refund.processed_at ? new Date(refund.processed_at) : undefined,
+      };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Get refund status error:', error.response?.data || error.message);
+      throw new Error(`Cashfree refund status fetch failed: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Additional method: Create payment link
+  async createPaymentLink(request: {
+    linkId: string;
+    amount: number;
+    currency?: string;
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+    linkPurpose: string;
+    linkExpiryTime?: string;
+    returnUrl?: string;
+    notifyUrl?: string;
+  }): Promise<{
+    linkId: string;
+    linkUrl: string;
+    status: string;
+  }> {
+    try {
+      const linkRequest = {
+        link_id: request.linkId,
+        link_amount: request.amount,
+        link_currency: request.currency || 'INR',
+        link_purpose: request.linkPurpose,
+        customer_details: {
+          customer_name: request.customerName,
+          customer_email: request.customerEmail,
+          customer_phone: request.customerPhone,
+        },
+        link_expiry_time: request.linkExpiryTime,
+        link_meta: {
+          return_url: request.returnUrl,
+          notify_url: request.notifyUrl,
+        },
+      };
+
+      const response = await this.cashfree.PGCreateLink("2023-08-01", linkRequest);
+      
+      if (!response.data) {
+        throw new Error('Failed to create payment link');
+      }
+
+      return {
+        linkId: response.data.link_id || request.linkId,
+        linkUrl: response.data.link_url || '',
+        status: response.data.link_status || 'ACTIVE',
+      };
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Create payment link error:', error.response?.data || error.message);
+      throw new Error(`Cashfree payment link creation failed: ${error.response?.data?.message || error.message}`);
+    }
+  }
+
+  // Settlement methods
+  async getSettlements(params?: {
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<any> {
+    try {
+      const response = await this.cashfree.PGFetchSettlements("2023-08-01", {
+        start_date: params?.startDate,
+        end_date: params?.endDate,
+        limit: params?.limit || 50,
+        cursor: params?.cursor,
+      });
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('[CashfreeGateway] Get settlements error:', error.response?.data || error.message);
+      throw new Error(`Cashfree settlements fetch failed: ${error.response?.data?.message || error.message}`);
+    }
   }
 }
