@@ -102,6 +102,7 @@ const organizationMenuCategories = [
     items: [
       { title: "Workflows", url: "/workflows", icon: Workflow, permission: "workflows.view" },
       { title: "Automation", url: "/automation", icon: Zap, permission: "workflows.view" },
+      { title: "Recordings", url: "/recordings", icon: Video, permission: "workflows.view" },
       { title: "Assignments", url: "/assignments", icon: ListTodo, permission: "workflows.view" },
       { title: "Kanban Board", url: "/kanban", icon: Kanban, permission: "workflows.view" },
       { title: "Projects", url: "/projects", icon: Network, permission: "projects.view" },

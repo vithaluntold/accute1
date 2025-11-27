@@ -16,6 +16,7 @@ import { registerPersonalityProfilingRoutes } from "./personality-profiling-rout
 import { registerSSEAgentRoutes } from "./sse-agent-routes";
 import { registerSSERoundtableRoutes } from "./sse-roundtable-routes";
 import { registerUnifiedPaymentRoutes } from "./unified-payment-routes";
+import { registerTaskRecordingRoutes } from "./task-recording-routes";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   hashPassword,
@@ -22170,6 +22171,9 @@ ${msg.bodyText || msg.bodyHtml || ''}
 
   // Register unified payment gateway routes (supports Razorpay, Stripe, Cashfree)
   registerUnifiedPaymentRoutes(app);
+
+  // Register task recording routes (screen capture for workflow documentation)
+  registerTaskRecordingRoutes(app);
 
   // ==================== FORECASTING SYSTEM ====================
   

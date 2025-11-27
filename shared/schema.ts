@@ -1199,6 +1199,78 @@ export const taskDependencies = pgTable("task_dependencies", {
   taskDependencyUnique: unique("task_dependencies_unique").on(table.taskId, table.dependsOnTaskId),
 }));
 
+// Task Recordings - Screen + audio recordings for workflow documentation (Workplete-style)
+export const taskRecordings = pgTable("task_recordings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Recording file storage
+  videoUrl: text("video_url"), // Stored video file URL (webm/mp4)
+  videoSize: integer("video_size"), // File size in bytes
+  videoDuration: integer("video_duration"), // Duration in seconds
+  thumbnailUrl: text("thumbnail_url"), // Preview thumbnail
+  
+  // Optional audio-only recording
+  audioUrl: text("audio_url"), // Separate audio file if needed
+  audioSize: integer("audio_size"),
+  
+  // Recording configuration
+  hasAudio: boolean("has_audio").notNull().default(false),
+  hasScreenCapture: boolean("has_screen_capture").notNull().default(true),
+  resolution: text("resolution").default("1920x1080"), // Recording resolution
+  frameRate: integer("frame_rate").default(30),
+  
+  // Task/workflow linkage
+  taskId: varchar("task_id").references(() => workflowTasks.id, { onDelete: "set null" }),
+  workflowId: varchar("workflow_id").references(() => workflows.id, { onDelete: "set null" }),
+  clientId: varchar("client_id").references(() => clients.id, { onDelete: "set null" }),
+  
+  // Recording metadata
+  status: text("status").notNull().default("draft"), // 'draft', 'processing', 'ready', 'failed'
+  processingError: text("processing_error"),
+  
+  // AI-generated content
+  transcript: text("transcript"), // AI-generated transcript from audio
+  procedureSteps: jsonb("procedure_steps").default(sql`'[]'::jsonb`), // AI-generated written procedure
+  aiGeneratedAt: timestamp("ai_generated_at"),
+  
+  // Tags and categorization
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  category: text("category"), // 'training', 'documentation', 'demo', 'client_onboarding'
+  
+  // Access control
+  isPublic: boolean("is_public").notNull().default(false), // Visible to all org members
+  sharedWith: text("shared_with").array().default(sql`ARRAY[]::text[]`), // User IDs with access
+  
+  // Metadata
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  orgIdx: index("task_recordings_org_idx").on(table.organizationId),
+  taskIdx: index("task_recordings_task_idx").on(table.taskId),
+  workflowIdx: index("task_recordings_workflow_idx").on(table.workflowId),
+  statusIdx: index("task_recordings_status_idx").on(table.status),
+}));
+
+// Recording Views - Track who watched recordings
+export const recordingViews = pgTable("recording_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recordingId: varchar("recording_id").notNull().references(() => taskRecordings.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  watchedSeconds: integer("watched_seconds").notNull().default(0),
+  completedAt: timestamp("completed_at"), // When they finished watching
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  recordingUserIdx: index("recording_views_recording_user_idx").on(table.recordingId, table.userId),
+}));
+
 // AI Agents in marketplace - Enhanced for Foundry
 export const aiAgents = pgTable("ai_agents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2439,6 +2511,19 @@ export const insertTaskDependencySchema = createInsertSchema(taskDependencies).o
   createdAt: true,
 });
 
+export const insertTaskRecordingSchema = createInsertSchema(taskRecordings).omit({
+  id: true,
+  aiGeneratedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRecordingViewSchema = createInsertSchema(recordingViews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertAiAgentSchema = createInsertSchema(aiAgents).omit({
   id: true,
   createdAt: true,
@@ -2642,6 +2727,10 @@ export type InsertTaskChecklist = z.infer<typeof insertTaskChecklistSchema>;
 export type TaskChecklist = typeof taskChecklists.$inferSelect;
 export type InsertTaskDependency = z.infer<typeof insertTaskDependencySchema>;
 export type TaskDependency = typeof taskDependencies.$inferSelect;
+export type InsertTaskRecording = z.infer<typeof insertTaskRecordingSchema>;
+export type TaskRecording = typeof taskRecordings.$inferSelect;
+export type InsertRecordingView = z.infer<typeof insertRecordingViewSchema>;
+export type RecordingView = typeof recordingViews.$inferSelect;
 
 export type InsertAiAgent = z.infer<typeof insertAiAgentSchema>;
 export type AiAgent = typeof aiAgents.$inferSelect;
