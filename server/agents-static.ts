@@ -18,6 +18,7 @@ import * as formaBackend from '../agents/forma/backend/index';
 import * as lucaBackend from '../agents/luca/backend/index';
 import * as lynkBackend from '../agents/lynk/backend/index';
 import * as omnispectraBackend from '../agents/omnispectra/backend/index';
+import * as onboardBackend from '../agents/onboard/backend/index';
 import * as parityBackend from '../agents/parity/backend/index';
 import * as radarBackend from '../agents/radar/backend/index';
 import * as relayBackend from '../agents/relay/backend/index';
@@ -37,6 +38,7 @@ const AGENT_BACKENDS: Record<string, AgentBackend> = {
   'luca': lucaBackend as AgentBackend,
   'lynk': lynkBackend as AgentBackend,
   'omnispectra': omnispectraBackend as AgentBackend,
+  'onboard': onboardBackend as AgentBackend,
   'parity': parityBackend as AgentBackend,
   'radar': radarBackend as AgentBackend,
   'relay': relayBackend as AgentBackend,

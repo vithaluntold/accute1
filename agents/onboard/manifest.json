@@ -1,0 +1,28 @@
+{
+  "slug": "onboard",
+  "name": "Onboard",
+  "description": "Jurisdiction-Aware Employee Onboarding Assistant - Guides employees through document requirements based on their country/region, tracks compliance status, and provides intelligent assistance throughout the onboarding journey",
+  "category": "hr",
+  "provider": "openai",
+  "frontendEntry": "frontend/index.tsx",
+  "backendEntry": "backend/index.ts",
+  "iconPath": null,
+  "capabilities": [
+    "jurisdiction_awareness",
+    "document_requirements",
+    "compliance_tracking",
+    "employee_onboarding",
+    "progress_tracking",
+    "regulatory_guidance"
+  ],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "version": "1.0.0",
+  "tags": ["hr", "onboarding", "compliance", "documents", "jurisdiction"],
+  "configuration": {
+    "supportedJurisdictions": ["USA", "IND", "GBR", "CAN", "AUS", "SGP", "ARE", "DEU", "FRA", "NLD"],
+    "documentCategories": ["identity", "tax", "banking", "employment", "address", "qualification"],
+    "aiProvider": "openai"
+  }
+}
