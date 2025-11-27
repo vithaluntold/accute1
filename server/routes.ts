@@ -20962,10 +20962,13 @@ ${msg.bodyText || msg.bodyHtml || ''}
       }
 
       // Create a small verification order
+      // Receipt must be <= 40 chars, so use short prefix + truncated org ID + short timestamp
+      const shortOrgId = organizationId.split('-')[0]; // First 8 chars of UUID
+      const shortTimestamp = Date.now().toString(36); // Base36 for shorter timestamp
       const order = await razorpayService.createOrder({
         amount: amount || 100, // ₹1 for verification
         currency: subscription.currency || 'INR',
-        receipt: `setup_${organizationId}_${Date.now()}`,
+        receipt: `setup_${shortOrgId}_${shortTimestamp}`, // ~25 chars max
         notes: {
           type: 'payment_method_setup',
           organization_id: organizationId,
