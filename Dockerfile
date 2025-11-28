@@ -12,8 +12,11 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --prefer-offline
 
-# Copy source code
+# Copy source code and configuration files
 COPY . .
+
+# Generate migrations
+RUN npm run db:generate || echo "Migration generation failed, continuing..."
 
 # Build the application
 ENV NODE_ENV=production
@@ -24,9 +27,8 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install runtime dependencies for native modules
-# libc6-compat is needed for bcrypt and other native modules on Alpine
-RUN apk add --no-cache openssl libc6-compat
+# Install runtime dependencies for native modules and database tools
+RUN apk add --no-cache openssl libc6-compat postgresql-client
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -36,6 +38,7 @@ COPY --from=builder /app/package*.json ./
 # Copy database configuration and schema (required for migrations)
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/migrations ./migrations
 
 # Copy agents directory (required for Agent Registry at runtime)
 COPY --from=builder /app/agents ./agents
@@ -46,12 +49,16 @@ COPY --from=builder /app/public ./public
 # Copy uploads directory structure
 RUN mkdir -p uploads
 
+# Copy startup script
+COPY --from=builder /app/start-production.sh ./
+RUN chmod +x start-production.sh
+
 # Set production environment
-# NOTE: PORT is set by Railway dynamically - do not hardcode
 ENV NODE_ENV=production
+ENV CI=true
 
 # Expose the port (Railway sets PORT dynamically)
 EXPOSE 5000
 
-# Start the application
-CMD ["node", "dist/start.js"]
+# Start with migration then server
+CMD ["./start-production.sh"]
