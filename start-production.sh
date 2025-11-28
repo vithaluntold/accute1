@@ -3,16 +3,13 @@ echo "🚀 Starting Accute deployment..."
 
 # Wait for database to be ready
 echo "⏳ Waiting for database connection..."
-until pg_isready -h $(echo $DATABASE_URL | cut -d'/' -f3 | cut -d'@' -f2 | cut -d':' -f1) -p $(echo $DATABASE_URL | cut -d':' -f4 | cut -d'/' -f1) 2>/dev/null; do
-  echo "🔄 Database not ready, waiting 2 seconds..."
-  sleep 2
-done
+sleep 5
 
-echo "✅ Database is ready!"
+echo "✅ Database should be ready!"
 
-# Enable required PostgreSQL extensions
+# Enable required PostgreSQL extensions using Node.js
 echo "🔧 Enabling PostgreSQL extensions..."
-psql "$DATABASE_URL" -f init-db.sql || echo "⚠️ Extension setup failed, continuing..."
+npm run db:setup-extensions || echo "⚠️ Extension setup failed, continuing..."
 
 # Try multiple migration approaches
 echo "🔧 Starting database migration..."

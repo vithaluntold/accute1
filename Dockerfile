@@ -28,7 +28,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install runtime dependencies for native modules and database tools
-RUN apk add --no-cache openssl libc6-compat postgresql-client
+RUN apk add --no-cache openssl libc6-compat
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -39,7 +39,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/migrations ./migrations
-COPY --from=builder /app/init-db.sql ./
+COPY --from=builder /app/server/enable-extensions.ts ./server/
 
 # Copy agents directory (required for Agent Registry at runtime)
 COPY --from=builder /app/agents ./agents
