@@ -10,6 +10,10 @@ done
 
 echo "✅ Database is ready!"
 
+# Enable required PostgreSQL extensions
+echo "🔧 Enabling PostgreSQL extensions..."
+psql "$DATABASE_URL" -f init-db.sql || echo "⚠️ Extension setup failed, continuing..."
+
 # Try multiple migration approaches
 echo "🔧 Starting database migration..."
 

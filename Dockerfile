@@ -39,6 +39,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/init-db.sql ./
 
 # Copy agents directory (required for Agent Registry at runtime)
 COPY --from=builder /app/agents ./agents
