@@ -1,3 +1,6 @@
+-- Enable required PostgreSQL extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";--> statement-breakpoint
 CREATE TYPE "public"."metric_aggregation_type" AS ENUM('sum', 'average', 'min', 'max', 'count', 'rate', 'percentage');--> statement-breakpoint
 CREATE TYPE "public"."ml_model_type" AS ENUM('keyword_analysis', 'sentiment_analysis', 'behavioral_patterns', 'llm_validation', 'cultural_inference', 'performance_predictor');--> statement-breakpoint
 CREATE TYPE "public"."personality_framework" AS ENUM('big_five', 'disc', 'mbti', 'eq', 'cultural');--> statement-breakpoint
