@@ -1,29 +1,27 @@
 # Dockerfile for Accute - Railway Deployment
-# FORCE REBUILD: 2025-11-29T10:15:00Z - Eliminating ALL cached layers
-ARG CACHE_BUST=2025-11-29T10:15:00Z
+# Clean rebuild: 2025-11-29T16:00:00Z
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Force layer invalidation
-RUN echo "Build timestamp: $CACHE_BUST"
-
-# Install dependencies for native modules (bcrypt, etc.)
+# Install build dependencies for native modules
 RUN apk add --no-cache python3 make g++ openssl libc6-compat
 
-# Copy package files
+# Copy package files first (layer caching for dependencies)
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --prefer-offline
+RUN npm ci --only=production --prefer-offline
 
-# Copy source code and configuration files
-# Note: .dockerignore excludes dist/ and node_modules/ from being copied
+# Copy source code (.dockerignore excludes dist/ and node_modules/)
 COPY . .
 
-# Build the application (fresh TypeScript compilation guaranteed)
+# Build application (creates fresh dist/ from TypeScript)
 ENV NODE_ENV=production
 RUN npm run build
+
+# Verify build output
+RUN ls -la dist/ && echo "Build completed successfully"
 
 # Production stage
 FROM node:20-alpine AS production
