@@ -251,46 +251,25 @@ class AgentRegistry {
             .limit(1);
 
           if (existingOrgAgent.length === 0) {
-            // Insert new organization agent - let database defaults handle timestamps
+            // Use raw SQL to avoid Drizzle ORM issues
             try {
-              console.log(`[DEBUG] Attempting INSERT for agent ${agentSlug}:`, {
-                organizationId: org.id,
-                agentId: agentId,
-                status: 'enabled',
-                grantedBy: installedBy,
-              });
-              
-              await db.insert(organizationAgents).values({
-                organizationId: org.id,
-                agentId: agentId,
-                status: 'enabled',
-                grantedBy: installedBy,
-              });
-              
-              console.log(`[DEBUG] INSERT successful for agent ${agentSlug}`);
+              await db.execute(
+                sql`INSERT INTO organization_agents (organization_id, agent_id, status, granted_by) 
+                    VALUES (${org.id}, ${agentId}, 'enabled', ${installedBy})
+                    ON CONFLICT (organization_id, agent_id) DO NOTHING`
+              );
             } catch (insertError: any) {
-              console.error(`[DEBUG] INSERT failed for agent ${agentSlug}:`, {
-                code: insertError.code,
-                message: insertError.message,
-                position: insertError.position,
-              });
-              
-              // If unique constraint violation (duplicate), silently skip
+              console.error(`[DEBUG] INSERT failed:`, insertError.message);
+              // Silently skip if duplicate
               if (insertError.code !== '23505') {
-                // Re-throw if it's not a duplicate error
                 throw insertError;
               }
             }
           } else if (existingOrgAgent[0].status !== 'enabled') {
-            // Update existing agent to enabled status
-            console.log(`[DEBUG] Attempting UPDATE for agent ${agentSlug}`);
-            
-            await db
-              .update(organizationAgents)
-              .set({ status: 'enabled' })
-              .where(eq(organizationAgents.id, existingOrgAgent[0].id));
-              
-            console.log(`[DEBUG] UPDATE successful for agent ${agentSlug}`);
+            // Use raw SQL for update
+            await db.execute(
+              sql`UPDATE organization_agents SET status = 'enabled' WHERE id = ${existingOrgAgent[0].id}`
+            );
           }
         }
         console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
