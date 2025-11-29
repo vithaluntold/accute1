@@ -509,7 +509,9 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     '/debug/agents-db',
     '/debug/agents-reinit',
     '/debug/cleanup-agents',
-    '/debug/encryption-test'
+    '/debug/encryption-test',
+    '/debug/environment-validation',
+    '/debug/test-services'
   ];
   
   // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
@@ -18162,6 +18164,165 @@ ${msg.bodyText || msg.bodyHtml || ''}
         error: 'Encryption test failed',
         details: error.message,
         hasEncryptionKey: !!process.env.ENCRYPTION_KEY
+      });
+    }
+  });
+
+  // Comprehensive environment and service validation endpoint
+  app.get('/api/debug/environment-validation', async (req: Request, res: Response) => {
+    try {
+      const results: any = {
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        services: {}
+      };
+
+      // Check database connection
+      try {
+        await db.select().from(sql`information_schema.tables`).limit(1);
+        results.services.database = { status: 'connected', url: process.env.DATABASE_URL ? 'configured' : 'missing' };
+      } catch (error: any) {
+        results.services.database = { status: 'failed', error: error.message };
+      }
+
+      // Check encryption
+      try {
+        const { EncryptionService } = await import("./encryption-service");
+        const service = EncryptionService.getInstance();
+        const testData = `test-${Date.now()}`;
+        const encrypted = service.encrypt(testData);
+        const decrypted = service.decrypt(encrypted);
+        results.services.encryption = { 
+          status: decrypted === testData ? 'working' : 'failed',
+          keyConfigured: !!process.env.ENCRYPTION_KEY,
+          keyLength: process.env.ENCRYPTION_KEY?.length || 0
+        };
+      } catch (error: any) {
+        results.services.encryption = { status: 'failed', error: error.message };
+      }
+
+      // Check environment variables
+      const envVars = {
+        // Core
+        NODE_ENV: !!process.env.NODE_ENV,
+        PORT: !!process.env.PORT,
+        DATABASE_URL: !!process.env.DATABASE_URL,
+        JWT_SECRET: !!process.env.JWT_SECRET,
+        SESSION_SECRET: !!process.env.SESSION_SECRET,
+        ENCRYPTION_KEY: !!process.env.ENCRYPTION_KEY,
+        
+        // Email
+        MAILGUN_API_KEY: !!process.env.MAILGUN_API_KEY,
+        MAILGUN_DOMAIN: !!process.env.MAILGUN_DOMAIN,
+        GMAIL_CLIENT_ID: !!process.env.GMAIL_CLIENT_ID,
+        GMAIL_CLIENT_SECRET: !!process.env.GMAIL_CLIENT_SECRET,
+        RESEND_API_KEY: !!process.env.RESEND_API_KEY,
+        
+        // Payment
+        RAZORPAY_KEY_ID: !!process.env.RAZORPAY_KEY_ID,
+        RAZORPAY_KEY_SECRET: !!process.env.RAZORPAY_KEY_SECRET,
+        CASHFREE_CLIENT_ID: !!process.env.CASHFREE_CLIENT_ID,
+        CASHFREE_CLIENT_SECRET: !!process.env.CASHFREE_CLIENT_SECRET,
+        TESTING_STRIPE_SECRET_KEY: !!process.env.TESTING_STRIPE_SECRET_KEY,
+        TESTING_VITE_STRIPE_PUBLIC_KEY: !!process.env.TESTING_VITE_STRIPE_PUBLIC_KEY,
+        
+        // Azure
+        AZURE_CLIENT_ID: !!process.env.AZURE_CLIENT_ID,
+        AZURE_CLIENT_SECRET: !!process.env.AZURE_CLIENT_SECRET,
+        AZURE_TENANT_ID: !!process.env.AZURE_TENANT_ID,
+        AZURE_KEY_VAULT_URL: !!process.env.AZURE_KEY_VAULT_URL,
+        
+        // SMS
+        TWILIO_ACCOUNT_SID: !!process.env.TWILIO_ACCOUNT_SID,
+        TWILIO_AUTH_TOKEN: !!process.env.TWILIO_AUTH_TOKEN,
+        TWILIO_PHONE_NUMBER: !!process.env.TWILIO_PHONE_NUMBER
+      };
+
+      results.environmentVariables = envVars;
+      results.summary = {
+        totalVars: Object.keys(envVars).length,
+        configuredVars: Object.values(envVars).filter(Boolean).length,
+        missingVars: Object.keys(envVars).filter(key => !envVars[key as keyof typeof envVars])
+      };
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: 'Environment validation failed',
+        details: error.message
+      });
+    }
+  });
+
+  // Test specific services with actual API calls
+  app.post('/api/debug/test-services', async (req: Request, res: Response) => {
+    try {
+      const results: any = {
+        timestamp: new Date().toISOString(),
+        tests: {}
+      };
+
+      // Test Twilio SMS
+      try {
+        if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+          const twilio = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+          const account = await twilio.api.accounts(process.env.TWILIO_ACCOUNT_SID).fetch();
+          results.tests.twilio = { 
+            status: 'connected', 
+            accountSid: account.sid,
+            phoneNumber: process.env.TWILIO_PHONE_NUMBER 
+          };
+        } else {
+          results.tests.twilio = { status: 'not_configured' };
+        }
+      } catch (error: any) {
+        results.tests.twilio = { status: 'failed', error: error.message };
+      }
+
+      // Test Mailgun (just validate API key format)
+      results.tests.mailgun = {
+        status: process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN ? 'configured' : 'not_configured',
+        domain: process.env.MAILGUN_DOMAIN || null,
+        hasApiKey: !!process.env.MAILGUN_API_KEY
+      };
+
+      // Test Razorpay (validate key format)
+      results.tests.razorpay = {
+        status: process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET ? 'configured' : 'not_configured',
+        keyId: process.env.RAZORPAY_KEY_ID ? process.env.RAZORPAY_KEY_ID.substring(0, 10) + '...' : null
+      };
+
+      // Test Cashfree (validate key format)
+      results.tests.cashfree = {
+        status: process.env.CASHFREE_CLIENT_ID && process.env.CASHFREE_CLIENT_SECRET ? 'configured' : 'not_configured',
+        clientId: process.env.CASHFREE_CLIENT_ID || null
+      };
+
+      // Test Azure configuration
+      results.tests.azure = {
+        status: process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET && process.env.AZURE_TENANT_ID ? 'configured' : 'not_configured',
+        keyVaultUrl: process.env.AZURE_KEY_VAULT_URL || null,
+        tenantId: process.env.AZURE_TENANT_ID || null
+      };
+
+      // Test Agent Registry
+      try {
+        const { agentRegistry } = await import("./agent-registry");
+        const agents = agentRegistry.getAllAgents();
+        results.tests.agentRegistry = {
+          status: 'working',
+          agentCount: agents.length,
+          agents: agents.slice(0, 5).map((a: any) => ({ slug: a.slug, name: a.name }))
+        };
+      } catch (error: any) {
+        results.tests.agentRegistry = { status: 'failed', error: error.message };
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: 'Service testing failed',
+        details: error.message
       });
     }
   });
