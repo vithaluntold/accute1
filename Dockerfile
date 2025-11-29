@@ -1,4 +1,5 @@
 # Dockerfile for Accute - Railway Deployment
+# Build timestamp: 2025-11-29T09:20:00Z (force rebuild)
 FROM node:20-alpine AS builder
 
 WORKDIR /app
