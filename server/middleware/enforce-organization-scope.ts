@@ -61,7 +61,8 @@ export async function enforceOrganizationScope(
       const role = await db.query.roles.findFirst({
         where: eq(schema.roles.id, user.roleId),
       });
-      isSuperAdmin = role?.name === 'Super Admin';
+      // Super Admin check: both name and scope must match
+      isSuperAdmin = role?.name === 'Super Admin' && role?.scope === 'platform';
     }
     req.isSuperAdmin = isSuperAdmin;
 

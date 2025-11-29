@@ -149,3 +149,13 @@ Create an intuitive Kanban board with appropriate columns and cards. Use meaning
     return resultStr;
   }
 }
+
+/**
+ * Register Kanban agent routes
+ * @param app Express application instance
+ */
+export function registerRoutes(app: any) {
+  // Kanban agent routes can be added here when needed
+  // For now, the agent works through the generic agent execution system
+  console.log('[Kanban Agent] Routes registered');
+}

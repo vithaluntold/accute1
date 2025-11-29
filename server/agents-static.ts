@@ -15,6 +15,7 @@ import { type Express } from 'express';
 import * as cadenceBackend from '../agents/cadence/backend/index';
 import * as echoBackend from '../agents/echo/backend/index';
 import * as formaBackend from '../agents/forma/backend/index';
+import * as kanbanBackend from '../agents/kanban/backend/index';
 import * as lucaBackend from '../agents/luca/backend/index';
 import * as lynkBackend from '../agents/lynk/backend/index';
 import * as omnispectraBackend from '../agents/omnispectra/backend/index';
@@ -35,6 +36,7 @@ const AGENT_BACKENDS: Record<string, AgentBackend> = {
   'cadence': cadenceBackend as AgentBackend,
   'echo': echoBackend as AgentBackend,
   'forma': formaBackend as AgentBackend,
+  'kanban': kanbanBackend as AgentBackend,
   'luca': lucaBackend as AgentBackend,
   'lynk': lynkBackend as AgentBackend,
   'omnispectra': omnispectraBackend as AgentBackend,

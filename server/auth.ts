@@ -180,7 +180,11 @@ export async function requirePlatform(req: AuthRequest, res: Response, next: Nex
   }
 
   const userRole = await storage.getRole(req.user.roleId);
-  if (!userRole || userRole.scope !== "platform") {
+  const isSuperAdmin = userRole?.name === "Super Admin" && userRole?.scope === "platform";
+  const hasPlatformAccess = userRole?.scope === "platform" || isSuperAdmin;
+  
+  if (!hasPlatformAccess) {
+    console.error(`Access denied for user ${req.user.id}: role=${userRole?.name}, scope=${userRole?.scope}`);
     return res.status(403).json({ error: "Platform administrator access required" });
   }
 

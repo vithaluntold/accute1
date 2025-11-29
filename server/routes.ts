@@ -16689,15 +16689,19 @@ ${msg.bodyText || msg.bodyHtml || ''}
         isPlatformScope: userRole?.scope === "platform"
       });
       
-      // Check if user has platform access
-      if (!userRole || userRole.scope !== "platform") {
+      // Check if user has platform access OR is Super Admin
+      const isSuperAdmin = userRole?.name === "Super Admin" && userRole?.scope === "platform";
+      const hasPlatformAccess = userRole?.scope === "platform" || isSuperAdmin;
+      
+      if (!hasPlatformAccess) {
         return res.status(403).json({ 
           error: "Platform administrator access required",
           debug: {
             hasRole: !!userRole,
             roleScope: userRole?.scope || "none",
             roleName: userRole?.name || "none",
-            requiredScope: "platform"
+            requiredScope: "platform",
+            isSuperAdmin
           }
         });
       }
@@ -17992,6 +17996,39 @@ ${msg.bodyText || msg.bodyHtml || ''}
       });
     } catch (error: any) {
       res.status(500).json({ error: "Fix failed", details: error.message });
+    }
+  });
+
+  // Agent system health check (Super Admin only)
+  app.get("/api/admin/agents/health", requireAuth, requirePlatform, async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const registryAgents = agentRegistry.getAllAgents();
+      const { getAvailableAgents } = await import("./agents-static");
+      const staticAgents = getAvailableAgents();
+      
+      // Check database agents
+      const dbAgents = await db.select().from(aiAgents);
+      
+      const health = {
+        timestamp: new Date().toISOString(),
+        registryCount: registryAgents.length,
+        staticCount: staticAgents.length,
+        dbCount: dbAgents.length,
+        expectedCount: 13, // Should be 13 agents total
+        registryAgents: registryAgents.map(a => a.slug).sort(),
+        staticAgents: staticAgents.sort(),
+        dbAgents: dbAgents.map(a => a.slug).sort(),
+        missingFromRegistry: staticAgents.filter(slug => !registryAgents.find(a => a.slug === slug)),
+        missingFromStatic: registryAgents.map(a => a.slug).filter(slug => !staticAgents.includes(slug)),
+        missingFromDb: registryAgents.map(a => a.slug).filter(slug => !dbAgents.find(db => db.slug === slug)),
+        status: registryAgents.length === 13 && staticAgents.length === 13 ? 'healthy' : 'degraded'
+      };
+      
+      res.json(health);
+    } catch (error: any) {
+      console.error('Agent health check error:', error);
+      res.status(500).json({ error: "Health check failed", details: error.message });
     }
   });
 
