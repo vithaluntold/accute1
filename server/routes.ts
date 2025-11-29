@@ -18457,38 +18457,50 @@ ${msg.bodyText || msg.bodyHtml || ''}
         isSystemRole: userRole?.isSystemRole
       });
 
-      const isSuperAdmin = userRole?.name === "Super Admin" && (userRole?.scope === "platform" || userRole?.scope === "tenant");
+      // Allow both Super Admin and Admin to access Agent Foundry
+      const hasAccess = 
+        (userRole?.name === "Super Admin" && (userRole?.scope === "platform" || userRole?.scope === "tenant")) ||
+        (userRole?.name === "Admin");
       
-      if (!isSuperAdmin) {
+      if (!hasAccess) {
         return res.status(403).json({ 
-          error: "Super Admin access required",
+          error: "Super Admin or Admin access required",
           debug: {
             hasRole: !!userRole,
             roleScope: userRole?.scope || "none",
             roleName: userRole?.name || "none",
-            isSuperAdmin,
-            requiredRole: "Super Admin"
+            hasAccess,
+            requiredRole: "Super Admin or Admin"
           }
         });
       }
 
-      console.log('Importing agent registry...');
+      console.log('[Agent Foundry] Importing agent registry...');
       const { agentRegistry } = await import("./agent-registry");
       
       const agents = agentRegistry.getAllAgents();
-      console.log(`Found ${agents.length} agents in registry:`, agents.map(a => a.slug));
+      console.log(`[Agent Foundry] Found ${agents.length} agents in registry:`, agents.map(a => a.slug));
       
       if (agents.length === 0) {
-        console.warn('No agents found in registry - checking if registry was initialized');
+        console.warn('[Agent Foundry] WARNING: No agents found in registry - attempting re-initialization');
         // Try to re-initialize if empty
         await agentRegistry.initialize();
         const agentsAfterInit = agentRegistry.getAllAgents();
-        console.log(`After re-initialization: ${agentsAfterInit.length} agents`);
+        console.log(`[Agent Foundry] After re-initialization: ${agentsAfterInit.length} agents`);
+        
+        // If still empty, return empty array but log the issue
+        if (agentsAfterInit.length === 0) {
+          console.error('[Agent Foundry] CRITICAL: No agents available after re-initialization');
+          return res.json({ agents: [] });
+        }
       }
       
       // Also get database info for each agent
+      const currentAgents = agentRegistry.getAllAgents(); // Re-fetch after potential re-init
+      console.log(`[Agent Foundry] Processing ${currentAgents.length} agents with database info...`);
+      
       const agentsWithDb = await Promise.all(
-        agents.map(async (agent) => {
+        currentAgents.map(async (agent) => {
           const dbAgent = await db
             .select()
             .from(aiAgents)
@@ -18518,11 +18530,12 @@ ${msg.bodyText || msg.bodyHtml || ''}
         })
       );
       
-      console.log(`Returning ${agentsWithDb.length} agents with database info`);
+      console.log(`[Agent Foundry] Successfully prepared ${agentsWithDb.length} agents for response`);
+      console.log(`[Agent Foundry] Agent names:`, agentsWithDb.map(a => a.name).join(', '));
       res.json({ agents: agentsWithDb });
     } catch (error: any) {
-      console.error('ERROR in GET /api/admin/agents:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('[Agent Foundry] ERROR in GET /api/admin/agents:', error);
+      console.error('[Agent Foundry] Stack trace:', error.stack);
       res.status(500).json({ 
         error: "Failed to get agents", 
         details: error.message,
