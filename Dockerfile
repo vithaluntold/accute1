@@ -1,27 +1,27 @@
-# Dockerfile for Accute - Railway Deployment
-# Clean rebuild: 2025-11-29T16:00:00Z
+# Dockerfile for Accute - Railway Deployment (Optimized for Speed)
+# Fast rebuild: 2025-11-29T12:30:00Z
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules
+# Install build dependencies (cached layer - rarely changes)
 RUN apk add --no-cache python3 make g++ openssl libc6-compat
 
-# Copy package files first (layer caching for dependencies)
-COPY package*.json ./
+# Copy ONLY package files first (maximize cache hits)
+COPY package.json package-lock.json ./
 
-# Install ALL dependencies (including devDependencies needed for build)
-RUN npm ci --prefer-offline
+# Install dependencies (this layer is cached unless package files change)
+RUN npm ci --prefer-offline --no-audit --progress=false
 
-# Copy source code (.dockerignore excludes dist/ and node_modules/)
+# Copy source code (only invalidates cache if code changes)
 COPY . .
 
-# Build application (creates fresh dist/ from TypeScript)
+# Build application
 ENV NODE_ENV=production
 RUN npm run build
 
-# Verify build output
-RUN ls -la dist/ && echo "Build completed successfully"
+# Verify build
+RUN ls -la dist/ && echo "✅ Build completed"
 
 # Production stage
 FROM node:20-alpine AS production
