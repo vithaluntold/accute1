@@ -24617,6 +24617,32 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // ==================== SSE AGENT STREAM ROUTES ====================
   registerSSEAgentRoutes(app);
 
+  // Debug endpoint for checking agent availability without auth
+  app.get("/api/debug/agents-public", async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const allAgents = agentRegistry.getAllAgents();
+      
+      res.json({
+        success: true,
+        message: "Public agent debug endpoint",
+        agentCount: allAgents.length,
+        agents: allAgents.map(agent => ({
+          slug: agent.slug,
+          name: agent.name,
+          category: agent.category,
+          subscriptionMinPlan: agent.subscriptionMinPlan || 'free'
+        }))
+      });
+    } catch (error: any) {
+      console.error('Debug agents public error:', error);
+      res.status(500).json({ 
+        error: "Failed to get agent registry",
+        message: error.message 
+      });
+    }
+  });
+
   // ==================== SSE ROUNDTABLE ROUTES ====================
   registerSSERoundtableRoutes(app);
 

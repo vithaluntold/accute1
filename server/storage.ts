@@ -1756,14 +1756,20 @@ export class DbStorage implements IStorage {
 
   async getAllPublicAiAgents(): Promise<AiAgent[]> {
     return await db.select().from(schema.aiAgents)
-      .where(eq(schema.aiAgents.isPublic, true))
+      .where(or(
+        eq(schema.aiAgents.isPublic, true),
+        eq(schema.aiAgents.isPublished, true)
+      ))
       .orderBy(desc(schema.aiAgents.rating));
   }
 
   async getAiAgentsByCategory(category: string): Promise<AiAgent[]> {
     return await db.select().from(schema.aiAgents)
       .where(and(
-        eq(schema.aiAgents.isPublic, true),
+        or(
+          eq(schema.aiAgents.isPublic, true),
+          eq(schema.aiAgents.isPublished, true)
+        ),
         eq(schema.aiAgents.category, category)
       ))
       .orderBy(desc(schema.aiAgents.rating));
