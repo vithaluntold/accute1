@@ -251,23 +251,19 @@ class AgentRegistry {
             .limit(1);
 
           if (existingOrgAgent.length === 0) {
+            // Insert with database defaults for timestamps
             await db.insert(organizationAgents).values({
               organizationId: org.id,
-              agentId,
+              agentId: agentId,
               status: 'enabled',
               grantedBy: installedBy,
-              enabledAt: sql`NOW()`,
-              disabledAt: null,
-              config: null,
             });
           } else if (existingOrgAgent[0].status !== 'enabled') {
             await db
               .update(organizationAgents)
               .set({ 
-                status: 'enabled', 
-                enabledAt: sql`NOW()`,
+                status: 'enabled',
                 disabledAt: null,
-                updatedAt: sql`NOW()` 
               })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
