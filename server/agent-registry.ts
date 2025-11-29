@@ -251,20 +251,42 @@ class AgentRegistry {
             .limit(1);
 
           if (existingOrgAgent.length === 0) {
-            // Insert with database defaults for timestamps
-            await db.insert(organizationAgents).values({
-              organizationId: org.id,
-              agentId: agentId,
-              status: 'enabled',
-              grantedBy: installedBy,
-            });
+            // Insert new organization agent
+            try {
+              await db.insert(organizationAgents).values({
+                organizationId: org.id,
+                agentId: agentId,
+                status: 'enabled',
+                grantedBy: installedBy,
+              });
+            } catch (insertError: any) {
+              // If duplicate, check if it exists with different status
+              if (insertError.code === '23505') {
+                const existingCheck = await db
+                  .select()
+                  .from(organizationAgents)
+                  .where(
+                    and(
+                      eq(organizationAgents.organizationId, org.id),
+                      eq(organizationAgents.agentId, agentId)
+                    )
+                  )
+                  .limit(1);
+                
+                if (existingCheck.length > 0 && existingCheck[0].status !== 'enabled') {
+                  await db
+                    .update(organizationAgents)
+                    .set({ status: 'enabled' })
+                    .where(eq(organizationAgents.id, existingCheck[0].id));
+                }
+              } else {
+                throw insertError;
+              }
+            }
           } else if (existingOrgAgent[0].status !== 'enabled') {
             await db
               .update(organizationAgents)
-              .set({ 
-                status: 'enabled',
-                disabledAt: null,
-              })
+              .set({ status: 'enabled' })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
         }
