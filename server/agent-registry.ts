@@ -251,43 +251,37 @@ class AgentRegistry {
             .limit(1);
 
           if (existingOrgAgent.length === 0) {
-            // Insert new organization agent
+            // Insert new organization agent using raw SQL to avoid Drizzle issues
             try {
-              await db.insert(organizationAgents).values({
-                organizationId: org.id,
-                agentId: agentId,
-                status: 'enabled',
-                grantedBy: installedBy,
-              });
-            } catch (insertError: any) {
-              // If duplicate, check if it exists with different status
-              if (insertError.code === '23505') {
-                const existingCheck = await db
-                  .select()
-                  .from(organizationAgents)
-                  .where(
-                    and(
-                      eq(organizationAgents.organizationId, org.id),
-                      eq(organizationAgents.agentId, agentId)
-                    )
+              const result = await db.execute(
+                sql`
+                  INSERT INTO organization_agents (
+                    organization_id, 
+                    agent_id, 
+                    status, 
+                    granted_by
+                  ) VALUES (
+                    ${org.id}::varchar, 
+                    ${agentId}::varchar, 
+                    'enabled'::text, 
+                    ${installedBy}::varchar
                   )
-                  .limit(1);
-                
-                if (existingCheck.length > 0 && existingCheck[0].status !== 'enabled') {
-                  await db
-                    .update(organizationAgents)
-                    .set({ status: 'enabled' })
-                    .where(eq(organizationAgents.id, existingCheck[0].id));
-                }
-              } else {
-                throw insertError;
-              }
+                  ON CONFLICT (organization_id, agent_id) DO NOTHING
+                `
+              );
+            } catch (insertError: any) {
+              console.error(`[DEBUG] Raw SQL INSERT failed for ${agentSlug}:`, insertError.message);
+              throw insertError;
             }
           } else if (existingOrgAgent[0].status !== 'enabled') {
-            await db
-              .update(organizationAgents)
-              .set({ status: 'enabled' })
-              .where(eq(organizationAgents.id, existingOrgAgent[0].id));
+            // Update existing agent to enabled status
+            await db.execute(
+              sql`
+                UPDATE organization_agents 
+                SET status = 'enabled'::text
+                WHERE id = ${existingOrgAgent[0].id}::varchar
+              `
+            );
           }
         }
         console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
