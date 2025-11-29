@@ -148,7 +148,7 @@ class AgentRegistry {
         console.log(`[DB SYNC] Updating existing agent: ${manifest.slug}`);
         await db
           .update(aiAgents)
-          .set({ ...agentData, updatedAt: new Date() })
+          .set(agentData)
           .where(eq(aiAgents.id, existing[0].id));
         agentId = existing[0].id;
         console.log(`[DB SYNC] ✅ Updated agent ${manifest.slug} with ID: ${agentId}`);
