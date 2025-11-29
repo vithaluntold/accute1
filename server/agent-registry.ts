@@ -262,9 +262,9 @@ class AgentRegistry {
               .update(organizationAgents)
               .set({ 
                 status: 'enabled', 
-                enabledAt: new Date(),
+                enabledAt: sql`NOW()`,
                 disabledAt: null,
-                updatedAt: new Date() 
+                updatedAt: sql`NOW()` 
               })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
