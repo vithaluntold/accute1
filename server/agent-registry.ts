@@ -252,18 +252,45 @@ class AgentRegistry {
 
           if (existingOrgAgent.length === 0) {
             // Insert new organization agent - let database defaults handle timestamps
-            await db.insert(organizationAgents).values({
-              organizationId: org.id,
-              agentId: agentId,
-              status: 'enabled',
-              grantedBy: installedBy,
-            }).onConflictDoNothing();
+            try {
+              console.log(`[DEBUG] Attempting INSERT for agent ${agentSlug}:`, {
+                organizationId: org.id,
+                agentId: agentId,
+                status: 'enabled',
+                grantedBy: installedBy,
+              });
+              
+              await db.insert(organizationAgents).values({
+                organizationId: org.id,
+                agentId: agentId,
+                status: 'enabled',
+                grantedBy: installedBy,
+              });
+              
+              console.log(`[DEBUG] INSERT successful for agent ${agentSlug}`);
+            } catch (insertError: any) {
+              console.error(`[DEBUG] INSERT failed for agent ${agentSlug}:`, {
+                code: insertError.code,
+                message: insertError.message,
+                position: insertError.position,
+              });
+              
+              // If unique constraint violation (duplicate), silently skip
+              if (insertError.code !== '23505') {
+                // Re-throw if it's not a duplicate error
+                throw insertError;
+              }
+            }
           } else if (existingOrgAgent[0].status !== 'enabled') {
             // Update existing agent to enabled status
+            console.log(`[DEBUG] Attempting UPDATE for agent ${agentSlug}`);
+            
             await db
               .update(organizationAgents)
               .set({ status: 'enabled' })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
+              
+            console.log(`[DEBUG] UPDATE successful for agent ${agentSlug}`);
           }
         }
         console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
