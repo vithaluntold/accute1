@@ -10,8 +10,8 @@ RUN apk add --no-cache python3 make g++ openssl libc6-compat
 # Copy package files first (layer caching for dependencies)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production --prefer-offline
+# Install ALL dependencies (including devDependencies needed for build)
+RUN npm ci --prefer-offline
 
 # Copy source code (.dockerignore excludes dist/ and node_modules/)
 COPY . .
