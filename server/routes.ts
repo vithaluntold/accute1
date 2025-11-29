@@ -18032,6 +18032,59 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Force agent registry re-initialization (debug endpoint)
+  app.post("/api/debug/agents-reinit", async (req: Request, res: Response) => {
+    try {
+      console.log('Force re-initializing agent registry...');
+      const { agentRegistry } = await import("./agent-registry");
+      
+      // Clear existing agents and re-initialize
+      await agentRegistry.initialize();
+      
+      const agents = agentRegistry.getAllAgents();
+      console.log(`After re-init: ${agents.length} agents loaded`);
+      
+      res.json({
+        success: true,
+        message: `Agent registry re-initialized with ${agents.length} agents`,
+        agents: agents.map(a => ({ slug: a.slug, name: a.name, category: a.category }))
+      });
+    } catch (error: any) {
+      console.error('Agent registry re-init failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        stack: error.stack 
+      });
+    }
+  });
+
+  // Debug endpoint to test agent registry (remove after testing)
+  app.get("/api/debug/agents-test", async (req: Request, res: Response) => {
+    try {
+      console.log('Testing agent registry access...');
+      const { agentRegistry } = await import("./agent-registry");
+      console.log('Agent registry imported successfully');
+      
+      const agents = agentRegistry.getAllAgents();
+      console.log(`Found ${agents.length} agents:`, agents.map(a => ({ slug: a.slug, name: a.name })));
+      
+      res.json({
+        success: true,
+        agentCount: agents.length,
+        agents: agents.map(a => ({ slug: a.slug, name: a.name, category: a.category })),
+        message: agents.length > 0 ? 'Agent registry working' : 'Agent registry empty - may need re-initialization'
+      });
+    } catch (error: any) {
+      console.error('Agent registry test failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message, 
+        stack: error.stack 
+      });
+    }
+  });
+
   // Check Super Admin account status (public endpoint for debugging)
   app.get("/api/debug/superadmin-check", async (req: Request, res: Response) => {
     try {
@@ -18121,10 +18174,49 @@ ${msg.bodyText || msg.bodyHtml || ''}
   });
 
   // Get all agents (Super Admin only)
-  app.get("/api/admin/agents", requireAuth, requirePlatform, async (req: Request, res: Response) => {
+  app.get("/api/admin/agents", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Check platform access directly (bypass middleware for debugging)
+      const user = req.user!;
+      const userRole = await storage.getRole(user.roleId);
+      
+      console.log('GET /api/admin/agents - User details:', {
+        userId: user.id,
+        email: user.email,
+        roleId: user.roleId,
+        roleName: userRole?.name,
+        roleScope: userRole?.scope,
+        isSystemRole: userRole?.isSystemRole
+      });
+
+      const isSuperAdmin = userRole?.name === "Super Admin" && userRole?.scope === "platform";
+      
+      if (!isSuperAdmin && userRole?.scope !== "platform") {
+        return res.status(403).json({ 
+          error: "Platform administrator access required",
+          debug: {
+            hasRole: !!userRole,
+            roleScope: userRole?.scope || "none",
+            roleName: userRole?.name || "none",
+            isSuperAdmin,
+            requiredScope: "platform"
+          }
+        });
+      }
+
+      console.log('Importing agent registry...');
       const { agentRegistry } = await import("./agent-registry");
+      
       const agents = agentRegistry.getAllAgents();
+      console.log(`Found ${agents.length} agents in registry:`, agents.map(a => a.slug));
+      
+      if (agents.length === 0) {
+        console.warn('No agents found in registry - checking if registry was initialized');
+        // Try to re-initialize if empty
+        await agentRegistry.initialize();
+        const agentsAfterInit = agentRegistry.getAllAgents();
+        console.log(`After re-initialization: ${agentsAfterInit.length} agents`);
+      }
       
       // Also get database info for each agent
       const agentsWithDb = await Promise.all(
@@ -18158,10 +18250,16 @@ ${msg.bodyText || msg.bodyHtml || ''}
         })
       );
       
+      console.log(`Returning ${agentsWithDb.length} agents with database info`);
       res.json({ agents: agentsWithDb });
     } catch (error: any) {
-      console.error('Get all agents error:', error);
-      res.status(500).json({ error: "Failed to get agents" });
+      console.error('ERROR in GET /api/admin/agents:', error);
+      console.error('Stack trace:', error.stack);
+      res.status(500).json({ 
+        error: "Failed to get agents", 
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 

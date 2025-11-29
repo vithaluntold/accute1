@@ -49,6 +49,10 @@ class AgentRegistry {
   async initialize() {
     console.log("Initializing Agent Registry...");
     try {
+      // Clear existing agents for clean re-initialization
+      this.agents.clear();
+      this.handlers.clear();
+      
       const entries = await fs.readdir(this.agentsDir, { withFileTypes: true });
       
       for (const entry of entries) {
