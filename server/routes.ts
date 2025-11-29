@@ -17972,10 +17972,25 @@ ${msg.bodyText || msg.bodyHtml || ''}
             .where(eq(aiAgents.slug, agent.slug))
             .limit(1);
           
+          // Transform manifest data to match frontend interface
+          const dbData = dbAgent.length > 0 ? dbAgent[0] : null;
+          
           return {
-            ...agent,
-            isPublished: dbAgent.length > 0 ? dbAgent[0].isPublished : false,
-            publishedAt: dbAgent.length > 0 ? dbAgent[0].publishedAt : null,
+            id: dbData?.id || agent.slug, // Use database ID or fallback to slug
+            slug: agent.slug,
+            name: agent.name,
+            description: agent.description,
+            provider: agent.provider,
+            category: agent.category,
+            version: agent.version || "1.0.0",
+            isPublished: dbData?.isPublished || false,
+            publishedAt: dbData?.publishedAt || null,
+            subscriptionMinPlan: agent.subscriptionMinPlan || "free",
+            backendPath: agent.backendEntry || null,
+            frontendPath: agent.frontendEntry || null,
+            manifestJson: JSON.stringify(agent),
+            installCount: dbData?.installCount || 0,
+            createdAt: dbData?.createdAt || new Date().toISOString(),
           };
         })
       );
