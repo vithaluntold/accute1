@@ -15,9 +15,6 @@ RUN npm ci --prefer-offline
 # Copy source code and configuration files
 COPY . .
 
-# Generate migrations
-RUN npm run db:generate || echo "Migration generation failed, continuing..."
-
 # Build the application
 ENV NODE_ENV=production
 RUN npm run build

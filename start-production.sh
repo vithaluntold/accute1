@@ -11,21 +11,13 @@ echo "✅ Database should be ready!"
 echo "🔧 Enabling PostgreSQL extensions..."
 npm run db:setup-extensions || echo "⚠️ Extension setup failed, continuing..."
 
-# Try multiple migration approaches
-echo "🔧 Starting database migration..."
-
-# Approach 1: Try generate + migrate
-if npm run db:generate; then
-  echo "✅ Migration files generated"
-  if npm run db:migrate; then
-    echo "✅ Migration completed successfully"
-  else
-    echo "⚠️ Migration failed, trying push approach..."
-    npm run db:push || echo "⚠️ Push also failed, continuing with existing schema..."
-  fi
+# Run migrations directly (do NOT regenerate - we have custom trigger migrations)
+echo "🔧 Running database migrations..."
+if npm run db:migrate; then
+  echo "✅ Migrations applied successfully!"
 else
-  echo "⚠️ Generation failed, trying direct push..."
-  npm run db:push || echo "⚠️ Push failed, continuing with existing schema..."
+  echo "❌ Migration failed - manual intervention may be required"
+  exit 1
 fi
 
 echo "🚀 Starting server..."
