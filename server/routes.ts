@@ -17918,6 +17918,45 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Force reinitialize agent registry (Super Admin only)
+  app.post("/api/admin/agents/reinitialize", requireAuth, requirePlatform, async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      await agentRegistry.initialize();
+      const agents = agentRegistry.getAllAgents();
+      
+      res.json({ 
+        success: true, 
+        message: `Agent registry reinitialized with ${agents.length} agents`,
+        agents: agents.map(a => ({ slug: a.slug, name: a.name }))
+      });
+    } catch (error: any) {
+      console.error('Agent reinitialize error:', error);
+      res.status(500).json({ error: "Failed to reinitialize agents", details: error.message });
+    }
+  });
+
+  // Debug endpoint to check agent registry status (Super Admin only)
+  app.get("/api/admin/agents/debug", requireAuth, requirePlatform, async (req: Request, res: Response) => {
+    try {
+      const { agentRegistry } = await import("./agent-registry");
+      const registryAgents = agentRegistry.getAllAgents();
+      
+      // Check database agents
+      const dbAgents = await db.select().from(aiAgents);
+      
+      res.json({
+        registryCount: registryAgents.length,
+        registryAgents: registryAgents.map(a => ({ slug: a.slug, name: a.name })),
+        dbCount: dbAgents.length,
+        dbAgents: dbAgents.map(a => ({ slug: a.slug, name: a.name, isPublished: a.isPublished }))
+      });
+    } catch (error: any) {
+      console.error('Agent debug error:', error);
+      res.status(500).json({ error: "Failed to debug agents", details: error.message });
+    }
+  });
+
   // Get all agents (Super Admin only)
   app.get("/api/admin/agents", requireAuth, requirePlatform, async (req: Request, res: Response) => {
     try {
