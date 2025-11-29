@@ -16675,8 +16675,32 @@ ${msg.bodyText || msg.bodyHtml || ''}
   // These routes are only accessible to platform-scoped Super Admins (organizationId is null)
 
   // Get dashboard metrics (real-time data)
-  app.get("/api/admin/dashboard/metrics", requireAuth, requirePlatform, async (req: Request, res: Response) => {
+  app.get("/api/admin/dashboard/metrics", requireAuth, async (req: Request, res: Response) => {
     try {
+      const user = req.user!;
+      const userRole = await storage.getRole(user.roleId);
+      
+      // Debug info for troubleshooting
+      console.log('Dashboard metrics request:', {
+        userId: user.id,
+        email: user.email,
+        roleId: user.roleId,
+        role: userRole,
+        isPlatformScope: userRole?.scope === "platform"
+      });
+      
+      // Check if user has platform access
+      if (!userRole || userRole.scope !== "platform") {
+        return res.status(403).json({ 
+          error: "Platform administrator access required",
+          debug: {
+            hasRole: !!userRole,
+            roleScope: userRole?.scope || "none",
+            roleName: userRole?.name || "none",
+            requiredScope: "platform"
+          }
+        });
+      }
       // Organizations metrics
       const totalOrganizations = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -17915,6 +17939,55 @@ ${msg.bodyText || msg.bodyHtml || ''}
     } catch (error: any) {
       console.error('Get available agents error:', error);
       res.status(500).json({ error: "Failed to get available agents" });
+    }
+  });
+
+  // Check Super Admin account status (public endpoint for debugging)
+  app.get("/api/debug/superadmin-check", async (req: Request, res: Response) => {
+    try {
+      const superAdmin = await storage.getUserByEmail("superadmin@accute.com");
+      const superAdminRole = await storage.getRoleByName("Super Admin");
+      
+      res.json({
+        superAdminExists: !!superAdmin,
+        superAdminActive: superAdmin?.isActive || false,
+        superAdminRoleId: superAdmin?.roleId || null,
+        superAdminOrgId: superAdmin?.organizationId || null,
+        roleExists: !!superAdminRole,
+        roleScope: superAdminRole?.scope || null,
+        roleName: superAdminRole?.name || null,
+        correctSetup: !!(superAdmin && superAdminRole && superAdmin.roleId === superAdminRole.id && superAdminRole.scope === "platform")
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Check failed", details: error.message });
+    }
+  });
+
+  // Debug current user session (authenticated users)
+  app.get("/api/debug/session", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      const userRole = await storage.getRole(user!.roleId);
+      
+      res.json({
+        user: {
+          id: user!.id,
+          email: user!.email,
+          roleId: user!.roleId,
+          organizationId: user!.organizationId,
+          isActive: user!.isActive
+        },
+        role: userRole ? {
+          id: userRole.id,
+          name: userRole.name,
+          scope: userRole.scope,
+          isSystemRole: userRole.isSystemRole
+        } : null,
+        isPlatformAdmin: userRole?.scope === "platform"
+      });
+    } catch (error: any) {
+      console.error('Session debug error:', error);
+      res.status(500).json({ error: "Failed to get session info", details: error.message });
     }
   });
 
