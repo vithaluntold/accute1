@@ -256,6 +256,9 @@ class AgentRegistry {
               agentId,
               status: 'enabled',
               grantedBy: installedBy,
+              enabledAt: sql`NOW()`,
+              disabledAt: null,
+              config: null,
             });
           } else if (existingOrgAgent[0].status !== 'enabled') {
             await db
