@@ -260,7 +260,12 @@ class AgentRegistry {
           } else if (existingOrgAgent[0].status !== 'enabled') {
             await db
               .update(organizationAgents)
-              .set({ status: 'enabled', updatedAt: new Date() })
+              .set({ 
+                status: 'enabled', 
+                enabledAt: new Date(),
+                disabledAt: null,
+                updatedAt: new Date() 
+              })
               .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
         }
