@@ -90,7 +90,10 @@ class AgentRegistry {
       this.agents.set(slug, manifest);
       console.log(`Loaded agent: ${manifest.name} (${slug})`);
       
+      // Sync to database
+      console.log(`Syncing agent ${slug} to database...`);
       await this.syncAgentToDatabase(manifest);
+      console.log(`✅ Agent ${slug} synced to database successfully`);
     } catch (error) {
       console.error(`Failed to load agent ${slug}:`, error);
     }
@@ -98,11 +101,15 @@ class AgentRegistry {
 
   private async syncAgentToDatabase(manifest: AgentManifest): Promise<void> {
     try {
+      console.log(`[DB SYNC] Starting sync for agent: ${manifest.slug}`);
+      
       const existing = await db
         .select()
         .from(aiAgents)
         .where(eq(aiAgents.slug, manifest.slug))
         .limit(1);
+
+      console.log(`[DB SYNC] Agent ${manifest.slug} - existing in DB: ${existing.length > 0}`);
 
       // Support both nested pricing object and top-level pricing fields for backward compatibility
       const pricing = (manifest as any).pricing || {};
@@ -132,27 +139,41 @@ class AgentRegistry {
         pricePerToken: pricePerToken !== null ? pricePerToken.toString() : null,
         oneTimeFee: oneTimeFee !== null ? oneTimeFee.toString() : null,
         isPublished: true, // Auto-publish registry agents
+        version: manifest.version || "1.0.0"
       };
 
       let agentId: string;
       
       if (existing.length > 0) {
+        console.log(`[DB SYNC] Updating existing agent: ${manifest.slug}`);
         await db
           .update(aiAgents)
           .set({ ...agentData, updatedAt: new Date() })
           .where(eq(aiAgents.id, existing[0].id));
         agentId = existing[0].id;
+        console.log(`[DB SYNC] ✅ Updated agent ${manifest.slug} with ID: ${agentId}`);
       } else {
+        console.log(`[DB SYNC] Creating new agent: ${manifest.slug}`);
         const inserted = await db.insert(aiAgents).values(agentData).returning();
         agentId = inserted[0].id;
+        console.log(`[DB SYNC] ✅ Created new agent ${manifest.slug} with ID: ${agentId}`);
       }
 
       // Auto-install free agents for all organizations
-      // NOTE: Temporarily disabled due to tsx compilation caching issues
-      // The method is public and can be called manually or via API endpoint
-      // await this.autoInstallForOrganizations(agentId, pricingModel, manifest.slug);
+      if (pricingModel === "free") {
+        console.log(`[DB SYNC] Auto-installing free agent ${manifest.slug} for all organizations...`);
+        try {
+          await this.autoInstallForOrganizations(agentId, pricingModel, manifest.slug);
+          console.log(`[DB SYNC] ✅ Completed auto-install for ${manifest.slug}`);
+        } catch (installError) {
+          console.error(`[DB SYNC] ⚠️ Failed to auto-install ${manifest.slug}:`, installError);
+        }
+      }
+
+      console.log(`[DB SYNC] ✅ Completed sync for agent: ${manifest.slug}`);
     } catch (error) {
-      console.error(`Failed to sync agent ${manifest.slug} to database:`, error);
+      console.error(`[DB SYNC] ❌ Failed to sync agent ${manifest.slug} to database:`, error);
+      throw error;
     }
   }
 

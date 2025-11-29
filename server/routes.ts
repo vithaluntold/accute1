@@ -504,6 +504,10 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     '/portal/login',
     '/sso/login',
     '/sso/callback',
+    // Debug endpoints for development
+    '/debug/agents-test',
+    '/debug/agents-db',
+    '/debug/agents-reinit'
   ];
   
   // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
@@ -18055,6 +18059,34 @@ ${msg.bodyText || msg.bodyHtml || ''}
         success: false, 
         error: error.message,
         stack: error.stack 
+      });
+    }
+  });
+
+  // Debug endpoint to check database directly
+  app.get('/api/debug/agents-db', async (req: Request, res: Response) => {
+    try {
+      const dbAgents = await db.select({
+        id: aiAgents.id,
+        slug: aiAgents.slug,
+        name: aiAgents.name,
+        category: aiAgents.category,
+        isPublished: aiAgents.isPublished,
+        createdAt: aiAgents.createdAt,
+        updatedAt: aiAgents.updatedAt
+      }).from(aiAgents);
+
+      res.json({
+        success: true,
+        message: 'Database agents retrieved',
+        agentCount: dbAgents.length,
+        agents: dbAgents
+      });
+    } catch (error: any) {
+      console.error('Failed to query database agents:', error);
+      res.status(500).json({ 
+        error: 'Failed to query database',
+        details: error.message
       });
     }
   });
