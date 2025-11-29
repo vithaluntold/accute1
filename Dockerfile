@@ -2,6 +2,9 @@
 # Build timestamp: 2025-11-29T09:20:00Z (force rebuild)
 FROM node:20-alpine AS builder
 
+# FORCE REBUILD: Delete old dist before build
+RUN echo "Forcing fresh compilation - 2025-11-29T09:35:00Z"
+
 WORKDIR /app
 
 # Install dependencies for native modules (bcrypt, etc.)
@@ -16,7 +19,10 @@ RUN npm ci --prefer-offline
 # Copy source code and configuration files
 COPY . .
 
-# Build the application
+# CRITICAL: Remove any stale dist/ from COPY operation
+RUN rm -rf dist/ || true
+
+# Build the application (fresh compilation)
 ENV NODE_ENV=production
 RUN npm run build
 
