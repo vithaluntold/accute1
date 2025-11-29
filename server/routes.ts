@@ -18457,17 +18457,17 @@ ${msg.bodyText || msg.bodyHtml || ''}
         isSystemRole: userRole?.isSystemRole
       });
 
-      const isSuperAdmin = userRole?.name === "Super Admin" && userRole?.scope === "platform";
+      const isSuperAdmin = userRole?.name === "Super Admin" && (userRole?.scope === "platform" || userRole?.scope === "tenant");
       
-      if (!isSuperAdmin && userRole?.scope !== "platform") {
+      if (!isSuperAdmin) {
         return res.status(403).json({ 
-          error: "Platform administrator access required",
+          error: "Super Admin access required",
           debug: {
             hasRole: !!userRole,
             roleScope: userRole?.scope || "none",
             roleName: userRole?.name || "none",
             isSuperAdmin,
-            requiredScope: "platform"
+            requiredRole: "Super Admin"
           }
         });
       }
