@@ -17942,6 +17942,59 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Fix Super Admin account (emergency endpoint)
+  app.post("/api/debug/fix-superadmin", async (req: Request, res: Response) => {
+    try {
+      const { emergency_code } = req.body;
+      
+      // Simple protection - only allow with specific code
+      if (emergency_code !== "EMERGENCY_FIX_2025") {
+        return res.status(403).json({ error: "Invalid emergency code" });
+      }
+      
+      // Get or create Super Admin role
+      let superAdminRole = await storage.getRoleByName("Super Admin");
+      if (!superAdminRole) {
+        // Create the role if it doesn't exist
+        superAdminRole = await db.insert(schema.roles).values({
+          name: "Super Admin",
+          description: "Platform administrator for SaaS management",
+          scope: "platform",
+          isSystemRole: true,
+          organizationId: null,
+        }).returning().then(r => r[0]);
+      } else {
+        // Update existing role to ensure correct scope
+        await db.update(schema.roles)
+          .set({ 
+            scope: "platform", 
+            isSystemRole: true, 
+            organizationId: null 
+          })
+          .where(eq(schema.roles.id, superAdminRole.id));
+      }
+      
+      // Fix Super Admin user
+      const superAdmin = await storage.getUserByEmail("superadmin@accute.com");
+      if (superAdmin) {
+        await storage.updateUser(superAdmin.id, {
+          roleId: superAdminRole.id,
+          organizationId: null, // Platform-scoped, no organization
+          isActive: true
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Super Admin account fixed",
+        roleId: superAdminRole.id,
+        userFixed: !!superAdmin
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Fix failed", details: error.message });
+    }
+  });
+
   // Check Super Admin account status (public endpoint for debugging)
   app.get("/api/debug/superadmin-check", async (req: Request, res: Response) => {
     try {
