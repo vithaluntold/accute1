@@ -455,9 +455,7 @@ class AgentRegistry {
           .update(organizationAgents)
           .set({
             status: "enabled",
-            enabledAt: new Date(),
             disabledAt: null,
-            updatedAt: new Date(),
           })
           .where(eq(organizationAgents.id, existing[0].id));
       } else {
@@ -510,7 +508,6 @@ class AgentRegistry {
           .set({
             accessLevel,
             revokedAt: null,
-            updatedAt: new Date(),
           })
           .where(eq(userAgentAccess.id, existing[0].id));
       } else {

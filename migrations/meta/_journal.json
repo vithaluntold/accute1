@@ -8,6 +8,20 @@
       "when": 1764155616682,
       "tag": "0000_icy_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764326000000,
+      "tag": "0001_add_unique_constraint_organization_agents",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764326100000,
+      "tag": "0002_add_updated_at_triggers",
+      "breakpoints": true
     }
   ]
 }
