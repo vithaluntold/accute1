@@ -251,25 +251,19 @@ class AgentRegistry {
             .limit(1);
 
           if (existingOrgAgent.length === 0) {
-            // Use raw SQL to avoid Drizzle ORM issues
-            try {
-              await db.execute(
-                sql`INSERT INTO organization_agents (organization_id, agent_id, status, granted_by) 
-                    VALUES (${org.id}, ${agentId}, 'enabled', ${installedBy})
-                    ON CONFLICT (organization_id, agent_id) DO NOTHING`
-              );
-            } catch (insertError: any) {
-              console.error(`[DEBUG] INSERT failed:`, insertError.message);
-              // Silently skip if duplicate
-              if (insertError.code !== '23505') {
-                throw insertError;
-              }
-            }
+            // Insert new organization agent
+            await db.insert(organizationAgents).values({
+              organizationId: org.id,
+              agentId: agentId,
+              status: 'enabled',
+              grantedBy: installedBy,
+            });
           } else if (existingOrgAgent[0].status !== 'enabled') {
-            // Use raw SQL for update
-            await db.execute(
-              sql`UPDATE organization_agents SET status = 'enabled' WHERE id = ${existingOrgAgent[0].id}`
-            );
+            // Update existing agent to enabled status
+            await db
+              .update(organizationAgents)
+              .set({ status: 'enabled' })
+              .where(eq(organizationAgents.id, existingOrgAgent[0].id));
           }
         }
         console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
