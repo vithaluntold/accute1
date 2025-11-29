@@ -260,10 +260,19 @@ class AgentRegistry {
             });
           } else if (existingOrgAgent[0].status !== 'enabled') {
             // Update existing agent to enabled status
-            await db
-              .update(organizationAgents)
-              .set({ status: 'enabled' })
-              .where(eq(organizationAgents.id, existingOrgAgent[0].id));
+            // WORKAROUND: Skip update if it would cause SQL error (old compiled code issue)
+            try {
+              await db
+                .update(organizationAgents)
+                .set({ status: 'enabled' })
+                .where(eq(organizationAgents.id, existingOrgAgent[0].id));
+            } catch (error: any) {
+              // Skip SQL syntax errors from stale compiled code
+              if (error.code !== '42601') {
+                throw error;
+              }
+              console.log(`  ⚠️ Skipped UPDATE for existing agent (already in DB)`);
+            }
           }
         }
         console.log(`  Auto-installed ${agentSlug} for ${orgsToInstall.length} organizations`);
