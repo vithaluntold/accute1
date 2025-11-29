@@ -24643,6 +24643,32 @@ ${msg.bodyText || msg.bodyHtml || ''}
     }
   });
 
+  // Debug endpoint to test storage.getAllPublicAiAgents with our fix
+  app.get("/api/debug/storage-agents", async (req: Request, res: Response) => {
+    try {
+      const agents = await storage.getAllPublicAiAgents();
+      res.json({
+        success: true,
+        message: "Storage agents retrieved (includes isPublished)",
+        agentCount: agents.length,
+        agents: agents.map(agent => ({
+          id: agent.id,
+          slug: agent.slug,
+          name: agent.name,
+          category: agent.category,
+          isPublic: agent.isPublic,
+          isPublished: agent.isPublished
+        }))
+      });
+    } catch (error: any) {
+      console.error('Debug storage agents error:', error);
+      res.status(500).json({ 
+        error: "Failed to get storage agents",
+        message: error.message 
+      });
+    }
+  });
+
   // ==================== SSE ROUNDTABLE ROUTES ====================
   registerSSERoundtableRoutes(app);
 
