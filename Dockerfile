@@ -25,7 +25,8 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install runtime dependencies for native modules and database tools
-RUN apk add --no-cache openssl libc6-compat
+# Added python3, make, g++ for bcrypt to work properly in production
+RUN apk add --no-cache openssl libc6-compat python3 make g++
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist

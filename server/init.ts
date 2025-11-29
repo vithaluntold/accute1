@@ -16,17 +16,23 @@ async function createPersistentSeedAccountsInline() {
   // 1. Super Admin
   let superAdmin = await db.select().from(schema.users).where(eq(schema.users.email, "superadmin@accute.com")).then(r => r[0]);
   if (!superAdmin) {
+    const hashedPassword = await hashPassword("SuperAdmin123!");
+    console.log("🔐 [SEED] Super Admin password hash generated:", hashedPassword.substring(0, 15) + "...");
     superAdmin = await db.insert(schema.users).values({
       email: "superadmin@accute.com",
       username: "superadmin",
-      password: await hashPassword("SuperAdmin123!"),
+      password: hashedPassword,
       firstName: "Super",
       lastName: "Admin",
       roleId: superAdminRole.id,
       organizationId: null,
       isActive: true,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     }).returning().then(r => r[0]);
-    console.log("✓ Super Admin created");
+    console.log("✓ Super Admin created with verified email");
+  } else {
+    console.log("✓ Super Admin exists:", superAdmin.email, "Hash:", superAdmin.password?.substring(0, 15) + "...");
   }
 
   // 2. Organization
