@@ -509,7 +509,6 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     '/debug/agents-db',
     '/debug/agents-reinit',
     '/debug/cleanup-agents',
-    '/debug/set-encryption-key',
     '/debug/encryption-test'
   ];
   
