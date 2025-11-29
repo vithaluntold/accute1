@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique, pgEnum, check, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, jsonb, integer, index, numeric, unique, uniqueIndex, pgEnum, check, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -3503,7 +3503,8 @@ export const organizationAgents = pgTable("organization_agents", {
 }, (table) => ({
   orgAgentIdx: index("organization_agents_org_agent_idx").on(table.organizationId, table.agentId),
   statusIdx: index("organization_agents_status_idx").on(table.status),
-  uniqueOrgAgent: index("organization_agents_unique_idx").on(table.organizationId, table.agentId),
+  // Changed from index to uniqueIndex for proper constraint
+  uniqueOrgAgent: uniqueIndex("organization_agents_unique_idx").on(table.organizationId, table.agentId),
 }));
 
 // User-level agent access control (which specific users can access which agents)
