@@ -1,0 +1,19 @@
+{
+  "slug": "kanban",
+  "name": "Kanban",
+  "description": "AI-powered project management assistant that analyzes workflows and pipelines to create intelligent Kanban board visualizations for better task organization and tracking.",
+  "category": "productivity",
+  "provider": "multi",
+  "backendEntry": "./backend/index.ts",
+  "capabilities": ["kanban", "workflow-visualization", "project-management", "task-organization"],
+  "subscriptionMinPlan": "free",
+  "defaultScope": "admin",
+  "pricingModel": "free",
+  "preInstalled": true,
+  "version": "1.0.0",
+  "tags": ["kanban", "project-management", "workflow", "visualization", "productivity"],
+  "configuration": {
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
+}
