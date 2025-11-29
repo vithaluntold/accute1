@@ -1,8 +1,12 @@
 # Dockerfile for Accute - Railway Deployment
-# Cache break: 2025-11-29T09:45:00Z
+# FORCE REBUILD: 2025-11-29T10:15:00Z - Eliminating ALL cached layers
+ARG CACHE_BUST=2025-11-29T10:15:00Z
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Force layer invalidation
+RUN echo "Build timestamp: $CACHE_BUST"
 
 # Install dependencies for native modules (bcrypt, etc.)
 RUN apk add --no-cache python3 make g++ openssl libc6-compat
