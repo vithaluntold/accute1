@@ -1,9 +1,6 @@
 # Dockerfile for Accute - Railway Deployment
-# Build timestamp: 2025-11-29T09:20:00Z (force rebuild)
+# Cache break: 2025-11-29T09:45:00Z
 FROM node:20-alpine AS builder
-
-# FORCE REBUILD: Delete old dist before build
-RUN echo "Forcing fresh compilation - 2025-11-29T09:35:00Z"
 
 WORKDIR /app
 
@@ -17,12 +14,10 @@ COPY package*.json ./
 RUN npm ci --prefer-offline
 
 # Copy source code and configuration files
+# Note: .dockerignore excludes dist/ and node_modules/ from being copied
 COPY . .
 
-# CRITICAL: Remove any stale dist/ from COPY operation
-RUN rm -rf dist/ || true
-
-# Build the application (fresh compilation)
+# Build the application (fresh TypeScript compilation guaranteed)
 ENV NODE_ENV=production
 RUN npm run build
 

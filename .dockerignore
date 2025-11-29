@@ -1,0 +1,14 @@
+# Prevent copying compiled/generated files to Docker build context
+dist/
+node_modules/
+.git/
+.vscode/
+*.log
+.env
+.env.local
+.DS_Store
+coverage/
+.nyc_output/
+*.test.ts
+*.spec.ts
+__tests__/
