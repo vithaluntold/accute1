@@ -507,7 +507,10 @@ export async function registerRoutesOnly(app: Express): Promise<void> {
     // Debug endpoints for development
     '/debug/agents-test',
     '/debug/agents-db',
-    '/debug/agents-reinit'
+    '/debug/agents-reinit',
+    '/debug/cleanup-agents',
+    '/debug/set-encryption-key',
+    '/debug/encryption-test'
   ];
   
   // Global middleware: Apply org enforcement to ALL /api routes except unauthenticated ones
@@ -18087,6 +18090,79 @@ ${msg.bodyText || msg.bodyHtml || ''}
       res.status(500).json({ 
         error: 'Failed to query database',
         details: error.message
+      });
+    }
+  });
+
+  // Debug endpoint to clean up duplicate agents without slugs
+  app.post('/api/debug/cleanup-agents', async (req: Request, res: Response) => {
+    try {
+      console.log('🧹 Cleaning up duplicate agents without slugs...');
+      
+      // Find agents without slugs
+      const agentsWithoutSlugs = await db.select({
+        id: aiAgents.id,
+        name: aiAgents.name,
+        slug: aiAgents.slug
+      }).from(aiAgents).where(sql`slug IS NULL`);
+
+      console.log(`Found ${agentsWithoutSlugs.length} agents without slugs:`, agentsWithoutSlugs);
+
+      // Delete them
+      if (agentsWithoutSlugs.length > 0) {
+        const deletedCount = await db.delete(aiAgents).where(sql`slug IS NULL`);
+        console.log(`Deleted ${deletedCount} agents without slugs`);
+      }
+
+      // Get final agent count
+      const remainingAgents = await db.select({
+        id: aiAgents.id,
+        slug: aiAgents.slug,
+        name: aiAgents.name
+      }).from(aiAgents);
+
+      res.json({
+        success: true,
+        message: 'Agent cleanup completed',
+        deletedCount: agentsWithoutSlugs.length,
+        remainingAgents: remainingAgents.length,
+        agents: remainingAgents
+      });
+    } catch (error: any) {
+      console.error('Failed to cleanup agents:', error);
+      res.status(500).json({ 
+        error: 'Failed to cleanup agents',
+        details: error.message
+      });
+    }
+  });
+
+  // Debug endpoint to test encryption configuration
+  app.get('/api/debug/encryption-test', async (req: Request, res: Response) => {
+    try {
+      const { EncryptionService } = await import("./encryption-service");
+      const service = EncryptionService.getInstance();
+      
+      // Test round-trip encryption
+      const testData = `test-${Date.now()}`;
+      const encrypted = service.encrypt(testData);
+      const decrypted = service.decrypt(encrypted);
+      
+      const isWorking = decrypted === testData;
+      
+      res.json({
+        success: isWorking,
+        message: isWorking ? 'Encryption working correctly' : 'Encryption failed',
+        hasEncryptionKey: !!process.env.ENCRYPTION_KEY,
+        keyLength: process.env.ENCRYPTION_KEY?.length || 0,
+        testPassed: isWorking
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false,
+        error: 'Encryption test failed',
+        details: error.message,
+        hasEncryptionKey: !!process.env.ENCRYPTION_KEY
       });
     }
   });
